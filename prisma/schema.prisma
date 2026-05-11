@@ -1,0 +1,333 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  BANNED
+}
+
+enum GenerationStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELED
+}
+
+enum ProviderHealth {
+  HEALTHY
+  DEGRADED
+  DOWN
+}
+
+enum ProviderProtocol {
+  OPENAI_IMAGES
+  OPENAI_RESPONSES_IMAGE
+  GEMINI_IMAGE
+}
+
+enum ProviderSelectionStrategy {
+  LEAST_IN_FLIGHT
+  ROUND_ROBIN
+}
+
+enum ConversationMessageRole {
+  USER
+  ASSISTANT
+}
+
+model User {
+  id              String     @id @default(cuid())
+  email           String     @unique
+  passwordHash    String
+  name            String?
+  role            UserRole   @default(USER)
+  status          UserStatus @default(ACTIVE)
+  sessionVersion  Int        @default(1)
+  credits         Int        @default(100)
+  dailyGenLimit   Int        @default(50)
+  concurrentLimit Int        @default(2)
+  inviteCodeId    String?
+  bannedAt        DateTime?
+  bannedReason    String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  generations   Generation[]
+  conversations Conversation[]
+  inviteCode     InviteCode? @relation(fields: [inviteCodeId], references: [id])
+  auditLogs      AuditLog[]  @relation("ActorAudits")
+  redemptions    CreditRedemption[]
+
+  @@index([createdAt])
+  @@index([status])
+}
+
+model InviteCode {
+  id             String   @id @default(cuid())
+  code           String   @unique
+  maxUses        Int      @default(1)
+  usedCount      Int      @default(0)
+  initialCredits Int      @default(100)
+  note           String?
+  expiresAt      DateTime?
+  revokedAt      DateTime?
+  createdBy      String?
+  createdAt      DateTime @default(now())
+
+  users User[]
+
+  @@index([code])
+}
+
+model Conversation {
+  id            String    @id @default(cuid())
+  userId        String
+  title         String
+  lastMessageAt DateTime  @default(now())
+  archivedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages    ConversationMessage[]
+  generations Generation[]
+
+  @@index([userId, lastMessageAt(sort: Desc)])
+  @@index([archivedAt])
+}
+
+model ConversationMessage {
+  id             String                  @id @default(cuid())
+  conversationId String
+  role           ConversationMessageRole
+  content        String                  @db.Text
+  generationId   String?
+  createdAt      DateTime                @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  generation   Generation?  @relation(fields: [generationId], references: [id], onDelete: SetNull)
+
+  @@index([conversationId, createdAt])
+  @@index([generationId])
+}
+
+model Generation {
+  id                 String           @id @default(cuid())
+  userId             String
+  conversationId     String?
+  modelId            String
+  prompt             String           @db.Text
+  negativePrompt     String?          @db.Text
+  aspectRatio        String
+  resolution         String?
+  n                  Int              @default(1)
+  seed               BigInt?
+  outputFormat       String           @default("png")
+  paramsRaw          Json
+  referenceImageKeys String[]
+  status             GenerationStatus @default(PENDING)
+  providerId         String?
+  providerAccountId  String?
+  jobId              String?
+  errorCode          String?
+  errorMessage       String?
+  costCredits        Int              @default(0)
+  pricingSnapshot    Json?
+  attempts           Int              @default(0)
+  startedAt          DateTime?
+  finishedAt         DateTime?
+  deletedAt          DateTime?
+  createdAt          DateTime         @default(now())
+
+  user         User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation Conversation?         @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  provider     Provider?             @relation(fields: [providerId], references: [id])
+  providerAccount ProviderAccount?    @relation(fields: [providerAccountId], references: [id])
+  images       GeneratedImage[]
+  messages     ConversationMessage[]
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([conversationId, createdAt(sort: Desc)])
+  @@index([status])
+  @@index([deletedAt])
+  @@index([modelId])
+  @@index([providerAccountId])
+}
+
+model GeneratedImage {
+  id           String   @id @default(cuid())
+  generationId String
+  storageKey   String
+  thumbnailKey String?
+  width        Int
+  height       Int
+  sizeBytes    Int
+  mimeType     String   @default("image/png")
+  createdAt    DateTime @default(now())
+
+  generation Generation @relation(fields: [generationId], references: [id], onDelete: Cascade)
+
+  @@index([generationId])
+}
+
+model Provider {
+  id                String         @id @default(cuid())
+  name              String
+  protocol          ProviderProtocol
+  baseUrl           String
+  apiKeyEnc         String
+  priority          Int            @default(0)
+  health            ProviderHealth @default(HEALTHY)
+  modelsSupported   String[]
+  costMultiplier    Float          @default(1)
+  selectionStrategy ProviderSelectionStrategy @default(LEAST_IN_FLIGHT)
+  poolMaxConcurrency Int?
+  isActive          Boolean        @default(true)
+  consecutiveErrors Int            @default(0)
+  lastErrorAt       DateTime?
+  lastErrorMsg      String?
+  lastHealthyAt     DateTime?
+  note              String?
+  createdAt         DateTime       @default(now())
+
+  generations Generation[]
+  accounts    ProviderAccount[]
+}
+
+model ProviderAccount {
+  id                String         @id @default(cuid())
+  providerId        String
+  name              String?
+  baseUrl           String
+  apiKeyEnc         String
+  apiKeyFingerprint String
+  priority          Int            @default(0)
+  weight            Int            @default(1)
+  maxConcurrency    Int            @default(1)
+  inFlight          Int            @default(0)
+  health            ProviderHealth @default(HEALTHY)
+  isActive          Boolean        @default(true)
+  consecutiveErrors Int            @default(0)
+  lastLeaseAt       DateTime?
+  lastHealthyAt     DateTime?
+  lastErrorAt       DateTime?
+  lastErrorMsg      String?
+  cooldownUntil     DateTime?
+  dailyLimit        Int?
+  dailyUsed         Int            @default(0)
+  note              String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  provider    Provider     @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  generations Generation[]
+
+  @@unique([providerId, baseUrl, apiKeyFingerprint])
+  @@index([providerId])
+  @@index([health])
+  @@index([isActive])
+}
+
+model ModelPricing {
+  id           String   @id @default(cuid())
+  modelId      String
+  resolution   String?
+  aspectRatio  String?
+  outputFormat String?
+  background   String?
+  usesReference Boolean?
+  credits      Int
+  priority     Int      @default(0)
+  isActive     Boolean  @default(true)
+  note         String?
+  updatedBy    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([modelId])
+  @@index([isActive])
+}
+
+model CreditRedemptionCode {
+  id           String   @id @default(cuid())
+  code         String   @unique
+  credits      Int
+  maxUses      Int      @default(1)
+  usedCount    Int      @default(0)
+  perUserLimit Int      @default(1)
+  note         String?
+  expiresAt    DateTime?
+  revokedAt    DateTime?
+  createdBy    String?
+  createdAt    DateTime @default(now())
+
+  redemptions CreditRedemption[]
+
+  @@index([code])
+  @@index([createdAt])
+}
+
+model CreditRedemption {
+  id        String   @id @default(cuid())
+  codeId    String
+  userId    String
+  credits   Int
+  createdAt DateTime @default(now())
+
+  code CreditRedemptionCode @relation(fields: [codeId], references: [id], onDelete: Cascade)
+  user User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([codeId, createdAt])
+  @@unique([codeId, userId])
+}
+
+model UsageLog {
+  id           String   @id @default(cuid())
+  userId       String
+  generationId String?
+  providerId   String?
+  providerAccountId String?
+  modelId      String?
+  action       String
+  creditsDelta Int
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+model SystemConfig {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String
+  action    String
+  target    String?
+  diff      Json?
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  actor User @relation("ActorAudits", fields: [actorId], references: [id])
+
+  @@index([actorId, createdAt(sort: Desc)])
+  @@index([action, createdAt(sort: Desc)])
+}

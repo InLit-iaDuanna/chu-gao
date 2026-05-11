@@ -1,0 +1,18 @@
+[data-surface="admin"] {
+  --bg: 9 9 11;
+  --surface: 17 17 19;
+  --surface-2: 24 24 27;
+  --border: 39 39 42;
+  --text: 244 244 245;
+  --text-muted: 113 113 122;
+  --accent: 96 165 250;
+  --success: 74 222 128;
+  --danger: 248 113 113;
+  --warning: 250 204 21;
+  --row-hover: 24 24 27;
+  --row-stripe: 14 14 16;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+}

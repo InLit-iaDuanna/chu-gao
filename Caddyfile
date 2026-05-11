@@ -1,0 +1,17 @@
+your-domain.com {
+    encode gzip zstd
+
+    @sse path /api/generations/*/stream
+    reverse_proxy @sse web:3000 {
+        flush_interval -1
+        transport http {
+            read_timeout 5m
+            response_header_timeout 5m
+        }
+    }
+
+    reverse_proxy web:3000
+    request_body {
+        max_size 12MB
+    }
+}
