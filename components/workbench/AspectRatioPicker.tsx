@@ -49,15 +49,17 @@ export function AspectRatioPicker({
             key={option}
             type="button"
             className={cn(
-              "surface-panel flex items-center justify-center p-3 transition-all duration-200 hover:bg-surface-2",
-              active && "border-border-strong bg-surface-2",
+              "selection-card flex items-center justify-center rounded-[12px] border p-3",
+              active && "selection-card-active",
             )}
             aria-pressed={active}
             onClick={() => onChange(option)}
           >
             <div
               className={cn(
-                "flex items-center justify-center rounded-[6px] border border-border font-mono text-xs text-text-muted",
+                "flex items-center justify-center rounded-[8px] border border-border bg-surface/70 font-mono text-xs text-text-muted transition-all duration-200",
+                active &&
+                  "border-border-strong bg-surface-2 text-foreground shadow-[inset_0_0_0_1px_rgb(var(--text)/0.03)]",
                 VISUAL_WIDTH[option],
                 VISUAL_HEIGHT[option],
               )}

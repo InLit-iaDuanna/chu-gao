@@ -42,11 +42,10 @@ export default function MarketingPage() {
         <div className="max-w-6xl">
           <p className="eyebrow">AI 图像生成工具</p>
           <h1 className="mt-6 max-w-5xl text-[48px] leading-[1.03] sm:text-[72px] lg:text-[96px]">
-            面向设计学生的安静图像工作台。
+            稳稳地🫴接住你的设计
           </h1>
           <p className="mt-8 max-w-2xl text-base leading-8 text-text-muted sm:text-lg">
-            Chūgǎo Studio 接入
-            image2，把提示词、页面尺度、历史对话和生成结果放在同一张干净的工作台上。
+            祝你设计愉快：）
           </p>
         </div>
 

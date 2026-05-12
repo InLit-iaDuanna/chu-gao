@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { fail, ok } from "@/lib/api-response";
 import type { SessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { LoginRateLimitError, assertLoginAllowed } from "@/lib/rate-limit";
 import { attachSessionCookie } from "@/lib/session-cookie";
 import { loginSchema } from "@/lib/validators";
 
@@ -19,6 +20,21 @@ export async function POST(request: Request) {
 
   if (!process.env.DATABASE_URL) {
     return fail("AUTH_UNAVAILABLE", "认证服务暂时不可用", { status: 503 });
+  }
+
+  try {
+    await assertLoginAllowed(request.headers, parsed.data.email);
+  } catch (error) {
+    if (error instanceof LoginRateLimitError) {
+      return fail("TOO_MANY_REQUESTS", error.message, {
+        status: 429,
+        headers: {
+          "Retry-After": String(error.retryAfterSeconds),
+        },
+      });
+    }
+
+    throw error;
   }
 
   let user: {

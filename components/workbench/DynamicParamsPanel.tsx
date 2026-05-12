@@ -4,6 +4,7 @@ import type { WorkbenchState } from "@/components/workbench/types";
 import { AspectRatioPicker } from "@/components/workbench/AspectRatioPicker";
 import { ResolutionPicker } from "@/components/workbench/ResolutionPicker";
 import type { PublicModelDefinition } from "@/lib/models/types";
+import { cn } from "@/lib/utils";
 
 function Section({
   title,
@@ -155,11 +156,12 @@ export function DynamicParamsPanel({
                 <button
                   key={format}
                   type="button"
-                  className={`rounded-[6px] border border-border bg-surface-2/55 px-3 py-2 font-mono text-sm transition-colors hover:bg-surface ${
-                    value.outputFormat === format
-                      ? "border-border-strong bg-surface"
-                      : ""
-                  }`}
+                  className={cn(
+                    "selection-card rounded-[10px] border px-3 py-2.5 font-mono text-sm",
+                    value.outputFormat === format &&
+                      "selection-card-active text-foreground",
+                  )}
+                  aria-pressed={value.outputFormat === format}
                   onClick={() =>
                     onChange({
                       ...value,
@@ -193,12 +195,13 @@ export function DynamicParamsPanel({
                   <button
                     key={background}
                     type="button"
-                    className={`rounded-[6px] border border-border bg-surface-2/55 px-3 py-2 text-sm transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-40 ${
-                      value.background === background
-                        ? "border-border-strong bg-surface"
-                        : ""
-                    }`}
+                    className={cn(
+                      "selection-card rounded-[10px] border px-3 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-40",
+                      value.background === background &&
+                        "selection-card-active text-foreground",
+                    )}
                     disabled={disabled}
+                    aria-pressed={value.background === background}
                     onClick={() => onChange({ ...value, background })}
                   >
                     {background === "auto"

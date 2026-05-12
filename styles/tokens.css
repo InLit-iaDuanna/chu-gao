@@ -1,5 +1,6 @@
 @layer base {
-  :root {
+  :root,
+  html.dark {
     --bg: 9 9 11;
     --surface: 18 18 20;
     --surface-2: 25 25 28;
@@ -69,5 +70,20 @@
     --s-64: 64px;
     --s-96: 96px;
     --s-128: 128px;
+  }
+
+  html.light {
+    --bg: 247 246 243;
+    --surface: 255 252 248;
+    --surface-2: 244 239 232;
+    --border: 220 213 205;
+    --border-strong: 188 178 168;
+    --text: 34 31 29;
+    --text-muted: 112 101 92;
+    --text-faint: 152 141 132;
+    --accent: 53 46 39;
+    --success: 60 121 89;
+    --danger: 161 77 68;
+    --warning: 160 117 41;
   }
 }

@@ -135,10 +135,10 @@ export default async function UserAppLayout({
                     key={item.href}
                     href={item.href}
                     className={cn(
-                      "rounded-[8px] border border-border px-3 py-2 transition-colors",
+                      "selection-pill px-3 py-2.5 font-medium tracking-[0.01em]",
                       active
-                        ? "border-border-strong bg-surface-2 text-foreground"
-                        : "hover:bg-surface-2 hover:text-foreground",
+                        ? "selection-pill-active"
+                        : "hover:text-foreground",
                     )}
                     aria-current={active ? "page" : undefined}
                   >

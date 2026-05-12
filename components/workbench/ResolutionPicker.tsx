@@ -18,9 +18,8 @@ export function ResolutionPicker({
           key={option}
           type="button"
           className={cn(
-            "surface-panel px-3 py-2 font-mono text-sm transition-colors hover:bg-surface-2",
-            value === option &&
-              "border-border-strong bg-surface-2 text-foreground",
+            "selection-card rounded-[10px] border px-3 py-2.5 font-mono text-sm",
+            value === option && "selection-card-active text-foreground",
           )}
           aria-pressed={value === option}
           onClick={() => onChange(option)}

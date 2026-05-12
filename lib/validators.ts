@@ -34,20 +34,40 @@ export const providerAccountSchema = z.object({
   note: z.string().max(200).optional(),
 });
 
-export const providerAccountPatchSchema = providerAccountSchema
-  .extend({
+export const providerAccountPatchSchema = z
+  .object({
+    name: z.string().trim().min(1).max(80).nullable().optional(),
+    baseUrl: z.url().optional(),
     apiKey: z.string().min(1).optional(),
+    priority: z.number().int().min(0).optional(),
+    weight: z.number().int().min(1).max(100).optional(),
+    maxConcurrency: z.number().int().min(1).max(100).optional(),
+    dailyLimit: z.number().int().min(1).nullable().optional(),
+    note: z.string().max(200).nullable().optional(),
     isActive: z.boolean().optional(),
     health: z.enum(["HEALTHY", "DEGRADED", "DOWN"]).optional(),
     cooldownUntil: z.string().datetime().nullable().optional(),
+    consecutiveErrors: z.number().int().min(0).optional(),
   })
   .partial()
   .refine((value) => Object.keys(value).length > 0, "至少提供一个字段");
 
 export const providerAccountImportSchema = z.object({
-  text: z.string().min(1).max(100_000),
+  mode: z.enum(["csv", "lines"]).default("csv"),
+  text: z.string().max(100_000).optional(),
+  csvText: z.string().max(100_000).optional(),
   defaultMaxConcurrency: z.number().int().min(1).max(100).default(1),
   defaultWeight: z.number().int().min(1).max(100).default(1),
+}).superRefine((value, ctx) => {
+  const source = value.mode === "csv" ? value.csvText : value.text;
+
+  if (!source?.trim()) {
+    ctx.addIssue({
+      code: "custom",
+      message: value.mode === "csv" ? "CSV 内容不能为空" : "文本内容不能为空",
+      path: [value.mode === "csv" ? "csvText" : "text"],
+    });
+  }
 });
 
 export const providerPatchSchema = providerSchema

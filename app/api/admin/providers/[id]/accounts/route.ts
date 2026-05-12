@@ -10,6 +10,7 @@ import {
 import { encrypt } from "@/lib/crypto";
 import { db } from "@/lib/db";
 import { normalizeProviderBaseUrl } from "@/lib/providers/protocols";
+import { serializeProviderAccount } from "@/lib/providers/serialize";
 import { providerAccountSchema } from "@/lib/validators";
 
 function fingerprint(value: string): string {
@@ -36,13 +37,34 @@ export async function GET(
     where: { providerId: id },
     orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
   });
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dailyUsage = accounts.length
+    ? await db.generation.groupBy({
+        by: ["providerAccountId"],
+        where: {
+          providerAccountId: {
+            in: accounts.map((account) => account.id),
+          },
+          createdAt: { gte: today },
+          deletedAt: null,
+          status: { not: "CANCELED" },
+        },
+        _count: {
+          _all: true,
+        },
+      })
+    : [];
+  const usageMap = new Map(
+    dailyUsage.map((item) => [item.providerAccountId, item._count._all]),
+  );
 
   return ok(
-    accounts.map((account) => ({
-      ...account,
-      apiKeyEnc: undefined,
-      hasApiKey: Boolean(account.apiKeyEnc),
-    })),
+    accounts.map((account) =>
+      serializeProviderAccount(account, {
+        dailyUsed: usageMap.get(account.id) ?? 0,
+      }),
+    ),
   );
 }
 
@@ -74,7 +96,7 @@ export async function POST(
 
   const provider = await db.provider.findUnique({
     where: { id },
-    select: { id: true, protocol: true },
+    select: { id: true, protocol: true, name: true },
   });
 
   if (!provider) {
@@ -110,5 +132,11 @@ export async function POST(
     request,
   });
 
-  return ok({ ...account, apiKeyEnc: undefined, hasApiKey: true }, { status: 201 });
+  return ok(
+    serializeProviderAccount(account, {
+      dailyUsed: 0,
+      isDefault: account.name === `${provider.name} 默认账号`,
+    }),
+    { status: 201 },
+  );
 }
