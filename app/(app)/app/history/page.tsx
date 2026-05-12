@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import { headers } from "next/headers";
 
@@ -151,11 +150,10 @@ export default async function HistoryPage() {
                   >
                     <div className="relative mb-3 h-40 overflow-hidden rounded-[8px] bg-surface-2">
                       {conversation.thumbnailUrl ? (
-                        <Image
+                        <img
                           src={conversation.thumbnailUrl}
                           alt={conversation.title}
-                          fill
-                          className="object-cover"
+                          className="h-full w-full object-cover"
                         />
                       ) : (
                         <div className="flex h-full items-center justify-center px-6 text-center text-sm text-text-muted">
@@ -205,11 +203,10 @@ export default async function HistoryPage() {
                   >
                     <div className="relative mb-3 h-64 overflow-hidden rounded-[8px] bg-surface-2 sm:h-80">
                       {imageUrl ? (
-                        <Image
+                        <img
                           src={imageUrl}
                           alt={generation.prompt}
-                          fill
-                          className="object-cover"
+                          className="h-full w-full object-cover"
                         />
                       ) : (
                         <div className="flex h-full items-center justify-center px-6 text-center text-sm text-text-muted">

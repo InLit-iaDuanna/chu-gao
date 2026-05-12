@@ -12,6 +12,8 @@ export function ProviderCard({
     lastErrorMsg: string;
     accounts?: number;
     availableAccounts?: number;
+    inFlight?: number;
+    maxConcurrency?: number;
   };
 }) {
   return (
@@ -28,6 +30,9 @@ export function ProviderCard({
         <span>优先级 {provider.priority}</span>
         <span>账号 {provider.accounts ?? 0}</span>
         <span>可用 {provider.availableAccounts ?? 0}</span>
+        <span>
+          并发 {provider.inFlight ?? 0}/{provider.maxConcurrency ?? 0}
+        </span>
       </div>
       <p className="mt-2 text-sm text-text-muted">
         {provider.lastErrorMsg || "最近 24h 无错误"}

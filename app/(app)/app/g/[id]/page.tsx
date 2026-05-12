@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
@@ -90,11 +89,10 @@ export default async function GenerationDetailPage({
       <div className="surface-panel relative min-h-[380px] overflow-hidden p-3 sm:p-4 lg:min-h-[680px]">
         {imageUrl ? (
           <div className="relative h-[380px] overflow-hidden rounded-[8px] lg:h-[680px]">
-            <Image
+            <img
               src={imageUrl}
               alt={generation.prompt}
-              fill
-              className="object-cover"
+              className="h-full w-full object-contain"
             />
           </div>
         ) : (

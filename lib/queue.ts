@@ -5,6 +5,9 @@ import { assertRedisReady, getRedis } from "@/lib/redis";
 
 let generationQueue: Queue<GenerationJobPayload> | null = null;
 
+const WORKER_HEARTBEAT_KEY = "generation:worker:heartbeat";
+const WORKER_HEARTBEAT_TTL_SECONDS = 45;
+
 export interface GenerationJobPayload {
   generationId: string;
   userId: string;
@@ -41,6 +44,43 @@ export async function enqueueGeneration(
   });
 
   return job.id ?? payload.generationId;
+}
+
+export async function generationQueueStats() {
+  await assertGenerationQueueReady();
+
+  const queue = getGenerationQueue();
+  const [counts, heartbeat] = await Promise.all([
+    queue.getJobCounts(
+      "waiting",
+      "active",
+      "delayed",
+      "failed",
+      "completed",
+      "paused",
+    ),
+    getRedis().get(WORKER_HEARTBEAT_KEY),
+  ]);
+
+  return {
+    waiting: counts.waiting ?? 0,
+    active: counts.active ?? 0,
+    delayed: counts.delayed ?? 0,
+    failed: counts.failed ?? 0,
+    completed: counts.completed ?? 0,
+    paused: counts.paused ?? 0,
+    workerOnline: Boolean(heartbeat),
+    workerHeartbeatAt: heartbeat,
+  };
+}
+
+export async function touchGenerationWorkerHeartbeat(): Promise<void> {
+  await getRedis().set(
+    WORKER_HEARTBEAT_KEY,
+    new Date().toISOString(),
+    "EX",
+    WORKER_HEARTBEAT_TTL_SECONDS,
+  );
 }
 
 export async function removeGenerationJob(jobId: string): Promise<boolean> {

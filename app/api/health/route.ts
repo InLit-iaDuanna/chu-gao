@@ -2,6 +2,7 @@ import { fail, ok } from "@/lib/api-response";
 import { db } from "@/lib/db";
 import { safeUrlForDiagnostics } from "@/lib/providers/diagnostics";
 import { normalizeOpenAIImagesBaseUrl } from "@/lib/providers/openai-images";
+import { generationQueueStats } from "@/lib/queue";
 import { getRedis } from "@/lib/redis";
 
 type CheckStatus = "ok" | "missing_config" | "unavailable";
@@ -120,6 +121,34 @@ async function checkRedis(): Promise<CheckResult> {
   }
 }
 
+async function checkWorker(): Promise<CheckResult> {
+  try {
+    const stats = await generationQueueStats();
+
+    return {
+      status: stats.workerOnline ? "ok" : "unavailable",
+      message: stats.workerOnline
+        ? "Generation worker heartbeat is fresh."
+        : "Generation worker is not reporting a heartbeat.",
+      detail: {
+        ...stats,
+        hint: stats.workerOnline
+          ? undefined
+          : "Start the full dev stack with `pnpm dev:all`, or start a worker with `pnpm worker`.",
+      },
+    };
+  } catch (error) {
+    return {
+      status: "unavailable",
+      message: "Queue status is not readable.",
+      detail: {
+        hint: "Start Redis and run `pnpm worker`.",
+        error: publicErrorSummary(error),
+      },
+    };
+  }
+}
+
 async function checkProvider(): Promise<CheckResult> {
   if (!process.env.DATABASE_URL) {
     return {
@@ -190,14 +219,16 @@ async function checkProvider(): Promise<CheckResult> {
 }
 
 export async function GET() {
-  const [database, redis, provider] = await Promise.all([
+  const [database, redis, worker, provider] = await Promise.all([
     checkDb(),
     checkRedis(),
+    checkWorker(),
     checkProvider(),
   ]);
   const checks = {
     database,
     redis,
+    worker,
     provider,
   };
   const healthy = Object.values(checks).every((check) => check.status === "ok");

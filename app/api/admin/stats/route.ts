@@ -1,6 +1,7 @@
 import { fail, ok } from "@/lib/api-response";
 import { adminFailureResponse, checkSession } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { generationQueueStats } from "@/lib/queue";
 import { isDatabaseUnavailableError } from "@/lib/service-errors";
 
 export async function GET(request: Request) {
@@ -29,6 +30,8 @@ export async function GET(request: Request) {
       succeededToday,
       creditsToday,
       providerSlots,
+      stuckGenerations,
+      queueStatsResult,
     ] =
       await Promise.all([
         db.generation.count({
@@ -69,7 +72,33 @@ export async function GET(request: Request) {
             inFlight: true,
           },
         }),
+        db.generation.count({
+          where: {
+            deletedAt: null,
+            OR: [
+              {
+                status: "PENDING",
+                createdAt: { lt: new Date(Date.now() - 2 * 60_000) },
+              },
+              {
+                status: "RUNNING",
+                startedAt: { lt: new Date(Date.now() - 10 * 60_000) },
+              },
+            ],
+          },
+        }),
+        generationQueueStats().catch(() => null),
       ]);
+    const queueStats = queueStatsResult ?? {
+      waiting: queueDepth,
+      active: running,
+      delayed: 0,
+      failed: 0,
+      completed: 0,
+      paused: 0,
+      workerOnline: false,
+      workerHeartbeatAt: null,
+    };
 
     return ok({
       todayGenerations,
@@ -86,6 +115,14 @@ export async function GET(request: Request) {
       creditsToday: Math.abs(creditsToday._sum.creditsDelta ?? 0),
       accountSlots: providerSlots._sum.maxConcurrency ?? 0,
       accountInFlight: providerSlots._sum.inFlight ?? 0,
+      queueWaiting: queueStats.waiting,
+      queueActive: queueStats.active,
+      queueDelayed: queueStats.delayed,
+      queueFailed: queueStats.failed,
+      queueCompleted: queueStats.completed,
+      workerOnline: queueStats.workerOnline,
+      workerHeartbeatAt: queueStats.workerHeartbeatAt,
+      stuckGenerations,
     });
   } catch (error) {
     if (isDatabaseUnavailableError(error)) {

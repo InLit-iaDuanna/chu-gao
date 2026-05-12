@@ -1,4 +1,3 @@
-import Image from "next/image";
 import { Download } from "lucide-react";
 
 import type { WorkbenchTaskStatus } from "@/components/workbench/types";
@@ -125,13 +124,10 @@ export function Canvas({
         下载
       </a>
       <div className="relative flex h-full min-h-[390px] items-center justify-center overflow-hidden rounded-[8px] bg-background">
-        <Image
+        <img
           src={imageUrl}
           alt="生成结果"
-          fill
-          className="object-contain"
-          sizes="(min-width: 1280px) 50vw, 100vw"
-          priority
+          className="h-full max-h-full w-full object-contain"
         />
       </div>
     </div>

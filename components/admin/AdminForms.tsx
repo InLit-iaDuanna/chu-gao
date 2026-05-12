@@ -512,6 +512,8 @@ export function RedemptionCodeCreateForm() {
 export function ProviderAccountImportForm({ providerId }: { providerId: string }) {
   const router = useRouter();
   const [text, setText] = useState("");
+  const [defaultMaxConcurrency, setDefaultMaxConcurrency] = useState(1);
+  const [defaultWeight, setDefaultWeight] = useState(1);
   const [message, setMessage] = useState<string | null>(null);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -521,8 +523,8 @@ export function ProviderAccountImportForm({ providerId }: { providerId: string }
     try {
       await postJson(`/api/admin/providers/${providerId}/accounts/import`, {
         text,
-        defaultMaxConcurrency: 1,
-        defaultWeight: 1,
+        defaultMaxConcurrency,
+        defaultWeight,
       });
       setText("");
       setMessage("账号已导入");
@@ -535,16 +537,41 @@ export function ProviderAccountImportForm({ providerId }: { providerId: string }
   return (
     <form onSubmit={submit} className="surface-panel p-4">
       <p className="text-sm font-medium">批量导入账号</p>
+      <p className="mt-1 text-xs leading-5 text-text-muted">
+        每行格式：baseUrl apiKey maxConcurrency weight name。多个账号会按空闲并发槽和权重自动分配任务，429/5xx/超时会自动切换下一个账号。
+      </p>
       <textarea
         className="mt-3 min-h-28 w-full rounded-[6px] border border-border bg-surface px-3 py-2 text-sm"
         placeholder="每行：baseUrl apiKey maxConcurrency weight name"
         value={text}
         onChange={(event) => setText(event.target.value)}
       />
-      <div className="mt-3 flex items-center gap-3">
+      <div className="mt-3 grid gap-3 sm:grid-cols-[160px_160px_auto]">
+        <input
+          className="rounded-[6px] border border-border bg-surface px-3 py-2 text-sm"
+          type="number"
+          min={1}
+          max={100}
+          value={defaultMaxConcurrency}
+          onChange={(event) =>
+            setDefaultMaxConcurrency(Number(event.target.value))
+          }
+          aria-label="默认并发"
+        />
+        <input
+          className="rounded-[6px] border border-border bg-surface px-3 py-2 text-sm"
+          type="number"
+          min={1}
+          max={100}
+          value={defaultWeight}
+          onChange={(event) => setDefaultWeight(Number(event.target.value))}
+          aria-label="默认权重"
+        />
         <button className="tool-button h-10" type="submit">
           导入
         </button>
+      </div>
+      <div className="mt-3 flex items-center gap-3">
         {message ? <span className="text-sm text-text-muted">{message}</span> : null}
       </div>
     </form>

@@ -49,10 +49,10 @@ pnpm dev:doctor
 如果当前机器 Docker daemon 不可用，但只需要进入页面检查 UI，可以显式启用非生产本地身份：
 
 ```bash
-pnpm dev
+pnpm dev:all
 ```
 
-账号系统始终使用真实数据库用户。首次本地启动请先准备 Postgres/Redis，执行 `pnpm db:push && pnpm db:seed` 创建初始管理员和 Provider 配置；只跑 `pnpm dev` 不会消费生成队列。测试真实出图请使用 `pnpm dev:all`，或分别启动 `pnpm dev` 与 `pnpm worker`。
+账号系统始终使用真实数据库用户。首次本地启动请先准备 Postgres/Redis，执行 `pnpm db:push && pnpm db:seed` 创建初始管理员和 Provider 配置。测试真实出图必须启动 worker：推荐 `pnpm dev:all`，或分别启动 `pnpm dev` 与 `pnpm worker`；只跑 `pnpm dev` 只适合看 UI，生成任务会停在排队中等待 worker 消费。
 
 对话式工作台会先把上下文编译成出图 prompt。默认使用本地拼接；配置 `OPENAI_API_KEY` 后可用 `CONVERSATION_COMPILER_MODEL=gpt-5.5` 作为上下文编译器。
 

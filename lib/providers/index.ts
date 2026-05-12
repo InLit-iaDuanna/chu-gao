@@ -65,6 +65,26 @@ function isDowngradable(error: unknown): boolean {
   return false;
 }
 
+function isAuthenticationError(error: unknown): boolean {
+  if (error instanceof ProviderRequestError) {
+    return (
+      error.diagnostic.status === 401 ||
+      error.diagnostic.status === 403 ||
+      error.diagnostic.status === 404
+    );
+  }
+
+  const message = serializeProviderError(error);
+  return (
+    message.includes("Provider error: 401") ||
+    message.includes("Provider error: 403") ||
+    message.includes("Provider error: 404") ||
+    message.includes("request failed: 401") ||
+    message.includes("request failed: 403") ||
+    message.includes("request failed: 404")
+  );
+}
+
 function isRateLimited(error: unknown): boolean {
   if (error instanceof ProviderRequestError) {
     return error.diagnostic.status === 429;
@@ -159,6 +179,10 @@ async function markAccountErrored(
   const nextErrors = account.consecutiveErrors + 1;
   let health: ProviderHealth = account.health;
 
+  if (isAuthenticationError(error)) {
+    health = "DOWN";
+  }
+
   if (downgradable) {
     if (nextErrors >= 5) {
       health = "DOWN";
@@ -172,9 +196,12 @@ async function markAccountErrored(
     data: {
       consecutiveErrors: nextErrors,
       health,
-      cooldownUntil: isRateLimited(error)
-        ? new Date(Date.now() + 5 * 60_000)
-        : undefined,
+      cooldownUntil:
+        isRateLimited(error) || isAuthenticationError(error)
+          ? new Date(Date.now() + 5 * 60_000)
+          : downgradable
+            ? new Date(Date.now() + 60_000)
+            : undefined,
       lastErrorAt: new Date(),
       lastErrorMsg: serializeProviderError(error).slice(0, 500),
     },
@@ -233,7 +260,7 @@ async function findAvailableProviderAccounts(modelId: string) {
 
   const now = new Date();
 
-  return db.providerAccount.findMany({
+  const accounts = await db.providerAccount.findMany({
     where: {
       isActive: true,
       health: { not: "DOWN" },
@@ -262,6 +289,39 @@ async function findAvailableProviderAccounts(modelId: string) {
       { lastLeaseAt: "asc" },
       { createdAt: "asc" },
     ],
+  });
+
+  return accounts.sort((left, right) => {
+    const leftProviderPriority = left.provider.priority;
+    const rightProviderPriority = right.provider.priority;
+
+    if (rightProviderPriority !== leftProviderPriority) {
+      return rightProviderPriority - leftProviderPriority;
+    }
+
+    if (right.priority !== left.priority) {
+      return right.priority - left.priority;
+    }
+
+    const leftFreeSlots = left.maxConcurrency - left.inFlight;
+    const rightFreeSlots = right.maxConcurrency - right.inFlight;
+
+    if (rightFreeSlots !== leftFreeSlots) {
+      return rightFreeSlots - leftFreeSlots;
+    }
+
+    if (right.weight !== left.weight) {
+      return right.weight - left.weight;
+    }
+
+    if (left.inFlight !== right.inFlight) {
+      return left.inFlight - right.inFlight;
+    }
+
+    const leftLease = left.lastLeaseAt?.getTime() ?? 0;
+    const rightLease = right.lastLeaseAt?.getTime() ?? 0;
+
+    return leftLease - rightLease;
   });
 }
 
@@ -329,7 +389,7 @@ export async function selectAndGenerate(
           : Promise.resolve(),
       ]);
 
-      if (!downgradable) {
+      if (!downgradable && !isAuthenticationError(error)) {
         throw error;
       }
     } finally {

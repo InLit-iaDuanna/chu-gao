@@ -252,6 +252,7 @@ export function WorkbenchShell({
   const [useCurrentImageAsReference, setUseCurrentImageAsReference] =
     useState(true);
   const [generationProgress, setGenerationProgress] = useState(0);
+  const [queueNotice, setQueueNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [modelsError, setModelsError] = useState<string | null>(null);
   const [accountError, setAccountError] = useState<string | null>(null);
@@ -657,14 +658,17 @@ export function WorkbenchShell({
 
       if (nextStatus === "pending") {
         setGenerationProgress((current) => Math.max(current, 12));
+        setQueueNotice((current) => current ?? "任务正在等待生成 worker 消费。");
       }
 
       if (nextStatus === "running") {
         setGenerationProgress((current) => Math.max(current, 62));
+        setQueueNotice(null);
       }
 
       if (nextStatus === "failed") {
         setGenerationProgress(0);
+        setQueueNotice(null);
         const message = friendlyErrorMessage(
           {
             code: next.errorCode ?? undefined,
@@ -678,6 +682,7 @@ export function WorkbenchShell({
 
       if (nextStatus === "succeeded") {
         setGenerationProgress(100);
+        setQueueNotice(null);
         setMessages((current) =>
           current.map((message) =>
             message.generationId === next.id
@@ -1017,6 +1022,8 @@ export function WorkbenchShell({
         generationId: string;
         status: string;
         estimatedCredits: number;
+        workerOnline?: boolean;
+        queueWaiting?: number;
       }>(
         await fetch("/api/generations", {
           method: "POST",
@@ -1063,6 +1070,13 @@ export function WorkbenchShell({
       setCredits((current) => Math.max(0, current - payload.estimatedCredits));
       setStatus(statusFromGeneration(payload.status));
       setGenerationProgress(payload.status === "PENDING" ? 12 : 62);
+      setQueueNotice(
+        payload.status === "PENDING"
+          ? payload.workerOnline
+            ? `任务已入队，前方约 ${payload.queueWaiting ?? 0} 个任务。`
+            : "任务已入队，但生成 worker 未在线；请启动 pnpm worker 或 pnpm dev:all。"
+          : null,
+      );
       clearUploadedReferenceImages();
       mergeGeneration(pendingGeneration);
       openGenerationStream(payload.generationId);
@@ -1078,6 +1092,7 @@ export function WorkbenchShell({
       );
       setStatus("failed");
       setGenerationProgress(0);
+      setQueueNotice(null);
       setError(message);
       setMessages((current) =>
         current.filter((messageItem) => messageItem.id !== userMessage.id),
@@ -1208,6 +1223,12 @@ export function WorkbenchShell({
                 <span>{model?.displayName ?? "等待可用模型"}</span>
                 <span className="h-1 w-1 rounded-full bg-border-strong" />
                 <span>{WORKBENCH_STATUS_LABEL[status]}</span>
+                {queueNotice ? (
+                  <>
+                    <span className="h-1 w-1 rounded-full bg-border-strong" />
+                    <span className="text-warning">{queueNotice}</span>
+                  </>
+                ) : null}
                 {canUseCurrentImageReference && useCurrentImageAsReference ? (
                   <>
                     <span className="h-1 w-1 rounded-full bg-border-strong" />

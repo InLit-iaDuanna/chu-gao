@@ -23,7 +23,11 @@ import {
   assertProviderAvailable,
 } from "@/lib/providers";
 import { serializeProviderError } from "@/lib/providers/diagnostics";
-import { assertGenerationQueueReady, enqueueGeneration } from "@/lib/queue";
+import {
+  assertGenerationQueueReady,
+  enqueueGeneration,
+  generationQueueStats,
+} from "@/lib/queue";
 import {
   ConcurrentLimitError,
   DailyLimitError,
@@ -412,11 +416,15 @@ export async function POST(request: Request) {
       });
     }
 
+    const queueStats = await generationQueueStats().catch(() => null);
+
     return ok({
       generationId: generation.id,
       status: generation.status,
       estimatedCredits,
-      queuePosition: 0,
+      queuePosition: queueStats?.waiting ?? 0,
+      workerOnline: queueStats?.workerOnline ?? false,
+      queueWaiting: queueStats?.waiting ?? 0,
     });
   } catch (error) {
     if (isDatabaseUnavailableError(error)) {

@@ -8,11 +8,23 @@ import {
   parsePricingSnapshot,
 } from "@/lib/model-pricing";
 import { getModel } from "@/lib/models/registry";
+import {
+  generationRequestSchema,
+  validateAgainstModel,
+} from "@/lib/models/validate";
 import { selectAndGenerate } from "@/lib/providers";
 import { serializeProviderError } from "@/lib/providers/diagnostics";
-import type { GenerationJobPayload } from "@/lib/queue";
+import {
+  enqueueGeneration,
+  touchGenerationWorkerHeartbeat,
+  type GenerationJobPayload,
+} from "@/lib/queue";
 import { assertRedisReady, getRedis } from "@/lib/redis";
 import { hydrateReferenceImages, saveGeneratedImage } from "@/lib/storage";
+
+const STUCK_PENDING_MS = Number(process.env.STUCK_PENDING_MS ?? 2 * 60_000);
+const STUCK_RUNNING_MS = Number(process.env.STUCK_RUNNING_MS ?? 10 * 60_000);
+const STUCK_MAX_ATTEMPTS = Number(process.env.STUCK_MAX_ATTEMPTS ?? 3);
 
 function userFacingGenerationError(error: unknown): string {
   const message = serializeProviderError(error);
@@ -31,6 +43,194 @@ function userFacingGenerationError(error: unknown): string {
   return "渠道生成失败，请稍后重试或联系管理员检查渠道状态。";
 }
 
+async function refundGeneration(
+  generationId: string,
+  userId: string,
+  reason: string,
+): Promise<void> {
+  await db.$transaction(async (tx) => {
+    const refunded = await tx.usageLog.aggregate({
+      where: {
+        generationId,
+        action: "refund",
+      },
+      _sum: {
+        creditsDelta: true,
+      },
+    });
+    const charged = await tx.usageLog.aggregate({
+      where: {
+        generationId,
+        action: "generate",
+      },
+      _sum: {
+        creditsDelta: true,
+      },
+    });
+    const debitedCredits = Math.max(0, -(charged._sum.creditsDelta ?? 0));
+    const refundedCredits = Math.max(0, refunded._sum.creditsDelta ?? 0);
+    const refundableCredits = Math.max(0, debitedCredits - refundedCredits);
+
+    if (refundableCredits === 0) {
+      return;
+    }
+
+    await tx.user.update({
+      where: { id: userId },
+      data: {
+        credits: {
+          increment: refundableCredits,
+        },
+      },
+    });
+
+    await tx.usageLog.create({
+      data: {
+        userId,
+        generationId,
+        action: "refund",
+        creditsDelta: refundableCredits,
+        metadata: {
+          reason,
+        },
+      },
+    });
+  });
+}
+
+async function markGenerationFailedAndRefund(
+  generationId: string,
+  userId: string,
+  errorCode: string,
+  errorMessage: string,
+  reason: string,
+): Promise<void> {
+  const failed = await db.generation.updateMany({
+    where: {
+      id: generationId,
+      userId,
+      status: { in: ["PENDING", "RUNNING"] },
+    },
+    data: {
+      status: "FAILED",
+      finishedAt: new Date(),
+      errorCode,
+      errorMessage,
+    },
+  });
+
+  if (failed.count > 0) {
+    await refundGeneration(generationId, userId, reason);
+  }
+}
+
+async function recoverStuckGenerations(): Promise<void> {
+  const now = Date.now();
+  const stuck = await db.generation.findMany({
+    where: {
+      deletedAt: null,
+      status: { in: ["PENDING", "RUNNING"] },
+      OR: [
+        {
+          status: "PENDING",
+          createdAt: { lt: new Date(now - STUCK_PENDING_MS) },
+        },
+        {
+          status: "RUNNING",
+          startedAt: { lt: new Date(now - STUCK_RUNNING_MS) },
+        },
+      ],
+    },
+    take: 100,
+    select: {
+      id: true,
+      userId: true,
+      status: true,
+      attempts: true,
+      modelId: true,
+      prompt: true,
+      negativePrompt: true,
+      aspectRatio: true,
+      resolution: true,
+      n: true,
+      outputFormat: true,
+      paramsRaw: true,
+      referenceImageKeys: true,
+      costCredits: true,
+      jobId: true,
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  for (const generation of stuck) {
+    if (generation.attempts >= STUCK_MAX_ATTEMPTS) {
+      await markGenerationFailedAndRefund(
+        generation.id,
+        generation.userId,
+        "STUCK_JOB",
+        "任务长时间未完成，已自动终止并退还点数。",
+        "stuck_generation",
+      );
+      logger.warn(
+        { generationId: generation.id, attempts: generation.attempts },
+        "Stuck generation failed after max recovery attempts.",
+      );
+      continue;
+    }
+
+    const parsedRequest = generationRequestSchema.safeParse(
+      generation.paramsRaw,
+    );
+
+    if (!parsedRequest.success) {
+      await markGenerationFailedAndRefund(
+        generation.id,
+        generation.userId,
+        "STUCK_JOB_INVALID_REQUEST",
+        "历史任务参数已不可恢复，已自动终止并退还点数。",
+        "stuck_generation_invalid_request",
+      );
+      logger.warn(
+        { generationId: generation.id },
+        "Stuck generation failed because paramsRaw is invalid.",
+      );
+      continue;
+    }
+
+    const request = validateAgainstModel(parsedRequest.data);
+
+    await db.generation.update({
+      where: { id: generation.id },
+      data: {
+        status: "PENDING",
+        startedAt: null,
+        finishedAt: null,
+        errorCode: null,
+        errorMessage: null,
+      },
+    });
+
+    const jobId = await enqueueGeneration({
+      generationId: generation.id,
+      userId: generation.userId,
+      request,
+      estimatedCredits: generation.costCredits,
+    });
+
+    if (jobId !== generation.jobId) {
+      await db.generation.update({
+        where: { id: generation.id },
+        data: { jobId },
+      });
+    }
+
+    logger.info(
+      { generationId: generation.id, previousStatus: generation.status },
+      "Recovered stuck generation into queue.",
+    );
+  }
+}
+
 async function main() {
   if (!process.env.DATABASE_URL) {
     throw new Error(
@@ -39,6 +239,8 @@ async function main() {
   }
 
   await db.$queryRaw`SELECT 1`;
+  await touchGenerationWorkerHeartbeat();
+  await recoverStuckGenerations();
 
   const worker = new Worker<GenerationJobPayload>(
     "generation",
@@ -298,6 +500,15 @@ async function main() {
     },
   );
 
+  const heartbeat = setInterval(() => {
+    touchGenerationWorkerHeartbeat().catch((error) => {
+      logger.warn(
+        { error: serializeProviderError(error) },
+        "Generation worker heartbeat failed.",
+      );
+    });
+  }, 15_000);
+
   worker.on("failed", (job, error) => {
     logger.error(
       { jobId: job?.id, error: serializeProviderError(error) },
@@ -307,6 +518,10 @@ async function main() {
 
   worker.on("completed", (job) => {
     logger.info({ jobId: job.id }, "Generation job completed.");
+  });
+
+  worker.on("closed", () => {
+    clearInterval(heartbeat);
   });
 
   logger.info("Generation worker started.");

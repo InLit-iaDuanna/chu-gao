@@ -91,6 +91,28 @@ export default async function AdminProvidersPage() {
                     </span>
                   </div>
                 </div>
+                <DataTable
+                  headers={[
+                    "账号",
+                    "状态",
+                    "并发",
+                    "优先级/权重",
+                    "冷却至",
+                    "最近错误",
+                  ]}
+                  rows={provider.accounts.map((account) => [
+                    account.name ?? account.baseUrl,
+                    `${account.isActive ? "启用" : "停用"} · ${account.health}`,
+                    `${account.inFlight}/${account.maxConcurrency}`,
+                    `${account.priority}/${account.weight}`,
+                    account.cooldownUntil
+                      ? account.cooldownUntil.toLocaleString("zh-CN", {
+                          hour12: false,
+                        })
+                      : "-",
+                    account.lastErrorMsg ?? "-",
+                  ])}
+                />
                 <ProviderAccountImportForm providerId={provider.id} />
               </section>
             ))}
