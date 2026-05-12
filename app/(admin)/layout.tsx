@@ -49,13 +49,13 @@ export default async function AdminLayout({
       data-surface="admin"
       className="min-h-screen bg-background text-foreground"
     >
-      <div className="page-shell grid gap-6 py-6 lg:grid-cols-[260px_minmax(0,1fr)]">
-        <aside className="surface-panel h-fit p-4">
+      <div className="page-shell grid min-w-0 max-w-full gap-6 py-6 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <aside className="surface-panel h-fit min-w-0 max-w-full p-4">
           <div className="flex items-center justify-between gap-3">
             <p className="eyebrow">Admin</p>
             <AccountMenu />
           </div>
-          <nav className="mt-4 space-y-2 text-sm text-text-muted">
+          <nav className="mt-4 min-w-0 space-y-2 text-sm text-text-muted">
             <Link
               className="block rounded-[6px] px-3 py-2 text-foreground hover:bg-surface-2"
               href="/app"
@@ -118,7 +118,7 @@ export default async function AdminLayout({
             </Link>
           </nav>
         </aside>
-        <main>{children}</main>
+        <main className="min-w-0 max-w-full">{children}</main>
       </div>
     </div>
   );
