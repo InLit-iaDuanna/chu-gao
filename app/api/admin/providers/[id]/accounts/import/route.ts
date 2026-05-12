@@ -11,6 +11,7 @@ import {
 } from "@/lib/auth";
 import { encrypt } from "@/lib/crypto";
 import { db } from "@/lib/db";
+import { redactSensitiveText } from "@/lib/providers/diagnostics";
 import { normalizeProviderBaseUrl } from "@/lib/providers/protocols";
 import { providerAccountImportSchema } from "@/lib/validators";
 
@@ -36,6 +37,118 @@ function parseLine(line: string) {
     weight: weight ? Number(weight) : undefined,
     name,
   };
+}
+
+function splitCsvLine(line: string): string[] {
+  const result: string[] = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+
+    if (char === '"') {
+      if (inQuotes && line[index + 1] === '"') {
+        current += '"';
+        index += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (char === "," && !inQuotes) {
+      result.push(current.trim());
+      current = "";
+      continue;
+    }
+
+    current += char;
+  }
+
+  result.push(current.trim());
+  return result;
+}
+
+type ParsedImportRow =
+  | {
+      ok: true;
+      lineNumber: number;
+      name?: string;
+      baseUrl: string;
+      apiKey: string;
+      maxConcurrency?: number;
+      weight?: number;
+      note?: string;
+    }
+  | {
+      ok: false;
+      lineNumber: number;
+      name?: string;
+      reason: string;
+    };
+
+function parseCsvRows(text: string, defaultBaseUrl: string): ParsedImportRow[] {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length === 0) {
+    return [];
+  }
+
+  const header = splitCsvLine(lines[0]).map((cell) => cell.trim().toLowerCase());
+  const required = ["api_key"];
+
+  if (required.some((cell) => !header.includes(cell))) {
+    return [
+      {
+        ok: false,
+        lineNumber: 1,
+        reason: "CSV 缺少 api_key 列",
+      },
+    ];
+  }
+
+  const getValue = (cells: string[], key: string) => {
+    const index = header.indexOf(key);
+    return index >= 0 ? (cells[index] ?? "").trim() : "";
+  };
+
+  return lines.slice(1).map((line, rowIndex) => {
+    const cells = splitCsvLine(line);
+    const name = getValue(cells, "name") || getValue(cells, "id") || undefined;
+    const apiKey = getValue(cells, "api_key");
+    const status = getValue(cells, "status");
+    const sourceId = getValue(cells, "id");
+    const error = getValue(cells, "error");
+    const lineNumber = rowIndex + 2;
+
+    if (!apiKey) {
+      return {
+        ok: false,
+        lineNumber,
+        name,
+        reason: "api_key 为空",
+      };
+    }
+
+    const notes = [
+      status ? `status=${status}` : "",
+      sourceId ? `sourceId=${sourceId}` : "",
+      error ? `sourceError=${redactSensitiveText(error).slice(0, 120)}` : "",
+    ].filter(Boolean);
+
+    return {
+      ok: true,
+      lineNumber,
+      name,
+      baseUrl: defaultBaseUrl,
+      apiKey,
+      note: notes.length > 0 ? notes.join(" | ") : undefined,
+    };
+  });
 }
 
 export async function POST(
@@ -66,7 +179,7 @@ export async function POST(
 
   const provider = await db.provider.findUnique({
     where: { id },
-    select: { id: true, protocol: true },
+    select: { id: true, protocol: true, baseUrl: true },
   });
 
   if (!provider) {
@@ -74,20 +187,58 @@ export async function POST(
   }
 
   const admin = authenticatedUser(sessionResult);
-  const rows = parsed.data.text
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map(parseLine)
-    .filter((row): row is NonNullable<typeof row> => Boolean(row));
-  const created = [];
-  const skipped = [];
+  const sourceText =
+    parsed.data.mode === "csv"
+      ? parsed.data.csvText ?? ""
+      : parsed.data.text ?? "";
+  const rows: ParsedImportRow[] =
+    parsed.data.mode === "csv"
+      ? parseCsvRows(sourceText, provider.baseUrl)
+      : sourceText
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter(Boolean)
+          .map((line, index) => {
+            const parsedLine = parseLine(line);
+
+            if (!parsedLine) {
+              return {
+                ok: false,
+                lineNumber: index + 1,
+                reason: "每行至少需要 baseUrl 和 apiKey",
+              } satisfies ParsedImportRow;
+            }
+
+            return {
+              ok: true,
+              lineNumber: index + 1,
+              name: parsedLine.name,
+              baseUrl: parsedLine.baseUrl,
+              apiKey: parsedLine.apiKey,
+              maxConcurrency: parsedLine.maxConcurrency,
+              weight: parsedLine.weight,
+            } satisfies ParsedImportRow;
+          });
+  let created = 0;
+  let skipped = 0;
+  let failed = 0;
+  const errors: Array<{ lineNumber: number; name?: string; reason: string }> = [];
 
   for (const row of rows) {
+    if (!row.ok) {
+      failed += 1;
+      errors.push({
+        lineNumber: row.lineNumber,
+        name: row.name,
+        reason: row.reason,
+      });
+      continue;
+    }
+
     const baseUrl = normalizeProviderBaseUrl(row.baseUrl, provider.protocol);
 
     try {
-      const account = await db.providerAccount.create({
+      await db.providerAccount.create({
         data: {
           providerId: id,
           name: row.name,
@@ -102,20 +253,26 @@ export async function POST(
             row.weight && Number.isFinite(row.weight)
               ? row.weight
               : parsed.data.defaultWeight,
+          note: row.note,
         },
       });
 
-      created.push(account.id);
+      created += 1;
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === "P2002"
       ) {
-        skipped.push(baseUrl);
+        skipped += 1;
         continue;
       }
 
-      throw error;
+      failed += 1;
+      errors.push({
+        lineNumber: row.lineNumber,
+        name: row.name,
+        reason: error instanceof Error ? error.message : "导入失败",
+      });
     }
   }
 
@@ -124,11 +281,13 @@ export async function POST(
     action: "admin.provider_account.import",
     target: id,
     diff: {
-      created: created.length,
-      skipped: skipped.length,
+      mode: parsed.data.mode,
+      created,
+      skipped,
+      failed,
     },
     request,
   });
 
-  return ok({ created: created.length, skipped: skipped.length });
+  return ok({ created, skipped, failed, errors });
 }

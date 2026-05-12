@@ -1,4 +1,4 @@
-your-domain.com {
+chugao.art, www.chugao.art {
     encode gzip zstd
 
     @sse path /api/generations/*/stream

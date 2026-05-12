@@ -10,6 +10,7 @@ import {
 import { encrypt } from "@/lib/crypto";
 import { db } from "@/lib/db";
 import { normalizeProviderBaseUrl } from "@/lib/providers/protocols";
+import { serializeProviderAccount } from "@/lib/providers/serialize";
 import { providerAccountPatchSchema } from "@/lib/validators";
 
 function fingerprint(value: string): string {
@@ -44,7 +45,7 @@ export async function PATCH(
 
   const current = await db.providerAccount.findFirst({
     where: { id: accountId, providerId: id },
-    include: { provider: { select: { protocol: true } } },
+    include: { provider: { select: { protocol: true, name: true } } },
   });
 
   if (!current) {
@@ -55,7 +56,10 @@ export async function PATCH(
   const account = await db.providerAccount.update({
     where: { id: accountId },
     data: {
-      name: parsed.data.name,
+      name:
+        parsed.data.name === null
+          ? null
+          : parsed.data.name,
       baseUrl: parsed.data.baseUrl
         ? normalizeProviderBaseUrl(parsed.data.baseUrl, current.provider.protocol)
         : undefined,
@@ -66,15 +70,19 @@ export async function PATCH(
       priority: parsed.data.priority,
       weight: parsed.data.weight,
       maxConcurrency: parsed.data.maxConcurrency,
-      dailyLimit: parsed.data.dailyLimit,
+      dailyLimit:
+        parsed.data.dailyLimit === null
+          ? null
+          : parsed.data.dailyLimit,
       isActive: parsed.data.isActive,
       health: parsed.data.health,
+      consecutiveErrors: parsed.data.consecutiveErrors,
       cooldownUntil: parsed.data.cooldownUntil
         ? new Date(parsed.data.cooldownUntil)
         : parsed.data.cooldownUntil === null
           ? null
           : undefined,
-      note: parsed.data.note,
+      note: parsed.data.note === null ? null : parsed.data.note,
     },
   });
 
@@ -89,7 +97,11 @@ export async function PATCH(
     request,
   });
 
-  return ok({ ...account, apiKeyEnc: undefined, hasApiKey: true });
+  return ok(
+    serializeProviderAccount(account, {
+      isDefault: account.name === `${current.provider.name} 默认账号`,
+    }),
+  );
 }
 
 export async function DELETE(

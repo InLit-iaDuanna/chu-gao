@@ -61,6 +61,29 @@ pnpm dev:all
 - 用户端：[http://127.0.0.1:3000/app](http://127.0.0.1:3000/app)
 - 管理端：[http://127.0.0.1:3000/admin](http://127.0.0.1:3000/admin)
 
+## 号池后台
+
+- `Provider` 页支持三种操作：新增池内账号、CSV 导入账号、逐行文本导入账号。
+- CSV 直接兼容列头：`name,status,api_key,id,error`。
+- CSV 导入时不会读取文件里的 `baseUrl`；统一继承当前 provider 的 `baseUrl`。
+- 后台只展示脱敏后的账号指纹，不会回显明文 key；替换 key 只能重新填写覆盖。
+- 单账号支持：编辑优先级/权重/并发/每日限额/冷却时间/备注、健康测试、停用/恢复、手动清冷却。
+
+## 安全开关
+
+- `RATE_LIMIT_LOGIN_PER_MIN`：登录接口按 `IP + email` 限流，默认每分钟 `5` 次。
+- `ADMIN_IP_ALLOWLIST`：为空时不限制；填写后仅允许白名单 IP/CIDR 访问 `/admin` 与 `/api/admin/*`。
+- 中间件会统一补安全响应头：`HSTS`、`CSP`、`X-Frame-Options`、`X-Content-Type-Options`、`Referrer-Policy`。
+- 审计日志、导入错误、provider 测试错误都不会记录或返回明文密钥。
+
+## 服务器加固基线
+
+- 仅对公网开放 `22/80/443`。
+- SSH 仅允许密钥登录，禁用 root 与密码认证。
+- 应用容器仅绑定到 `127.0.0.1`，由 nginx/Caddy 反代到公网。
+- 建议启用 `fail2ban` 保护 `sshd` 和 nginx 基本爆破流量。
+- 生产环境应保持 `.env` 权限为 `600`，并开启系统自动安全更新。
+
 ## 当前状态
 
 这版已经从纯 mock 推进到可运行业务链路：有数据库和 Redis 时会创建真实任务、扣点、入队、调用 Provider、写回状态和图片记录；未启动基础设施时接口会 fail closed，并通过 `/api/health` 与 `pnpm dev:doctor` 给出诊断和启动步骤。
