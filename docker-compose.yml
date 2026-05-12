@@ -7,8 +7,6 @@ services:
       POSTGRES_DB: app
     volumes:
       - pg_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
     restart: unless-stopped
 
   redis:
@@ -16,8 +14,6 @@ services:
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
-    ports:
-      - "6379:6379"
     restart: unless-stopped
 
   web:
@@ -28,6 +24,10 @@ services:
     depends_on:
       - postgres
       - redis
+    volumes:
+      - private_storage:/app/.data/storage
+    ports:
+      - "${WEB_BIND_HOST:-127.0.0.1}:${WEB_PORT:-3002}:3000"
     expose:
       - "3000"
     restart: unless-stopped
@@ -40,8 +40,11 @@ services:
     depends_on:
       - postgres
       - redis
+    volumes:
+      - private_storage:/app/.data/storage
     restart: unless-stopped
 
 volumes:
   pg_data: {}
   redis_data: {}
+  private_storage: {}

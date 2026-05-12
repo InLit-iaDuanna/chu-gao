@@ -22,7 +22,7 @@ export function getRedis(): IORedis {
     process.env.REDIS_URL ?? "redis://localhost:6379",
     {
       connectTimeout: Number(process.env.REDIS_CONNECT_TIMEOUT_MS ?? 3000),
-      enableOfflineQueue: false,
+      enableOfflineQueue: true,
       lazyConnect: true,
       maxRetriesPerRequest: null,
     },
