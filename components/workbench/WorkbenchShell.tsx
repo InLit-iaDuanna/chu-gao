@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ChevronDown,
   MessageSquarePlus,
   Settings,
   SlidersHorizontal,
@@ -253,6 +254,7 @@ export function WorkbenchShell({
     useState(true);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [queueNotice, setQueueNotice] = useState<string | null>(null);
+  const [isParamsOpen, setIsParamsOpen] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [modelsError, setModelsError] = useState<string | null>(null);
   const [accountError, setAccountError] = useState<string | null>(null);
@@ -1417,25 +1419,37 @@ export function WorkbenchShell({
             }}
           />
           {state ? (
-            <details className="surface-panel group overflow-hidden" open>
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-3 text-sm marker:hidden">
+            <div className="surface-panel overflow-hidden">
+              <button
+                type="button"
+                className="flex w-full items-center justify-between gap-3 px-3 py-3 text-sm transition-colors hover:bg-surface-2"
+                aria-expanded={isParamsOpen}
+                aria-controls="workbench-params-panel"
+                onClick={() => setIsParamsOpen((current) => !current)}
+              >
                 <span className="inline-flex items-center gap-2 text-text-muted">
                   <SlidersHorizontal className="h-4 w-4 stroke-[1.5]" />
                   生成参数
                 </span>
-                <span className="font-mono text-xs text-text-faint group-open:hidden">
-                  展开
+                <span className="inline-flex items-center gap-1 font-mono text-xs text-text-faint">
+                  {isParamsOpen ? "收起" : "展开"}
+                  <ChevronDown
+                    className={`h-3.5 w-3.5 stroke-[1.5] transition-transform ${
+                      isParamsOpen ? "" : "-rotate-90"
+                    }`}
+                  />
                 </span>
-                <span className="hidden font-mono text-xs text-text-faint group-open:inline">
-                  收起
-                </span>
-              </summary>
-              <DynamicParamsPanel
-                value={state}
-                onChange={setState}
-                models={models}
-              />
-            </details>
+              </button>
+              {isParamsOpen ? (
+                <div id="workbench-params-panel">
+                  <DynamicParamsPanel
+                    value={state}
+                    onChange={setState}
+                    models={models}
+                  />
+                </div>
+              ) : null}
+            </div>
           ) : (
             <div className="surface-panel p-4 text-sm leading-6 text-text-muted">
               {isBooting

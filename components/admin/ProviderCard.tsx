@@ -17,15 +17,19 @@ export function ProviderCard({
   };
 }) {
   return (
-    <div className="surface-panel p-4">
-      <div className="flex items-start justify-between gap-4">
-        <div>
+    <div className="surface-panel min-w-0 p-4">
+      <div className="flex min-w-0 items-start justify-between gap-4">
+        <div className="min-w-0">
           <p className="text-sm text-text-muted">{provider.protocol}</p>
-          <h3 className="mt-1 text-lg font-semibold">{provider.name}</h3>
+          <h3 className="mt-1 break-words text-lg font-semibold">
+            {provider.name}
+          </h3>
         </div>
         <ProviderHealthBadge health={provider.health} />
       </div>
-      <p className="mt-3 text-sm text-text-muted">{provider.baseUrl}</p>
+      <p className="mt-3 break-words text-sm text-text-muted">
+        {provider.baseUrl}
+      </p>
       <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
         <span>优先级 {provider.priority}</span>
         <span>账号 {provider.accounts ?? 0}</span>
@@ -34,7 +38,7 @@ export function ProviderCard({
           并发 {provider.inFlight ?? 0}/{provider.maxConcurrency ?? 0}
         </span>
       </div>
-      <p className="mt-2 text-sm text-text-muted">
+      <p className="mt-2 break-words text-sm text-text-muted">
         {provider.lastErrorMsg || "最近 24h 无错误"}
       </p>
     </div>

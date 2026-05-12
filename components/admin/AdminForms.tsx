@@ -51,14 +51,21 @@ export function AdminUserProfileForm({
   const [concurrentLimit, setConcurrentLimit] = useState(user.concurrentLimit);
   const [bannedReason, setBannedReason] = useState(user.bannedReason ?? "");
   const [message, setMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const canSubmit = email.trim().length > 0 && !isSubmitting;
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canSubmit) {
+      return;
+    }
+
+    setIsSubmitting(true);
     setMessage("保存中...");
 
     try {
       await patchJson(`/api/admin/users/${user.id}`, {
-        email,
+        email: email.trim(),
         name: name.trim() || null,
         role,
         status,
@@ -70,6 +77,8 @@ export function AdminUserProfileForm({
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "保存失败");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -79,6 +88,7 @@ export function AdminUserProfileForm({
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         <input
           className="rounded-[6px] border border-border bg-surface px-3 py-2 text-sm"
+          required
           value={email}
           onChange={(event) => setEmail(event.target.value)}
         />
@@ -130,7 +140,7 @@ export function AdminUserProfileForm({
         />
       </div>
       <div className="mt-4 flex items-center gap-3">
-        <button className="tool-button h-10" type="submit">
+        <button className="tool-button h-10" type="submit" disabled={!canSubmit}>
           保存资料
         </button>
         {message ? <span className="text-sm text-text-muted">{message}</span> : null}
@@ -143,23 +153,34 @@ export function AdminPasswordResetForm({ userId }: { userId: string }) {
   const router = useRouter();
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const canSubmit = password.trim().length >= 8 && !isSubmitting;
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (!canSubmit) {
+      return;
+    }
 
     if (!window.confirm("确认重置该账号密码并强制旧登录失效？")) {
       return;
     }
 
+    setIsSubmitting(true);
     setMessage("重置中...");
 
     try {
-      await postJson(`/api/admin/users/${userId}/password`, { password });
+      await postJson(`/api/admin/users/${userId}/password`, {
+        password: password.trim(),
+      });
       setPassword("");
       setMessage("密码已重置");
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "重置失败");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -171,11 +192,12 @@ export function AdminPasswordResetForm({ userId }: { userId: string }) {
           className="rounded-[6px] border border-border bg-surface px-3 py-2 text-sm"
           type="password"
           minLength={8}
+          required
           placeholder="输入新密码"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
         />
-        <button className="tool-button h-10" type="submit">
+        <button className="tool-button h-10" type="submit" disabled={!canSubmit}>
           重置
         </button>
       </div>
@@ -263,17 +285,29 @@ export function AdminCreditForm({ userId }: { userId: string }) {
   const [amount, setAmount] = useState(100);
   const [note, setNote] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const canSubmit = Number.isFinite(amount) && amount !== 0 && !isSubmitting;
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canSubmit) {
+      return;
+    }
+
+    setIsSubmitting(true);
     setMessage("处理中...");
 
     try {
-      await postJson(`/api/admin/users/${userId}/credits`, { amount, note });
+      await postJson(`/api/admin/users/${userId}/credits`, {
+        amount,
+        note: note.trim(),
+      });
       setMessage("点数已更新");
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "操作失败");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -293,7 +327,7 @@ export function AdminCreditForm({ userId }: { userId: string }) {
           value={note}
           onChange={(event) => setNote(event.target.value)}
         />
-        <button className="tool-button h-10" type="submit">
+        <button className="tool-button h-10" type="submit" disabled={!canSubmit}>
           保存
         </button>
       </div>
@@ -305,12 +339,18 @@ export function AdminCreditForm({ userId }: { userId: string }) {
 export function DashboardRecentControls({ limit }: { limit: number }) {
   const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
+  const [isClearing, setIsClearing] = useState(false);
 
   async function clearRecent() {
+    if (isClearing) {
+      return;
+    }
+
     if (!window.confirm(`确认清空最近 ${limit} 条生成记录展示？`)) {
       return;
     }
 
+    setIsClearing(true);
     setMessage("清空中...");
 
     try {
@@ -319,6 +359,8 @@ export function DashboardRecentControls({ limit }: { limit: number }) {
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "清空失败");
+    } finally {
+      setIsClearing(false);
     }
   }
 
@@ -339,6 +381,7 @@ export function DashboardRecentControls({ limit }: { limit: number }) {
       <button
         className="tool-button h-9 text-xs text-danger"
         type="button"
+        disabled={isClearing}
         onClick={clearRecent}
       >
         清空
@@ -362,29 +405,45 @@ export function ProviderCreateForm({
   const [costMultiplier, setCostMultiplier] = useState(1);
   const [modelsText, setModelsText] = useState("gpt-image-2");
   const [message, setMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const normalizedModels = modelsText
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const canSubmit =
+    name.trim().length > 0 &&
+    protocol.trim().length > 0 &&
+    baseUrl.trim().length > 0 &&
+    apiKey.trim().length > 0 &&
+    normalizedModels.length > 0 &&
+    !isSubmitting;
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canSubmit) {
+      return;
+    }
+
+    setIsSubmitting(true);
     setMessage("创建中...");
 
     try {
       await postJson("/api/admin/providers", {
-        name,
+        name: name.trim(),
         protocol,
-        baseUrl,
-        apiKey,
+        baseUrl: baseUrl.trim(),
+        apiKey: apiKey.trim(),
         priority,
         costMultiplier,
-        modelsSupported: modelsText
-          .split(",")
-          .map((item) => item.trim())
-          .filter(Boolean),
+        modelsSupported: normalizedModels,
       });
       setMessage("渠道已创建，可继续添加下一个");
       setApiKey("");
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "创建失败");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -397,7 +456,7 @@ export function ProviderCreateForm({
             每个渠道会自动创建一个默认账号，后续可继续批量导入更多 API。
           </p>
         </div>
-        <button className="tool-button h-10" type="submit">
+        <button className="tool-button h-10" type="submit" disabled={!canSubmit}>
           添加渠道
         </button>
       </div>
@@ -405,6 +464,7 @@ export function ProviderCreateForm({
         <input
           className="rounded-[6px] border border-border bg-surface px-3 py-2 text-sm"
           placeholder="渠道名称"
+          required
           value={name}
           onChange={(event) => setName(event.target.value)}
         />
@@ -420,6 +480,7 @@ export function ProviderCreateForm({
         <input
           className="rounded-[6px] border border-border bg-surface px-3 py-2 text-sm"
           placeholder="模型 ID，多个用逗号分隔"
+          required
           value={modelsText}
           onChange={(event) => setModelsText(event.target.value)}
           list="provider-models"
@@ -427,12 +488,14 @@ export function ProviderCreateForm({
         <input
           className="rounded-[6px] border border-border bg-surface px-3 py-2 text-sm lg:col-span-2"
           placeholder="Base URL"
+          required
           value={baseUrl}
           onChange={(event) => setBaseUrl(event.target.value)}
         />
         <input
           className="rounded-[6px] border border-border bg-surface px-3 py-2 text-sm"
           placeholder="API Key"
+          required
           value={apiKey}
           onChange={(event) => setApiKey(event.target.value)}
         />
@@ -467,9 +530,16 @@ export function RedemptionCodeCreateForm() {
   const [count, setCount] = useState(10);
   const [credits, setCredits] = useState(100);
   const [message, setMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const canSubmit = count >= 1 && credits >= 1 && !isSubmitting;
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canSubmit) {
+      return;
+    }
+
+    setIsSubmitting(true);
     setMessage("生成中...");
 
     try {
@@ -478,6 +548,8 @@ export function RedemptionCodeCreateForm() {
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "生成失败");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -500,7 +572,7 @@ export function RedemptionCodeCreateForm() {
           value={credits}
           onChange={(event) => setCredits(Number(event.target.value))}
         />
-        <button className="tool-button h-10" type="submit">
+        <button className="tool-button h-10" type="submit" disabled={!canSubmit}>
           生成
         </button>
       </div>
@@ -515,14 +587,21 @@ export function ProviderAccountImportForm({ providerId }: { providerId: string }
   const [defaultMaxConcurrency, setDefaultMaxConcurrency] = useState(1);
   const [defaultWeight, setDefaultWeight] = useState(1);
   const [message, setMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const canSubmit = text.trim().length > 0 && !isSubmitting;
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canSubmit) {
+      return;
+    }
+
+    setIsSubmitting(true);
     setMessage("导入中...");
 
     try {
       await postJson(`/api/admin/providers/${providerId}/accounts/import`, {
-        text,
+        text: text.trim(),
         defaultMaxConcurrency,
         defaultWeight,
       });
@@ -531,6 +610,8 @@ export function ProviderAccountImportForm({ providerId }: { providerId: string }
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "导入失败");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -543,6 +624,7 @@ export function ProviderAccountImportForm({ providerId }: { providerId: string }
       <textarea
         className="mt-3 min-h-28 w-full rounded-[6px] border border-border bg-surface px-3 py-2 text-sm"
         placeholder="每行：baseUrl apiKey maxConcurrency weight name"
+        required
         value={text}
         onChange={(event) => setText(event.target.value)}
       />
@@ -567,7 +649,7 @@ export function ProviderAccountImportForm({ providerId }: { providerId: string }
           onChange={(event) => setDefaultWeight(Number(event.target.value))}
           aria-label="默认权重"
         />
-        <button className="tool-button h-10" type="submit">
+        <button className="tool-button h-10" type="submit" disabled={!canSubmit}>
           导入
         </button>
       </div>
@@ -584,9 +666,17 @@ export function PricingRuleForm({ models }: { models: Array<{ id: string }> }) {
   const [resolution, setResolution] = useState("1K");
   const [credits, setCredits] = useState(2);
   const [message, setMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const canSubmit =
+    models.length > 0 && modelId.trim().length > 0 && Number.isFinite(credits) && !isSubmitting;
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canSubmit) {
+      return;
+    }
+
+    setIsSubmitting(true);
     setMessage("保存中...");
 
     try {
@@ -600,6 +690,8 @@ export function PricingRuleForm({ models }: { models: Array<{ id: string }> }) {
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "保存失败");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -635,7 +727,7 @@ export function PricingRuleForm({ models }: { models: Array<{ id: string }> }) {
           value={credits}
           onChange={(event) => setCredits(Number(event.target.value))}
         />
-        <button className="tool-button h-10" type="submit">
+        <button className="tool-button h-10" type="submit" disabled={!canSubmit}>
           保存
         </button>
       </div>

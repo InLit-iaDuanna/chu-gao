@@ -216,27 +216,27 @@ export default async function AdminDashboardPage({
           </div>
         </div>
         <div className="grid gap-4">
-          {providers.map((provider) => (
-            <ProviderCard key={provider.id} provider={provider} />
-          ))}
-        </div>
-      </section>
+            {providers.map((provider) => (
+              <ProviderCard key={provider.id} provider={provider} />
+            ))}
+          </div>
+        </section>
       <section className="surface-panel p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-text-muted">最近 {recentLimit} 条生成</p>
           <DashboardRecentControls limit={recentLimit} />
         </div>
-        <div className="mt-4 space-y-3">
-          {generations.map((generation) => (
-            <div
-              key={generation.id}
-              className="surface-panel-soft grid gap-2 px-4 py-3 text-sm lg:grid-cols-[minmax(0,1fr)_auto]"
-            >
-              <span className="min-w-0 truncate">{generation.prompt}</span>
-              <span className="text-text-muted">
-                {generation.user.email} · {generation.modelId} ·{" "}
-                {generation.status}
-                {generation.status === "PENDING" && !stats.workerOnline
+            <div className="mt-4 space-y-3">
+              {generations.map((generation) => (
+                <div
+                  key={generation.id}
+                  className="surface-panel-soft grid gap-2 px-4 py-3 text-sm lg:grid-cols-[minmax(0,1fr)_auto]"
+                >
+                  <span className="min-w-0 break-words">{generation.prompt}</span>
+                  <span className="break-words text-text-muted">
+                    {generation.user.email} · {generation.modelId} ·{" "}
+                    {generation.status}
+                    {generation.status === "PENDING" && !stats.workerOnline
                   ? " · 等待 worker 消费"
                   : ""}
               </span>

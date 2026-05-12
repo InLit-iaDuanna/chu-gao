@@ -15,6 +15,23 @@ function safeNextPath(value: string | undefined): string {
   return value?.startsWith("/") && !value.startsWith("//") ? value : "/app";
 }
 
+function loginErrorMessage(
+  error: { code?: string; message?: string } | string | null | undefined,
+  fallback: string,
+): string {
+  const message = typeof error === "string" ? error : error?.message;
+
+  if (typeof error !== "string" && error?.code === "UNAUTHORIZED") {
+    return message || fallback;
+  }
+
+  if (message && /Failed to fetch|NetworkError/i.test(message)) {
+    return fallback;
+  }
+
+  return friendlyErrorMessage(error, fallback);
+}
+
 export function LoginForm({ nextPath }: { nextPath?: string }) {
   const router = useRouter();
   const safeNext = safeNextPath(nextPath);
@@ -44,7 +61,7 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
 
       if (!payload.ok) {
         throw new Error(
-          friendlyErrorMessage(
+          loginErrorMessage(
             payload.error,
             "登录失败，请检查邮箱和密码后重试。",
           ),
@@ -55,7 +72,7 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
       router.refresh();
     } catch (loginError) {
       setError(
-        friendlyErrorMessage(
+        loginErrorMessage(
           loginError instanceof Error ? loginError.message : null,
           "登录失败，请检查邮箱和密码后重试。",
         ),
