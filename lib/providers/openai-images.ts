@@ -1,4 +1,4 @@
-import { fetchWithTimeout } from "@/lib/http";
+import { PROVIDER_FETCH_RETRY, fetchWithTimeout } from "@/lib/http";
 import type {
   GenerateResult,
   ProviderAdapter,
@@ -115,6 +115,7 @@ export class OpenAIImagesAdapter implements ProviderAdapter {
         method: "POST",
         signal,
         timeoutMs: 180_000,
+        retry: PROVIDER_FETCH_RETRY,
         headers: {
           Authorization: `Bearer ${this.config.apiKey}`,
         },
@@ -132,6 +133,7 @@ export class OpenAIImagesAdapter implements ProviderAdapter {
       method: "POST",
       signal,
       timeoutMs: 180_000,
+      retry: PROVIDER_FETCH_RETRY,
       headers: {
         Authorization: `Bearer ${this.config.apiKey}`,
         "Content-Type": "application/json",

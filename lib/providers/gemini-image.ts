@@ -1,4 +1,4 @@
-import { fetchWithTimeout } from "@/lib/http";
+import { PROVIDER_FETCH_RETRY, fetchWithTimeout } from "@/lib/http";
 import type { InternalRequest } from "@/lib/models/types";
 import { providerError } from "@/lib/providers/diagnostics";
 import type {
@@ -57,6 +57,7 @@ export class GeminiImageAdapter implements ProviderAdapter {
       method: "POST",
       signal,
       timeoutMs: 90_000,
+      retry: PROVIDER_FETCH_RETRY,
       headers: {
         "x-goog-api-key": this.config.apiKey,
         "Content-Type": "application/json",
