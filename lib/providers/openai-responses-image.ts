@@ -1,4 +1,4 @@
-import { fetchWithTimeout } from "@/lib/http";
+import { PROVIDER_FETCH_RETRY, fetchWithTimeout } from "@/lib/http";
 import type {
   AspectRatio,
   InternalRequest,
@@ -203,6 +203,7 @@ export class OpenAIResponsesImageAdapter implements ProviderAdapter {
         method: "POST",
         signal,
         timeoutMs: 180_000,
+        retry: PROVIDER_FETCH_RETRY,
         headers: {
           Authorization: `Bearer ${this.config.apiKey}`,
           "Content-Type": "application/json",
