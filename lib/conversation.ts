@@ -8,6 +8,11 @@ export interface ConversationMessage {
   imageId?: string;
   imageUrl?: string;
   generationStatus?: string;
+  generationProvider?: string | null;
+  generationProviderAccountName?: string | null;
+  generationStartedAt?: string | null;
+  generationFinishedAt?: string | null;
+  generationProgress?: number | null;
   createdAt?: string;
 }
 

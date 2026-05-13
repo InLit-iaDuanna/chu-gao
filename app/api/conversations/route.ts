@@ -131,3 +131,43 @@ export async function POST(request: Request) {
     throw error;
   }
 }
+
+export async function DELETE(request: Request) {
+  const sessionResult = await checkSession(request);
+  const failure = sessionFailureResponse(sessionResult);
+
+  if (failure) {
+    return failure;
+  }
+
+  if (sessionResult.status !== "authenticated") {
+    return fail("UNAUTHORIZED", "请先登录", { status: 401 });
+  }
+
+  if (!process.env.DATABASE_URL) {
+    return fail("SERVICE_UNAVAILABLE", "对话服务未配置数据库", { status: 503 });
+  }
+
+  try {
+    const session = authenticatedUser(sessionResult);
+    const archived = await db.conversation.updateMany({
+      where: {
+        userId: session.id,
+        archivedAt: null,
+      },
+      data: {
+        archivedAt: new Date(),
+      },
+    });
+
+    return ok({
+      archived: archived.count,
+    });
+  } catch (error) {
+    if (isDatabaseUnavailableError(error)) {
+      return conversationsUnavailable();
+    }
+
+    throw error;
+  }
+}

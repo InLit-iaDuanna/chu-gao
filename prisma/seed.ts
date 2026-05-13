@@ -155,7 +155,7 @@ async function main() {
       db.systemConfig.upsert({
         where: { key },
         create: { key, value },
-        update: { value },
+        update: {},
       }),
     ),
   );

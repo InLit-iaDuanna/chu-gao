@@ -12,7 +12,7 @@ import {
   generationRequestSchema,
   validateAgainstModel,
 } from "@/lib/models/validate";
-import { selectAndGenerate } from "@/lib/providers";
+import { ProviderUnavailableError, selectAndGenerate } from "@/lib/providers";
 import { serializeProviderError } from "@/lib/providers/diagnostics";
 import {
   enqueueGeneration,
@@ -25,6 +25,14 @@ import { hydrateReferenceImages, saveGeneratedImage } from "@/lib/storage";
 const STUCK_PENDING_MS = Number(process.env.STUCK_PENDING_MS ?? 2 * 60_000);
 const STUCK_RUNNING_MS = Number(process.env.STUCK_RUNNING_MS ?? 10 * 60_000);
 const STUCK_MAX_ATTEMPTS = Number(process.env.STUCK_MAX_ATTEMPTS ?? 3);
+
+function clampProgress(value?: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.min(100, Math.round(value ?? 0)));
+}
 
 function userFacingGenerationError(error: unknown): string {
   const message = serializeProviderError(error);
@@ -203,6 +211,7 @@ async function recoverStuckGenerations(): Promise<void> {
       where: { id: generation.id },
       data: {
         status: "PENDING",
+        progress: 0,
         startedAt: null,
         finishedAt: null,
         errorCode: null,
@@ -263,6 +272,7 @@ async function main() {
         },
         data: {
           status: "RUNNING",
+          progress: 0,
           startedAt: new Date(),
           attempts: {
             increment: 1,
@@ -285,8 +295,50 @@ async function main() {
             request.referenceImages,
           ),
         };
-        const { result, providerId, providerAccountId, multiplier } =
-          await selectAndGenerate(hydratedRequest);
+        let selectedProviderId: string | null = null;
+        let selectedProviderAccountId: string | null = null;
+        const {
+          result,
+          providerId,
+          providerName,
+          providerAccountId,
+          providerAccountName,
+          multiplier,
+        } = await selectAndGenerate(hydratedRequest, {
+          onProviderSelected: async (selection) => {
+            selectedProviderId = selection.providerId;
+            selectedProviderAccountId = selection.providerAccountId;
+            await db.generation.updateMany({
+              where: {
+                id: generationId,
+                userId,
+                status: { in: ["PENDING", "RUNNING"] },
+              },
+              data: {
+                providerId: selection.providerId,
+                providerAccountId: selection.providerAccountId,
+              },
+            });
+          },
+          onProgress: async (event) => {
+            const progress = clampProgress(event.progress);
+            const status = event.status === "queued" ? "PENDING" : "RUNNING";
+
+            await db.generation.updateMany({
+              where: {
+                id: generationId,
+                userId,
+                status: { in: ["PENDING", "RUNNING"] },
+              },
+              data: {
+                status,
+                progress,
+                providerId: selectedProviderId,
+                providerAccountId: selectedProviderAccountId,
+              },
+            });
+          },
+        });
 
         if (result.images.length === 0) {
           throw new Error("provider returned no images");
@@ -344,12 +396,13 @@ async function main() {
             where: {
               id: generationId,
               userId,
-              status: "RUNNING",
+              status: { in: ["PENDING", "RUNNING"] },
             },
             data: {
               status: "SUCCEEDED",
               providerId,
               providerAccountId,
+              progress: 100,
               finishedAt: new Date(),
               costCredits: boundedActualCredits,
             },
@@ -404,12 +457,32 @@ async function main() {
           }
         });
 
-        logger.info({ generationId, providerId }, "Generation completed.");
+        logger.info(
+          {
+            generationId,
+            providerId,
+            providerName,
+            providerAccountId,
+            providerAccountName,
+          },
+          "Generation completed.",
+        );
       } catch (error) {
         const internalDiagnostic = serializeProviderError(error);
 
         logger.error(
-          { generationId, error: internalDiagnostic },
+          {
+            generationId,
+            error: internalDiagnostic,
+            providerAttempts:
+              error instanceof ProviderUnavailableError
+                ? error.details?.accountAttempts
+                : undefined,
+            providerMaxAttempts:
+              error instanceof ProviderUnavailableError
+                ? error.details?.maxAccountAttempts
+                : undefined,
+          },
           "Generation provider failed.",
         );
 
@@ -418,11 +491,12 @@ async function main() {
             where: {
               id: generationId,
               userId,
-              status: "RUNNING",
+              status: { in: ["PENDING", "RUNNING"] },
             },
             data: {
               status: "FAILED",
               finishedAt: new Date(),
+              progress: 0,
               errorCode: "PROVIDER_ERROR",
               errorMessage: userFacingGenerationError(error),
             },

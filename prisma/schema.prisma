@@ -141,6 +141,7 @@ model Generation {
   providerId         String?
   providerAccountId  String?
   jobId              String?
+  progress           Int              @default(0)
   errorCode          String?
   errorMessage       String?
   costCredits        Int              @default(0)

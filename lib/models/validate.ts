@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { getModel } from "@/lib/models/registry";
+import { isResolutionAspectRatioSupported } from "@/lib/models/capabilities";
 import type {
   AspectRatio,
   ImageBackground,
@@ -89,6 +90,14 @@ export function validateAgainstModel(
 
   if (!capabilities.resolutions.includes(resolution)) {
     throw new UnsupportedParamError(`resolution ${resolution} 不被支持`);
+  }
+
+  if (
+    !isResolutionAspectRatioSupported(capabilities, resolution, aspectRatio)
+  ) {
+    throw new UnsupportedParamError(
+      `${resolution} 不支持 ${aspectRatio} 比例`,
+    );
   }
 
   if (input.n > capabilities.maxN) {

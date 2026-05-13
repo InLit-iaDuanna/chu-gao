@@ -30,6 +30,48 @@ export class ProviderRequestError extends Error {
   }
 }
 
+export function isProviderTimeoutError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return (
+    error.name === "AbortError" ||
+    error.name === "HttpTimeoutError" ||
+    error.message.includes("This operation was aborted") ||
+    error.message.includes("AbortError") ||
+    error.message.includes("请求超时") ||
+    error.message.includes("超时")
+  );
+}
+
+export function isUpstreamAccessForbiddenError(error: unknown): boolean {
+  if (error instanceof ProviderRequestError) {
+    if (error.diagnostic.status !== 502) {
+      return false;
+    }
+
+    const body = error.diagnostic.bodyPreview.toLowerCase();
+    return (
+      body.includes("upstream access forbidden") ||
+      body.includes("upstream_error") ||
+      body.includes("access forbidden") ||
+      body.includes("forbidden")
+    );
+  }
+
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const message = `${error.name} ${error.message}`.toLowerCase();
+  return (
+    message.includes("upstream access forbidden") ||
+    message.includes("upstream_error") ||
+    message.includes("access forbidden")
+  );
+}
+
 export function redactSensitiveText(value: string): string {
   return SECRET_PATTERNS.reduce(
     (current, pattern) =>
@@ -83,6 +125,14 @@ export async function providerError(
 }
 
 export function serializeProviderError(error: unknown): string {
+  if (isProviderTimeoutError(error)) {
+    return "渠道请求超时";
+  }
+
+  if (isUpstreamAccessForbiddenError(error)) {
+    return "渠道访问被拒绝";
+  }
+
   if (error instanceof ProviderRequestError) {
     return error.message;
   }

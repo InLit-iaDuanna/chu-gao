@@ -45,6 +45,10 @@ export interface WorkbenchGeneration {
   resolution?: string | null;
   outputFormat?: string;
   provider?: string | null;
+  providerAccountName?: string | null;
+  startedAt?: string | null;
+  finishedAt?: string | null;
+  progress?: number | null;
   errorCode?: string | null;
   errorMessage?: string | null;
   credits?: number;

@@ -38,6 +38,12 @@ async function getGenerations() {
             name: true,
           },
         },
+        providerAccount: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
       },
       orderBy: {
         createdAt: "desc",

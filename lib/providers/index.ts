@@ -6,18 +6,44 @@ import { getModel } from "@/lib/models/registry";
 import type { InternalRequest } from "@/lib/models/types";
 import {
   ProviderRequestError,
+  isProviderTimeoutError,
+  isUpstreamAccessForbiddenError,
   serializeProviderError,
 } from "@/lib/providers/diagnostics";
 import { buildAdapter } from "@/lib/providers/factory";
 import {
+  generationTimeoutMs,
+  providerAccountMaxAttempts,
+} from "@/lib/providers/config";
+import {
   modelProtocolToProviderProtocol,
   providerProtocolToModelProtocol,
 } from "@/lib/providers/protocols";
-import type { GenerateResult } from "@/lib/providers/types";
+import type {
+  GenerateProgressCallback,
+  GenerateResult,
+} from "@/lib/providers/types";
 
 type ProviderTarget = {
   provider: Provider;
   account: ProviderAccount | null;
+};
+
+function supportedModelIds(modelId: string): string[] {
+  if (modelId === "gemini-3.1-flash-image-preview") {
+    return [modelId, "gemini-2.5-flash-image"];
+  }
+
+  if (modelId === "gemini-3-pro-image-preview") {
+    return [modelId, "gemini-2.5-flash-image-pro"];
+  }
+
+  return [modelId];
+}
+
+type ProviderFailureDetails = {
+  accountAttempts?: number;
+  maxAccountAttempts?: number;
 };
 
 export class ModelNotAvailableError extends Error {
@@ -31,6 +57,7 @@ export class ProviderUnavailableError extends Error {
   constructor(
     modelId: string,
     readonly cause?: unknown,
+    readonly details?: ProviderFailureDetails,
   ) {
     super(`模型 ${modelId} 的渠道暂不可用`);
     this.name = "ProviderUnavailableError";
@@ -38,6 +65,10 @@ export class ProviderUnavailableError extends Error {
 }
 
 function isDowngradable(error: unknown): boolean {
+  if (isProviderTimeoutError(error)) {
+    return true;
+  }
+
   if (error instanceof ProviderRequestError) {
     return error.diagnostic.status === 429 || error.diagnostic.status >= 500;
   }
@@ -83,6 +114,10 @@ function isAuthenticationError(error: unknown): boolean {
     message.includes("request failed: 403") ||
     message.includes("request failed: 404")
   );
+}
+
+function isFatalAccountError(error: unknown): boolean {
+  return isAuthenticationError(error) || isUpstreamAccessForbiddenError(error);
 }
 
 function isRateLimited(error: unknown): boolean {
@@ -159,6 +194,25 @@ async function markErrored(
   });
 }
 
+async function markProviderPoolErrored(
+  providerId: string,
+  errors: unknown[],
+): Promise<void> {
+  if (errors.length === 0) {
+    return;
+  }
+
+  await markErrored(
+    providerId,
+    new Error(
+      `账号池本轮尝试失败（${errors.length} 个账号）: ${errors
+        .map(serializeProviderError)
+        .join("; ")}`,
+    ),
+    true,
+  );
+}
+
 async function markAccountErrored(
   accountId: string,
   error: unknown,
@@ -179,7 +233,7 @@ async function markAccountErrored(
   const nextErrors = account.consecutiveErrors + 1;
   let health: ProviderHealth = account.health;
 
-  if (isAuthenticationError(error)) {
+  if (isFatalAccountError(error)) {
     health = "DOWN";
   }
 
@@ -197,7 +251,7 @@ async function markAccountErrored(
       consecutiveErrors: nextErrors,
       health,
       cooldownUntil:
-        isRateLimited(error) || isAuthenticationError(error)
+        isRateLimited(error) || isFatalAccountError(error)
           ? new Date(Date.now() + 5 * 60_000)
           : downgradable
             ? new Date(Date.now() + 60_000)
@@ -259,6 +313,7 @@ async function findAvailableProviderAccounts(modelId: string) {
   }
 
   const now = new Date();
+  const modelIds = supportedModelIds(modelId);
 
   const accounts = await db.providerAccount.findMany({
     where: {
@@ -271,9 +326,7 @@ async function findAvailableProviderAccounts(modelId: string) {
       provider: {
         isActive: true,
         protocol: modelProtocolToProviderProtocol(model.protocol),
-        modelsSupported: {
-          has: modelId,
-        },
+        OR: modelIds.map((id) => ({ modelsSupported: { has: id } })),
         health: {
           not: "DOWN",
         },
@@ -327,10 +380,21 @@ async function findAvailableProviderAccounts(modelId: string) {
 
 export async function selectAndGenerate(
   request: InternalRequest,
+  options?: {
+    onProviderSelected?: (selection: {
+      providerId: string;
+      providerName: string;
+      providerAccountId: string | null;
+      providerAccountName: string | null;
+    }) => Promise<void> | void;
+    onProgress?: GenerateProgressCallback;
+  },
 ): Promise<{
   result: GenerateResult;
   providerId: string;
+  providerName: string;
   providerAccountId: string | null;
+  providerAccountName: string | null;
   multiplier: number;
 }> {
   if (!process.env.DATABASE_URL) {
@@ -345,13 +409,29 @@ export async function selectAndGenerate(
   }
 
   const errors: unknown[] = [];
+  const providerPoolErrors = new Map<string, unknown[]>();
+  let accountAttempts = 0;
+  const maxAccountAttempts = Math.min(
+    providerAccountMaxAttempts(),
+    accountCandidates.length,
+  );
 
   for (const account of accountCandidates) {
+    if (accountAttempts >= maxAccountAttempts) {
+      break;
+    }
+
     const target = await leaseProviderAccount(account);
 
     if (!target) {
       continue;
     }
+
+    if (!target.account) {
+      continue;
+    }
+
+    accountAttempts += 1;
 
     const adapter = buildAdapter({
       id: target.account?.id ?? target.provider.id,
@@ -362,10 +442,20 @@ export async function selectAndGenerate(
     });
 
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 180_000);
+    const timer = setTimeout(() => controller.abort(), generationTimeoutMs());
 
     try {
-      const result = await adapter.generate(request, controller.signal);
+      await options?.onProviderSelected?.({
+        providerId: target.provider.id,
+        providerName: target.provider.name,
+        providerAccountId: target.account?.id ?? null,
+        providerAccountName: target.account?.name ?? null,
+      });
+      const result = await adapter.generate(
+        request,
+        controller.signal,
+        options?.onProgress,
+      );
       clearTimeout(timer);
       await Promise.all([
         markHealthy(target.provider.id),
@@ -375,21 +465,22 @@ export async function selectAndGenerate(
       return {
         result,
         providerId: target.provider.id,
+        providerName: target.provider.name,
         providerAccountId: target.account?.id ?? null,
+        providerAccountName: target.account?.name ?? null,
         multiplier: target.provider.costMultiplier,
       };
     } catch (error) {
       clearTimeout(timer);
       const downgradable = isDowngradable(error);
       errors.push(error);
-      await Promise.all([
-        markErrored(target.provider.id, error, downgradable),
-        target.account
-          ? markAccountErrored(target.account.id, error, downgradable)
-          : Promise.resolve(),
-      ]);
+      const providerErrors = providerPoolErrors.get(target.provider.id) ?? [];
+      providerErrors.push(error);
+      providerPoolErrors.set(target.provider.id, providerErrors);
 
-      if (!downgradable && !isAuthenticationError(error)) {
+      await markAccountErrored(target.account.id, error, downgradable);
+
+      if (!downgradable && !isFatalAccountError(error)) {
         throw error;
       }
     } finally {
@@ -398,6 +489,12 @@ export async function selectAndGenerate(
       }
     }
   }
+
+  await Promise.all(
+    Array.from(providerPoolErrors.entries()).map(([providerId, providerErrors]) =>
+      markProviderPoolErrored(providerId, providerErrors),
+    ),
+  );
 
   for (const provider of legacyCandidates) {
     const hasAccounts = await db.providerAccount.count({
@@ -417,17 +514,29 @@ export async function selectAndGenerate(
     });
 
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 180_000);
+    const timer = setTimeout(() => controller.abort(), generationTimeoutMs());
 
     try {
-      const result = await adapter.generate(request, controller.signal);
+      await options?.onProviderSelected?.({
+        providerId: provider.id,
+        providerName: provider.name,
+        providerAccountId: null,
+        providerAccountName: null,
+      });
+      const result = await adapter.generate(
+        request,
+        controller.signal,
+        options?.onProgress,
+      );
       clearTimeout(timer);
       await markHealthy(provider.id);
 
       return {
         result,
         providerId: provider.id,
+        providerName: provider.name,
         providerAccountId: null,
+        providerAccountName: null,
         multiplier: provider.costMultiplier,
       };
     } catch (error) {
@@ -447,6 +556,10 @@ export async function selectAndGenerate(
     new Error(
       `所有渠道均不可用: ${errors.map(serializeProviderError).join("; ")}`,
     ),
+    {
+      accountAttempts,
+      maxAccountAttempts,
+    },
   );
 }
 
@@ -457,13 +570,13 @@ export async function findAvailableProviders(modelId: string) {
     return [];
   }
 
+  const modelIds = supportedModelIds(modelId);
+
   return db.provider.findMany({
     where: {
       isActive: true,
       protocol: modelProtocolToProviderProtocol(model.protocol),
-      modelsSupported: {
-        has: modelId,
-      },
+      OR: modelIds.map((id) => ({ modelsSupported: { has: id } })),
       health: {
         not: "DOWN",
       },

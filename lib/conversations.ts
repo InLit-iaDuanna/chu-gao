@@ -5,6 +5,7 @@ import type {
   ConversationSummaryView,
   ConversationView,
 } from "@/lib/conversation";
+import { publicChannelAlias } from "@/lib/channel-alias";
 import { privateImageUrl } from "@/lib/storage";
 
 const conversationInclude = {
@@ -12,6 +13,16 @@ const conversationInclude = {
     include: {
       generation: {
         include: {
+          provider: {
+            select: {
+              name: true,
+            },
+          },
+          providerAccount: {
+            select: {
+              name: true,
+            },
+          },
           images: {
             orderBy: {
               createdAt: "asc",
@@ -36,6 +47,16 @@ const conversationSummaryInclude = {
   },
   generations: {
     include: {
+      provider: {
+        select: {
+          name: true,
+        },
+      },
+      providerAccount: {
+        select: {
+          name: true,
+        },
+      },
       images: {
         orderBy: {
           createdAt: "asc",
@@ -103,6 +124,14 @@ function firstGenerationImage(
     imageId: image.id,
     imageUrl: privateImageUrl(generation.id, image.id),
     generationStatus: generation.status,
+    generationProvider: generation.provider?.name ?? null,
+    generationProviderAccountName: publicChannelAlias(
+      generation.providerAccount?.name,
+      generation.provider?.name,
+    ),
+    generationStartedAt: generation.startedAt?.toISOString() ?? null,
+    generationFinishedAt: generation.finishedAt?.toISOString() ?? null,
+    generationProgress: generation.progress,
   };
 }
 

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronDown,
+  Trash2,
   MessageSquarePlus,
   Settings,
   SlidersHorizontal,
@@ -34,6 +35,7 @@ import type {
   ConversationView,
 } from "@/lib/conversation";
 import { estimateCost } from "@/lib/credits";
+import { firstSupportedResolutionAspectPair } from "@/lib/models/capabilities";
 import type { AspectRatio, PublicModelDefinition } from "@/lib/models/types";
 import {
   readWorkbenchPreferences,
@@ -149,18 +151,15 @@ function initialStateFor(
   model: PublicModelDefinition,
   preferences: WorkbenchPreferences = {},
 ): WorkbenchState {
+  const pair = firstSupportedResolutionAspectPair(model, {
+    aspectRatio: preferences.aspectRatio as AspectRatio | undefined,
+    resolution: preferences.resolution as WorkbenchState["resolution"],
+  });
+
   return {
     modelId: model.id,
-    aspectRatio:
-      preferences.aspectRatio &&
-      model.capabilities.aspectRatios.includes(preferences.aspectRatio as never)
-        ? preferences.aspectRatio
-        : model.defaults.aspectRatio,
-    resolution:
-      preferences.resolution &&
-      model.capabilities.resolutions.includes(preferences.resolution as never)
-        ? (preferences.resolution as WorkbenchState["resolution"])
-        : model.defaults.resolution,
+    aspectRatio: pair.aspectRatio,
+    resolution: pair.resolution,
     n: 1,
     outputFormat: model.defaults.outputFormat,
     background: model.defaults.background,
@@ -251,7 +250,7 @@ export function WorkbenchShell({
     UploadedReferenceImage[]
   >([]);
   const [useCurrentImageAsReference, setUseCurrentImageAsReference] =
-    useState(true);
+    useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [queueNotice, setQueueNotice] = useState<string | null>(null);
   const [isParamsOpen, setIsParamsOpen] = useState(true);
@@ -315,7 +314,7 @@ export function WorkbenchShell({
     setError(null);
     setDraft("");
     clearUploadedReferenceImages();
-    setUseCurrentImageAsReference(true);
+    setUseCurrentImageAsReference(false);
   }
 
   function resetWorkspaceForNewConversation() {
@@ -376,6 +375,7 @@ export function WorkbenchShell({
   function applyConversation(conversation: ConversationView) {
     setConversationId(conversation.id);
     setConversationTitle(conversation.title);
+    setUseCurrentImageAsReference(false);
     setMessages(
       conversation.messages.length ? conversation.messages : [WELCOME_MESSAGE],
     );
@@ -395,6 +395,12 @@ export function WorkbenchShell({
         prompt: lastImageMessage.content,
         status: lastImageMessage.generationStatus ?? "SUCCEEDED",
         createdAt: lastImageMessage.createdAt ?? new Date().toISOString(),
+        provider: lastImageMessage.generationProvider ?? null,
+        providerAccountName:
+          lastImageMessage.generationProviderAccountName ?? null,
+        startedAt: lastImageMessage.generationStartedAt ?? null,
+        finishedAt: lastImageMessage.generationFinishedAt ?? null,
+        progress: lastImageMessage.generationProgress ?? null,
         images: [
           {
             id: lastImageMessage.imageId,
@@ -404,8 +410,10 @@ export function WorkbenchShell({
         ],
       });
       setStatus(nextStatus);
-      setGenerationProgress(nextStatus === "succeeded" ? 100 : 0);
-      setUseCurrentImageAsReference(true);
+      setGenerationProgress(
+        lastImageMessage.generationProgress ??
+          (nextStatus === "succeeded" ? 100 : 0),
+      );
     } else {
       setActiveGeneration(null);
       setStatus("idle");
@@ -461,41 +469,6 @@ export function WorkbenchShell({
     }
   }
 
-  async function appendConversationMessages(
-    targetConversationId: string,
-    nextMessages: Array<
-      Pick<ConversationMessage, "role" | "content" | "generationId">
-    >,
-  ) {
-    try {
-      const conversation = await readApiResponse<ConversationView>(
-        await fetch(`/api/conversations/${targetConversationId}/messages`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ messages: nextMessages }),
-        }),
-        "对话保存失败。",
-      );
-
-      applyConversation(conversation);
-      setConversationError(null);
-    } catch (saveError) {
-      if (isUnauthorizedError(saveError)) {
-        redirectToLogin();
-        return;
-      }
-
-      setConversationError(
-        friendlyErrorMessage(
-          saveError instanceof Error ? saveError.message : null,
-          "对话保存失败。",
-        ),
-      );
-    }
-  }
-
   async function clearCurrentConversationMessages() {
     if (!conversationId) {
       setMessages([WELCOME_MESSAGE]);
@@ -538,6 +511,124 @@ export function WorkbenchShell({
         friendlyErrorMessage(
           clearError instanceof Error ? clearError.message : null,
           "聊天记录清空失败。",
+        ),
+      );
+    }
+  }
+
+  async function updateConversationMessage(messageId: string, content: string) {
+    if (!conversationId || messageId === WELCOME_MESSAGE.id) {
+      return;
+    }
+
+    try {
+      const conversation = await readApiResponse<ConversationView>(
+        await fetch(
+          `/api/conversations/${conversationId}/messages/${messageId}`,
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ content }),
+          },
+        ),
+        "消息编辑失败。",
+      );
+
+      applyConversation(conversation);
+      setConversationError(null);
+    } catch (editError) {
+      if (isUnauthorizedError(editError)) {
+        redirectToLogin();
+        return;
+      }
+
+      setConversationError(
+        friendlyErrorMessage(
+          editError instanceof Error ? editError.message : null,
+          "消息编辑失败。",
+        ),
+      );
+      throw editError;
+    }
+  }
+
+  async function archiveConversation(targetConversationId: string) {
+    const confirmed = window.confirm("确定删除这个历史对话吗？");
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await readApiResponse<ConversationView>(
+        await fetch(`/api/conversations/${targetConversationId}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ archived: true }),
+        }),
+        "历史对话删除失败。",
+      );
+
+      setConversations((current) =>
+        current.filter((item) => item.id !== targetConversationId),
+      );
+
+      if (targetConversationId === conversationId) {
+        resetWorkspaceForNewConversation();
+      }
+
+      setConversationError(null);
+    } catch (archiveError) {
+      if (isUnauthorizedError(archiveError)) {
+        redirectToLogin();
+        return;
+      }
+
+      setConversationError(
+        friendlyErrorMessage(
+          archiveError instanceof Error ? archiveError.message : null,
+          "历史对话删除失败。",
+        ),
+      );
+    }
+  }
+
+  async function clearAllConversations() {
+    if (conversations.length === 0) {
+      return;
+    }
+
+    const confirmed = window.confirm("确定清空全部历史对话吗？生成记录会保留。");
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await readApiResponse<{ archived: number }>(
+        await fetch("/api/conversations", {
+          method: "DELETE",
+        }),
+        "历史对话清空失败。",
+      );
+
+      setConversations([]);
+      resetWorkspaceForNewConversation();
+      setConversationError(null);
+    } catch (clearError) {
+      if (isUnauthorizedError(clearError)) {
+        redirectToLogin();
+        return;
+      }
+
+      setConversationError(
+        friendlyErrorMessage(
+          clearError instanceof Error ? clearError.message : null,
+          "历史对话清空失败。",
         ),
       );
     }
@@ -659,12 +750,12 @@ export function WorkbenchShell({
       setStatus(nextStatus);
 
       if (nextStatus === "pending") {
-        setGenerationProgress((current) => Math.max(current, 12));
+        setGenerationProgress(next.progress ?? 12);
         setQueueNotice((current) => current ?? "任务正在等待生成 worker 消费。");
       }
 
       if (nextStatus === "running") {
-        setGenerationProgress((current) => Math.max(current, 62));
+        setGenerationProgress(next.progress ?? 62);
         setQueueNotice(null);
       }
 
@@ -693,6 +784,12 @@ export function WorkbenchShell({
                   imageId: next.images[0]?.id,
                   imageUrl: next.images[0]?.src ?? next.images[0]?.url,
                   generationStatus: next.status,
+                  generationProvider: next.provider ?? null,
+                  generationProviderAccountName:
+                    next.providerAccountName ?? null,
+                  generationStartedAt: next.startedAt ?? null,
+                  generationFinishedAt: next.finishedAt ?? null,
+                  generationProgress: next.progress ?? 100,
                 }
               : message,
           ),
@@ -1060,6 +1157,7 @@ export function WorkbenchShell({
         prompt: userText,
         status: payload.status,
         createdAt: new Date().toISOString(),
+        progress: 0,
         images: [],
       };
       const assistantMessage = createMessage(
@@ -1071,7 +1169,7 @@ export function WorkbenchShell({
       setMessages((current) => [...current, assistantMessage]);
       setCredits((current) => Math.max(0, current - payload.estimatedCredits));
       setStatus(statusFromGeneration(payload.status));
-      setGenerationProgress(payload.status === "PENDING" ? 12 : 62);
+      setGenerationProgress(0);
       setQueueNotice(
         payload.status === "PENDING"
           ? payload.workerOnline
@@ -1252,6 +1350,16 @@ export function WorkbenchShell({
               messages={messages}
               taskStatus={status}
               progress={generationProgress}
+              taskMeta={{
+                provider:
+                  activeGeneration?.providerAccountName ??
+                  activeGeneration?.provider ??
+                  null,
+                startedAt: activeGeneration?.startedAt ?? null,
+                finishedAt: activeGeneration?.finishedAt ?? null,
+              }}
+              onReuseMessage={setDraft}
+              onEditMessage={updateConversationMessage}
               onClearMessages={clearCurrentConversationMessages}
               canClearMessages={
                 messages.some((message) => message.id !== WELCOME_MESSAGE.id)
@@ -1348,40 +1456,66 @@ export function WorkbenchShell({
           <div className="surface-panel p-3">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="eyebrow">对话</p>
+                <p className="eyebrow">历史对话</p>
                 <h3 className="mt-1 truncate text-base font-medium">
                   {conversationTitle}
                 </h3>
               </div>
-              <button
-                type="button"
-                className="tool-button h-9 w-9 shrink-0 px-0 text-text-muted"
-                aria-label="新建对话"
-                onClick={resetWorkspaceForNewConversation}
-              >
-                <MessageSquarePlus className="h-4 w-4 stroke-[1.5]" />
-              </button>
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  className="tool-button h-9 w-9 px-0 text-text-muted"
+                  aria-label="清空历史对话"
+                  title="清空历史对话"
+                  onClick={clearAllConversations}
+                  disabled={conversations.length === 0}
+                >
+                  <Trash2 className="h-4 w-4 stroke-[1.5]" />
+                </button>
+                <button
+                  type="button"
+                  className="tool-button h-9 w-9 px-0 text-text-muted"
+                  aria-label="新建对话"
+                  title="新建对话"
+                  onClick={resetWorkspaceForNewConversation}
+                >
+                  <MessageSquarePlus className="h-4 w-4 stroke-[1.5]" />
+                </button>
+              </div>
             </div>
             <div className="space-y-2">
               {conversations.slice(0, 5).map((item) => (
-                <Link
+                <div
                   key={item.id}
-                  href={`/app?conversation=${item.id}`}
-                  className={`block rounded-[6px] border px-3 py-2 text-sm leading-5 transition-colors ${
+                  className={`group flex items-start gap-2 rounded-[6px] border px-3 py-2 text-sm leading-5 transition-colors ${
                     item.id === conversationId
-                      ? "border-border-strong bg-surface-2 text-foreground"
-                      : "border-border bg-surface-2 text-text-muted hover:text-foreground"
+                      ? "border-foreground bg-foreground/10 text-foreground shadow-[inset_0_0_0_1px_rgb(var(--text)/0.16)]"
+                      : "border-border bg-surface-2 text-text-muted hover:border-border-strong hover:text-foreground"
                   }`}
                 >
-                  <span className="block truncate font-medium">
-                    {item.title}
-                  </span>
-                  {item.latestMessage ? (
-                    <span className="mt-1 line-clamp-1 block text-xs opacity-75">
-                      {item.latestMessage}
+                  <Link
+                    href={`/app?conversation=${item.id}`}
+                    className="min-w-0 flex-1"
+                  >
+                    <span className="block truncate font-medium">
+                      {item.title}
                     </span>
-                  ) : null}
-                </Link>
+                    {item.latestMessage ? (
+                      <span className="mt-1 line-clamp-1 block text-xs opacity-75">
+                        {item.latestMessage}
+                      </span>
+                    ) : null}
+                  </Link>
+                  <button
+                    type="button"
+                    className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-[6px] border border-border text-text-faint opacity-0 transition-all hover:border-border-strong hover:text-foreground focus:opacity-100 group-hover:opacity-100"
+                    aria-label={`删除历史对话 ${item.title}`}
+                    title="删除历史对话"
+                    onClick={() => void archiveConversation(item.id)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5 stroke-[1.5]" />
+                  </button>
+                </div>
               ))}
               {conversations.length === 0 ? (
                 <p className="text-sm leading-6 text-text-muted">

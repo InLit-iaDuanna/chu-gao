@@ -1,6 +1,7 @@
 import { PROVIDER_FETCH_RETRY, fetchWithTimeout } from "@/lib/http";
 import type { InternalRequest } from "@/lib/models/types";
 import { providerError } from "@/lib/providers/diagnostics";
+import { providerRequestTimeoutMs } from "@/lib/providers/config";
 import type {
   GenerateResult,
   ProviderAdapter,
@@ -47,16 +48,11 @@ export class GeminiImageAdapter implements ProviderAdapter {
       });
     }
 
-    const imageConfig: Record<string, string> = {
-      aspectRatio: req.aspectRatio,
-      imageSize: req.resolution,
-    };
-
     const endpoint = `${this.config.baseUrl}/v1beta/models/${req.modelId}:generateContent`;
     const response = await fetchWithTimeout(endpoint, {
       method: "POST",
       signal,
-      timeoutMs: 90_000,
+      timeoutMs: providerRequestTimeoutMs(),
       retry: PROVIDER_FETCH_RETRY,
       headers: {
         "x-goog-api-key": this.config.apiKey,
@@ -71,7 +67,12 @@ export class GeminiImageAdapter implements ProviderAdapter {
         ],
         generationConfig: {
           responseModalities: ["IMAGE"],
-          imageConfig,
+          responseFormat: {
+            image: {
+              aspectRatio: req.aspectRatio,
+              imageSize: req.resolution,
+            },
+          },
         },
       }),
     });

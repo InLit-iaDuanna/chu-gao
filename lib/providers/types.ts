@@ -13,11 +13,25 @@ export interface GenerateResult {
   rawProviderResponse?: unknown;
 }
 
+export interface GenerateProgressEvent {
+  status?: "queued" | "in_progress" | "completed" | "failed";
+  progress?: number;
+  rawProviderResponse?: unknown;
+}
+
+export type GenerateProgressCallback = (
+  event: GenerateProgressEvent,
+) => Promise<void> | void;
+
 export interface ProviderAdapter {
   readonly id: string;
   readonly name: string;
   readonly protocol: ProtocolName;
-  generate(req: InternalRequest, signal: AbortSignal): Promise<GenerateResult>;
+  generate(
+    req: InternalRequest,
+    signal: AbortSignal,
+    onProgress?: GenerateProgressCallback,
+  ): Promise<GenerateResult>;
 }
 
 export interface ProviderConfig {

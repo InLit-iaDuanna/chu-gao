@@ -8,6 +8,8 @@ export type AspectRatio =
   | "5:4"
   | "16:9"
   | "9:16"
+  | "2:1"
+  | "1:2"
   | "21:9"
   | "9:21";
 
@@ -35,6 +37,7 @@ export interface PricingRule {
 export interface ModelCapabilities {
   aspectRatios: AspectRatio[];
   resolutions: Resolution[];
+  resolutionAspectRatios?: Partial<Record<Resolution, AspectRatio[]>>;
   supportsReferenceImage: boolean;
   maxReferenceImages: number;
   supportsNegativePrompt: boolean;
@@ -47,6 +50,7 @@ export interface ModelCapabilities {
 
 export interface ModelDefinition {
   id: string;
+  selectorId?: string;
   displayName: string;
   vendor: string;
   protocol: ProtocolName;

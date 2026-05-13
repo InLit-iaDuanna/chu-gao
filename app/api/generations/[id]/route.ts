@@ -39,6 +39,12 @@ export async function GET(
             name: true,
           },
         },
+        providerAccount: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
       },
     });
 
