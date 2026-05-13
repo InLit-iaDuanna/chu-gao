@@ -1,7 +1,5 @@
 import { z } from "zod";
 
-import { SYSTEM_CONFIG_DEFAULT_ROWS } from "@/lib/system-config";
-
 export const loginSchema = z.object({
   email: z.email("邮箱格式不正确"),
   password: z.string().min(8, "密码至少 8 位"),
@@ -151,7 +149,45 @@ export const redeemCodeSchema = z.object({
   code: z.string().trim().min(4).max(80),
 });
 
-export const systemConfigPatchSchema = z.object({
-  key: z.enum(Object.keys(SYSTEM_CONFIG_DEFAULT_ROWS) as [string, ...string[]]),
-  value: z.unknown(),
-});
+export const systemConfigPatchSchema = z.discriminatedUnion("key", [
+  z.object({
+    key: z.literal("registration.inviteOnly"),
+    value: z.boolean(),
+  }),
+  z.object({
+    key: z.literal("registration.defaultCredits"),
+    value: z.number().int().min(0).max(1_000_000),
+  }),
+  z.object({
+    key: z.literal("generation.globalConcurrency"),
+    value: z.number().int().min(1).max(10_000),
+  }),
+  z.object({
+    key: z.literal("generation.defaultDailyLimit"),
+    value: z.number().int().min(1).max(10_000),
+  }),
+  z.object({
+    key: z.literal("moderation.enabled"),
+    value: z.boolean(),
+  }),
+  z.object({
+    key: z.literal("moderation.blockedKeywords"),
+    value: z.array(z.string().trim().min(1).max(80)).max(500),
+  }),
+  z.object({
+    key: z.literal("announcement.enabled"),
+    value: z.boolean(),
+  }),
+  z.object({
+    key: z.literal("announcement.title"),
+    value: z.string().trim().max(80),
+  }),
+  z.object({
+    key: z.literal("announcement.body"),
+    value: z.string().trim().max(500),
+  }),
+  z.object({
+    key: z.literal("announcement.tone"),
+    value: z.enum(["info", "warning", "success", "danger"]),
+  }),
+]);

@@ -34,6 +34,12 @@ async function getGeneration(id: string) {
             name: true,
           },
         },
+        providerAccount: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
       },
     });
 

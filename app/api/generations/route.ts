@@ -92,6 +92,12 @@ export async function GET(request: Request) {
             name: true,
           },
         },
+        providerAccount: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
       },
       orderBy: {
         createdAt: "desc",
@@ -290,6 +296,7 @@ export async function POST(request: Request) {
             ...sourceReferenceImages.map((image) => image.storageKey),
           ],
           status: "PENDING",
+          progress: 0,
           costCredits: estimatedCredits,
           pricingSnapshot: pricingSnapshotJson,
         },

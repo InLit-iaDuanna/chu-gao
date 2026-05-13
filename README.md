@@ -87,3 +87,8 @@ pnpm dev:all
 ## 当前状态
 
 这版已经从纯 mock 推进到可运行业务链路：有数据库和 Redis 时会创建真实任务、扣点、入队、调用 Provider、写回状态和图片记录；未启动基础设施时接口会 fail closed，并通过 `/api/health` 与 `pnpm dev:doctor` 给出诊断和启动步骤。
+
+## 对话同步记录
+
+如果你换了一个新对话，先看这个文件：[`docs/CONVERSATION_RECORD.md`](./docs/CONVERSATION_RECORD.md)。
+这里专门放跨对话需要延续的状态、风险、环境变量和下一步，不放密钥。

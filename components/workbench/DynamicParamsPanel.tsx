@@ -3,6 +3,10 @@
 import type { WorkbenchState } from "@/components/workbench/types";
 import { AspectRatioPicker } from "@/components/workbench/AspectRatioPicker";
 import { ResolutionPicker } from "@/components/workbench/ResolutionPicker";
+import {
+  firstSupportedResolutionAspectPair,
+  isResolutionAspectRatioSupported,
+} from "@/lib/models/capabilities";
 import type { PublicModelDefinition } from "@/lib/models/types";
 import { cn } from "@/lib/utils";
 
@@ -32,17 +36,16 @@ export function normalizeWorkbenchState(
     return prev;
   }
 
+  const pair = firstSupportedResolutionAspectPair(model, {
+    aspectRatio: prev.aspectRatio as never,
+    resolution: prev.resolution,
+  });
+
   return {
     ...prev,
     modelId,
-    aspectRatio: model.capabilities.aspectRatios.includes(
-      prev.aspectRatio as never,
-    )
-      ? prev.aspectRatio
-      : model.defaults.aspectRatio,
-    resolution: model.capabilities.resolutions.includes(prev.resolution)
-      ? prev.resolution
-      : model.defaults.resolution,
+    aspectRatio: pair.aspectRatio,
+    resolution: pair.resolution,
     n: Math.min(prev.n, model.capabilities.maxN),
     negativePrompt: model.capabilities.supportsNegativePrompt
       ? prev.negativePrompt
@@ -91,6 +94,7 @@ export function DynamicParamsPanel({
   }
 
   const { capabilities } = model;
+  const availableResolutions = capabilities.resolutions;
   const canCompress =
     capabilities.supportsOutputCompression &&
     (value.outputFormat === "jpeg" || value.outputFormat === "webp");
@@ -102,14 +106,41 @@ export function DynamicParamsPanel({
           <AspectRatioPicker
             options={capabilities.aspectRatios}
             value={value.aspectRatio}
-            onChange={(aspectRatio) => onChange({ ...value, aspectRatio })}
+            disabledOptions={capabilities.aspectRatios.filter(
+              (aspectRatio) =>
+                !isResolutionAspectRatioSupported(
+                  capabilities,
+                  value.resolution,
+                  aspectRatio,
+                ),
+            )}
+            onChange={(aspectRatio) => {
+              const pair = firstSupportedResolutionAspectPair(model, {
+                aspectRatio: aspectRatio as never,
+                resolution: value.resolution,
+              });
+
+              onChange({
+                ...value,
+                aspectRatio: pair.aspectRatio,
+                resolution: pair.resolution,
+              });
+            }}
           />
         </Section>
 
         <Section title="分辨率">
           <ResolutionPicker
-            options={capabilities.resolutions}
+            options={availableResolutions}
             value={value.resolution}
+            disabledOptions={availableResolutions.filter(
+              (resolution) =>
+                !isResolutionAspectRatioSupported(
+                  capabilities,
+                  resolution,
+                  value.aspectRatio as never,
+                ),
+            )}
             onChange={(resolution) =>
               onChange({ ...value, resolution: resolution as never })
             }

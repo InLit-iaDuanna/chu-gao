@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 
+import { publicChannelAlias } from "@/lib/channel-alias";
 import { privateImageUrl } from "@/lib/storage";
 
 export const GENERATION_STATUSES = [
@@ -16,6 +17,12 @@ export type GenerationWithRelations = Prisma.GenerationGetPayload<{
   include: {
     images: true;
     provider: {
+      select: {
+        id: true;
+        name: true;
+      };
+    };
+    providerAccount: {
       select: {
         id: true;
         name: true;
@@ -56,6 +63,11 @@ export function serializeGeneration(row: GenerationWithRelations) {
     referenceImageKeys: row.referenceImageKeys,
     status: row.status,
     provider: row.provider?.name ?? null,
+    providerAccountName: publicChannelAlias(
+      row.providerAccount?.name,
+      row.provider?.name,
+    ),
+    progress: row.progress,
     errorCode: row.errorCode,
     errorMessage: row.errorMessage,
     credits: row.costCredits,

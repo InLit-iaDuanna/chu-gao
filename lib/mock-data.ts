@@ -30,7 +30,7 @@ export const mockGenerations = [
   },
   {
     id: "gen_2",
-    modelId: "gemini-2.5-flash-image-pro",
+    modelId: "gemini-3-pro-image-preview",
     prompt: "服装立裁工作室，晨雾感，柔和天光，浅灰与米白。",
     status: "RUNNING",
     createdAt: "2026-05-10T01:31:00.000Z",
@@ -42,7 +42,7 @@ export const mockGenerations = [
   },
   {
     id: "gen_3",
-    modelId: "gemini-2.5-flash-image",
+    modelId: "gemini-3.1-flash-image-preview",
     prompt: "赛博重庆夜景，长焦压缩感，霓虹雨丝。",
     status: "PENDING",
     createdAt: "2026-05-10T01:34:00.000Z",
@@ -81,7 +81,10 @@ export const mockProviders = [
     priority: 80,
     health: "DEGRADED",
     lastErrorMsg: "上游 429 较多",
-    modelsSupported: ["gemini-2.5-flash-image", "gemini-2.5-flash-image-pro"],
+    modelsSupported: [
+      "gemini-3.1-flash-image-preview",
+      "gemini-3-pro-image-preview",
+    ],
     costMultiplier: 1,
   },
 ] as const;

@@ -6,6 +6,7 @@ import type {
   Resolution,
 } from "@/lib/models/types";
 import { providerError } from "@/lib/providers/diagnostics";
+import { providerRequestTimeoutMs } from "@/lib/providers/config";
 import {
   RESOLUTION_TO_QUALITY,
   imagePixelSizeForRequest,
@@ -202,7 +203,7 @@ export class OpenAIResponsesImageAdapter implements ProviderAdapter {
       const response = await fetchWithTimeout(endpoint, {
         method: "POST",
         signal,
-        timeoutMs: 180_000,
+        timeoutMs: providerRequestTimeoutMs(),
         retry: PROVIDER_FETCH_RETRY,
         headers: {
           Authorization: `Bearer ${this.config.apiKey}`,

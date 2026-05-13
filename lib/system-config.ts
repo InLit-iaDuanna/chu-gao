@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import type { Prisma } from "@prisma/client";
 
 import { db } from "@/lib/db";
@@ -16,14 +18,34 @@ export const SYSTEM_CONFIG_DEFAULTS = {
     enabled: true,
     blockedKeywords: [] as string[],
   },
+  announcement: {
+    enabled: false,
+    title: "",
+    body: "",
+    tone: "info",
+  },
 } as const;
 
 export type SystemConfig = typeof SYSTEM_CONFIG_DEFAULTS;
 
-export function getPublicConfig(): { inviteOnly: boolean; version: string } {
+export type AnnouncementTone = "info" | "warning" | "success" | "danger";
+
+export type PublicAnnouncement = {
+  id: string;
+  title: string;
+  body: string;
+  tone: AnnouncementTone;
+};
+
+export function getPublicConfig(): {
+  inviteOnly: boolean;
+  version: string;
+  announcement: PublicAnnouncement | null;
+} {
   return {
     inviteOnly: SYSTEM_CONFIG_DEFAULTS.registration.inviteOnly,
     version: "v3.1-mvp",
+    announcement: null,
   };
 }
 
@@ -34,6 +56,10 @@ export const SYSTEM_CONFIG_DEFAULT_ROWS = {
   "generation.defaultDailyLimit": 50,
   "moderation.enabled": true,
   "moderation.blockedKeywords": [] as string[],
+  "announcement.enabled": false,
+  "announcement.title": "",
+  "announcement.body": "",
+  "announcement.tone": "info" as AnnouncementTone,
 } as const;
 
 export type SystemConfigKey = keyof typeof SYSTEM_CONFIG_DEFAULT_ROWS;
@@ -164,12 +190,58 @@ export async function setSystemConfigValue(
   configCache = null;
 }
 
+function toBoolean(value: unknown): boolean {
+  return value === true;
+}
+
+function toStringValue(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function toAnnouncementTone(value: unknown): AnnouncementTone {
+  return value === "warning" ||
+    value === "success" ||
+    value === "danger" ||
+    value === "info"
+    ? value
+    : "info";
+}
+
+function publicAnnouncementFromValues(
+  values: Record<SystemConfigKey, unknown>,
+): PublicAnnouncement | null {
+  const enabled = toBoolean(values["announcement.enabled"]);
+  const title = toStringValue(values["announcement.title"]);
+  const body = toStringValue(values["announcement.body"]);
+  const tone = toAnnouncementTone(values["announcement.tone"]);
+
+  if (!enabled || !body) {
+    return null;
+  }
+
+  const hash = createHash("sha256")
+    .update(JSON.stringify({ title, body, tone }))
+    .digest("hex")
+    .slice(0, 16);
+
+  return {
+    id: hash,
+    title,
+    body,
+    tone,
+  };
+}
+
 export async function getPublicRuntimeConfig(): Promise<{
   inviteOnly: boolean;
   version: string;
+  announcement: PublicAnnouncement | null;
 }> {
+  const values = await loadConfigRows({ strict: true });
+
   return {
-    inviteOnly: await getRequiredSystemConfigValue("registration.inviteOnly"),
+    inviteOnly: values["registration.inviteOnly"] as boolean,
     version: "v3.1-mvp",
+    announcement: publicAnnouncementFromValues(values),
   };
 }

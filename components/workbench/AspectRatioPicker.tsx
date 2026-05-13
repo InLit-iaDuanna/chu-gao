@@ -33,16 +33,19 @@ const VISUAL_HEIGHT: Record<string, string> = {
 export function AspectRatioPicker({
   options,
   value,
+  disabledOptions = [],
   onChange,
 }: {
   options: string[];
   value: string;
+  disabledOptions?: string[];
   onChange: (next: string) => void;
 }) {
   return (
     <div className="grid grid-cols-3 gap-3">
       {options.map((option) => {
         const active = option === value;
+        const disabled = disabledOptions.includes(option);
 
         return (
           <button
@@ -51,15 +54,19 @@ export function AspectRatioPicker({
             className={cn(
               "selection-card flex items-center justify-center rounded-[12px] border p-3",
               active && "selection-card-active",
+              disabled &&
+                "cursor-not-allowed opacity-35 hover:border-border hover:bg-surface",
             )}
             aria-pressed={active}
+            disabled={disabled}
+            title={disabled ? "当前分辨率不支持这个比例" : undefined}
             onClick={() => onChange(option)}
           >
             <div
               className={cn(
                 "flex items-center justify-center rounded-[8px] border border-border bg-surface/70 font-mono text-xs text-text-muted transition-all duration-200",
                 active &&
-                  "border-border-strong bg-surface-2 text-foreground shadow-[inset_0_0_0_1px_rgb(var(--text)/0.03)]",
+                  "border-border-strong bg-surface-2 text-foreground shadow-[0_0_0_3px_rgb(var(--text)/0.08)]",
                 VISUAL_WIDTH[option],
                 VISUAL_HEIGHT[option],
               )}
