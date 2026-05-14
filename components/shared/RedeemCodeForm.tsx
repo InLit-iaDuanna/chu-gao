@@ -54,6 +54,7 @@ export function RedeemCodeForm(): React.ReactElement {
 
   return (
     <form
+      id="redeem-code"
       onSubmit={submit}
       className="mt-6 rounded-lg border border-border p-4"
     >

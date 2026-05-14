@@ -6,7 +6,7 @@ import { RedeemCodeForm } from "@/components/shared/RedeemCodeForm";
 import { WorkbenchPreferencesForm } from "@/components/workbench/WorkbenchPreferencesForm";
 import { checkSessionFromHeaders } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { listModels } from "@/lib/models/registry";
+import { listConfiguredModels } from "@/lib/models/runtime-config";
 import { isDatabaseUnavailableError } from "@/lib/service-errors";
 
 async function getUserProfile() {
@@ -67,7 +67,10 @@ function usageLabel(used: number, limit: number | null) {
 }
 
 export default async function SettingsPage() {
-  const user = await getUserProfile();
+  const [user, models] = await Promise.all([
+    getUserProfile(),
+    listConfiguredModels(),
+  ]);
 
   if (!user) {
     return (
@@ -109,7 +112,7 @@ export default async function SettingsPage() {
         <RedeemCodeForm />
       </section>
       <WorkbenchPreferencesForm
-        models={listModels().map((model) => ({ ...model, available: true }))}
+        models={models.map((model) => ({ ...model, available: true }))}
       />
     </div>
   );

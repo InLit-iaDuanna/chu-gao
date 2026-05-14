@@ -7,9 +7,10 @@ export interface ConversationMessage {
   generationId?: string;
   imageId?: string;
   imageUrl?: string;
+  thumbnailUrl?: string;
   generationStatus?: string;
   generationProvider?: string | null;
-  generationProviderChannelId?: "aquatic" | "terrestrial" | null;
+  generationProviderChannelId?: string | null;
   generationProviderChannelName?: string | null;
   generationProviderAccountName?: string | null;
   generationStartedAt?: string | null;

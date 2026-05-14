@@ -120,7 +120,7 @@ export function AccountMenu({
       {showAdminLink && me.role === "ADMIN" ? (
         <IconButton asChild aria-label="管理后台" title="管理后台">
           <Link href="/admin">
-            <Shield />
+            <Shield className="h-3.5 w-3.5" strokeWidth={1.6} />
           </Link>
         </IconButton>
       ) : null}
@@ -155,11 +155,13 @@ export function AccountMenu({
           </Badge>
         </div>
         <DropdownMenuSeparator />
-        <DropdownMenuItem>
+        <DropdownMenuItem onClick={() => router.push("/app/settings")}>
           <Settings className="h-3.5 w-3.5" strokeWidth={1.6} />
           账户设置
         </DropdownMenuItem>
-        <DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => router.push("/app/settings#redeem-code")}
+        >
           <Ticket className="h-3.5 w-3.5" strokeWidth={1.6} />
           兑换码
         </DropdownMenuItem>

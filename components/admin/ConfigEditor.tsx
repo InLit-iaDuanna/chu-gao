@@ -3,6 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
+import {
+  IMAGE_ASPECT_RATIO_OPTIONS,
+  IMAGE_RESOLUTION_OPTIONS,
+} from "@/lib/models/options";
 import type { AnnouncementTone } from "@/lib/system-config";
 
 type ConfigEntry = { key: string; value: unknown };
@@ -43,6 +47,34 @@ function toneValue(value: unknown): AnnouncementTone {
     : "info";
 }
 
+function stringArrayValue(
+  value: unknown,
+  allowed: readonly string[],
+  fallback: readonly string[],
+): string[] {
+  if (!Array.isArray(value)) {
+    return [...fallback];
+  }
+
+  const allowedSet = new Set(allowed);
+  const unique = value.filter(
+    (item, index): item is string =>
+      typeof item === "string" &&
+      allowedSet.has(item) &&
+      value.indexOf(item) === index,
+  );
+
+  return unique.length > 0 ? unique : [...fallback];
+}
+
+function numberValue(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function clampImage2MaxN(value: unknown): number {
+  return Math.max(1, Math.min(4, numberValue(value, 4)));
+}
+
 const TONE_OPTIONS: Array<{ value: AnnouncementTone; label: string }> = [
   { value: "info", label: "普通" },
   { value: "warning", label: "提醒" },
@@ -65,13 +97,54 @@ export function ConfigEditor({
     }),
     [entries],
   );
+  const initialImage2Limits = useMemo(
+    () => ({
+      aspectRatios: stringArrayValue(
+        entryValue(entries, "generation.image2AspectRatios"),
+        IMAGE_ASPECT_RATIO_OPTIONS,
+        IMAGE_ASPECT_RATIO_OPTIONS,
+      ),
+      resolutions: stringArrayValue(
+        entryValue(entries, "generation.image2Resolutions"),
+        IMAGE_RESOLUTION_OPTIONS,
+        IMAGE_RESOLUTION_OPTIONS,
+      ),
+      maxN: clampImage2MaxN(entryValue(entries, "generation.image2MaxN")),
+    }),
+    [entries],
+  );
   const [enabled, setEnabled] = useState(initialAnnouncement.enabled);
   const [title, setTitle] = useState(initialAnnouncement.title);
   const [body, setBody] = useState(initialAnnouncement.body);
   const [tone, setTone] = useState<AnnouncementTone>(initialAnnouncement.tone);
+  const [image2AspectRatios, setImage2AspectRatios] = useState(
+    initialImage2Limits.aspectRatios,
+  );
+  const [image2Resolutions, setImage2Resolutions] = useState(
+    initialImage2Limits.resolutions,
+  );
+  const [image2MaxN, setImage2MaxN] = useState(initialImage2Limits.maxN);
   const [message, setMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const canSubmit = body.length <= 500 && title.length <= 80 && !isSubmitting;
+  const canSubmitImage2 =
+    image2AspectRatios.length > 0 &&
+    image2Resolutions.length > 0 &&
+    image2MaxN >= 1 &&
+    image2MaxN <= 4 &&
+    !isSubmitting;
+
+  function toggleListValue(
+    values: string[],
+    value: string,
+    fallback: readonly string[],
+  ) {
+    const next = values.includes(value)
+      ? values.filter((item) => item !== value)
+      : [...values, value];
+
+    return next.length > 0 ? next : [fallback[0] as string];
+  }
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -90,6 +163,30 @@ export function ConfigEditor({
         patchSystemConfig("announcement.tone", tone),
       ]);
       setMessage("公告已保存");
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "保存失败");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function submitImage2Limits(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canSubmitImage2) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setMessage("保存中...");
+
+    try {
+      await Promise.all([
+        patchSystemConfig("generation.image2AspectRatios", image2AspectRatios),
+        patchSystemConfig("generation.image2Resolutions", image2Resolutions),
+        patchSystemConfig("generation.image2MaxN", image2MaxN),
+      ]);
+      setMessage("Image2 限制已保存");
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "保存失败");
@@ -172,8 +269,106 @@ export function ConfigEditor({
             </label>
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            <button className="tool-button h-10" type="submit" disabled={!canSubmit}>
+            <button
+              className="tool-button h-10"
+              type="submit"
+              disabled={!canSubmit}
+            >
               保存公告
+            </button>
+            {message ? (
+              <span className="text-sm text-text-muted">{message}</span>
+            ) : null}
+          </div>
+        </form>
+        <form onSubmit={submitImage2Limits} className="surface-panel-soft p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium">Image2 前台限制</p>
+              <p className="mt-1 text-xs text-text-muted">
+                控制创作页可选的比例、分辨率和单次张数。
+              </p>
+            </div>
+            <label className="grid gap-1 text-sm text-text-muted">
+              <span className="field-label">最大张数</span>
+              <input
+                className="h-9 w-24 rounded-[6px] border border-border bg-surface px-3"
+                type="number"
+                min={1}
+                max={4}
+                value={image2MaxN}
+                onChange={(event) =>
+                  setImage2MaxN(
+                    clampImage2MaxN(Number.parseInt(event.target.value, 10)),
+                  )
+                }
+              />
+            </label>
+          </div>
+
+          <div className="mt-4 grid gap-4">
+            <div className="space-y-2">
+              <p className="field-label">比例</p>
+              <div className="grid grid-cols-3 gap-2 md:grid-cols-5">
+                {IMAGE_ASPECT_RATIO_OPTIONS.map((ratio) => (
+                  <label
+                    key={ratio}
+                    className="inline-flex items-center gap-2 rounded-[6px] border border-border bg-surface px-3 py-2 text-sm"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={image2AspectRatios.includes(ratio)}
+                      onChange={() =>
+                        setImage2AspectRatios((current) =>
+                          toggleListValue(
+                            current,
+                            ratio,
+                            IMAGE_ASPECT_RATIO_OPTIONS,
+                          ),
+                        )
+                      }
+                    />
+                    {ratio}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <p className="field-label">分辨率</p>
+              <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                {IMAGE_RESOLUTION_OPTIONS.map((resolution) => (
+                  <label
+                    key={resolution}
+                    className="inline-flex items-center gap-2 rounded-[6px] border border-border bg-surface px-3 py-2 text-sm"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={image2Resolutions.includes(resolution)}
+                      onChange={() =>
+                        setImage2Resolutions((current) =>
+                          toggleListValue(
+                            current,
+                            resolution,
+                            IMAGE_RESOLUTION_OPTIONS,
+                          ),
+                        )
+                      }
+                    />
+                    {resolution}
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button
+              className="tool-button h-10"
+              type="submit"
+              disabled={!canSubmitImage2}
+            >
+              保存 Image2 限制
             </button>
             {message ? (
               <span className="text-sm text-text-muted">{message}</span>

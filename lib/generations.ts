@@ -2,10 +2,12 @@ import type { Prisma } from "@prisma/client";
 
 import { publicChannelAlias } from "@/lib/channel-alias";
 import {
+  displayNameForProviderChannelWithMap,
   getImage2ProviderChannelName,
   resolveImage2ProviderChannelId,
+  type Image2ChannelDisplayNameMap,
 } from "@/lib/provider-channels";
-import { privateImageUrl } from "@/lib/storage";
+import { privateImageThumbnailUrl, privateImageUrl } from "@/lib/storage";
 
 export const GENERATION_STATUSES = [
   "PENDING",
@@ -44,16 +46,40 @@ export function isGenerationStatus(
   );
 }
 
-export function serializeGeneration(row: GenerationWithRelations) {
+export function serializeGeneration(
+  row: GenerationWithRelations,
+  options: { displayNameMap?: Image2ChannelDisplayNameMap } = {},
+) {
   const images = row.images.map((image) => ({
     id: image.id,
     url: privateImageUrl(row.id, image.id),
     src: privateImageUrl(row.id, image.id),
+    thumbnailUrl: image.thumbnailKey
+      ? privateImageThumbnailUrl(row.id, image.id)
+      : privateImageUrl(row.id, image.id),
     width: image.width,
     height: image.height,
     mimeType: image.mimeType,
     createdAt: image.createdAt,
   }));
+
+  const providerChannelId = resolveImage2ProviderChannelId(
+    row.modelId,
+    row.paramsRaw,
+    row.providerAccount?.baseUrl,
+  );
+  const paramsRaw =
+    row.paramsRaw && typeof row.paramsRaw === "object"
+      ? (row.paramsRaw as Record<string, unknown>)
+      : null;
+  const paramsProviderChannelBaseUrl =
+    typeof paramsRaw?.providerChannelBaseUrl === "string"
+      ? paramsRaw.providerChannelBaseUrl
+      : null;
+  const paramsProviderChannelName =
+    typeof paramsRaw?.providerChannelName === "string"
+      ? paramsRaw.providerChannelName
+      : null;
 
   return {
     id: row.id,
@@ -68,18 +94,15 @@ export function serializeGeneration(row: GenerationWithRelations) {
     referenceImageKeys: row.referenceImageKeys,
     status: row.status,
     provider: row.provider?.name ?? null,
-    providerChannelId: resolveImage2ProviderChannelId(
-      row.modelId,
-      row.paramsRaw,
-      row.providerAccount?.baseUrl,
-    ),
-    providerChannelName: getImage2ProviderChannelName(
-      resolveImage2ProviderChannelId(
-        row.modelId,
-        row.paramsRaw,
-        row.providerAccount?.baseUrl,
-      ),
-    ),
+    providerChannelId,
+    providerChannelName:
+      paramsProviderChannelName ??
+      displayNameForProviderChannelWithMap(
+        row.providerAccount?.baseUrl ?? paramsProviderChannelBaseUrl,
+        row.provider?.name,
+        options.displayNameMap,
+      ) ??
+      getImage2ProviderChannelName(providerChannelId),
     providerAccountName: publicChannelAlias(
       row.providerAccount?.name,
       row.provider?.name,
@@ -98,8 +121,11 @@ export function serializeGeneration(row: GenerationWithRelations) {
   };
 }
 
-export function serializeAdminGeneration(row: GenerationWithRelations) {
-  const generation = serializeGeneration(row);
+export function serializeAdminGeneration(
+  row: GenerationWithRelations,
+  options: { displayNameMap?: Image2ChannelDisplayNameMap } = {},
+) {
+  const generation = serializeGeneration(row, options);
 
   return {
     ...generation,

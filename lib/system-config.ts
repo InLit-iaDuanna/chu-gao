@@ -4,6 +4,10 @@ import type { Prisma } from "@prisma/client";
 
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import {
+  IMAGE_ASPECT_RATIO_OPTIONS,
+  IMAGE_RESOLUTION_OPTIONS,
+} from "@/lib/models/options";
 
 export const SYSTEM_CONFIG_DEFAULTS = {
   registration: {
@@ -13,6 +17,9 @@ export const SYSTEM_CONFIG_DEFAULTS = {
   generation: {
     globalConcurrency: 20,
     defaultDailyLimit: 50,
+    image2AspectRatios: [...IMAGE_ASPECT_RATIO_OPTIONS],
+    image2Resolutions: [...IMAGE_RESOLUTION_OPTIONS],
+    image2MaxN: 4,
   },
   moderation: {
     enabled: true,
@@ -54,6 +61,9 @@ export const SYSTEM_CONFIG_DEFAULT_ROWS = {
   "registration.defaultCredits": 100,
   "generation.globalConcurrency": 20,
   "generation.defaultDailyLimit": 50,
+  "generation.image2AspectRatios": [...IMAGE_ASPECT_RATIO_OPTIONS],
+  "generation.image2Resolutions": [...IMAGE_RESOLUTION_OPTIONS],
+  "generation.image2MaxN": 4,
   "moderation.enabled": true,
   "moderation.blockedKeywords": [] as string[],
   "announcement.enabled": false,

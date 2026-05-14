@@ -24,6 +24,13 @@ export function DropdownMenu({
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
+  function onMenuClick(event: React.MouseEvent<HTMLDivElement>) {
+    const target = event.target;
+    if (target instanceof Element && target.closest('[role="menuitem"]')) {
+      setOpen(false);
+    }
+  }
+
   useEffect(() => {
     function onPointerDown(event: PointerEvent) {
       if (!ref.current?.contains(event.target as Node)) {
@@ -55,6 +62,7 @@ export function DropdownMenu({
             "animate-in fade-in duration-[var(--duration-base)]",
             className,
           )}
+          onClick={onMenuClick}
           role="menu"
         >
           {children}

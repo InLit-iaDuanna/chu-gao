@@ -11,6 +11,7 @@ import {
   serializeConversation,
 } from "@/lib/conversations";
 import { db } from "@/lib/db";
+import { getImage2ChannelDisplayNameMap } from "@/lib/provider-channel-config";
 import { isDatabaseUnavailableError } from "@/lib/service-errors";
 
 const updateMessageSchema = z.object({
@@ -89,7 +90,9 @@ export async function PATCH(
       include: conversationMessagesInclude(),
     });
 
-    return ok(serializeConversation(conversation));
+    const displayNameMap = await getImage2ChannelDisplayNameMap();
+
+    return ok(serializeConversation(conversation, { displayNameMap }));
   } catch (error) {
     if (isDatabaseUnavailableError(error)) {
       return conversationsUnavailable();

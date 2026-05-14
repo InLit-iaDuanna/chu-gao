@@ -50,23 +50,41 @@ export const providerAccountPatchSchema = z
   .partial()
   .refine((value) => Object.keys(value).length > 0, "至少提供一个字段");
 
-export const providerAccountImportSchema = z.object({
-  mode: z.enum(["csv", "lines"]).default("csv"),
-  text: z.string().max(100_000).optional(),
-  csvText: z.string().max(100_000).optional(),
-  defaultMaxConcurrency: z.number().int().min(1).max(100).default(1),
-  defaultWeight: z.number().int().min(1).max(100).default(1),
-}).superRefine((value, ctx) => {
-  const source = value.mode === "csv" ? value.csvText : value.text;
-
-  if (!source?.trim()) {
-    ctx.addIssue({
-      code: "custom",
-      message: value.mode === "csv" ? "CSV 内容不能为空" : "文本内容不能为空",
-      path: [value.mode === "csv" ? "csvText" : "text"],
-    });
-  }
+export const providerChannelDeleteSchema = z.object({
+  baseUrl: z.url(),
 });
+
+export const providerChannelPatchSchema = z
+  .object({
+    baseUrl: z.url(),
+    displayName: z.string().trim().min(1).max(80).optional(),
+    maxConcurrency: z.number().int().min(1).max(10_000).optional(),
+  })
+  .refine(
+    (value) =>
+      value.displayName !== undefined || value.maxConcurrency !== undefined,
+    "至少提供一个字段",
+  );
+
+export const providerAccountImportSchema = z
+  .object({
+    mode: z.enum(["csv", "lines"]).default("csv"),
+    text: z.string().max(100_000).optional(),
+    csvText: z.string().max(100_000).optional(),
+    defaultMaxConcurrency: z.number().int().min(1).max(100).default(1),
+    defaultWeight: z.number().int().min(1).max(100).default(1),
+  })
+  .superRefine((value, ctx) => {
+    const source = value.mode === "csv" ? value.csvText : value.text;
+
+    if (!source?.trim()) {
+      ctx.addIssue({
+        code: "custom",
+        message: value.mode === "csv" ? "CSV 内容不能为空" : "文本内容不能为空",
+        path: [value.mode === "csv" ? "csvText" : "text"],
+      });
+    }
+  });
 
 export const providerPatchSchema = providerSchema
   .extend({
@@ -130,9 +148,14 @@ export const modelPricingPatchSchema = modelPricingSchema
   .refine((value) => Object.keys(value).length > 0, "至少提供一个字段");
 
 export const adminCreditAdjustmentSchema = z.object({
-  amount: z.number().int().min(-1_000_000).max(1_000_000).refine((value) => value !== 0, {
-    message: "点数变动不能为 0",
-  }),
+  amount: z
+    .number()
+    .int()
+    .min(-1_000_000)
+    .max(1_000_000)
+    .refine((value) => value !== 0, {
+      message: "点数变动不能为 0",
+    }),
   note: z.string().trim().max(200).optional(),
 });
 
@@ -165,6 +188,36 @@ export const systemConfigPatchSchema = z.discriminatedUnion("key", [
   z.object({
     key: z.literal("generation.defaultDailyLimit"),
     value: z.number().int().min(1).max(10_000),
+  }),
+  z.object({
+    key: z.literal("generation.image2AspectRatios"),
+    value: z
+      .array(
+        z.enum([
+          "1:1",
+          "3:2",
+          "2:3",
+          "4:3",
+          "3:4",
+          "5:4",
+          "4:5",
+          "16:9",
+          "9:16",
+          "2:1",
+          "1:2",
+          "21:9",
+          "9:21",
+        ]),
+      )
+      .min(1),
+  }),
+  z.object({
+    key: z.literal("generation.image2Resolutions"),
+    value: z.array(z.enum(["1K", "2K", "4K", "High"])).min(1),
+  }),
+  z.object({
+    key: z.literal("generation.image2MaxN"),
+    value: z.number().int().min(1).max(4),
   }),
   z.object({
     key: z.literal("moderation.enabled"),

@@ -2,6 +2,7 @@ import { errorBody } from "@/lib/api-response";
 import { checkSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { serializeGeneration } from "@/lib/generations";
+import { getProviderChannelDisplayNameMap } from "@/lib/provider-channel-config";
 import { isDatabaseUnavailableError } from "@/lib/service-errors";
 
 const TERMINAL_STATUSES = new Set(["SUCCEEDED", "FAILED", "CANCELED"]);
@@ -68,6 +69,7 @@ export async function GET(
       }
 
       const session = sessionResult.user;
+      const displayNameMap = await getProviderChannelDisplayNameMap();
       let closed = false;
       let timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -123,7 +125,7 @@ export async function GET(
           if (!safeEnqueue(
             controller,
             encoder.encode(
-              `event: update\ndata: ${JSON.stringify(serializeGeneration(generation))}\n\n`,
+              `event: update\ndata: ${JSON.stringify(serializeGeneration(generation, { displayNameMap }))}\n\n`,
             ),
           )) {
             close();

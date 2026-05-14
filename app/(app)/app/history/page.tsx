@@ -14,6 +14,7 @@ import {
 } from "@/lib/conversations";
 import { db } from "@/lib/db";
 import { serializeGeneration } from "@/lib/generations";
+import { getImage2ChannelDisplayNameMap } from "@/lib/provider-channel-config";
 import { isDatabaseUnavailableError } from "@/lib/service-errors";
 import { formatDate } from "@/lib/utils";
 
@@ -25,34 +26,37 @@ async function getGenerations() {
   }
 
   try {
-    const rows = await db.generation.findMany({
-      where: {
-        userId: sessionResult.user.id,
-        deletedAt: null,
-      },
-      include: {
-        images: true,
-        provider: {
-          select: {
-            id: true,
-            name: true,
+    const [rows, displayNameMap] = await Promise.all([
+      db.generation.findMany({
+        where: {
+          userId: sessionResult.user.id,
+          deletedAt: null,
+        },
+        include: {
+          images: true,
+          provider: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          providerAccount: {
+            select: {
+              id: true,
+              name: true,
+              baseUrl: true,
+            },
           },
         },
-        providerAccount: {
-          select: {
-            id: true,
-            name: true,
-            baseUrl: true,
-          },
+        orderBy: {
+          createdAt: "desc",
         },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-      take: 60,
-    });
+        take: 60,
+      }),
+      getImage2ChannelDisplayNameMap(),
+    ]);
 
-    return rows.map(serializeGeneration);
+    return rows.map((row) => serializeGeneration(row, { displayNameMap }));
   } catch (error) {
     if (isDatabaseUnavailableError(error)) {
       return null;
@@ -70,19 +74,24 @@ async function getConversations() {
   }
 
   try {
-    const rows = await db.conversation.findMany({
-      where: {
-        userId: sessionResult.user.id,
-        archivedAt: null,
-      },
-      include: conversationSummaryRowInclude(),
-      orderBy: {
-        lastMessageAt: "desc",
-      },
-      take: 60,
-    });
+    const [rows, displayNameMap] = await Promise.all([
+      db.conversation.findMany({
+        where: {
+          userId: sessionResult.user.id,
+          archivedAt: null,
+        },
+        include: conversationSummaryRowInclude(),
+        orderBy: {
+          lastMessageAt: "desc",
+        },
+        take: 60,
+      }),
+      getImage2ChannelDisplayNameMap(),
+    ]);
 
-    return rows.map(serializeConversationSummary);
+    return rows.map((row) =>
+      serializeConversationSummary(row, { displayNameMap }),
+    );
   } catch (error) {
     if (isDatabaseUnavailableError(error)) {
       return null;
@@ -161,6 +170,8 @@ export default async function HistoryPage() {
                           src={conversation.thumbnailUrl}
                           alt={conversation.title}
                           className="h-full w-full object-cover"
+                          loading="lazy"
+                          decoding="async"
                         />
                       ) : (
                         <div className="flex h-full items-center justify-center px-6 text-center text-sm text-text-muted">
@@ -194,9 +205,10 @@ export default async function HistoryPage() {
             <div className="columns-1 gap-4 md:columns-2 xl:columns-3">
               {generations.map((generation) => {
                 const firstImage = generation.images[0] as
-                  | { src?: string; url?: string }
+                  | { src?: string; url?: string; thumbnailUrl?: string }
                   | undefined;
-                const imageUrl = firstImage?.src ?? firstImage?.url;
+                const imageUrl =
+                  firstImage?.thumbnailUrl ?? firstImage?.src ?? firstImage?.url;
 
                 return (
                   <Link
@@ -214,6 +226,8 @@ export default async function HistoryPage() {
                           src={imageUrl}
                           alt={generation.prompt}
                           className="h-full w-full object-cover"
+                          loading="lazy"
+                          decoding="async"
                         />
                       ) : (
                         <div className="flex h-full items-center justify-center px-6 text-center text-sm text-text-muted">

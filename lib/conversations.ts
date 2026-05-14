@@ -7,10 +7,12 @@ import type {
 } from "@/lib/conversation";
 import { publicChannelAlias } from "@/lib/channel-alias";
 import {
+  displayNameForProviderChannelWithMap,
   getImage2ProviderChannelName,
   resolveImage2ProviderChannelId,
+  type Image2ChannelDisplayNameMap,
 } from "@/lib/provider-channels";
-import { privateImageUrl } from "@/lib/storage";
+import { privateImageThumbnailUrl, privateImageUrl } from "@/lib/storage";
 
 const conversationInclude = {
   messages: {
@@ -119,6 +121,7 @@ function generationMessageMeta(
     | ConversationWithMessages["messages"][number]["generation"]
     | ConversationSummaryRow["generations"][number]
     | null,
+  options: { displayNameMap?: Image2ChannelDisplayNameMap } = {},
 ) {
   if (!generation) {
     return null;
@@ -130,18 +133,39 @@ function generationMessageMeta(
     generation.paramsRaw,
     generation.providerAccount?.baseUrl,
   );
+  const paramsRaw =
+    generation.paramsRaw && typeof generation.paramsRaw === "object"
+      ? (generation.paramsRaw as Record<string, unknown>)
+      : null;
+  const paramsProviderChannelBaseUrl =
+    typeof paramsRaw?.providerChannelBaseUrl === "string"
+      ? paramsRaw.providerChannelBaseUrl
+      : null;
+  const paramsProviderChannelName =
+    typeof paramsRaw?.providerChannelName === "string"
+      ? paramsRaw.providerChannelName
+      : null;
 
   return {
     ...(image
       ? {
           imageId: image.id,
           imageUrl: privateImageUrl(generation.id, image.id),
+          thumbnailUrl: image.thumbnailKey
+            ? privateImageThumbnailUrl(generation.id, image.id)
+            : privateImageUrl(generation.id, image.id),
         }
       : {}),
     generationStatus: generation.status,
     generationProvider: generation.provider?.name ?? null,
     generationProviderChannelId: providerChannelId,
     generationProviderChannelName:
+      paramsProviderChannelName ??
+      displayNameForProviderChannelWithMap(
+        generation.providerAccount?.baseUrl ?? paramsProviderChannelBaseUrl,
+        generation.provider?.name,
+        options.displayNameMap,
+      ) ??
       getImage2ProviderChannelName(providerChannelId),
     generationProviderAccountName: publicChannelAlias(
       generation.providerAccount?.name,
@@ -156,6 +180,7 @@ function generationMessageMeta(
 
 export function serializeConversation(
   row: ConversationWithMessages,
+  options: { displayNameMap?: Image2ChannelDisplayNameMap } = {},
 ): ConversationView {
   return {
     id: row.id,
@@ -168,16 +193,17 @@ export function serializeConversation(
       content: message.content,
       generationId: message.generationId ?? undefined,
       createdAt: message.createdAt.toISOString(),
-      ...(generationMessageMeta(message.generation) ?? {}),
+      ...(generationMessageMeta(message.generation, options) ?? {}),
     })),
   };
 }
 
 export function serializeConversationSummary(
   row: ConversationSummaryRow,
+  options: { displayNameMap?: Image2ChannelDisplayNameMap } = {},
 ): ConversationSummaryView {
   const latestGeneration = row.generations[0];
-  const generationMeta = generationMessageMeta(latestGeneration);
+  const generationMeta = generationMessageMeta(latestGeneration, options);
 
   return {
     id: row.id,
@@ -185,7 +211,10 @@ export function serializeConversationSummary(
     lastMessageAt: row.lastMessageAt.toISOString(),
     createdAt: row.createdAt.toISOString(),
     latestMessage: row.messages[0]?.content ?? null,
-    thumbnailUrl: generationMeta?.imageUrl ?? null,
+    thumbnailUrl:
+      generationMeta && "thumbnailUrl" in generationMeta
+        ? (generationMeta.thumbnailUrl ?? null)
+        : null,
     generationCount: row._count.generations,
   };
 }

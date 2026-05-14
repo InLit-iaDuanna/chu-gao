@@ -14,6 +14,7 @@ import {
   serializeConversationSummary,
 } from "@/lib/conversations";
 import { db } from "@/lib/db";
+import { getImage2ChannelDisplayNameMap } from "@/lib/provider-channel-config";
 import { isDatabaseUnavailableError } from "@/lib/service-errors";
 
 const createConversationSchema = z.object({
@@ -48,20 +49,25 @@ export async function GET(request: Request) {
       Math.max(Number(searchParams.get("limit") ?? 20), 1),
       50,
     );
-    const rows = await db.conversation.findMany({
-      where: {
-        userId: session.id,
-        archivedAt: null,
-      },
-      include: conversationSummaryRowInclude(),
-      orderBy: {
-        lastMessageAt: "desc",
-      },
-      take: limit,
-    });
+    const [rows, displayNameMap] = await Promise.all([
+      db.conversation.findMany({
+        where: {
+          userId: session.id,
+          archivedAt: null,
+        },
+        include: conversationSummaryRowInclude(),
+        orderBy: {
+          lastMessageAt: "desc",
+        },
+        take: limit,
+      }),
+      getImage2ChannelDisplayNameMap(),
+    ]);
 
     return ok({
-      items: rows.map(serializeConversationSummary),
+      items: rows.map((row) =>
+        serializeConversationSummary(row, { displayNameMap }),
+      ),
     });
   } catch (error) {
     if (isDatabaseUnavailableError(error)) {
@@ -122,7 +128,9 @@ export async function POST(request: Request) {
       include: conversationMessagesInclude(),
     });
 
-    return ok(serializeConversation(conversation));
+    const displayNameMap = await getImage2ChannelDisplayNameMap();
+
+    return ok(serializeConversation(conversation, { displayNameMap }));
   } catch (error) {
     if (isDatabaseUnavailableError(error)) {
       return conversationsUnavailable();

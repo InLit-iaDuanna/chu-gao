@@ -17,7 +17,10 @@ function visibleModels(models: PublicModelDefinition[]): VisibleModel[] {
       continue;
     }
 
-    groups.set(model.selectorId, [...(groups.get(model.selectorId) ?? []), model]);
+    groups.set(model.selectorId, [
+      ...(groups.get(model.selectorId) ?? []),
+      model,
+    ]);
   }
 
   for (const grouped of groups.values()) {
@@ -28,11 +31,23 @@ function visibleModels(models: PublicModelDefinition[]): VisibleModel[] {
       candidatePool[0];
 
     if (preferred) {
+      const providerChannels = grouped
+        .flatMap((model) => model.providerChannels ?? [])
+        .filter(
+          (channel, index, list) =>
+            list.findIndex((item) => item.id === channel.id) === index,
+        );
+
       result.push({
         ...preferred,
         groupedIds: grouped.map((model) => model.id),
+        providerChannels:
+          providerChannels.length > 0
+            ? providerChannels
+            : preferred.providerChannels,
         displayName: "Nano Banana 2 / Pro",
-        tagline: "Google 生图通道，优先使用 Pro，可用性不足时回退到 Nano Banana 2。",
+        tagline:
+          "Google 生图通道，优先使用 Pro，可用性不足时回退到 Nano Banana 2。",
       });
     }
   }
@@ -78,8 +93,7 @@ export function ModelSelector({
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-xs text-text-muted">{model.vendor}</div>
-                  <div className="mt-1 truncate text-sm font-medium">
+                  <div className="truncate text-sm font-medium">
                     {model.displayName}
                   </div>
                 </div>

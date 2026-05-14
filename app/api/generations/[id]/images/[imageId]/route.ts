@@ -65,6 +65,7 @@ export async function GET(
       },
       select: {
         storageKey: true,
+        thumbnailKey: true,
         mimeType: true,
         sizeBytes: true,
       },
@@ -74,14 +75,26 @@ export async function GET(
       return fail("NOT_FOUND", "图片不存在", { status: 404 });
     }
 
-    const buffer = await readPrivateStorageKey(image.storageKey);
+    const { searchParams } = new URL(request.url);
+    const wantsThumbnail = searchParams.get("variant") === "thumb";
+    const storageKey =
+      wantsThumbnail && image.thumbnailKey ? image.thumbnailKey : image.storageKey;
+    const mimeType =
+      wantsThumbnail && image.thumbnailKey ? "image/webp" : image.mimeType;
+    const buffer = await readPrivateStorageKey(storageKey);
 
     return new Response(new Uint8Array(buffer), {
       headers: {
-        "Content-Type": image.mimeType,
-        "Content-Length": String(image.sizeBytes || buffer.byteLength),
-        "Content-Disposition": `attachment; filename="chugao-${timestampForFilename()}.${extensionForMimeType(image.mimeType)}"`,
-        "Cache-Control": "private, max-age=300",
+        "Content-Type": mimeType,
+        "Content-Length": String(
+          wantsThumbnail ? buffer.byteLength : image.sizeBytes || buffer.byteLength,
+        ),
+        "Content-Disposition": wantsThumbnail
+          ? "inline"
+          : `attachment; filename="chugao-${timestampForFilename()}.${extensionForMimeType(image.mimeType)}"`,
+        "Cache-Control": wantsThumbnail
+          ? "private, max-age=3600"
+          : "private, max-age=300",
       },
     });
   } catch (error) {

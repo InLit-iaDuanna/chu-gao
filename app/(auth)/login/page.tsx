@@ -2,6 +2,7 @@ import { LoginForm } from "@/components/auth/LoginForm";
 import { Logo } from "@/components/shared/Logo";
 import { checkSessionFromHeaders } from "@/lib/auth";
 import { headers } from "next/headers";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 function safeNextPath(value: string | undefined): string {
@@ -50,6 +51,15 @@ export default async function LoginPage({
             欢迎回来，继续你的创作。
           </p>
           <LoginForm className="mt-8" nextPath={safeNext} />
+          <p className="mt-6 text-center text-sm text-text-muted">
+            还没有账户？{" "}
+            <Link
+              href={`/register?next=${encodeURIComponent(safeNext)}`}
+              className="font-medium text-foreground underline-offset-4 hover:underline"
+            >
+              创建账户
+            </Link>
+          </p>
         </div>
       </main>
     </div>

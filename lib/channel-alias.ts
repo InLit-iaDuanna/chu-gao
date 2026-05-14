@@ -1,5 +1,4 @@
 import {
-  inferImage2ProviderChannelIdFromBaseUrl,
   normalizeProviderChannelBaseUrl,
 } from "@/lib/provider-channels";
 
@@ -72,13 +71,14 @@ export function publicChannelAlias(
   }
 
   const normalizedBaseUrl = normalizeProviderChannelBaseUrl(baseUrl);
-  const channelId = inferImage2ProviderChannelIdFromBaseUrl(normalizedBaseUrl);
   const aliasPool =
-    channelId === "aquatic"
+    normalizedBaseUrl === "https://lucen.cc"
       ? AQUATIC_CHANNEL_ALIASES
-      : channelId === "terrestrial"
+      : normalizedBaseUrl === "https://api.xpzhao.top"
         ? TERRESTRIAL_CHANNEL_ALIASES
         : [...AQUATIC_CHANNEL_ALIASES, ...TERRESTRIAL_CHANNEL_ALIASES];
 
-  return aliasPool[hashChannelName(`${source}:${normalizedBaseUrl ?? ""}`) % aliasPool.length];
+  return aliasPool[
+    hashChannelName(`${source}:${normalizedBaseUrl ?? ""}`) % aliasPool.length
+  ];
 }

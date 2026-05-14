@@ -1,18 +1,17 @@
 import { z } from "zod";
 
-import { getModel } from "@/lib/models/registry";
 import { isResolutionAspectRatioSupported } from "@/lib/models/capabilities";
 import type {
   AspectRatio,
   ImageBackground,
   InternalRequest,
+  ModelDefinition,
   OutputFormat,
   Resolution,
 } from "@/lib/models/types";
+import { getConfiguredModel } from "@/lib/models/runtime-config";
 import {
-  isImage2ModelId,
-  isImage2ProviderChannelSelectable,
-  normalizeImage2ProviderChannelId,
+  normalizeProviderChannelIdForModel,
 } from "@/lib/provider-channels";
 import { normalizeUploadedReferenceKey } from "@/lib/storage";
 
@@ -38,7 +37,7 @@ export const generationRequestSchema = z.object({
   prompt: z.string().min(1).max(4000),
   negativePrompt: z.string().max(4000).optional(),
   aspectRatio: z.string().min(1),
-  resolution: z.enum(["1K", "2K", "4K"]).optional(),
+  resolution: z.enum(["1K", "2K", "4K", "High"]).optional(),
   n: z.number().int().min(1),
   seed: z.number().int().optional(),
   outputFormat: z.enum(["png", "jpeg", "webp"]).optional(),
@@ -46,7 +45,7 @@ export const generationRequestSchema = z.object({
   outputCompression: z.number().int().min(0).max(100).optional(),
   referenceImageKeys: z.array(z.string().min(1)).max(16).optional(),
   sourceImageIds: z.array(z.string().min(1)).max(4).optional(),
-  providerChannelId: z.enum(["aquatic", "terrestrial"]).optional(),
+  providerChannelId: z.string().trim().min(1).max(200).optional(),
 });
 
 export type GenerationRequestInput = z.infer<typeof generationRequestSchema>;
@@ -65,15 +64,11 @@ function mimeTypeForReferenceKey(key: string): string {
   return "image/png";
 }
 
-export function validateAgainstModel(
+export function validateAgainstModelDefinition(
   input: GenerationRequestInput,
+  model: ModelDefinition,
 ): InternalRequest {
   const modelId = input.modelId;
-  const model = getModel(modelId);
-
-  if (!model) {
-    throw new ValidationError("UNKNOWN_MODEL");
-  }
 
   const capabilities = model.capabilities;
   const aspectRatio = input.aspectRatio as AspectRatio;
@@ -101,9 +96,7 @@ export function validateAgainstModel(
   if (
     !isResolutionAspectRatioSupported(capabilities, resolution, aspectRatio)
   ) {
-    throw new UnsupportedParamError(
-      `${resolution} 不支持 ${aspectRatio} 比例`,
-    );
+    throw new UnsupportedParamError(`${resolution} 不支持 ${aspectRatio} 比例`);
   }
 
   if (input.n > capabilities.maxN) {
@@ -160,16 +153,10 @@ export function validateAgainstModel(
     throw new UnsupportedParamError("当前格式不支持压缩率");
   }
 
-  const providerChannelId = isImage2ModelId(modelId)
-    ? normalizeImage2ProviderChannelId(modelId, input.providerChannelId)
-    : undefined;
-
-  if (
-    providerChannelId &&
-    !isImage2ProviderChannelSelectable(providerChannelId)
-  ) {
-    throw new UnsupportedParamError("该大渠道当前暂不可用，请选择其他渠道");
-  }
+  const providerChannelId = normalizeProviderChannelIdForModel(
+    modelId,
+    input.providerChannelId,
+  );
 
   return {
     modelId,
@@ -189,4 +176,16 @@ export function validateAgainstModel(
       mimeType: mimeTypeForReferenceKey(key),
     })),
   };
+}
+
+export async function validateAgainstModel(
+  input: GenerationRequestInput,
+): Promise<InternalRequest> {
+  const model = await getConfiguredModel(input.modelId);
+
+  if (!model) {
+    throw new ValidationError("UNKNOWN_MODEL");
+  }
+
+  return validateAgainstModelDefinition(input, model);
 }

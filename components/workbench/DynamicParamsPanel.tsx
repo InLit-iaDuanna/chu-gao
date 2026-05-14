@@ -9,10 +9,7 @@ import {
   isResolutionAspectRatioSupported,
 } from "@/lib/models/capabilities";
 import type { PublicModelDefinition } from "@/lib/models/types";
-import {
-  DEFAULT_IMAGE2_PROVIDER_CHANNEL_ID,
-  normalizeSelectableImage2ProviderChannelId,
-} from "@/lib/provider-channels";
+import { normalizeSelectableProviderChannelId } from "@/lib/provider-channels";
 import { cn } from "@/lib/utils";
 
 function Section({
@@ -50,10 +47,11 @@ export function normalizeWorkbenchState(
     ...prev,
     modelId,
     providerChannelId:
-      model.protocol === "openai-images"
-        ? normalizeSelectableImage2ProviderChannelId(
+      model.providerChannels?.length
+        ? normalizeSelectableProviderChannelId(
             modelId,
             prev.providerChannelId,
+            model.providerChannels,
           )
         : undefined,
     aspectRatio: pair.aspectRatio,
@@ -110,15 +108,16 @@ export function DynamicParamsPanel({
   const canCompress =
     capabilities.supportsOutputCompression &&
     (value.outputFormat === "jpeg" || value.outputFormat === "webp");
-  const showProviderChannels =
-    model.protocol === "openai-images" && model.id === "gpt-image-2";
+  const providerChannels = model.providerChannels ?? [];
+  const showProviderChannels = providerChannels.length > 0;
 
   return (
     <div className="border-t border-border px-3 pb-3 pt-1">
       <div className="space-y-4">
         {showProviderChannels ? (
           <ProviderChannelSelector
-            value={value.providerChannelId ?? DEFAULT_IMAGE2_PROVIDER_CHANNEL_ID}
+            value={value.providerChannelId ?? providerChannels[0]?.id ?? ""}
+            options={providerChannels}
             onChange={(providerChannelId) =>
               onChange({ ...value, providerChannelId })
             }

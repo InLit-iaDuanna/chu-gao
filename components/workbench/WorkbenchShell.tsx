@@ -43,9 +43,8 @@ import {
   type WorkbenchPreferences,
 } from "@/lib/workbench-preferences";
 import {
-  DEFAULT_IMAGE2_PROVIDER_CHANNEL_ID,
   getImage2ProviderChannelName,
-  normalizeSelectableImage2ProviderChannelId,
+  normalizeSelectableProviderChannelId,
 } from "@/lib/provider-channels";
 
 type ApiResponse<T> =
@@ -163,9 +162,10 @@ function initialStateFor(
 
   return {
     modelId: model.id,
-    providerChannelId: normalizeSelectableImage2ProviderChannelId(
+    providerChannelId: normalizeSelectableProviderChannelId(
       model.id,
       preferences.providerChannelId,
+      model.providerChannels,
     ),
     aspectRatio: pair.aspectRatio,
     resolution: pair.resolution,
@@ -404,6 +404,7 @@ export function WorkbenchShell({
                 id: lastGenerationMessage.imageId,
                 src: lastGenerationMessage.imageUrl,
                 url: lastGenerationMessage.imageUrl,
+                thumbnailUrl: lastGenerationMessage.thumbnailUrl,
               },
             ]
           : [];
@@ -736,6 +737,7 @@ export function WorkbenchShell({
 
     if (next.conversationId) {
       const imageUrl = next.images[0]?.src ?? next.images[0]?.url ?? null;
+      const thumbnailUrl = next.images[0]?.thumbnailUrl ?? imageUrl;
 
       setConversations((current) =>
         current.map((item) =>
@@ -743,7 +745,7 @@ export function WorkbenchShell({
             ? {
                 ...item,
                 lastMessageAt: new Date().toISOString(),
-                thumbnailUrl: imageUrl ?? item.thumbnailUrl,
+                thumbnailUrl: thumbnailUrl ?? item.thumbnailUrl,
                 generationCount: Math.max(item.generationCount, 1),
               }
             : item,
@@ -800,10 +802,11 @@ export function WorkbenchShell({
         setMessages((current) =>
           current.map((message) =>
             message.generationId === next.id
-                ? {
-                    ...message,
+              ? {
+                  ...message,
                   imageId: next.images[0]?.id,
                   imageUrl: next.images[0]?.src ?? next.images[0]?.url,
+                  thumbnailUrl: next.images[0]?.thumbnailUrl,
                   generationStatus: next.status,
                   generationProvider: next.provider ?? null,
                   generationProviderChannelId:
@@ -1177,12 +1180,12 @@ export function WorkbenchShell({
         }),
         "生成请求没有提交成功。请稍后重试。",
       );
-      const acceptedProviderChannelId =
-        requestState.modelId === "gpt-image-2"
-          ? (payload.providerChannelId ??
-            requestState.providerChannelId ??
-            DEFAULT_IMAGE2_PROVIDER_CHANNEL_ID)
-          : null;
+      const acceptedProviderChannelId = model.providerChannels?.length
+        ? (payload.providerChannelId ??
+          requestState.providerChannelId ??
+          model.providerChannels[0]?.id ??
+          null)
+        : null;
 
       const pendingGeneration: WorkbenchGeneration = {
         id: payload.generationId,
@@ -1192,12 +1195,13 @@ export function WorkbenchShell({
         status: payload.status,
         createdAt: new Date().toISOString(),
         providerChannelId:
-          requestState.modelId === "gpt-image-2"
-            ? acceptedProviderChannelId
-            : null,
+          model.providerChannels?.length ? acceptedProviderChannelId : null,
         providerChannelName:
-          requestState.modelId === "gpt-image-2"
-            ? getImage2ProviderChannelName(acceptedProviderChannelId)
+          model.providerChannels?.length
+            ? (model.providerChannels?.find(
+                (channel) => channel.id === acceptedProviderChannelId,
+              )?.displayName ??
+              getImage2ProviderChannelName(acceptedProviderChannelId))
             : null,
         progress: 0,
         images: [],
@@ -1467,20 +1471,42 @@ export function WorkbenchShell({
             </div>
             <div className="grid gap-2 md:grid-cols-2">
               {history.slice(0, 4).map((item) => (
-                <Link
-                  key={item.id}
-                  href={
-                    item.conversationId
-                      ? `/app?conversation=${item.conversationId}`
-                      : `/app/g/${item.id}`
-                  }
-                  className="surface-panel block p-3 text-sm leading-6 transition-colors hover:-translate-y-0.5 hover:bg-surface-2"
-                >
-                  <span className="font-mono text-xs text-text-muted">
-                    {generationStatusLabel(item.status)}
-                  </span>
-                  <span className="mt-1 line-clamp-2 block">{item.prompt}</span>
-                </Link>
+                (() => {
+                  const previewUrl =
+                    item.images[0]?.thumbnailUrl ??
+                    item.images[0]?.src ??
+                    item.images[0]?.url;
+
+                  return (
+                    <Link
+                      key={item.id}
+                      href={
+                        item.conversationId
+                          ? `/app?conversation=${item.conversationId}`
+                          : `/app/g/${item.id}`
+                      }
+                      className="surface-panel block p-3 text-sm leading-6 transition-colors hover:-translate-y-0.5 hover:bg-surface-2"
+                    >
+                      {previewUrl ? (
+                        <div className="mb-2 h-24 overflow-hidden rounded-[6px] bg-surface-2">
+                          <img
+                            src={previewUrl}
+                            alt=""
+                            className="h-full w-full object-cover"
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        </div>
+                      ) : null}
+                      <span className="font-mono text-xs text-text-muted">
+                        {generationStatusLabel(item.status)}
+                      </span>
+                      <span className="mt-1 line-clamp-2 block">
+                        {item.prompt}
+                      </span>
+                    </Link>
+                  );
+                })()
               ))}
               {history.length === 0 ? (
                 <div className="surface-panel-soft p-3 text-sm leading-6 text-text-muted md:col-span-2">
