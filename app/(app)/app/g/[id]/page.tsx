@@ -9,6 +9,7 @@ import {
 import { checkSessionFromHeaders } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { serializeGeneration } from "@/lib/generations";
+import { getProviderChannelDisplayNameMap } from "@/lib/provider-channel-config";
 import { isDatabaseUnavailableError } from "@/lib/service-errors";
 import { formatDate } from "@/lib/utils";
 
@@ -44,9 +45,16 @@ async function getGeneration(id: string) {
       },
     });
 
-    return row
-      ? { status: "found" as const, generation: serializeGeneration(row) }
-      : { status: "not_found" as const };
+    if (!row) {
+      return { status: "not_found" as const };
+    }
+
+    const displayNameMap = await getProviderChannelDisplayNameMap();
+
+    return {
+      status: "found" as const,
+      generation: serializeGeneration(row, { displayNameMap }),
+    };
   } catch (error) {
     if (isDatabaseUnavailableError(error)) {
       return { status: "unavailable" as const };
@@ -100,6 +108,7 @@ export default async function GenerationDetailPage({
               src={imageUrl}
               alt={generation.prompt}
               className="h-full w-full object-contain"
+              decoding="async"
             />
           </div>
         ) : (
@@ -180,7 +189,11 @@ export default async function GenerationDetailPage({
           </div>
           <div>
             <dt className="text-text-muted">渠道</dt>
-            <dd className="mt-1">{generation.provider ?? "未分配"}</dd>
+            <dd className="mt-1">
+              {generation.providerChannelName ??
+                generation.provider ??
+                "未分配"}
+            </dd>
           </div>
           <div>
             <dt className="text-text-muted">消耗</dt>

@@ -55,13 +55,21 @@ export default function HomePage() {
             初稿
           </span>
         </div>
-        <Link
-          href="/login"
-          className="flex h-8 items-center gap-1.5 rounded-lg border border-border px-3.5 text-[13px] font-medium text-foreground transition-colors hover:bg-surface-2"
-        >
-          登录
-          <ArrowRight size={13} strokeWidth={1.5} />
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/register"
+            className="flex h-8 items-center rounded-lg px-3.5 text-[13px] font-medium text-foreground transition-colors hover:bg-surface-2"
+          >
+            注册
+          </Link>
+          <Link
+            href="/login"
+            className="flex h-8 items-center gap-1.5 rounded-lg border border-border px-3.5 text-[13px] font-medium text-foreground transition-colors hover:bg-surface-2"
+          >
+            登录
+            <ArrowRight size={13} strokeWidth={1.5} />
+          </Link>
+        </div>
       </header>
 
       {/* Hero */}
@@ -114,18 +122,12 @@ export default function HomePage() {
           className="mt-8 flex flex-wrap items-center justify-center gap-3"
         >
           <Link
-            href="/login"
+            href="/register"
             className="flex h-10 items-center gap-2 rounded-lg bg-info px-5 text-[14px] font-medium text-white shadow-[var(--shadow-sm)] transition-colors hover:bg-info/90"
           >
-            开始创作
+            免费注册
             <ArrowRight size={14} strokeWidth={1.5} />
           </Link>
-          <a
-            href="#features"
-            className="flex h-10 items-center rounded-lg border border-border px-5 text-[14px] font-medium text-foreground transition-colors hover:bg-surface-2"
-          >
-            了解更多
-          </a>
         </motion.div>
       </section>
 

@@ -10,7 +10,7 @@ import {
 } from "@/lib/conversation";
 import { fetchWithTimeout } from "@/lib/http";
 import { logger } from "@/lib/logger";
-import { getModel } from "@/lib/models/registry";
+import { getConfiguredModel } from "@/lib/models/runtime-config";
 
 const messageSchema = z.object({
   id: z.string().optional(),
@@ -135,7 +135,7 @@ async function compileWithGpt55({
     return compilePromptFallback(trimmedMessages, "OPENAI_API_KEY_MISSING");
   }
 
-  const model = getModel(modelId);
+  const model = await getConfiguredModel(modelId);
 
   if (!model) {
     throw new Error("UNKNOWN_MODEL");
@@ -241,7 +241,7 @@ export async function POST(request: Request) {
     });
   }
 
-  if (!getModel(parsed.data.modelId)) {
+  if (!(await getConfiguredModel(parsed.data.modelId))) {
     return fail("MODEL_NOT_AVAILABLE", "当前模型不可用", { status: 404 });
   }
 

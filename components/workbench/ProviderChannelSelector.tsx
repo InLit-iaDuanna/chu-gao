@@ -1,26 +1,27 @@
 "use client";
 
-import type { Image2ProviderChannelId } from "@/lib/models/types";
-import {
-  IMAGE2_PROVIDER_CHANNEL_OPTIONS,
-  isImage2ProviderChannelSelectable,
-} from "@/lib/provider-channels";
+import type {
+  ProviderChannelId,
+  PublicProviderChannel,
+} from "@/lib/models/types";
 import { cn } from "@/lib/utils";
 
 export function ProviderChannelSelector({
   value,
+  options,
   onChange,
 }: {
-  value: Image2ProviderChannelId;
-  onChange: (value: Image2ProviderChannelId) => void;
+  value: ProviderChannelId;
+  options: PublicProviderChannel[];
+  onChange: (value: ProviderChannelId) => void;
 }) {
   return (
     <section className="space-y-2">
       <p className="field-label">大渠道</p>
       <div className="grid gap-2">
-        {IMAGE2_PROVIDER_CHANNEL_OPTIONS.map((channel) => {
+        {options.map((channel) => {
           const active = channel.id === value;
-          const disabled = !isImage2ProviderChannelSelectable(channel.id);
+          const disabled = channel.availableAccountCount <= 0;
 
           return (
             <button
@@ -33,7 +34,7 @@ export function ProviderChannelSelector({
                   "cursor-not-allowed opacity-45 hover:border-border hover:bg-surface",
               )}
               disabled={disabled}
-              title={disabled ? channel.unavailableReason : undefined}
+              title={disabled ? "当前渠道不可选" : undefined}
               aria-pressed={active}
               onClick={() => onChange(channel.id)}
             >
@@ -41,13 +42,20 @@ export function ProviderChannelSelector({
                 <div className="min-w-0">
                   <div className="text-sm font-medium">{channel.displayName}</div>
                   <div className="mt-1 text-xs text-text-muted">
-                    {disabled ? channel.unavailableReason : "动物账号自动轮询"}
+                    {disabled
+                      ? "暂无可用账号"
+                      : `${channel.availableAccountCount}/${channel.accountCount} 个动物账号可用`}
                   </div>
                 </div>
               </div>
             </button>
           );
         })}
+        {options.length === 0 ? (
+          <div className="rounded-[10px] border border-border bg-surface-2 px-3 py-2.5 text-sm leading-6 text-text-muted">
+            后台还没有给这个模型添加可用大渠道。
+          </div>
+        ) : null}
       </div>
     </section>
   );

@@ -2,8 +2,15 @@ import type { Prisma } from "@prisma/client";
 
 import { estimateCost, resolvePerImageCredits } from "@/lib/credits";
 import { db } from "@/lib/db";
-import { listModels, getModel } from "@/lib/models/registry";
-import type { InternalRequest, ModelDefinition, PricingRule } from "@/lib/models/types";
+import {
+  getConfiguredModel,
+  listConfiguredModels,
+} from "@/lib/models/runtime-config";
+import type {
+  InternalRequest,
+  ModelDefinition,
+  PricingRule,
+} from "@/lib/models/types";
 
 export interface PricingSnapshot {
   modelId: string;
@@ -59,8 +66,9 @@ export async function listModelPricingRules(): Promise<PricingRule[]> {
 
 export async function listModelsWithPricing(): Promise<ModelDefinition[]> {
   const rules = await listModelPricingRules();
+  const models = await listConfiguredModels();
 
-  return listModels().map((model) => ({
+  return models.map((model) => ({
     ...model,
     pricingRules: rules.filter((rule) => rule.modelId === model.id),
   }));
@@ -69,7 +77,7 @@ export async function listModelsWithPricing(): Promise<ModelDefinition[]> {
 export async function getModelWithPricing(
   modelId: string,
 ): Promise<ModelDefinition | null> {
-  const model = getModel(modelId);
+  const model = await getConfiguredModel(modelId);
 
   if (!model) {
     return null;

@@ -7,7 +7,7 @@ import {
   estimateCostFromSnapshot,
   parsePricingSnapshot,
 } from "@/lib/model-pricing";
-import { getModel } from "@/lib/models/registry";
+import { getConfiguredModel } from "@/lib/models/runtime-config";
 import {
   generationRequestSchema,
   validateAgainstModel,
@@ -205,7 +205,7 @@ async function recoverStuckGenerations(): Promise<void> {
       continue;
     }
 
-    const request = validateAgainstModel(parsedRequest.data);
+    const request = await validateAgainstModel(parsedRequest.data);
 
     await db.generation.update({
       where: { id: generation.id },
@@ -349,7 +349,7 @@ async function main() {
             saveGeneratedImage(image, generationId, index),
           ),
         );
-        const model = getModel(request.modelId);
+        const model = await getConfiguredModel(request.modelId);
         const successCount = Math.max(savedImages.length, 1);
         const generationSnapshot = await db.generation.findUnique({
           where: { id: generationId },
@@ -420,6 +420,7 @@ async function main() {
             data: savedImages.map((image) => ({
               generationId,
               storageKey: image.storageKey,
+              thumbnailKey: image.thumbnailKey,
               width: image.width,
               height: image.height,
               sizeBytes: image.sizeBytes,

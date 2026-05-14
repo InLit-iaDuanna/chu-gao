@@ -6,6 +6,7 @@ import { estimateCost } from "@/lib/credits";
 import { db } from "@/lib/db";
 import { isGenerationStatus, serializeGeneration } from "@/lib/generations";
 import { logger } from "@/lib/logger";
+import { getProviderChannelDisplayNameMap } from "@/lib/provider-channel-config";
 import { isPromptBlocked } from "@/lib/moderation";
 import {
   createPricingSnapshot,
@@ -15,14 +16,22 @@ import {
   ValidationError,
   UnsupportedParamError,
   generationRequestSchema,
-  validateAgainstModel,
+  validateAgainstModelDefinition,
 } from "@/lib/models/validate";
 import {
   ModelNotAvailableError,
   ProviderUnavailableError,
   assertProviderAvailable,
+  providerChannelMatchesBaseUrl,
+  supportedModelIds,
 } from "@/lib/providers";
+import {
+  displayNameForProviderChannelWithMap,
+  normalizeProviderChannelBaseUrl,
+  supportsProviderChannels,
+} from "@/lib/provider-channels";
 import { serializeProviderError } from "@/lib/providers/diagnostics";
+import { modelProtocolToProviderProtocol } from "@/lib/providers/protocols";
 import {
   assertGenerationQueueReady,
   enqueueGeneration,
@@ -78,38 +87,41 @@ export async function GET(request: Request) {
     );
     const cursor = searchParams.get("cursor");
     const status = searchParams.get("status");
-    const rows = await db.generation.findMany({
-      where: {
-        userId: session.id,
-        deletedAt: null,
-        ...(isGenerationStatus(status) ? { status } : {}),
-      },
-      include: {
-        images: true,
-        provider: {
-          select: {
-            id: true,
-            name: true,
+    const [rows, displayNameMap] = await Promise.all([
+      db.generation.findMany({
+        where: {
+          userId: session.id,
+          deletedAt: null,
+          ...(isGenerationStatus(status) ? { status } : {}),
+        },
+        include: {
+          images: true,
+          provider: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          providerAccount: {
+            select: {
+              id: true,
+              name: true,
+              baseUrl: true,
+            },
           },
         },
-        providerAccount: {
-          select: {
-            id: true,
-            name: true,
-            baseUrl: true,
-          },
+        orderBy: {
+          createdAt: "desc",
         },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-      take: limit + 1,
-    });
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        take: limit + 1,
+      }),
+      getProviderChannelDisplayNameMap(),
+    ]);
     const items = rows.slice(0, limit);
 
     return ok({
-      items: items.map(serializeGeneration),
+      items: items.map((item) => serializeGeneration(item, { displayNameMap })),
       nextCursor: rows.length > limit ? rows[limit]?.id : null,
     });
   } catch (error) {
@@ -136,16 +148,17 @@ export async function POST(request: Request) {
   }
 
   try {
-    const internalRequest = validateAgainstModel(parsed.data);
-    const normalizedRequestParams = {
-      ...parsed.data,
-      providerChannelId: internalRequest.providerChannelId,
-    };
-    const model = await getModelWithPricing(internalRequest.modelId);
+    const model = await getModelWithPricing(parsed.data.modelId);
 
     if (!model) {
       return fail("MODEL_NOT_AVAILABLE", "当前模型不可用", { status: 404 });
     }
+
+    const internalRequest = validateAgainstModelDefinition(parsed.data, model);
+    const normalizedRequestParams = {
+      ...parsed.data,
+      providerChannelId: internalRequest.providerChannelId,
+    };
 
     if (!process.env.DATABASE_URL) {
       return fail("SERVICE_UNAVAILABLE", "生成服务未配置数据库", {
@@ -171,6 +184,63 @@ export async function POST(request: Request) {
     const pricingSnapshotJson =
       pricingSnapshot as unknown as Prisma.InputJsonObject;
     const conversationId = parsed.data.conversationId;
+    const providerChannelId = internalRequest.providerChannelId;
+    const displayNameMap = await getProviderChannelDisplayNameMap();
+    let selectedProviderChannel:
+      | {
+          baseUrl: string;
+          displayName: string | null;
+        }
+      | null = null;
+
+    if (supportsProviderChannels(internalRequest.modelId) && providerChannelId) {
+      const modelIds = supportedModelIds(internalRequest.modelId);
+      const candidateAccounts = await db.providerAccount.findMany({
+        where: {
+          isActive: true,
+          health: { not: "DOWN" },
+          OR: [{ cooldownUntil: null }, { cooldownUntil: { lte: new Date() } }],
+          provider: {
+            isActive: true,
+            health: { not: "DOWN" },
+            protocol: modelProtocolToProviderProtocol(internalRequest.protocol),
+            OR: modelIds.map((id) => ({ modelsSupported: { has: id } })),
+          },
+        },
+        include: {
+          provider: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      });
+      const selectedAccount = candidateAccounts.find((account) =>
+        providerChannelMatchesBaseUrl(providerChannelId, account.baseUrl),
+      );
+
+      if (!selectedAccount) {
+        return fail("PROVIDER_CHANNEL_NOT_FOUND", "该大渠道暂不可用", {
+          status: 503,
+        });
+      }
+
+      const baseUrl = normalizeProviderChannelBaseUrl(selectedAccount.baseUrl);
+      selectedProviderChannel = baseUrl
+        ? {
+            baseUrl,
+            displayName: displayNameForProviderChannelWithMap(
+              selectedAccount.baseUrl,
+              selectedAccount.provider.name,
+              displayNameMap,
+            ),
+          }
+        : null;
+      Object.assign(normalizedRequestParams, {
+        providerChannelBaseUrl: selectedProviderChannel?.baseUrl,
+        providerChannelName: selectedProviderChannel?.displayName,
+      });
+    }
 
     await assertProviderAvailable(
       internalRequest.modelId,

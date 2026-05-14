@@ -2,11 +2,14 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import sharp from "sharp";
+
 import type { InternalReferenceImage } from "@/lib/models/types";
 import type { GeneratedImageData } from "@/lib/providers/types";
 
 export interface PersistedGeneratedImage {
   storageKey: string;
+  thumbnailKey?: string | null;
   width: number;
   height: number;
   sizeBytes: number;
@@ -37,6 +40,13 @@ export function publicUrlForStorageKey(key: string): string {
 
 export function privateImageUrl(generationId: string, imageId: string): string {
   return `/api/generations/${generationId}/images/${imageId}`;
+}
+
+export function privateImageThumbnailUrl(
+  generationId: string,
+  imageId: string,
+): string {
+  return `/api/generations/${generationId}/images/${imageId}?variant=thumb`;
 }
 
 export function normalizeUploadedReferenceKey(key: string): string | null {
@@ -235,6 +245,23 @@ function readImageSize(buffer: Buffer): { width: number; height: number } {
   );
 }
 
+async function createThumbnailBuffer(buffer: Buffer): Promise<Buffer | null> {
+  try {
+    return await sharp(buffer, { failOn: "none" })
+      .rotate()
+      .resize({
+        width: 720,
+        height: 720,
+        fit: "inside",
+        withoutEnlargement: true,
+      })
+      .webp({ quality: 72, effort: 4 })
+      .toBuffer();
+  } catch {
+    return null;
+  }
+}
+
 export async function saveGeneratedImage(
   image: GeneratedImageData,
   generationId: string,
@@ -246,12 +273,21 @@ export async function saveGeneratedImage(
   const ext = extensionForMimeType(mimeType);
   const storageKey = `${GENERATED_PREFIX}/${generationId}/${index + 1}.${ext}`;
   const filePath = resolvePrivateStorageKey(storageKey);
+  const thumbnailKey = `${GENERATED_PREFIX}/${generationId}/${index + 1}-thumb.webp`;
+  const thumbnailPath = resolvePrivateStorageKey(thumbnailKey);
 
   await mkdir(path.dirname(filePath), { recursive: true });
   await writeFile(filePath, buffer);
+  const thumbnailBuffer = await createThumbnailBuffer(buffer);
+
+  if (thumbnailBuffer) {
+    await mkdir(path.dirname(thumbnailPath), { recursive: true });
+    await writeFile(thumbnailPath, thumbnailBuffer);
+  }
 
   return {
     storageKey,
+    thumbnailKey: thumbnailBuffer ? thumbnailKey : null,
     width: image.width || dimensions.width,
     height: image.height || dimensions.height,
     sizeBytes: buffer.byteLength,

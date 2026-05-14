@@ -13,8 +13,9 @@ export type AspectRatio =
   | "21:9"
   | "9:21";
 
-export type Resolution = "1K" | "2K" | "4K";
-export type Image2ProviderChannelId = "aquatic" | "terrestrial";
+export type Resolution = "1K" | "2K" | "4K" | "High";
+export type ProviderChannelId = string;
+export type Image2ProviderChannelId = ProviderChannelId;
 export type ProtocolName =
   | "openai-images"
   | "openai-responses-image"
@@ -71,7 +72,15 @@ export interface ModelDefinition {
 
 export type PublicModelDefinition = ModelDefinition & {
   available: boolean;
+  providerChannels?: PublicProviderChannel[];
 };
+
+export interface PublicProviderChannel {
+  id: ProviderChannelId;
+  displayName: string;
+  accountCount: number;
+  availableAccountCount: number;
+}
 
 export interface InternalReferenceImage {
   key: string;
@@ -82,7 +91,7 @@ export interface InternalReferenceImage {
 export interface InternalRequest {
   modelId: string;
   protocol: ProtocolName;
-  providerChannelId?: Image2ProviderChannelId;
+  providerChannelId?: ProviderChannelId;
   prompt: string;
   negativePrompt?: string;
   aspectRatio: AspectRatio;

@@ -1,4 +1,4 @@
-import { listModels } from "@/lib/models/registry";
+import { MODELS } from "@/lib/models/registry";
 
 export const mockUser = {
   id: "user_demo",
@@ -98,10 +98,36 @@ export const mockSystemConfigEntries = [
   { key: "registration.inviteOnly", value: true },
   { key: "registration.defaultCredits", value: 100 },
   { key: "generation.globalConcurrency", value: 20 },
+  { key: "generation.defaultDailyLimit", value: 50 },
+  {
+    key: "generation.image2AspectRatios",
+    value: [
+      "1:1",
+      "3:2",
+      "2:3",
+      "4:3",
+      "3:4",
+      "5:4",
+      "4:5",
+      "16:9",
+      "9:16",
+      "2:1",
+      "1:2",
+      "21:9",
+      "9:21",
+    ],
+  },
+  { key: "generation.image2Resolutions", value: ["1K", "2K", "4K", "High"] },
+  { key: "generation.image2MaxN", value: 4 },
   { key: "moderation.enabled", value: true },
+  { key: "moderation.blockedKeywords", value: [] },
+  { key: "announcement.enabled", value: false },
+  { key: "announcement.title", value: "" },
+  { key: "announcement.body", value: "" },
+  { key: "announcement.tone", value: "info" },
 ] as const;
 
-export const mockModelAvailability = listModels().map((model) => ({
+export const mockModelAvailability = Object.values(MODELS).map((model) => ({
   ...model,
   available: true,
 }));

@@ -1,4 +1,5 @@
 import type { ModelDefinition, ProtocolName } from "@/lib/models/types";
+import { IMAGE_ASPECT_RATIO_OPTIONS } from "@/lib/models/options";
 
 export const MODELS: Record<string, ModelDefinition> = {
   "gpt-image-2": {
@@ -7,22 +8,8 @@ export const MODELS: Record<string, ModelDefinition> = {
     vendor: "动物通道",
     protocol: "openai-images",
     capabilities: {
-      aspectRatios: [
-        "1:1",
-        "3:2",
-        "2:3",
-        "4:3",
-        "3:4",
-        "5:4",
-        "4:5",
-        "16:9",
-        "9:16",
-        "2:1",
-        "1:2",
-        "21:9",
-        "9:21",
-      ],
-      resolutions: ["1K", "2K", "4K"],
+      aspectRatios: [...IMAGE_ASPECT_RATIO_OPTIONS],
+      resolutions: ["1K", "2K", "4K", "High"],
       supportsReferenceImage: true,
       maxReferenceImages: 16,
       supportsNegativePrompt: false,
@@ -49,6 +36,21 @@ export const MODELS: Record<string, ModelDefinition> = {
           "9:21",
         ],
         "4K": ["16:9", "9:16", "2:1", "1:2", "21:9", "9:21"],
+        High: [
+          "1:1",
+          "3:2",
+          "2:3",
+          "4:3",
+          "3:4",
+          "5:4",
+          "4:5",
+          "16:9",
+          "9:16",
+          "2:1",
+          "1:2",
+          "21:9",
+          "9:21",
+        ],
       },
     },
     defaults: {
@@ -62,6 +64,7 @@ export const MODELS: Record<string, ModelDefinition> = {
       "1K": 2,
       "2K": 8,
       "4K": 20,
+      High: 30,
     },
     tagline: "指令精准，适合海报、字体与排版类画面。",
   },

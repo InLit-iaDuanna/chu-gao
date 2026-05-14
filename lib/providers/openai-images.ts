@@ -10,6 +10,7 @@ import { providerError } from "@/lib/providers/diagnostics";
 import { providerRequestTimeoutMs } from "@/lib/providers/config";
 import {
   RESOLUTION_TO_QUALITY,
+  RESOLUTION_TO_SYSRV_QUALITY,
   imagePixelSizeForRequest,
 } from "@/lib/providers/image-params";
 
@@ -90,6 +91,20 @@ function openAIImageTaskUrl(baseUrl: string, taskId: string): string {
   return `${normalizeOpenAIImagesBaseUrl(baseUrl)}/v1/images/generations/${taskId}`;
 }
 
+function hostForBaseUrl(baseUrl: string): string | null {
+  try {
+    return new URL(normalizeOpenAIImagesBaseUrl(baseUrl)).hostname
+      .replace(/^www\./, "")
+      .toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+function isSysrvImagesProvider(baseUrl: string): boolean {
+  return hostForBaseUrl(baseUrl) === "sysrv.net";
+}
+
 function sleep(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal.aborted) {
@@ -136,7 +151,9 @@ function isTaskResponse(payload: unknown): payload is OpenAIImageTaskResponse {
   );
 }
 
-function extractImageItems(payload: OpenAIImageTaskResponse): OpenAIImageItem[] {
+function extractImageItems(
+  payload: OpenAIImageTaskResponse,
+): OpenAIImageItem[] {
   const buckets = [
     payload.data,
     payload.images,
@@ -151,6 +168,20 @@ function extractImageItems(payload: OpenAIImageTaskResponse): OpenAIImageItem[] 
 
 function imageSizeForRequest(req: InternalRequest): string {
   return imagePixelSizeForRequest(req.aspectRatio, req.resolution, "OpenAI");
+}
+
+function sysrvQualityForRequest(req: InternalRequest): string {
+  return RESOLUTION_TO_SYSRV_QUALITY[req.resolution] ?? "2k";
+}
+
+function sysrvModelForRequest(req: InternalRequest): string {
+  if (req.modelId === "gpt-image-2") {
+    return req.resolution === "High"
+      ? "gpt-image-2-high"
+      : "gpt-image-2-standard";
+  }
+
+  return req.modelId;
 }
 
 export class OpenAIImagesAdapter implements ProviderAdapter {
@@ -171,24 +202,32 @@ export class OpenAIImagesAdapter implements ProviderAdapter {
     signal: AbortSignal,
     onProgress?: GenerateProgressCallback,
   ): Promise<GenerateResult> {
-    const size = imageSizeForRequest(req);
+    const usesSysrvFormat = isSysrvImagesProvider(this.config.baseUrl);
+    const size = usesSysrvFormat ? req.aspectRatio : imageSizeForRequest(req);
+    const model = usesSysrvFormat ? sysrvModelForRequest(req) : req.modelId;
+    const quality = usesSysrvFormat
+      ? sysrvQualityForRequest(req)
+      : (RESOLUTION_TO_QUALITY[req.resolution] ?? "medium");
 
     if (req.referenceImages?.length) {
       const form = new FormData();
-      form.append("model", req.modelId);
+      form.append("model", model);
       form.append("prompt", req.prompt);
-      form.append("n", String(req.n));
       form.append("size", size);
-      form.append("resolution", req.resolution);
-      form.append("response_format", "url");
-      form.append("output_format", req.outputFormat);
-      form.append("background", req.background);
-      form.append("quality", RESOLUTION_TO_QUALITY[req.resolution] ?? "medium");
+      form.append("quality", quality);
 
-      if (
-        shouldSendOutputCompression(req.outputFormat, req.outputCompression)
-      ) {
-        form.append("output_compression", String(req.outputCompression));
+      if (!usesSysrvFormat) {
+        form.append("n", String(req.n));
+        form.append("resolution", req.resolution);
+        form.append("response_format", "url");
+        form.append("output_format", req.outputFormat);
+        form.append("background", req.background);
+
+        if (
+          shouldSendOutputCompression(req.outputFormat, req.outputCompression)
+        ) {
+          form.append("output_compression", String(req.outputCompression));
+        }
       }
 
       for (const image of req.referenceImages) {
@@ -232,18 +271,25 @@ export class OpenAIImagesAdapter implements ProviderAdapter {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: req.modelId,
+        model,
         prompt: req.prompt,
-        n: req.n,
         size,
-        resolution: req.resolution,
-        response_format: "url",
-        output_format: req.outputFormat,
-        background: req.background,
-        quality: RESOLUTION_TO_QUALITY[req.resolution] ?? "medium",
-        ...(shouldSendOutputCompression(req.outputFormat, req.outputCompression)
-          ? { output_compression: req.outputCompression }
-          : {}),
+        quality,
+        ...(usesSysrvFormat
+          ? {}
+          : {
+              n: req.n,
+              resolution: req.resolution,
+              response_format: "url",
+              output_format: req.outputFormat,
+              background: req.background,
+              ...(shouldSendOutputCompression(
+                req.outputFormat,
+                req.outputCompression,
+              )
+                ? { output_compression: req.outputCompression }
+                : {}),
+            }),
       }),
     });
 
@@ -310,7 +356,7 @@ export class OpenAIImagesAdapter implements ProviderAdapter {
       progress:
         task.status === "completed"
           ? 100
-          : normalizeProgress(task.progress) ?? 0,
+          : (normalizeProgress(task.progress) ?? 0),
       rawProviderResponse: task,
     });
 
@@ -351,7 +397,7 @@ export class OpenAIImagesAdapter implements ProviderAdapter {
         progress:
           task.status === "completed"
             ? 100
-            : normalizeProgress(task.progress) ?? 0,
+            : (normalizeProgress(task.progress) ?? 0),
         rawProviderResponse: task,
       });
     }

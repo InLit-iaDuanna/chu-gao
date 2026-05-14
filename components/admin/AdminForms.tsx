@@ -28,6 +28,10 @@ async function patchJson(url: string, body: unknown) {
   return requestJson(url, "PATCH", body);
 }
 
+async function deleteJson(url: string, body: unknown) {
+  return requestJson(url, "DELETE", body);
+}
+
 function toDatetimeLocalValue(value: string | null | undefined) {
   if (!value) {
     return "";
@@ -62,6 +66,21 @@ type ProviderAccountRecord = {
   lastErrorMsg: string | null;
   hasApiKey: boolean;
   isDefault: boolean;
+};
+
+type ProviderChannelGroupRecord = {
+  baseUrl: string;
+  displayName: string;
+  providerName?: string;
+  protocol?: string;
+  modelsSupported?: string[];
+  accountCount: number;
+  activeAccountCount: number;
+  healthyAccountCount: number;
+  inFlight: number;
+  maxConcurrency: number;
+  dailyUsed: number;
+  dailyLimit: number | null;
 };
 
 export function AdminUserProfileForm({
@@ -176,10 +195,16 @@ export function AdminUserProfileForm({
         />
       </div>
       <div className="mt-4 flex items-center gap-3">
-        <button className="tool-button h-10" type="submit" disabled={!canSubmit}>
+        <button
+          className="tool-button h-10"
+          type="submit"
+          disabled={!canSubmit}
+        >
           保存资料
         </button>
-        {message ? <span className="text-sm text-text-muted">{message}</span> : null}
+        {message ? (
+          <span className="text-sm text-text-muted">{message}</span>
+        ) : null}
       </div>
     </form>
   );
@@ -233,11 +258,17 @@ export function AdminPasswordResetForm({ userId }: { userId: string }) {
           value={password}
           onChange={(event) => setPassword(event.target.value)}
         />
-        <button className="tool-button h-10" type="submit" disabled={!canSubmit}>
+        <button
+          className="tool-button h-10"
+          type="submit"
+          disabled={!canSubmit}
+        >
           重置
         </button>
       </div>
-      {message ? <p className="mt-3 text-sm text-text-muted">{message}</p> : null}
+      {message ? (
+        <p className="mt-3 text-sm text-text-muted">{message}</p>
+      ) : null}
     </form>
   );
 }
@@ -281,9 +312,13 @@ export function AdminDangerActions({ userId }: { userId: string }) {
           className="tool-button h-10 text-text-muted"
           type="button"
           onClick={() =>
-            run("归档全部会话", `/api/admin/users/${userId}/conversations/archive`, {
-              mode: "all",
-            })
+            run(
+              "归档全部会话",
+              `/api/admin/users/${userId}/conversations/archive`,
+              {
+                mode: "all",
+              },
+            )
           }
         >
           归档会话
@@ -292,9 +327,13 @@ export function AdminDangerActions({ userId }: { userId: string }) {
           className="tool-button h-10 text-danger"
           type="button"
           onClick={() =>
-            run("软删除失败任务", `/api/admin/users/${userId}/generations/delete`, {
-              mode: "failed",
-            })
+            run(
+              "软删除失败任务",
+              `/api/admin/users/${userId}/generations/delete`,
+              {
+                mode: "failed",
+              },
+            )
           }
         >
           删除失败任务
@@ -303,15 +342,21 @@ export function AdminDangerActions({ userId }: { userId: string }) {
           className="tool-button h-10 text-danger"
           type="button"
           onClick={() =>
-            run("软删除全部任务", `/api/admin/users/${userId}/generations/delete`, {
-              mode: "all",
-            })
+            run(
+              "软删除全部任务",
+              `/api/admin/users/${userId}/generations/delete`,
+              {
+                mode: "all",
+              },
+            )
           }
         >
           删除全部任务
         </button>
       </div>
-      {message ? <p className="mt-3 text-sm text-text-muted">{message}</p> : null}
+      {message ? (
+        <p className="mt-3 text-sm text-text-muted">{message}</p>
+      ) : null}
     </div>
   );
 }
@@ -363,11 +408,17 @@ export function AdminCreditForm({ userId }: { userId: string }) {
           value={note}
           onChange={(event) => setNote(event.target.value)}
         />
-        <button className="tool-button h-10" type="submit" disabled={!canSubmit}>
+        <button
+          className="tool-button h-10"
+          type="submit"
+          disabled={!canSubmit}
+        >
           保存
         </button>
       </div>
-      {message ? <p className="mt-3 text-sm text-text-muted">{message}</p> : null}
+      {message ? (
+        <p className="mt-3 text-sm text-text-muted">{message}</p>
+      ) : null}
     </form>
   );
 }
@@ -422,7 +473,9 @@ export function DashboardRecentControls({ limit }: { limit: number }) {
       >
         清空
       </button>
-      {message ? <span className="text-xs text-text-muted">{message}</span> : null}
+      {message ? (
+        <span className="text-xs text-text-muted">{message}</span>
+      ) : null}
     </div>
   );
 }
@@ -433,7 +486,7 @@ export function ProviderCreateForm({
   models: Array<{ id: string; protocol: string }>;
 }) {
   const router = useRouter();
-  const [name, setName] = useState("image2");
+  const [name, setName] = useState("nano-banana");
   const [protocol, setProtocol] = useState("OPENAI_IMAGES");
   const [baseUrl, setBaseUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
@@ -492,7 +545,11 @@ export function ProviderCreateForm({
             每个渠道会自动创建一个默认账号，后续可继续批量导入更多 API。
           </p>
         </div>
-        <button className="tool-button h-10" type="submit" disabled={!canSubmit}>
+        <button
+          className="tool-button h-10"
+          type="submit"
+          disabled={!canSubmit}
+        >
           添加渠道
         </button>
       </div>
@@ -507,7 +564,30 @@ export function ProviderCreateForm({
         <select
           className="rounded-[6px] border border-border bg-surface px-3 py-2 text-sm"
           value={protocol}
-          onChange={(event) => setProtocol(event.target.value)}
+          onChange={(event) => {
+            const nextProtocol = event.target.value;
+            setProtocol(nextProtocol);
+            const nextModels = models
+              .filter((model) => {
+                if (nextProtocol === "OPENAI_IMAGES") {
+                  return model.protocol === "openai-images";
+                }
+
+                if (nextProtocol === "GEMINI_IMAGE") {
+                  return model.protocol === "gemini-image";
+                }
+
+                return model.protocol === "openai-responses-image";
+              })
+              .map((model) => model.id);
+            setModelsText(nextModels.join(", "));
+            if (nextProtocol === "GEMINI_IMAGE" && name === "image2") {
+              setName("nano-banana");
+            }
+            if (nextProtocol === "OPENAI_IMAGES" && name === "nano-banana") {
+              setName("image2");
+            }
+          }}
         >
           <option value="OPENAI_IMAGES">OPENAI_IMAGES</option>
           <option value="OPENAI_RESPONSES_IMAGE">OPENAI_RESPONSES_IMAGE</option>
@@ -556,7 +636,13 @@ export function ProviderCreateForm({
           <option key={model.id} value={model.id} />
         ))}
       </datalist>
-      {message ? <p className="mt-3 text-sm text-text-muted">{message}</p> : null}
+      <p className="mt-3 text-xs leading-5 text-text-muted">
+        Nano Banana 请选择 GEMINI_IMAGE，并填写 gemini-3.1-flash-image-preview,
+        gemini-3-pro-image-preview。不同 Base URL 会在前台显示为不同大渠道。
+      </p>
+      {message ? (
+        <p className="mt-3 text-sm text-text-muted">{message}</p>
+      ) : null}
     </form>
   );
 }
@@ -608,11 +694,17 @@ export function RedemptionCodeCreateForm() {
           value={credits}
           onChange={(event) => setCredits(Number(event.target.value))}
         />
-        <button className="tool-button h-10" type="submit" disabled={!canSubmit}>
+        <button
+          className="tool-button h-10"
+          type="submit"
+          disabled={!canSubmit}
+        >
           生成
         </button>
       </div>
-      {message ? <p className="mt-3 text-sm text-text-muted">{message}</p> : null}
+      {message ? (
+        <p className="mt-3 text-sm text-text-muted">{message}</p>
+      ) : null}
     </form>
   );
 }
@@ -714,16 +806,26 @@ export function InviteCodeCreateForm() {
             onChange={(event) => setNote(event.target.value)}
           />
         </label>
-        <button className="tool-button h-10" type="submit" disabled={!canSubmit}>
+        <button
+          className="tool-button h-10"
+          type="submit"
+          disabled={!canSubmit}
+        >
           生成
         </button>
       </div>
-      {message ? <p className="mt-3 text-sm text-text-muted">{message}</p> : null}
+      {message ? (
+        <p className="mt-3 text-sm text-text-muted">{message}</p>
+      ) : null}
     </form>
   );
 }
 
-export function ProviderAccountImportForm({ providerId }: { providerId: string }) {
+export function ProviderAccountImportForm({
+  providerId,
+}: {
+  providerId: string;
+}) {
   const router = useRouter();
   const [mode, setMode] = useState<"csv" | "lines">("csv");
   const [text, setText] = useState("");
@@ -858,12 +960,18 @@ export function ProviderAccountImportForm({ providerId }: { providerId: string }
           onChange={(event) => setDefaultWeight(Number(event.target.value))}
           aria-label="默认权重"
         />
-        <button className="tool-button h-10" type="submit" disabled={!canSubmit}>
+        <button
+          className="tool-button h-10"
+          type="submit"
+          disabled={!canSubmit}
+        >
           导入
         </button>
       </div>
       <div className="mt-3 flex items-center gap-3">
-        {message ? <span className="text-sm text-text-muted">{message}</span> : null}
+        {message ? (
+          <span className="text-sm text-text-muted">{message}</span>
+        ) : null}
         {!message && sourceText ? (
           <span className="text-xs text-text-muted">
             待处理 {sourceText.split(/\r?\n/).filter(Boolean).length} 行
@@ -874,12 +982,266 @@ export function ProviderAccountImportForm({ providerId }: { providerId: string }
   );
 }
 
+export function ProviderChannelGroupPanel({
+  providerId,
+  group,
+}: {
+  providerId: string;
+  group: ProviderChannelGroupRecord;
+}) {
+  const router = useRouter();
+  const [displayName, setDisplayName] = useState(group.displayName);
+  const [maxConcurrency, setMaxConcurrency] = useState(group.maxConcurrency);
+  const [message, setMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function saveSettings(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const nextName = displayName.trim();
+    const nextConcurrency = Number(maxConcurrency);
+    const payload: {
+      baseUrl: string;
+      displayName?: string;
+      maxConcurrency?: number;
+    } = {
+      baseUrl: group.baseUrl,
+    };
+
+    if (nextName && nextName !== group.displayName) {
+      payload.displayName = nextName;
+    }
+
+    if (
+      Number.isFinite(nextConcurrency) &&
+      nextConcurrency > 0 &&
+      nextConcurrency !== group.maxConcurrency
+    ) {
+      payload.maxConcurrency = nextConcurrency;
+    }
+
+    if (!payload.displayName && payload.maxConcurrency === undefined) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setMessage("保存中...");
+
+    try {
+      await patchJson(`/api/admin/providers/${providerId}/channels`, {
+        ...payload,
+      });
+      setMessage("设置已保存");
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "保存失败");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function disableGroup() {
+    if (
+      !window.confirm(
+        `确定停用「${group.displayName}」下的 ${group.accountCount} 个账号吗？历史任务会保留。`,
+      )
+    ) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setMessage("停用中...");
+
+    try {
+      const payload = (await deleteJson(
+        `/api/admin/providers/${providerId}/channels`,
+        { baseUrl: group.baseUrl },
+      )) as { data?: { disabled: number } };
+
+      setMessage(
+        `已停用 ${payload.data?.disabled ?? group.accountCount} 个账号`,
+      );
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "停用失败");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <section className="rounded-[8px] border border-border bg-surface p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-medium">{group.displayName}</p>
+            <span className="rounded-full bg-surface-2 px-2 py-1 text-[11px] text-text-muted">
+              {group.healthyAccountCount}/{group.accountCount} 可用
+            </span>
+            {group.protocol ? (
+              <span className="rounded-full bg-surface-2 px-2 py-1 text-[11px] text-text-muted">
+                {group.protocol}
+              </span>
+            ) : null}
+          </div>
+          <p className="mt-1 break-all text-xs text-text-muted">
+            {group.baseUrl}
+          </p>
+          {group.providerName || group.modelsSupported?.length ? (
+            <p className="mt-1 text-xs text-text-muted">
+              {group.providerName ? `${group.providerName} 号池` : "号池"} ·{" "}
+              {(group.modelsSupported ?? []).join(", ") || "未标模型"}
+            </p>
+          ) : null}
+        </div>
+        <button
+          className="tool-button h-9 text-danger"
+          type="button"
+          disabled={isSubmitting || group.accountCount === 0}
+          onClick={() => void disableGroup()}
+        >
+          停用整组
+        </button>
+      </div>
+      <form
+        className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,1fr)_140px_auto]"
+        onSubmit={saveSettings}
+      >
+        <label className="grid gap-1">
+          <span className="field-label">前台显示名</span>
+          <input
+            className="rounded-[6px] border border-border bg-surface px-3 py-2 text-sm"
+            maxLength={80}
+            value={displayName}
+            onChange={(event) => setDisplayName(event.target.value)}
+          />
+        </label>
+        <label className="grid gap-1">
+          <span className="field-label">总并发</span>
+          <input
+            className="rounded-[6px] border border-border bg-surface px-3 py-2 text-sm"
+            type="number"
+            min={1}
+            max={10_000}
+            value={maxConcurrency}
+            onChange={(event) => setMaxConcurrency(Number(event.target.value))}
+          />
+        </label>
+        <button
+          className="tool-button h-10 self-end"
+          type="submit"
+          disabled={
+            isSubmitting ||
+            ((!displayName.trim() ||
+              displayName.trim() === group.displayName) &&
+              (Number(maxConcurrency) === group.maxConcurrency ||
+                !Number.isFinite(Number(maxConcurrency))))
+          }
+        >
+          保存
+        </button>
+      </form>
+      <div className="mt-3 grid gap-2 text-sm text-text-muted sm:grid-cols-2 xl:grid-cols-4">
+        <span>启用 {group.activeAccountCount}</span>
+        <span>
+          并发 {group.inFlight}/{group.maxConcurrency}
+        </span>
+        <span>
+          今日 {group.dailyUsed}/{group.dailyLimit ?? "∞"}
+        </span>
+        <span>账号 {group.accountCount}</span>
+      </div>
+      {message ? (
+        <p className="mt-3 text-sm text-text-muted">{message}</p>
+      ) : null}
+      <details className="mt-3 rounded-[6px] border border-border bg-surface-2/45 p-3">
+        <summary className="cursor-pointer list-none text-xs font-medium text-text-muted">
+          向这个大渠道添加账号
+        </summary>
+        <div className="mt-3">
+          <ProviderAccountCreateForm
+            providerId={providerId}
+            defaultBaseUrl={group.baseUrl}
+            compact
+          />
+        </div>
+      </details>
+    </section>
+  );
+}
+
+export function ProviderPoolActions({
+  providerId,
+  providerName,
+  accountCount,
+}: {
+  providerId: string;
+  providerName: string;
+  accountCount: number;
+}) {
+  const router = useRouter();
+  const [message, setMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function deletePool() {
+    if (
+      !window.confirm(
+        `确认删除「${providerName}」号池？这会停用它下面的 ${accountCount} 个账号，历史任务会保留。`,
+      )
+    ) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setMessage("删除中...");
+
+    try {
+      const payload = (await deleteJson(
+        `/api/admin/providers/${providerId}`,
+        {},
+      )) as {
+        data?: { disabledAccounts?: number };
+      };
+
+      setMessage(
+        `号池已删除，已停用 ${payload.data?.disabledAccounts ?? accountCount} 个账号`,
+      );
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "删除失败");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      <button
+        className="tool-button h-9 text-danger"
+        type="button"
+        disabled={isSubmitting}
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          void deletePool();
+        }}
+      >
+        删除号池
+      </button>
+      {message ? (
+        <span className="text-xs text-text-muted">{message}</span>
+      ) : null}
+    </div>
+  );
+}
+
 export function ProviderAccountCreateForm({
   providerId,
   defaultBaseUrl,
+  compact = false,
 }: {
   providerId: string;
   defaultBaseUrl: string;
+  compact?: boolean;
 }) {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -929,19 +1291,36 @@ export function ProviderAccountCreateForm({
   }
 
   return (
-    <form onSubmit={submit} className="surface-panel p-4">
+    <form
+      onSubmit={submit}
+      className={compact ? "space-y-3" : "surface-panel p-4"}
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-medium">新增池内账号</p>
-          <p className="mt-1 text-xs text-text-muted">
-            账号名称用于后台识别，前台会自动显示为动物通道代称。
+          <p className="text-sm font-medium">
+            {compact ? "新增账号" : "新增池内账号"}
           </p>
+          {!compact ? (
+            <p className="mt-1 text-xs text-text-muted">
+              账号名称用于后台识别，前台会自动显示为动物通道代称。
+            </p>
+          ) : null}
         </div>
-        <button className="tool-button h-10" type="submit" disabled={!canSubmit}>
+        <button
+          className="tool-button h-10"
+          type="submit"
+          disabled={!canSubmit}
+        >
           添加账号
         </button>
       </div>
-      <div className="mt-4 grid gap-3 lg:grid-cols-3">
+      <div
+        className={
+          compact
+            ? "grid gap-3 lg:grid-cols-2"
+            : "mt-4 grid gap-3 lg:grid-cols-3"
+        }
+      >
         <input
           className="rounded-[6px] border border-border bg-surface px-3 py-2 text-sm"
           placeholder="账号名称（如 imagegen-021）"
@@ -956,7 +1335,11 @@ export function ProviderAccountCreateForm({
           onChange={(event) => setBaseUrl(event.target.value)}
         />
         <input
-          className="rounded-[6px] border border-border bg-surface px-3 py-2 text-sm lg:col-span-3"
+          className={
+            compact
+              ? "rounded-[6px] border border-border bg-surface px-3 py-2 text-sm lg:col-span-2"
+              : "rounded-[6px] border border-border bg-surface px-3 py-2 text-sm lg:col-span-3"
+          }
           placeholder="API Key"
           required
           value={apiKey}
@@ -1000,7 +1383,9 @@ export function ProviderAccountCreateForm({
           onChange={(event) => setNote(event.target.value)}
         />
       </div>
-      {message ? <p className="mt-3 text-sm text-text-muted">{message}</p> : null}
+      {message ? (
+        <p className="mt-3 text-sm text-text-muted">{message}</p>
+      ) : null}
     </form>
   );
 }
@@ -1036,21 +1421,24 @@ export function ProviderAccountEditForm({
     setMessage("保存中...");
 
     try {
-      await patchJson(`/api/admin/providers/${providerId}/accounts/${account.id}`, {
-        name: name.trim() || null,
-        baseUrl: baseUrl.trim(),
-        apiKey: apiKey.trim() || undefined,
-        priority,
-        weight,
-        maxConcurrency,
-        dailyLimit: dailyLimit.trim() ? Number(dailyLimit) : null,
-        note: note.trim() || null,
-        isActive,
-        health,
-        cooldownUntil: cooldownUntil
-          ? new Date(cooldownUntil).toISOString()
-          : null,
-      });
+      await patchJson(
+        `/api/admin/providers/${providerId}/accounts/${account.id}`,
+        {
+          name: name.trim() || null,
+          baseUrl: baseUrl.trim(),
+          apiKey: apiKey.trim() || undefined,
+          priority,
+          weight,
+          maxConcurrency,
+          dailyLimit: dailyLimit.trim() ? Number(dailyLimit) : null,
+          note: note.trim() || null,
+          isActive,
+          health,
+          cooldownUntil: cooldownUntil
+            ? new Date(cooldownUntil).toISOString()
+            : null,
+        },
+      );
       setApiKey("");
       setMessage("账号已更新");
       router.refresh();
@@ -1066,7 +1454,10 @@ export function ProviderAccountEditForm({
     setMessage("测试中...");
 
     try {
-      await postJson(`/api/admin/providers/${providerId}/accounts/${account.id}/test`, {});
+      await postJson(
+        `/api/admin/providers/${providerId}/accounts/${account.id}/test`,
+        {},
+      );
       setMessage("测试通过");
       router.refresh();
     } catch (error) {
@@ -1081,7 +1472,10 @@ export function ProviderAccountEditForm({
     setMessage("处理中...");
 
     try {
-      await patchJson(`/api/admin/providers/${providerId}/accounts/${account.id}`, body);
+      await patchJson(
+        `/api/admin/providers/${providerId}/accounts/${account.id}`,
+        body,
+      );
       setMessage(successMessage);
       router.refresh();
     } catch (error) {
@@ -1109,7 +1503,9 @@ export function ProviderAccountEditForm({
                 指纹 {account.apiKeyFingerprintMasked}
               </span>
             </div>
-            <p className="mt-1 break-all text-xs text-text-muted">{account.baseUrl}</p>
+            <p className="mt-1 break-all text-xs text-text-muted">
+              {account.baseUrl}
+            </p>
           </div>
           <div className="grid gap-1 text-right text-xs text-text-muted">
             <span>
@@ -1118,7 +1514,9 @@ export function ProviderAccountEditForm({
             <span>
               并发 {account.inFlight}/{account.maxConcurrency}
             </span>
-            <span>今日 {account.dailyUsed}/{account.dailyLimit ?? "∞"}</span>
+            <span>
+              今日 {account.dailyUsed}/{account.dailyLimit ?? "∞"}
+            </span>
           </div>
         </div>
       </summary>
@@ -1266,7 +1664,9 @@ export function ProviderAccountEditForm({
           {account.isActive ? "停用" : "恢复"}
         </button>
       </div>
-      {message ? <p className="mt-3 text-sm text-text-muted">{message}</p> : null}
+      {message ? (
+        <p className="mt-3 text-sm text-text-muted">{message}</p>
+      ) : null}
     </details>
   );
 }
@@ -1279,7 +1679,10 @@ export function PricingRuleForm({ models }: { models: Array<{ id: string }> }) {
   const [message, setMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const canSubmit =
-    models.length > 0 && modelId.trim().length > 0 && Number.isFinite(credits) && !isSubmitting;
+    models.length > 0 &&
+    modelId.trim().length > 0 &&
+    Number.isFinite(credits) &&
+    !isSubmitting;
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1330,6 +1733,7 @@ export function PricingRuleForm({ models }: { models: Array<{ id: string }> }) {
           <option value="1K">1K</option>
           <option value="2K">2K</option>
           <option value="4K">4K</option>
+          <option value="High">High</option>
         </select>
         <input
           className="rounded-[6px] border border-border bg-surface px-3 py-2 text-sm"
@@ -1338,11 +1742,17 @@ export function PricingRuleForm({ models }: { models: Array<{ id: string }> }) {
           value={credits}
           onChange={(event) => setCredits(Number(event.target.value))}
         />
-        <button className="tool-button h-10" type="submit" disabled={!canSubmit}>
+        <button
+          className="tool-button h-10"
+          type="submit"
+          disabled={!canSubmit}
+        >
           保存
         </button>
       </div>
-      {message ? <p className="mt-3 text-sm text-text-muted">{message}</p> : null}
+      {message ? (
+        <p className="mt-3 text-sm text-text-muted">{message}</p>
+      ) : null}
     </form>
   );
 }

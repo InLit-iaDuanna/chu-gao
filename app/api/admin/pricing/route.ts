@@ -7,7 +7,7 @@ import {
 } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { listModelsWithPricing } from "@/lib/model-pricing";
-import { getModel } from "@/lib/models/registry";
+import { getConfiguredModel } from "@/lib/models/runtime-config";
 import { modelPricingPatchSchema, modelPricingSchema } from "@/lib/validators";
 
 export async function GET(request: Request) {
@@ -25,7 +25,11 @@ export async function GET(request: Request) {
   const [models, rules] = await Promise.all([
     listModelsWithPricing(),
     db.modelPricing.findMany({
-      orderBy: [{ modelId: "asc" }, { priority: "desc" }, { updatedAt: "desc" }],
+      orderBy: [
+        { modelId: "asc" },
+        { priority: "desc" },
+        { updatedAt: "desc" },
+      ],
     }),
   ]);
 
@@ -54,7 +58,7 @@ export async function POST(request: Request) {
     });
   }
 
-  if (!getModel(parsed.data.modelId)) {
+  if (!(await getConfiguredModel(parsed.data.modelId))) {
     return fail("VALIDATION_ERROR", "未知模型", { status: 400 });
   }
 
@@ -111,7 +115,7 @@ export async function PATCH(request: Request) {
     });
   }
 
-  if (parsed.data.modelId && !getModel(parsed.data.modelId)) {
+  if (parsed.data.modelId && !(await getConfiguredModel(parsed.data.modelId))) {
     return fail("VALIDATION_ERROR", "未知模型", { status: 400 });
   }
 

@@ -2,6 +2,7 @@ import { fail, ok } from "@/lib/api-response";
 import { checkSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { serializeGeneration } from "@/lib/generations";
+import { getProviderChannelDisplayNameMap } from "@/lib/provider-channel-config";
 import { isDatabaseUnavailableError } from "@/lib/service-errors";
 
 export async function GET(
@@ -53,7 +54,9 @@ export async function GET(
       return fail("NOT_FOUND", "任务不存在", { status: 404 });
     }
 
-    return ok(serializeGeneration(generation));
+    const displayNameMap = await getProviderChannelDisplayNameMap();
+
+    return ok(serializeGeneration(generation, { displayNameMap }));
   } catch (error) {
     if (isDatabaseUnavailableError(error)) {
       return fail("SERVICE_UNAVAILABLE", "生成服务暂时不可用", { status: 503 });

@@ -128,6 +128,7 @@ export function Canvas({
           src={imageUrl}
           alt="生成结果"
           className="h-full max-h-full w-full object-contain"
+          decoding="async"
         />
       </div>
     </div>

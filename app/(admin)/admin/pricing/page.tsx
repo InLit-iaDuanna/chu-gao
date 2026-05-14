@@ -1,7 +1,7 @@
 import { PricingRuleForm } from "@/components/admin/AdminForms";
 import { DataTable } from "@/components/admin/DataTable";
 import { db } from "@/lib/db";
-import { listModels } from "@/lib/models/registry";
+import { listConfiguredModels } from "@/lib/models/runtime-config";
 
 export const dynamic = "force-dynamic";
 
@@ -16,8 +16,10 @@ async function getRules() {
 }
 
 export default async function AdminPricingPage() {
-  const models = listModels();
-  const rules = await getRules();
+  const [models, rules] = await Promise.all([
+    listConfiguredModels(),
+    getRules(),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -44,14 +46,27 @@ export default async function AdminPricingPage() {
       <PricingRuleForm models={models} />
       {rules ? (
         <DataTable
-          headers={["模型", "分辨率", "比例", "格式", "背景", "参考图", "点数", "状态"]}
+          headers={[
+            "模型",
+            "分辨率",
+            "比例",
+            "格式",
+            "背景",
+            "参考图",
+            "点数",
+            "状态",
+          ]}
           rows={rules.map((rule) => [
             rule.modelId,
             rule.resolution ?? "全部",
             rule.aspectRatio ?? "全部",
             rule.outputFormat ?? "全部",
             rule.background ?? "全部",
-            rule.usesReference === null ? "全部" : rule.usesReference ? "是" : "否",
+            rule.usesReference === null
+              ? "全部"
+              : rule.usesReference
+                ? "是"
+                : "否",
             `${rule.credits} 点`,
             rule.isActive ? "启用" : "停用",
           ])}

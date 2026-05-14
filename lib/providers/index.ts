@@ -5,9 +5,11 @@ import { db } from "@/lib/db";
 import { getModel } from "@/lib/models/registry";
 import type { InternalRequest } from "@/lib/models/types";
 import {
+  channelIdFromBaseUrl,
+  displayNameForProviderChannel,
   getImage2ProviderChannel,
-  isImage2ModelId,
   normalizeProviderChannelBaseUrl,
+  supportsProviderChannels,
 } from "@/lib/provider-channels";
 import {
   ProviderRequestError,
@@ -44,6 +46,28 @@ function supportedModelIds(modelId: string): string[] {
   }
 
   return [modelId];
+}
+
+export { supportedModelIds };
+
+export function providerChannelMatchesBaseUrl(
+  providerChannelId: string | undefined | null,
+  baseUrl?: string | null,
+): boolean {
+  if (!providerChannelId) {
+    return true;
+  }
+
+  const normalizedBaseUrl = normalizeProviderChannelBaseUrl(baseUrl);
+
+  if (!normalizedBaseUrl) {
+    return false;
+  }
+
+  return (
+    channelIdFromBaseUrl(normalizedBaseUrl) === providerChannelId ||
+    getImage2ProviderChannel(providerChannelId)?.baseUrl === normalizedBaseUrl
+  );
 }
 
 type ProviderFailureDetails = {
@@ -354,10 +378,9 @@ async function findAvailableProviderAccounts(
 
   const now = new Date();
   const modelIds = supportedModelIds(modelId);
-  const channel = isImage2ModelId(modelId)
-    ? getImage2ProviderChannel(providerChannelId)
-    : null;
-  const channelBaseUrl = normalizeProviderChannelBaseUrl(channel?.baseUrl);
+  const channelId = supportsProviderChannels(modelId)
+    ? providerChannelId
+    : undefined;
 
   const accounts = await db.providerAccount.findMany({
     where: {
@@ -391,8 +414,7 @@ async function findAvailableProviderAccounts(
   return accounts
     .filter(
       (account) =>
-        !channelBaseUrl ||
-        normalizeProviderChannelBaseUrl(account.baseUrl) === channelBaseUrl,
+        providerChannelMatchesBaseUrl(channelId, account.baseUrl),
     )
     .sort((left, right) => {
       const leftProviderPriority = left.provider.priority;
@@ -437,9 +459,9 @@ async function findAvailableProviderAccounts(
 
 function maxAttemptsForAccounts(
   accounts: Array<ProviderAccount & { provider: Provider }>,
-  providerChannel: ReturnType<typeof getImage2ProviderChannel>,
+  providerChannelId?: string | null,
 ): number {
-  if (!providerChannel) {
+  if (!providerChannelId) {
     return Math.min(providerAccountMaxAttempts(), accounts.length);
   }
 
@@ -480,31 +502,37 @@ export async function selectAndGenerate(
     request.modelId,
     request.providerChannelId,
   );
-  const providerChannel = isImage2ModelId(request.modelId)
-    ? getImage2ProviderChannel(request.providerChannelId)
-    : null;
+  const providerChannel = getImage2ProviderChannel(request.providerChannelId);
+  const providerChannelName =
+    providerChannel?.displayName ??
+    displayNameForProviderChannel(
+      accountCandidates[0]?.baseUrl,
+      accountCandidates[0]?.provider.name,
+    );
   const legacyCandidates = await findAvailableProviders(request.modelId);
 
   if (accountCandidates.length === 0 && legacyCandidates.length === 0) {
     throw new ModelNotAvailableError(
       request.modelId,
-      providerChannel?.displayName ?? null,
+      providerChannelName ?? null,
     );
   }
 
   const errors: unknown[] = [];
   const providerPoolErrors = new Map<string, unknown[]>();
   let accountAttempts = 0;
-  const filteredAccountCandidates = providerChannel
+  const filteredAccountCandidates = request.providerChannelId
     ? accountCandidates.filter(
         (account) =>
-          normalizeProviderChannelBaseUrl(account.baseUrl) ===
-          normalizeProviderChannelBaseUrl(providerChannel.baseUrl),
+          providerChannelMatchesBaseUrl(
+            request.providerChannelId,
+            account.baseUrl,
+          ),
       )
     : accountCandidates;
   const maxAccountAttempts = maxAttemptsForAccounts(
     filteredAccountCandidates,
-    providerChannel,
+    request.providerChannelId,
   );
 
   for (const account of filteredAccountCandidates) {
@@ -587,7 +615,7 @@ export async function selectAndGenerate(
     ),
   );
 
-  for (const provider of providerChannel ? [] : legacyCandidates) {
+  for (const provider of request.providerChannelId ? [] : legacyCandidates) {
     const hasAccounts = await db.providerAccount.count({
       where: { providerId: provider.id },
     });
@@ -644,7 +672,7 @@ export async function selectAndGenerate(
 
   throw new ProviderUnavailableError(
     request.modelId,
-    providerChannel?.displayName ?? null,
+    providerChannelName ?? null,
     new Error(
       `所有渠道均不可用: ${errors.map(serializeProviderError).join("; ")}`,
     ),
@@ -687,11 +715,9 @@ export async function assertProviderAvailable(
     findAvailableProviderAccounts(modelId, providerChannelId),
     findAvailableProviders(modelId),
   ]);
-  const providerChannel = isImage2ModelId(modelId)
-    ? getImage2ProviderChannel(providerChannelId)
-    : null;
+  const providerChannel = getImage2ProviderChannel(providerChannelId);
   const legacyProviders = await Promise.all(
-    (providerChannel ? [] : providers).map(async (provider) => ({
+    (providerChannelId ? [] : providers).map(async (provider) => ({
       provider,
       accountCount: await db.providerAccount.count({
         where: { providerId: provider.id },
@@ -705,7 +731,9 @@ export async function assertProviderAvailable(
   ) {
     throw new ModelNotAvailableError(
       modelId,
-      providerChannel?.displayName ?? null,
+      providerChannel?.displayName ??
+        displayNameForProviderChannel(accounts[0]?.baseUrl, accounts[0]?.provider.name) ??
+        null,
     );
   }
 }

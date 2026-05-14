@@ -176,26 +176,53 @@ export async function DELETE(
 
   const admin = authenticatedUser(sessionResult);
 
-  const provider = await db.provider.update({
+  const provider = await db.provider.findUnique({
     where: { id },
-    data: {
-      isActive: false,
-      health: "DOWN",
-    },
     select: {
       id: true,
-      isActive: true,
-      health: true,
     },
   });
+
+  if (!provider) {
+    return fail("NOT_FOUND", "渠道不存在", { status: 404 });
+  }
+
+  const [, accounts] = await db.$transaction([
+    db.provider.update({
+      where: { id },
+      data: {
+        isActive: false,
+        health: "DOWN",
+      },
+      select: {
+        id: true,
+        isActive: true,
+        health: true,
+      },
+    }),
+    db.providerAccount.updateMany({
+      where: { providerId: id },
+      data: {
+        isActive: false,
+        health: "DOWN",
+        cooldownUntil: null,
+        inFlight: 0,
+      },
+    }),
+  ]);
 
   await audit({
     actorId: admin.id,
     action: "admin.provider.disable",
     target: id,
-    diff: { isActive: false, health: "DOWN" },
+    diff: { isActive: false, health: "DOWN", disabledAccounts: accounts.count },
     request,
   });
 
-  return ok(provider);
+  return ok({
+    id,
+    isActive: false,
+    health: "DOWN",
+    disabledAccounts: accounts.count,
+  });
 }

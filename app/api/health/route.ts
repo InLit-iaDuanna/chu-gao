@@ -1,11 +1,10 @@
 import { fail, ok } from "@/lib/api-response";
 import { db } from "@/lib/db";
+import { getProviderChannelDisplayNameMap } from "@/lib/provider-channel-config";
 import {
-  IMAGE2_PROVIDER_CHANNEL_OPTIONS,
-  inferImage2ProviderChannelIdFromBaseUrl,
+  buildProviderChannelsFromAccounts,
 } from "@/lib/provider-channels";
 import { safeUrlForDiagnostics } from "@/lib/providers/diagnostics";
-import { normalizeOpenAIImagesBaseUrl } from "@/lib/providers/openai-images";
 import { generationQueueStats } from "@/lib/queue";
 import { getRedis } from "@/lib/redis";
 
@@ -162,73 +161,77 @@ async function checkProvider(): Promise<CheckResult> {
   }
 
   try {
-    const activeProviders = await db.provider.count({
-      where: {
-        isActive: true,
-        health: { not: "DOWN" },
-      },
-    });
-    const imageProviders = await db.provider.findMany({
-      where: {
-        isActive: true,
-        health: { not: "DOWN" },
-        protocol: "OPENAI_IMAGES",
-        modelsSupported: {
-          has: "gpt-image-2",
-        },
-      },
-      select: {
-        baseUrl: true,
-        accounts: {
+    const [activeProviders, imageProviders, displayNameMap] =
+      await Promise.all([
+        db.provider.count({
           where: {
             isActive: true,
+            health: { not: "DOWN" },
+          },
+        }),
+        db.provider.findMany({
+          where: {
+            isActive: true,
+            health: { not: "DOWN" },
+            OR: [
+              { modelsSupported: { has: "gpt-image-2" } },
+              { modelsSupported: { has: "gemini-3.1-flash-image-preview" } },
+              { modelsSupported: { has: "gemini-2.5-flash-image" } },
+              { modelsSupported: { has: "gemini-3-pro-image-preview" } },
+              { modelsSupported: { has: "gemini-2.5-flash-image-pro" } },
+            ],
           },
           select: {
+            name: true,
+            protocol: true,
             baseUrl: true,
-            health: true,
-            cooldownUntil: true,
+            modelsSupported: true,
+            accounts: {
+              select: {
+                baseUrl: true,
+                isActive: true,
+                health: true,
+                cooldownUntil: true,
+              },
+            },
           },
-        },
-      },
-    });
-    const now = new Date();
-    const image2Channels = IMAGE2_PROVIDER_CHANNEL_OPTIONS.map((channel) => {
-      const accounts = imageProviders.flatMap((provider) =>
-        provider.accounts.filter(
-          (account) =>
-            inferImage2ProviderChannelIdFromBaseUrl(account.baseUrl) ===
-            channel.id,
-        ),
-      );
-      const availableAccounts = accounts.filter(
-        (account) =>
-          account.health !== "DOWN" &&
-          (!account.cooldownUntil || account.cooldownUntil <= now),
-      );
+        }),
+        getProviderChannelDisplayNameMap(),
+      ]);
+    const providerChannels = buildProviderChannelsFromAccounts(
+      imageProviders.flatMap((provider) =>
+        provider.accounts.map((account) => ({
+          ...account,
+          provider: { name: provider.name },
+        })),
+      ),
+      { displayNameMap },
+    ).map((channel) => ({
+      id: channel.id,
+      name: channel.displayName,
+      baseUrl: safeUrlForDiagnostics(channel.baseUrl),
+      status: channel.availableAccountCount === 0 ? "unavailable" : "ok",
+      accountCount: channel.accountCount ?? 0,
+      availableAccountCount: channel.availableAccountCount ?? 0,
+    }));
+    const availableChannelCount = providerChannels.filter(
+      (channel) => channel.availableAccountCount > 0,
+    ).length;
 
-      return {
-        id: channel.id,
-        name: channel.displayName,
-        status:
-          channel.unavailableReason || availableAccounts.length === 0
-            ? "unavailable"
-            : "ok",
-        unavailableReason: channel.unavailableReason,
-        accountCount: accounts.length,
-        availableAccountCount: availableAccounts.length,
-      };
-    });
-
-    if (imageProviders.length === 0) {
+    if (imageProviders.length === 0 || availableChannelCount === 0) {
       return {
         status: "unavailable",
         message:
-          "No active Images provider supports the required image model. Configure providers and run setup.",
+          "No active image provider channel is available. Configure providers and accounts.",
         detail: {
           activeProviders,
-          requiredProtocol: "OPENAI_IMAGES",
-          requiredModel: "gpt-image-2",
-          requiredModelAvailable: false,
+          supportedModels: [
+            "gpt-image-2",
+            "gemini-3.1-flash-image-preview",
+            "gemini-3-pro-image-preview",
+          ],
+          imageProviderCount: imageProviders.length,
+          providerChannels,
         },
       };
     }
@@ -239,11 +242,9 @@ async function checkProvider(): Promise<CheckResult> {
         activeProviders,
         imageProviders: imageProviders.length,
         requiredModelAvailable: true,
-        image2Channels,
+        providerChannels,
         endpoints: imageProviders.map((provider) =>
-          safeUrlForDiagnostics(
-            `${normalizeOpenAIImagesBaseUrl(provider.baseUrl)}/v1/images/generations`,
-          ),
+          safeUrlForDiagnostics(provider.baseUrl),
         ),
       },
     };
