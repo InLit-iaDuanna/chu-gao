@@ -144,10 +144,6 @@ export function classifyProviderFailure(
     return { category: "TRANSIENT_PROVIDER" };
   }
 
-  if (isUpstreamAccessForbiddenError(error)) {
-    return { category: "AUTH_ACCOUNT_FATAL", status: 502 };
-  }
-
   const text = providerErrorText(error);
 
   if (error instanceof ProviderRequestError) {
@@ -164,8 +160,16 @@ export function classifyProviderFailure(
       return { category: "CONTENT_REJECTED", status };
     }
 
+    if (status >= 500 && hasContentRejectionSignal(text)) {
+      return { category: "CONTENT_REJECTED", status };
+    }
+
     if (status === 400 || status === 422) {
       return { category: "BAD_REQUEST", status };
+    }
+
+    if (isUpstreamAccessForbiddenError(error)) {
+      return { category: "AUTH_ACCOUNT_FATAL", status };
     }
 
     if (status >= 500) {
@@ -181,6 +185,10 @@ export function classifyProviderFailure(
 
   if (hasContentRejectionSignal(text)) {
     return { category: "CONTENT_REJECTED" };
+  }
+
+  if (isUpstreamAccessForbiddenError(error)) {
+    return { category: "AUTH_ACCOUNT_FATAL", status: 502 };
   }
 
   const status = statusFromSerializedMessage(text);
