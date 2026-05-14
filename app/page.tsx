@@ -66,8 +66,18 @@ export default function HomePage() {
 
       {/* Hero */}
       <section className="relative z-10 mt-24 flex w-full max-w-3xl flex-col items-center px-6 text-center">
-        <motion.p
+        <motion.div
           custom={0}
+          variants={fadeUp}
+          initial="hidden"
+          animate="visible"
+          className="mb-3 text-3xl leading-none"
+          aria-hidden="true"
+        >
+          🫴
+        </motion.div>
+        <motion.p
+          custom={1}
           variants={fadeUp}
           initial="hidden"
           animate="visible"
@@ -77,27 +87,17 @@ export default function HomePage() {
         </motion.p>
 
         <motion.h1
-          custom={1}
+          custom={2}
           variants={fadeUp}
           initial="hidden"
           animate="visible"
           className="text-[clamp(2.4rem,6vw,4rem)] font-semibold leading-[1.1] tracking-[-0.03em] text-foreground"
         >
-          写出{" "}
-          <span
-            style={{
-              background:
-                "linear-gradient(135deg, hsl(var(--foreground)) 0%, hsl(var(--foreground)/0.4) 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-            }}
-          >
-            你的设计
-          </span>
+          稳稳地接住<span className="text-info">你的设计</span>
         </motion.h1>
 
         <motion.p
-          custom={2}
+          custom={3}
           variants={fadeUp}
           initial="hidden"
           animate="visible"
@@ -107,7 +107,7 @@ export default function HomePage() {
         </motion.p>
 
         <motion.div
-          custom={3}
+          custom={4}
           variants={fadeUp}
           initial="hidden"
           animate="visible"
@@ -115,7 +115,7 @@ export default function HomePage() {
         >
           <Link
             href="/login"
-            className="flex h-10 items-center gap-2 rounded-lg bg-foreground px-5 text-[14px] font-medium text-background transition-opacity hover:opacity-85"
+            className="flex h-10 items-center gap-2 rounded-lg bg-info px-5 text-[14px] font-medium text-white shadow-[var(--shadow-sm)] transition-colors hover:bg-info/90"
           >
             开始创作
             <ArrowRight size={14} strokeWidth={1.5} />
@@ -135,7 +135,7 @@ export default function HomePage() {
         className="relative z-10 mt-28 w-full max-w-4xl px-6 pb-24"
       >
         <motion.p
-          custom={4}
+          custom={5}
           variants={fadeUp}
           initial="hidden"
           animate="visible"
@@ -148,7 +148,7 @@ export default function HomePage() {
           {FEATURES.map(({ icon: Icon, title, desc }, i) => (
             <motion.div
               key={title}
-              custom={5 + i}
+              custom={6 + i}
               variants={fadeUp}
               initial="hidden"
               animate="visible"
@@ -160,7 +160,9 @@ export default function HomePage() {
               <h3 className="mb-2 text-[15px] font-semibold text-foreground">
                 {title}
               </h3>
-              <p className="text-[13px] leading-relaxed text-text-faint">{desc}</p>
+              <p className="text-[13px] leading-relaxed text-text-faint">
+                {desc}
+              </p>
               {/* Hover accent line */}
               <div className="absolute inset-x-6 bottom-0 h-px scale-x-0 bg-foreground transition-transform duration-300 group-hover:scale-x-100" />
             </motion.div>

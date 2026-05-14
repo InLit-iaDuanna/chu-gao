@@ -18,7 +18,8 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantClass: Record<ButtonVariant, string> = {
-  primary: "bg-foreground text-background hover:bg-foreground/90 active:bg-foreground/80",
+  primary:
+    "bg-foreground text-background hover:bg-foreground/90 active:bg-foreground/80",
   secondary:
     "bg-surface-2 text-foreground shadow-[inset_0_0_0_1px_rgb(var(--border))] hover:bg-surface-3",
   ghost: "text-text-muted hover:bg-surface-2 hover:text-foreground",
@@ -63,14 +64,22 @@ export function Button({
 
   if (asChild && isValidElement(children)) {
     return cloneElement(children, {
-      className: cn((children.props as { className?: string }).className, classes),
+      className: cn(
+        (children.props as { className?: string }).className,
+        classes,
+      ),
       "aria-disabled": disabled || loading ? true : undefined,
       ...props,
     } as React.HTMLAttributes<HTMLElement>);
   }
 
   return (
-    <button className={classes} disabled={disabled || loading} type={type} {...props}>
+    <button
+      className={classes}
+      disabled={disabled || loading}
+      type={type}
+      {...props}
+    >
       {content}
     </button>
   );

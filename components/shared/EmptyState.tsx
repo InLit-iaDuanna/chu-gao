@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+import { EmptyState as UiEmptyState } from "@/components/ui";
+
 export function EmptyState({
   title,
   description,
@@ -8,16 +10,8 @@ export function EmptyState({
   title: string;
   description: string;
   action?: ReactNode;
-}) {
+}): React.ReactElement {
   return (
-    <div className="surface-panel flex min-h-72 flex-col items-center justify-center gap-4 px-8 text-center">
-      <div className="space-y-2">
-        <p className="text-xl font-semibold">{title}</p>
-        <p className="max-w-md text-sm leading-6 text-text-muted">
-          {description}
-        </p>
-      </div>
-      {action}
-    </div>
+    <UiEmptyState action={action} description={description} title={title} />
   );
 }

@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 import { AppThemeProvider } from "@/components/shared/AppThemeProvider";
 import { AnnouncementBanner } from "@/components/shared/AnnouncementBanner";
+import { ToastProvider } from "@/components/ui";
 import {
   getPublicRuntimeConfig,
   SystemConfigUnavailableError,
@@ -36,11 +38,15 @@ export default async function RootLayout({
   const announcement = await getAnnouncement();
 
   return (
-    <html lang="zh-CN" className="h-full antialiased" suppressHydrationWarning>
+    <html lang="zh-CN" className="h-full" suppressHydrationWarning>
       <body className="min-h-full bg-background text-foreground">
         <AppThemeProvider>
-          <AnnouncementBanner announcement={announcement} />
-          {children}
+          <ToastProvider>
+            <Suspense fallback={null}>
+              <AnnouncementBanner announcement={announcement} />
+            </Suspense>
+            {children}
+          </ToastProvider>
         </AppThemeProvider>
       </body>
     </html>
