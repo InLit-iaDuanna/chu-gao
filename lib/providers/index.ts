@@ -5,6 +5,11 @@ import { db } from "@/lib/db";
 import { getModel } from "@/lib/models/registry";
 import type { InternalRequest } from "@/lib/models/types";
 import {
+  getImage2ProviderChannel,
+  isImage2ModelId,
+  normalizeProviderChannelBaseUrl,
+} from "@/lib/provider-channels";
+import {
   ProviderRequestError,
   isProviderTimeoutError,
   isUpstreamAccessForbiddenError,
@@ -46,9 +51,40 @@ type ProviderFailureDetails = {
   maxAccountAttempts?: number;
 };
 
+function accountReliabilityScore(
+  account: ProviderAccount & { provider: Provider },
+): number {
+  let score = 0;
+
+  if (account.lastHealthyAt) {
+    score += 10_000;
+  }
+
+  if (account.lastErrorMsg?.includes("访问被拒绝")) {
+    score -= 5_000;
+  }
+
+  if (account.lastErrorMsg?.includes("Upstream access forbidden")) {
+    score -= 5_000;
+  }
+
+  if (account.lastErrorMsg?.includes("502 Bad Gateway")) {
+    score -= 1_000;
+  }
+
+  score -= account.consecutiveErrors * 500;
+  score += account.weight * 10;
+
+  return score;
+}
+
 export class ModelNotAvailableError extends Error {
-  constructor(modelId: string) {
-    super(`模型 ${modelId} 当前没有可用渠道`);
+  constructor(modelId: string, channelLabel?: string | null) {
+    super(
+      channelLabel
+        ? `${channelLabel} 暂不可用`
+        : `模型 ${modelId} 当前没有可用渠道`,
+    );
     this.name = "ModelNotAvailableError";
   }
 }
@@ -56,10 +92,11 @@ export class ModelNotAvailableError extends Error {
 export class ProviderUnavailableError extends Error {
   constructor(
     modelId: string,
+    readonly channelLabel?: string | null,
     readonly cause?: unknown,
     readonly details?: ProviderFailureDetails,
   ) {
-    super(`模型 ${modelId} 的渠道暂不可用`);
+    super(channelLabel ? `${channelLabel} 暂不可用` : `模型 ${modelId} 的渠道暂不可用`);
     this.name = "ProviderUnavailableError";
   }
 }
@@ -305,7 +342,10 @@ async function leaseProviderAccount(
   };
 }
 
-async function findAvailableProviderAccounts(modelId: string) {
+async function findAvailableProviderAccounts(
+  modelId: string,
+  providerChannelId?: string,
+) {
   const model = getModel(modelId);
 
   if (!model || !process.env.DATABASE_URL) {
@@ -314,6 +354,10 @@ async function findAvailableProviderAccounts(modelId: string) {
 
   const now = new Date();
   const modelIds = supportedModelIds(modelId);
+  const channel = isImage2ModelId(modelId)
+    ? getImage2ProviderChannel(providerChannelId)
+    : null;
+  const channelBaseUrl = normalizeProviderChannelBaseUrl(channel?.baseUrl);
 
   const accounts = await db.providerAccount.findMany({
     where: {
@@ -344,38 +388,69 @@ async function findAvailableProviderAccounts(modelId: string) {
     ],
   });
 
-  return accounts.sort((left, right) => {
-    const leftProviderPriority = left.provider.priority;
-    const rightProviderPriority = right.provider.priority;
+  return accounts
+    .filter(
+      (account) =>
+        !channelBaseUrl ||
+        normalizeProviderChannelBaseUrl(account.baseUrl) === channelBaseUrl,
+    )
+    .sort((left, right) => {
+      const leftProviderPriority = left.provider.priority;
+      const rightProviderPriority = right.provider.priority;
 
-    if (rightProviderPriority !== leftProviderPriority) {
-      return rightProviderPriority - leftProviderPriority;
-    }
+      if (rightProviderPriority !== leftProviderPriority) {
+        return rightProviderPriority - leftProviderPriority;
+      }
 
-    if (right.priority !== left.priority) {
-      return right.priority - left.priority;
-    }
+      if (right.priority !== left.priority) {
+        return right.priority - left.priority;
+      }
 
-    const leftFreeSlots = left.maxConcurrency - left.inFlight;
-    const rightFreeSlots = right.maxConcurrency - right.inFlight;
+      const leftReliability = accountReliabilityScore(left);
+      const rightReliability = accountReliabilityScore(right);
 
-    if (rightFreeSlots !== leftFreeSlots) {
-      return rightFreeSlots - leftFreeSlots;
-    }
+      if (rightReliability !== leftReliability) {
+        return rightReliability - leftReliability;
+      }
 
-    if (right.weight !== left.weight) {
-      return right.weight - left.weight;
-    }
+      const leftFreeSlots = left.maxConcurrency - left.inFlight;
+      const rightFreeSlots = right.maxConcurrency - right.inFlight;
 
-    if (left.inFlight !== right.inFlight) {
-      return left.inFlight - right.inFlight;
-    }
+      if (rightFreeSlots !== leftFreeSlots) {
+        return rightFreeSlots - leftFreeSlots;
+      }
 
-    const leftLease = left.lastLeaseAt?.getTime() ?? 0;
-    const rightLease = right.lastLeaseAt?.getTime() ?? 0;
+      if (right.weight !== left.weight) {
+        return right.weight - left.weight;
+      }
 
-    return leftLease - rightLease;
-  });
+      if (left.inFlight !== right.inFlight) {
+        return left.inFlight - right.inFlight;
+      }
+
+      const leftLease = left.lastLeaseAt?.getTime() ?? 0;
+      const rightLease = right.lastLeaseAt?.getTime() ?? 0;
+
+      return leftLease - rightLease;
+    });
+}
+
+function maxAttemptsForAccounts(
+  accounts: Array<ProviderAccount & { provider: Provider }>,
+  providerChannel: ReturnType<typeof getImage2ProviderChannel>,
+): number {
+  if (!providerChannel) {
+    return Math.min(providerAccountMaxAttempts(), accounts.length);
+  }
+
+  const successfulAccountCount = accounts.filter(
+    (account) => account.lastHealthyAt,
+  ).length;
+
+  return Math.min(
+    accounts.length,
+    Math.max(providerAccountMaxAttempts(), successfulAccountCount, 12),
+  );
 }
 
 export async function selectAndGenerate(
@@ -401,22 +476,38 @@ export async function selectAndGenerate(
     throw new ProviderUnavailableError(request.modelId);
   }
 
-  const accountCandidates = await findAvailableProviderAccounts(request.modelId);
+  const accountCandidates = await findAvailableProviderAccounts(
+    request.modelId,
+    request.providerChannelId,
+  );
+  const providerChannel = isImage2ModelId(request.modelId)
+    ? getImage2ProviderChannel(request.providerChannelId)
+    : null;
   const legacyCandidates = await findAvailableProviders(request.modelId);
 
   if (accountCandidates.length === 0 && legacyCandidates.length === 0) {
-    throw new ModelNotAvailableError(request.modelId);
+    throw new ModelNotAvailableError(
+      request.modelId,
+      providerChannel?.displayName ?? null,
+    );
   }
 
   const errors: unknown[] = [];
   const providerPoolErrors = new Map<string, unknown[]>();
   let accountAttempts = 0;
-  const maxAccountAttempts = Math.min(
-    providerAccountMaxAttempts(),
-    accountCandidates.length,
+  const filteredAccountCandidates = providerChannel
+    ? accountCandidates.filter(
+        (account) =>
+          normalizeProviderChannelBaseUrl(account.baseUrl) ===
+          normalizeProviderChannelBaseUrl(providerChannel.baseUrl),
+      )
+    : accountCandidates;
+  const maxAccountAttempts = maxAttemptsForAccounts(
+    filteredAccountCandidates,
+    providerChannel,
   );
 
-  for (const account of accountCandidates) {
+  for (const account of filteredAccountCandidates) {
     if (accountAttempts >= maxAccountAttempts) {
       break;
     }
@@ -496,7 +587,7 @@ export async function selectAndGenerate(
     ),
   );
 
-  for (const provider of legacyCandidates) {
+  for (const provider of providerChannel ? [] : legacyCandidates) {
     const hasAccounts = await db.providerAccount.count({
       where: { providerId: provider.id },
     });
@@ -553,6 +644,7 @@ export async function selectAndGenerate(
 
   throw new ProviderUnavailableError(
     request.modelId,
+    providerChannel?.displayName ?? null,
     new Error(
       `所有渠道均不可用: ${errors.map(serializeProviderError).join("; ")}`,
     ),
@@ -587,13 +679,19 @@ export async function findAvailableProviders(modelId: string) {
   });
 }
 
-export async function assertProviderAvailable(modelId: string): Promise<void> {
+export async function assertProviderAvailable(
+  modelId: string,
+  providerChannelId?: string,
+): Promise<void> {
   const [accounts, providers] = await Promise.all([
-    findAvailableProviderAccounts(modelId),
+    findAvailableProviderAccounts(modelId, providerChannelId),
     findAvailableProviders(modelId),
   ]);
+  const providerChannel = isImage2ModelId(modelId)
+    ? getImage2ProviderChannel(providerChannelId)
+    : null;
   const legacyProviders = await Promise.all(
-    providers.map(async (provider) => ({
+    (providerChannel ? [] : providers).map(async (provider) => ({
       provider,
       accountCount: await db.providerAccount.count({
         where: { providerId: provider.id },
@@ -605,6 +703,9 @@ export async function assertProviderAvailable(modelId: string): Promise<void> {
     accounts.length === 0 &&
     legacyProviders.every((item) => item.accountCount > 0)
   ) {
-    throw new ModelNotAvailableError(modelId);
+    throw new ModelNotAvailableError(
+      modelId,
+      providerChannel?.displayName ?? null,
+    );
   }
 }

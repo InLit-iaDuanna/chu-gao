@@ -14,6 +14,7 @@ export type AspectRatio =
   | "9:21";
 
 export type Resolution = "1K" | "2K" | "4K";
+export type Image2ProviderChannelId = "aquatic" | "terrestrial";
 export type ProtocolName =
   | "openai-images"
   | "openai-responses-image"
@@ -81,6 +82,7 @@ export interface InternalReferenceImage {
 export interface InternalRequest {
   modelId: string;
   protocol: ProtocolName;
+  providerChannelId?: Image2ProviderChannelId;
   prompt: string;
   negativePrompt?: string;
   aspectRatio: AspectRatio;

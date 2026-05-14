@@ -150,10 +150,6 @@ function extractImageItems(payload: OpenAIImageTaskResponse): OpenAIImageItem[] 
 }
 
 function imageSizeForRequest(req: InternalRequest): string {
-  if (req.modelId === "gpt-image-2") {
-    return req.aspectRatio;
-  }
-
   return imagePixelSizeForRequest(req.aspectRatio, req.resolution, "OpenAI");
 }
 

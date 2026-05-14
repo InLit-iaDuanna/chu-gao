@@ -24,6 +24,11 @@ export async function GET() {
       select: {
         protocol: true,
         modelsSupported: true,
+        _count: {
+          select: {
+            accounts: true,
+          },
+        },
         accounts: {
           where: {
             isActive: true,
@@ -63,7 +68,7 @@ export async function GET() {
         if (
           model.protocol === expectedProtocol &&
           aliases.some((id) => providerModelIds.has(id)) &&
-          (provider.accounts.length > 0 || provider.modelsSupported.length > 0)
+          (provider._count.accounts === 0 || provider.accounts.length > 0)
         ) {
           availableModelIds.add(model.id);
         }

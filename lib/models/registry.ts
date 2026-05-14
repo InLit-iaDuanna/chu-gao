@@ -4,7 +4,7 @@ export const MODELS: Record<string, ModelDefinition> = {
   "gpt-image-2": {
     id: "gpt-image-2",
     displayName: "Image2",
-    vendor: "image2",
+    vendor: "动物通道",
     protocol: "openai-images",
     capabilities: {
       aspectRatios: [

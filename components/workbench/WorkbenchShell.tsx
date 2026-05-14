@@ -42,6 +42,11 @@ import {
   writeWorkbenchPreferences,
   type WorkbenchPreferences,
 } from "@/lib/workbench-preferences";
+import {
+  DEFAULT_IMAGE2_PROVIDER_CHANNEL_ID,
+  getImage2ProviderChannelName,
+  normalizeSelectableImage2ProviderChannelId,
+} from "@/lib/provider-channels";
 
 type ApiResponse<T> =
   | {
@@ -158,6 +163,10 @@ function initialStateFor(
 
   return {
     modelId: model.id,
+    providerChannelId: normalizeSelectableImage2ProviderChannelId(
+      model.id,
+      preferences.providerChannelId,
+    ),
     aspectRatio: pair.aspectRatio,
     resolution: pair.resolution,
     n: 1,
@@ -294,7 +303,7 @@ export function WorkbenchShell({
       usesReference,
     });
   }, [
-    activeGeneration?.images[0]?.id,
+    activeGeneration?.images,
     model,
     state,
     uploadedReferenceImages.length,
@@ -380,40 +389,52 @@ export function WorkbenchShell({
       conversation.messages.length ? conversation.messages : [WELCOME_MESSAGE],
     );
 
-    const lastImageMessage = [...conversation.messages]
+    const lastGenerationMessage = [...conversation.messages]
       .reverse()
-      .find((message) => message.generationId && message.imageUrl);
+      .find((message) => message.generationId);
 
-    if (lastImageMessage?.generationId && lastImageMessage.imageUrl) {
+    if (lastGenerationMessage?.generationId) {
       const nextStatus = statusFromGeneration(
-        lastImageMessage.generationStatus ?? "SUCCEEDED",
+        lastGenerationMessage.generationStatus ?? "SUCCEEDED",
       );
+      const image =
+        lastGenerationMessage.imageUrl || lastGenerationMessage.imageId
+          ? [
+              {
+                id: lastGenerationMessage.imageId,
+                src: lastGenerationMessage.imageUrl,
+                url: lastGenerationMessage.imageUrl,
+              },
+            ]
+          : [];
 
       setActiveGeneration({
-        id: lastImageMessage.generationId,
+        id: lastGenerationMessage.generationId,
         conversationId: conversation.id,
-        prompt: lastImageMessage.content,
-        status: lastImageMessage.generationStatus ?? "SUCCEEDED",
-        createdAt: lastImageMessage.createdAt ?? new Date().toISOString(),
-        provider: lastImageMessage.generationProvider ?? null,
+        prompt: lastGenerationMessage.content,
+        status: lastGenerationMessage.generationStatus ?? "SUCCEEDED",
+        createdAt: lastGenerationMessage.createdAt ?? new Date().toISOString(),
+        provider: lastGenerationMessage.generationProvider ?? null,
+        providerChannelId:
+          lastGenerationMessage.generationProviderChannelId ?? null,
+        providerChannelName:
+          lastGenerationMessage.generationProviderChannelName ?? null,
         providerAccountName:
-          lastImageMessage.generationProviderAccountName ?? null,
-        startedAt: lastImageMessage.generationStartedAt ?? null,
-        finishedAt: lastImageMessage.generationFinishedAt ?? null,
-        progress: lastImageMessage.generationProgress ?? null,
-        images: [
-          {
-            id: lastImageMessage.imageId,
-            src: lastImageMessage.imageUrl,
-            url: lastImageMessage.imageUrl,
-          },
-        ],
+          lastGenerationMessage.generationProviderAccountName ?? null,
+        startedAt: lastGenerationMessage.generationStartedAt ?? null,
+        finishedAt: lastGenerationMessage.generationFinishedAt ?? null,
+        progress: lastGenerationMessage.generationProgress ?? null,
+        images: image,
       });
       setStatus(nextStatus);
       setGenerationProgress(
-        lastImageMessage.generationProgress ??
+        lastGenerationMessage.generationProgress ??
           (nextStatus === "succeeded" ? 100 : 0),
       );
+
+      if (nextStatus === "pending" || nextStatus === "running") {
+        openGenerationStream(lastGenerationMessage.generationId);
+      }
     } else {
       setActiveGeneration(null);
       setStatus("idle");
@@ -779,12 +800,16 @@ export function WorkbenchShell({
         setMessages((current) =>
           current.map((message) =>
             message.generationId === next.id
-              ? {
-                  ...message,
+                ? {
+                    ...message,
                   imageId: next.images[0]?.id,
                   imageUrl: next.images[0]?.src ?? next.images[0]?.url,
                   generationStatus: next.status,
                   generationProvider: next.provider ?? null,
+                  generationProviderChannelId:
+                    next.providerChannelId ?? null,
+                  generationProviderChannelName:
+                    next.providerChannelName ?? null,
                   generationProviderAccountName:
                     next.providerAccountName ?? null,
                   generationStartedAt: next.startedAt ?? null,
@@ -1079,6 +1104,7 @@ export function WorkbenchShell({
         modelId: state.modelId,
         aspectRatio: state.aspectRatio,
         resolution: state.resolution,
+        providerChannelId: state.providerChannelId,
       },
       accountId,
     );
@@ -1121,6 +1147,7 @@ export function WorkbenchShell({
         generationId: string;
         status: string;
         estimatedCredits: number;
+        providerChannelId?: typeof requestState.providerChannelId | null;
         workerOnline?: boolean;
         queueWaiting?: number;
       }>(
@@ -1134,6 +1161,7 @@ export function WorkbenchShell({
             userMessage: userText,
             assistantMessage: assistantMessageText,
             modelId: requestState.modelId,
+            providerChannelId: requestState.providerChannelId,
             prompt: userText,
             aspectRatio: requestState.aspectRatio,
             resolution: requestState.resolution,
@@ -1149,6 +1177,12 @@ export function WorkbenchShell({
         }),
         "生成请求没有提交成功。请稍后重试。",
       );
+      const acceptedProviderChannelId =
+        requestState.modelId === "gpt-image-2"
+          ? (payload.providerChannelId ??
+            requestState.providerChannelId ??
+            DEFAULT_IMAGE2_PROVIDER_CHANNEL_ID)
+          : null;
 
       const pendingGeneration: WorkbenchGeneration = {
         id: payload.generationId,
@@ -1157,6 +1191,14 @@ export function WorkbenchShell({
         prompt: userText,
         status: payload.status,
         createdAt: new Date().toISOString(),
+        providerChannelId:
+          requestState.modelId === "gpt-image-2"
+            ? acceptedProviderChannelId
+            : null,
+        providerChannelName:
+          requestState.modelId === "gpt-image-2"
+            ? getImage2ProviderChannelName(acceptedProviderChannelId)
+            : null,
         progress: 0,
         images: [],
       };
@@ -1351,10 +1393,9 @@ export function WorkbenchShell({
               taskStatus={status}
               progress={generationProgress}
               taskMeta={{
-                provider:
-                  activeGeneration?.providerAccountName ??
-                  activeGeneration?.provider ??
-                  null,
+                provider: activeGeneration?.providerAccountName ?? null,
+                providerChannelName:
+                  activeGeneration?.providerChannelName ?? null,
                 startedAt: activeGeneration?.startedAt ?? null,
                 finishedAt: activeGeneration?.finishedAt ?? null,
               }}

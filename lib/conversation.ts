@@ -9,6 +9,8 @@ export interface ConversationMessage {
   imageUrl?: string;
   generationStatus?: string;
   generationProvider?: string | null;
+  generationProviderChannelId?: "aquatic" | "terrestrial" | null;
+  generationProviderChannelName?: string | null;
   generationProviderAccountName?: string | null;
   generationStartedAt?: string | null;
   generationFinishedAt?: string | null;

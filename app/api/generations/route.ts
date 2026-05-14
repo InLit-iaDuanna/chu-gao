@@ -96,6 +96,7 @@ export async function GET(request: Request) {
           select: {
             id: true,
             name: true,
+            baseUrl: true,
           },
         },
       },
@@ -136,6 +137,10 @@ export async function POST(request: Request) {
 
   try {
     const internalRequest = validateAgainstModel(parsed.data);
+    const normalizedRequestParams = {
+      ...parsed.data,
+      providerChannelId: internalRequest.providerChannelId,
+    };
     const model = await getModelWithPricing(internalRequest.modelId);
 
     if (!model) {
@@ -167,7 +172,10 @@ export async function POST(request: Request) {
       pricingSnapshot as unknown as Prisma.InputJsonObject;
     const conversationId = parsed.data.conversationId;
 
-    await assertProviderAvailable(internalRequest.modelId);
+    await assertProviderAvailable(
+      internalRequest.modelId,
+      internalRequest.providerChannelId,
+    );
     await assertGenerationQueueReady();
     await assertGenerationAllowed(session.id);
 
@@ -290,7 +298,7 @@ export async function POST(request: Request) {
               ? undefined
               : BigInt(internalRequest.seed),
           outputFormat: internalRequest.outputFormat,
-          paramsRaw: parsed.data,
+          paramsRaw: normalizedRequestParams,
           referenceImageKeys: [
             ...(parsed.data.referenceImageKeys ?? []),
             ...sourceReferenceImages.map((image) => image.storageKey),
@@ -429,6 +437,7 @@ export async function POST(request: Request) {
       generationId: generation.id,
       status: generation.status,
       estimatedCredits,
+      providerChannelId: internalRequest.providerChannelId ?? null,
       queuePosition: queueStats?.waiting ?? 0,
       workerOnline: queueStats?.workerOnline ?? false,
       queueWaiting: queueStats?.waiting ?? 0,

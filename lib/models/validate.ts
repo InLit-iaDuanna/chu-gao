@@ -9,6 +9,11 @@ import type {
   OutputFormat,
   Resolution,
 } from "@/lib/models/types";
+import {
+  isImage2ModelId,
+  isImage2ProviderChannelSelectable,
+  normalizeImage2ProviderChannelId,
+} from "@/lib/provider-channels";
 import { normalizeUploadedReferenceKey } from "@/lib/storage";
 
 export class ValidationError extends Error {
@@ -41,6 +46,7 @@ export const generationRequestSchema = z.object({
   outputCompression: z.number().int().min(0).max(100).optional(),
   referenceImageKeys: z.array(z.string().min(1)).max(16).optional(),
   sourceImageIds: z.array(z.string().min(1)).max(4).optional(),
+  providerChannelId: z.enum(["aquatic", "terrestrial"]).optional(),
 });
 
 export type GenerationRequestInput = z.infer<typeof generationRequestSchema>;
@@ -154,9 +160,21 @@ export function validateAgainstModel(
     throw new UnsupportedParamError("当前格式不支持压缩率");
   }
 
+  const providerChannelId = isImage2ModelId(modelId)
+    ? normalizeImage2ProviderChannelId(modelId, input.providerChannelId)
+    : undefined;
+
+  if (
+    providerChannelId &&
+    !isImage2ProviderChannelSelectable(providerChannelId)
+  ) {
+    throw new UnsupportedParamError("该大渠道当前暂不可用，请选择其他渠道");
+  }
+
   return {
     modelId,
     protocol: model.protocol,
+    providerChannelId,
     prompt: input.prompt,
     negativePrompt: input.negativePrompt,
     aspectRatio,

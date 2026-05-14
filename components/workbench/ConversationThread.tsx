@@ -68,6 +68,7 @@ export function ConversationThread({
   progress?: number;
   taskMeta?: {
     provider?: string | null;
+    providerChannelName?: string | null;
     startedAt?: string | null;
     finishedAt?: string | null;
   };
@@ -156,10 +157,20 @@ export function ConversationThread({
             <p className="break-words text-xs text-text-muted">
               当前任务：{STATUS_LABEL[taskStatus]}
               {duration ? ` · 耗时 ${duration}` : ""}
-              {taskMeta?.provider
+              {taskMeta?.provider || taskMeta?.providerChannelName
                 ? taskStatus === "pending" || taskStatus === "running"
-                  ? ` · ${taskMeta.provider}正在给你生成`
-                  : ` · 通道 ${taskMeta.provider}`
+                  ? ` · ${
+                      taskMeta?.providerChannelName
+                        ? `${taskMeta.providerChannelName} · `
+                        : ""
+                    }${taskMeta?.provider ?? "当前通道"}正在给你生成`
+                  : ` · 通道 ${
+                      taskMeta?.providerChannelName
+                        ? `${taskMeta.providerChannelName}${
+                            taskMeta.provider ? ` · ${taskMeta.provider}` : ""
+                          }`
+                        : taskMeta.provider
+                    }`
                 : ""}
             </p>
             {showProgress ? (
