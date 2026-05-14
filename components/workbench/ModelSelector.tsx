@@ -91,7 +91,7 @@ export function ModelSelector({
                 >
                   {model.available
                     ? model.protocol === "openai-images"
-                      ? "image2"
+                      ? "动物通道"
                       : model.protocol === "openai-responses-image"
                         ? "对话式"
                         : "Gemini"

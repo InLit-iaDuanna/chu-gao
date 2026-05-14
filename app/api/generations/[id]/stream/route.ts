@@ -6,6 +6,28 @@ import { isDatabaseUnavailableError } from "@/lib/service-errors";
 
 const TERMINAL_STATUSES = new Set(["SUCCEEDED", "FAILED", "CANCELED"]);
 
+function safeEnqueue(
+  controller: ReadableStreamDefaultController<Uint8Array>,
+  chunk: Uint8Array,
+): boolean {
+  try {
+    controller.enqueue(chunk);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function safeClose(
+  controller: ReadableStreamDefaultController<Uint8Array>,
+): void {
+  try {
+    controller.close();
+  } catch {
+    // The browser may have already closed the SSE connection.
+  }
+}
+
 export async function GET(
   request: Request,
   context: { params: Promise<{ id: string }> },
@@ -22,24 +44,26 @@ export async function GET(
   const stream = new ReadableStream({
     async start(controller) {
       if (!process.env.DATABASE_URL) {
-        controller.enqueue(
+        safeEnqueue(
+          controller,
           errorEvent("SERVICE_UNAVAILABLE", "生成服务未配置数据库"),
         );
-        controller.close();
+        safeClose(controller);
         return;
       }
 
       if (sessionResult.status === "unavailable") {
-        controller.enqueue(
+        safeEnqueue(
+          controller,
           errorEvent("AUTH_UNAVAILABLE", "认证服务暂时不可用"),
         );
-        controller.close();
+        safeClose(controller);
         return;
       }
 
       if (sessionResult.status === "unauthenticated") {
-        controller.enqueue(errorEvent("UNAUTHORIZED", "请先登录"));
-        controller.close();
+        safeEnqueue(controller, errorEvent("UNAUTHORIZED", "请先登录"));
+        safeClose(controller);
         return;
       }
 
@@ -55,7 +79,7 @@ export async function GET(
 
         if (!closed) {
           closed = true;
-          controller.close();
+          safeClose(controller);
         }
       };
       cleanup = close;
@@ -84,22 +108,27 @@ export async function GET(
                 select: {
                   id: true,
                   name: true,
+                  baseUrl: true,
                 },
               },
             },
           });
 
           if (!generation) {
-            controller.enqueue(errorEvent("NOT_FOUND", "任务不存在"));
+            safeEnqueue(controller, errorEvent("NOT_FOUND", "任务不存在"));
             close();
             return;
           }
 
-          controller.enqueue(
+          if (!safeEnqueue(
+            controller,
             encoder.encode(
               `event: update\ndata: ${JSON.stringify(serializeGeneration(generation))}\n\n`,
             ),
-          );
+          )) {
+            close();
+            return;
+          }
 
           if (TERMINAL_STATUSES.has(generation.status)) {
             close();
@@ -107,14 +136,15 @@ export async function GET(
           }
         } catch (error) {
           if (isDatabaseUnavailableError(error)) {
-            controller.enqueue(
+            safeEnqueue(
+              controller,
               errorEvent("SERVICE_UNAVAILABLE", "生成服务暂时不可用"),
             );
             close();
             return;
           }
 
-          controller.enqueue(errorEvent("INTERNAL_ERROR", "任务状态读取失败"));
+          safeEnqueue(controller, errorEvent("INTERNAL_ERROR", "任务状态读取失败"));
           close();
           return;
         }

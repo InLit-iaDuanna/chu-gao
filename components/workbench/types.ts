@@ -1,4 +1,5 @@
 import type {
+  Image2ProviderChannelId,
   ImageBackground,
   OutputFormat,
   Resolution,
@@ -6,6 +7,7 @@ import type {
 
 export interface WorkbenchState {
   modelId: string;
+  providerChannelId?: Image2ProviderChannelId;
   negativePrompt?: string;
   aspectRatio: string;
   resolution: Resolution;
@@ -45,6 +47,8 @@ export interface WorkbenchGeneration {
   resolution?: string | null;
   outputFormat?: string;
   provider?: string | null;
+  providerChannelId?: Image2ProviderChannelId | null;
+  providerChannelName?: string | null;
   providerAccountName?: string | null;
   startedAt?: string | null;
   finishedAt?: string | null;

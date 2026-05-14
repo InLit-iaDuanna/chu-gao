@@ -1,6 +1,10 @@
 import type { Prisma } from "@prisma/client";
 
 import { publicChannelAlias } from "@/lib/channel-alias";
+import {
+  getImage2ProviderChannelName,
+  resolveImage2ProviderChannelId,
+} from "@/lib/provider-channels";
 import { privateImageUrl } from "@/lib/storage";
 
 export const GENERATION_STATUSES = [
@@ -26,6 +30,7 @@ export type GenerationWithRelations = Prisma.GenerationGetPayload<{
       select: {
         id: true;
         name: true;
+        baseUrl: true;
       };
     };
   };
@@ -63,9 +68,22 @@ export function serializeGeneration(row: GenerationWithRelations) {
     referenceImageKeys: row.referenceImageKeys,
     status: row.status,
     provider: row.provider?.name ?? null,
+    providerChannelId: resolveImage2ProviderChannelId(
+      row.modelId,
+      row.paramsRaw,
+      row.providerAccount?.baseUrl,
+    ),
+    providerChannelName: getImage2ProviderChannelName(
+      resolveImage2ProviderChannelId(
+        row.modelId,
+        row.paramsRaw,
+        row.providerAccount?.baseUrl,
+      ),
+    ),
     providerAccountName: publicChannelAlias(
       row.providerAccount?.name,
       row.provider?.name,
+      row.providerAccount?.baseUrl,
     ),
     progress: row.progress,
     errorCode: row.errorCode,

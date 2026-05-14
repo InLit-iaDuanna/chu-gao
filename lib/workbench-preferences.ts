@@ -2,6 +2,7 @@ export interface WorkbenchPreferences {
   modelId?: string;
   aspectRatio?: string;
   resolution?: string;
+  providerChannelId?: string;
 }
 
 const STORAGE_KEY = "chugao_workbench_preferences";
@@ -20,6 +21,10 @@ function normalizePreferences(value: unknown): WorkbenchPreferences {
       typeof parsed.aspectRatio === "string" ? parsed.aspectRatio : undefined,
     resolution:
       typeof parsed.resolution === "string" ? parsed.resolution : undefined,
+    providerChannelId:
+      typeof parsed.providerChannelId === "string"
+        ? parsed.providerChannelId
+        : undefined,
   };
 }
 

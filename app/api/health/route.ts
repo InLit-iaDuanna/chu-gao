@@ -1,5 +1,9 @@
 import { fail, ok } from "@/lib/api-response";
 import { db } from "@/lib/db";
+import {
+  IMAGE2_PROVIDER_CHANNEL_OPTIONS,
+  inferImage2ProviderChannelIdFromBaseUrl,
+} from "@/lib/provider-channels";
 import { safeUrlForDiagnostics } from "@/lib/providers/diagnostics";
 import { normalizeOpenAIImagesBaseUrl } from "@/lib/providers/openai-images";
 import { generationQueueStats } from "@/lib/queue";
@@ -175,7 +179,44 @@ async function checkProvider(): Promise<CheckResult> {
       },
       select: {
         baseUrl: true,
+        accounts: {
+          where: {
+            isActive: true,
+          },
+          select: {
+            baseUrl: true,
+            health: true,
+            cooldownUntil: true,
+          },
+        },
       },
+    });
+    const now = new Date();
+    const image2Channels = IMAGE2_PROVIDER_CHANNEL_OPTIONS.map((channel) => {
+      const accounts = imageProviders.flatMap((provider) =>
+        provider.accounts.filter(
+          (account) =>
+            inferImage2ProviderChannelIdFromBaseUrl(account.baseUrl) ===
+            channel.id,
+        ),
+      );
+      const availableAccounts = accounts.filter(
+        (account) =>
+          account.health !== "DOWN" &&
+          (!account.cooldownUntil || account.cooldownUntil <= now),
+      );
+
+      return {
+        id: channel.id,
+        name: channel.displayName,
+        status:
+          channel.unavailableReason || availableAccounts.length === 0
+            ? "unavailable"
+            : "ok",
+        unavailableReason: channel.unavailableReason,
+        accountCount: accounts.length,
+        availableAccountCount: availableAccounts.length,
+      };
     });
 
     if (imageProviders.length === 0) {
@@ -198,6 +239,7 @@ async function checkProvider(): Promise<CheckResult> {
         activeProviders,
         imageProviders: imageProviders.length,
         requiredModelAvailable: true,
+        image2Channels,
         endpoints: imageProviders.map((provider) =>
           safeUrlForDiagnostics(
             `${normalizeOpenAIImagesBaseUrl(provider.baseUrl)}/v1/images/generations`,

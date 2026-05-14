@@ -38,6 +38,7 @@ async function getGeneration(id: string) {
           select: {
             id: true,
             name: true,
+            baseUrl: true,
           },
         },
       },

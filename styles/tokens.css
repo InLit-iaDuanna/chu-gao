@@ -1,43 +1,45 @@
 @layer base {
   :root,
   html.dark {
-    --bg: 9 9 11;
-    --surface: 18 18 20;
-    --surface-2: 25 25 28;
-    --border: 39 39 42;
-    --border-strong: 63 63 70;
-    --text: 250 250 250;
-    --text-muted: 161 161 170;
-    --text-faint: 82 82 91;
-    --accent: 250 250 250;
-    --success: 91 140 111;
-    --danger: 179 80 78;
-    --warning: 181 138 62;
+    --bg: 8 8 9;
+    --surface: 14 14 16;
+    --surface-2: 22 22 25;
+    --surface-3: 32 32 36;
 
-    --radius-sm: 6px;
-    --radius-md: 8px;
-    --radius-lg: 12px;
-    --radius-xl: 16px;
+    --border: 32 32 36;
+    --border-strong: 56 56 62;
+
+    --text: 237 237 240;
+    --text-muted: 150 150 158;
+    --text-faint: 95 95 102;
+
+    --accent: 237 237 240;
+    --success: 76 175 130;
+    --danger: 232 90 79;
+    --warning: 230 175 84;
+    --info: 130 170 230;
+
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 10px;
+    --radius-xl: 14px;
     --radius-pill: 999px;
 
-    --duration-fade: 100ms;
-    --duration-fast: 100ms;
-    --duration-base: 200ms;
-    --duration-modal: 180ms;
-    --duration-image: 220ms;
-    --duration-slow: 320ms;
-    --ease-out: cubic-bezier(0.2, 0.6, 0.2, 1);
+    --duration-fast: 120ms;
+    --duration-base: 160ms;
+    --duration-modal: 200ms;
+    --duration-image: 180ms;
+    --duration-slow: 240ms;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
 
     --font-stack-sans:
-      "Geist", "Geist Sans", "HarmonyOS Sans SC", "PingFang SC",
-      "Microsoft YaHei", system-ui, -apple-system, BlinkMacSystemFont,
-      "Segoe UI", sans-serif;
-    --font-stack-serif:
-      "Fraunces", "LXGW WenKai", "LXGW WenKai Screen", "霞鹜文楷", Georgia,
-      serif;
-    --font-stack-mono:
-      "Geist Mono", "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+      "Geist", "HarmonyOS Sans SC", "PingFang SC", system-ui, -apple-system,
+      BlinkMacSystemFont, sans-serif;
+    --font-stack-serif: "Fraunces", "LXGW WenKai", Georgia, serif;
+    --font-stack-mono: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
 
+    --fs-11: 11px;
     --fs-12: 12px;
     --fs-13: 13px;
     --fs-14: 14px;
@@ -46,44 +48,72 @@
     --fs-18: 18px;
     --fs-20: 20px;
     --fs-24: 24px;
-    --fs-32: 32px;
-    --fs-40: 40px;
-    --fs-56: 56px;
-    --fs-72: 72px;
+    --fs-30: 30px;
+    --fs-36: 36px;
+    --fs-48: 48px;
+    --fs-60: 60px;
 
-    --lh-tight: 1.05;
-    --lh-snug: 1.25;
+    --lh-tight: 1.1;
+    --lh-snug: 1.3;
     --lh-normal: 1.5;
     --lh-loose: 1.7;
-
+    --ls-tight: -0.02em;
+    --ls-snug: -0.01em;
     --ls-normal: 0;
     --ls-wide: 0.04em;
-    --ls-eyebrow: 0.14em;
+    --ls-eyebrow: 0.12em;
 
+    --s-2: 2px;
     --s-4: 4px;
+    --s-6: 6px;
     --s-8: 8px;
+    --s-10: 10px;
     --s-12: 12px;
     --s-16: 16px;
+    --s-20: 20px;
     --s-24: 24px;
     --s-32: 32px;
+    --s-40: 40px;
     --s-48: 48px;
     --s-64: 64px;
+    --s-80: 80px;
     --s-96: 96px;
     --s-128: 128px;
+
+    --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.06);
+    --shadow-sm:
+      0 2px 4px -1px rgb(0 0 0 / 0.08), 0 1px 2px rgb(0 0 0 / 0.04);
+    --shadow-md: 0 8px 24px -8px rgb(0 0 0 / 0.18);
+    --shadow-lg: 0 16px 40px -12px rgb(0 0 0 / 0.24);
+    --shadow-ring: 0 0 0 1px rgb(var(--border));
+    --shadow-ring-strong: 0 0 0 1px rgb(var(--border-strong));
+    --shadow-focus:
+      0 0 0 2px rgb(var(--bg)), 0 0 0 4px rgb(var(--text) / 0.5);
   }
 
   html.light {
-    --bg: 247 246 243;
-    --surface: 255 252 248;
-    --surface-2: 244 239 232;
-    --border: 220 213 205;
-    --border-strong: 188 178 168;
-    --text: 34 31 29;
-    --text-muted: 112 101 92;
-    --text-faint: 152 141 132;
-    --accent: 53 46 39;
-    --success: 60 121 89;
-    --danger: 161 77 68;
-    --warning: 160 117 41;
+    --bg: 252 252 252;
+    --surface: 255 255 255;
+    --surface-2: 247 247 248;
+    --surface-3: 240 240 242;
+    --border: 232 232 234;
+    --border-strong: 210 210 214;
+    --text: 17 17 19;
+    --text-muted: 102 102 110;
+    --text-faint: 156 156 163;
+    --accent: 17 17 19;
+    --success: 22 128 86;
+    --danger: 196 56 50;
+    --warning: 178 124 32;
+    --info: 56 110 196;
+
+    --shadow-xs: 0 1px 2px rgb(17 17 19 / 0.04);
+    --shadow-sm:
+      0 2px 4px -1px rgb(17 17 19 / 0.06),
+      0 1px 2px rgb(17 17 19 / 0.03);
+    --shadow-md: 0 8px 24px -8px rgb(17 17 19 / 0.1);
+    --shadow-lg: 0 16px 40px -12px rgb(17 17 19 / 0.12);
+    --shadow-focus:
+      0 0 0 2px rgb(var(--bg)), 0 0 0 4px rgb(var(--text) / 0.4);
   }
 }

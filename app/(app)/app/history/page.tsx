@@ -42,6 +42,7 @@ async function getGenerations() {
           select: {
             id: true,
             name: true,
+            baseUrl: true,
           },
         },
       },

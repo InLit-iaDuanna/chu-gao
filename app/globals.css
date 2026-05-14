@@ -3,13 +3,13 @@
 @import url("https://chinese-fonts-cdn.deno.dev/packages/lxgwwenkai/dist/LXGWWenKai-Regular/result.css");
 @import "tailwindcss";
 @import "../styles/tokens.css";
-@import "../styles/tokens-admin.css";
 
 @theme inline {
   --color-background: rgb(var(--bg));
   --color-foreground: rgb(var(--text));
   --color-surface: rgb(var(--surface));
   --color-surface-2: rgb(var(--surface-2));
+  --color-surface-3: rgb(var(--surface-3));
   --color-border: rgb(var(--border));
   --color-border-strong: rgb(var(--border-strong));
   --color-text-muted: rgb(var(--text-muted));
@@ -18,6 +18,7 @@
   --color-success: rgb(var(--success));
   --color-danger: rgb(var(--danger));
   --color-warning: rgb(var(--warning));
+  --color-info: rgb(var(--info));
   --font-sans: var(--font-stack-sans);
   --font-serif: var(--font-stack-serif);
   --font-mono: var(--font-stack-mono);
@@ -39,7 +40,7 @@ body {
   line-height: var(--lh-normal);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  font-feature-settings: "ss01", "cv11";
+  font-feature-settings: normal;
 }
 
 a {
@@ -60,8 +61,8 @@ select {
 }
 
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -69,9 +70,8 @@ select {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgb(var(--border));
-  border: 2px solid rgb(var(--bg));
-  border-radius: var(--radius-sm);
+  background: transparent;
+  border-radius: var(--radius-pill);
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -79,22 +79,22 @@ select {
 }
 
 :focus-visible {
-  outline: 1px solid rgb(var(--text));
-  outline-offset: 2px;
-  border-radius: 2px;
+  outline: none;
+  box-shadow: var(--shadow-focus);
 }
 
 @layer base {
   h1,
   h2,
   h3 {
-    letter-spacing: 0;
+    letter-spacing: var(--ls-snug);
   }
 
   h1,
   h2 {
-    font-family: var(--font-stack-serif);
-    font-weight: 400;
+    font-family: var(--font-stack-sans);
+    font-weight: 600;
+    letter-spacing: var(--ls-tight);
     line-height: var(--lh-tight);
   }
 }
@@ -214,6 +214,31 @@ select {
   .img-enter {
     animation: imageEnter var(--duration-image) var(--ease-out) both;
     animation-delay: calc(var(--i, 0) * 60ms);
+  }
+}
+
+@keyframes skeletonPulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes indeterminate {
+  0% {
+    transform: translateX(-100%) scaleX(0.45);
+  }
+
+  50% {
+    transform: translateX(35%) scaleX(0.7);
+  }
+
+  100% {
+    transform: translateX(120%) scaleX(0.45);
   }
 }
 

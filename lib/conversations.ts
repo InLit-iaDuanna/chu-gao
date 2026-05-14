@@ -6,6 +6,10 @@ import type {
   ConversationView,
 } from "@/lib/conversation";
 import { publicChannelAlias } from "@/lib/channel-alias";
+import {
+  getImage2ProviderChannelName,
+  resolveImage2ProviderChannelId,
+} from "@/lib/provider-channels";
 import { privateImageUrl } from "@/lib/storage";
 
 const conversationInclude = {
@@ -21,6 +25,7 @@ const conversationInclude = {
           providerAccount: {
             select: {
               name: true,
+              baseUrl: true,
             },
           },
           images: {
@@ -55,6 +60,7 @@ const conversationSummaryInclude = {
       providerAccount: {
         select: {
           name: true,
+          baseUrl: true,
         },
       },
       images: {
@@ -108,26 +114,39 @@ function roleToView(
   return role === "USER" ? "user" : "assistant";
 }
 
-function firstGenerationImage(
+function generationMessageMeta(
   generation:
     | ConversationWithMessages["messages"][number]["generation"]
     | ConversationSummaryRow["generations"][number]
     | null,
 ) {
-  const image = generation?.images[0];
-
-  if (!generation || !image) {
+  if (!generation) {
     return null;
   }
 
+  const image = generation.images[0];
+  const providerChannelId = resolveImage2ProviderChannelId(
+    generation.modelId,
+    generation.paramsRaw,
+    generation.providerAccount?.baseUrl,
+  );
+
   return {
-    imageId: image.id,
-    imageUrl: privateImageUrl(generation.id, image.id),
+    ...(image
+      ? {
+          imageId: image.id,
+          imageUrl: privateImageUrl(generation.id, image.id),
+        }
+      : {}),
     generationStatus: generation.status,
     generationProvider: generation.provider?.name ?? null,
+    generationProviderChannelId: providerChannelId,
+    generationProviderChannelName:
+      getImage2ProviderChannelName(providerChannelId),
     generationProviderAccountName: publicChannelAlias(
       generation.providerAccount?.name,
       generation.provider?.name,
+      generation.providerAccount?.baseUrl,
     ),
     generationStartedAt: generation.startedAt?.toISOString() ?? null,
     generationFinishedAt: generation.finishedAt?.toISOString() ?? null,
@@ -149,7 +168,7 @@ export function serializeConversation(
       content: message.content,
       generationId: message.generationId ?? undefined,
       createdAt: message.createdAt.toISOString(),
-      ...(firstGenerationImage(message.generation) ?? {}),
+      ...(generationMessageMeta(message.generation) ?? {}),
     })),
   };
 }
@@ -158,7 +177,7 @@ export function serializeConversationSummary(
   row: ConversationSummaryRow,
 ): ConversationSummaryView {
   const latestGeneration = row.generations[0];
-  const image = firstGenerationImage(latestGeneration);
+  const generationMeta = generationMessageMeta(latestGeneration);
 
   return {
     id: row.id,
@@ -166,7 +185,7 @@ export function serializeConversationSummary(
     lastMessageAt: row.lastMessageAt.toISOString(),
     createdAt: row.createdAt.toISOString(),
     latestMessage: row.messages[0]?.content ?? null,
-    thumbnailUrl: image?.imageUrl ?? null,
+    thumbnailUrl: generationMeta?.imageUrl ?? null,
     generationCount: row._count.generations,
   };
 }

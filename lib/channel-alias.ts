@@ -1,34 +1,52 @@
-const ANIMAL_CHANNEL_ALIASES = [
-  "雪豹",
+import {
+  inferImage2ProviderChannelIdFromBaseUrl,
+  normalizeProviderChannelBaseUrl,
+} from "@/lib/provider-channels";
+
+const AQUATIC_CHANNEL_ALIASES = [
   "海豚",
-  "雨燕",
-  "赤狐",
-  "山雀",
-  "云鹿",
-  "银鹭",
-  "白鹤",
-  "松貂",
-  "岩羊",
   "蓝鲸",
+  "白鲸",
+  "海獭",
+  "鲸鲨",
+  "锦鲤",
+  "水獭",
+  "海马",
+  "飞鱼",
+  "海豹",
+  "章鱼",
+  "海狮",
+  "海象",
+  "珊瑚",
+  "水母",
+  "海燕",
+  "鳐鱼",
+  "河豚",
+  "海鸥",
+  "青鳗",
+] as const;
+
+const TERRESTRIAL_CHANNEL_ALIASES = [
+  "雪豹",
+  "赤狐",
+  "灰狼",
+  "云豹",
+  "月熊",
+  "岩羊",
+  "松貂",
+  "灵猫",
+  "北极狐",
+  "黑豹",
+  "银狐",
+  "山雀",
+  "雨燕",
+  "白鹤",
   "金雕",
   "林鸮",
   "游隼",
-  "锦鲤",
-  "玄猫",
-  "灰狼",
-  "海獭",
-  "灵猫",
-  "北极狐",
-  "月熊",
-  "雪鸮",
-  "红隼",
-  "黑豹",
-  "银狐",
-  "鲸鲨",
-  "白鲸",
   "朱鹮",
-  "水獭",
-  "云豹",
+  "云鹿",
+  "玄猫",
 ] as const;
 
 function hashChannelName(value: string): number {
@@ -45,6 +63,7 @@ function hashChannelName(value: string): number {
 export function publicChannelAlias(
   providerAccountName?: string | null,
   providerName?: string | null,
+  baseUrl?: string | null,
 ): string | null {
   const source = providerAccountName?.trim() || providerName?.trim();
 
@@ -52,7 +71,14 @@ export function publicChannelAlias(
     return null;
   }
 
-  return ANIMAL_CHANNEL_ALIASES[
-    hashChannelName(source) % ANIMAL_CHANNEL_ALIASES.length
-  ];
+  const normalizedBaseUrl = normalizeProviderChannelBaseUrl(baseUrl);
+  const channelId = inferImage2ProviderChannelIdFromBaseUrl(normalizedBaseUrl);
+  const aliasPool =
+    channelId === "aquatic"
+      ? AQUATIC_CHANNEL_ALIASES
+      : channelId === "terrestrial"
+        ? TERRESTRIAL_CHANNEL_ALIASES
+        : [...AQUATIC_CHANNEL_ALIASES, ...TERRESTRIAL_CHANNEL_ALIASES];
+
+  return aliasPool[hashChannelName(`${source}:${normalizedBaseUrl ?? ""}`) % aliasPool.length];
 }
