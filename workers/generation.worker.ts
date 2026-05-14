@@ -13,7 +13,10 @@ import {
   validateAgainstModel,
 } from "@/lib/models/validate";
 import { ProviderUnavailableError, selectAndGenerate } from "@/lib/providers";
-import { serializeProviderError } from "@/lib/providers/diagnostics";
+import {
+  classifyProviderFailure,
+  serializeProviderError,
+} from "@/lib/providers/diagnostics";
 import {
   enqueueGeneration,
   touchGenerationWorkerHeartbeat,
@@ -35,6 +38,16 @@ function clampProgress(value?: number): number {
 }
 
 function userFacingGenerationError(error: unknown): string {
+  const { category } = classifyProviderFailure(error);
+
+  if (category === "CONTENT_REJECTED") {
+    return "提示词或参考图包含不允许的内容，请调整后再试。";
+  }
+
+  if (category === "BAD_REQUEST") {
+    return "生成请求被渠道拒绝，请调整提示词、参考图或参数后再试。";
+  }
+
   const message = serializeProviderError(error);
 
   if (message.includes("provider returned no images")) {
@@ -49,6 +62,34 @@ function userFacingGenerationError(error: unknown): string {
   }
 
   return "渠道生成失败，请稍后重试或联系管理员检查渠道状态。";
+}
+
+function generationFailureCode(error: unknown): string {
+  const { category } = classifyProviderFailure(error);
+
+  if (category === "CONTENT_REJECTED") {
+    return "MODERATION_REJECTED";
+  }
+
+  if (category === "BAD_REQUEST") {
+    return "PROVIDER_REJECTED_REQUEST";
+  }
+
+  return "PROVIDER_ERROR";
+}
+
+function usageFailureCategory(error: unknown): string {
+  const { category } = classifyProviderFailure(error);
+
+  if (category === "CONTENT_REJECTED") {
+    return "moderation";
+  }
+
+  if (category === "BAD_REQUEST") {
+    return "request";
+  }
+
+  return "provider";
 }
 
 async function refundGeneration(
@@ -470,6 +511,9 @@ async function main() {
         );
       } catch (error) {
         const internalDiagnostic = serializeProviderError(error);
+        const failureCode = generationFailureCode(error);
+        const failureCategory = usageFailureCategory(error);
+        const failureMessage = userFacingGenerationError(error);
 
         logger.error(
           {
@@ -498,8 +542,8 @@ async function main() {
               status: "FAILED",
               finishedAt: new Date(),
               progress: 0,
-              errorCode: "PROVIDER_ERROR",
-              errorMessage: userFacingGenerationError(error),
+              errorCode: failureCode,
+              errorMessage: failureMessage,
             },
           });
 
@@ -559,14 +603,29 @@ async function main() {
                 metadata: {
                   reason: "generation_failed",
                   estimatedCredits,
-                  failureCategory: "provider",
+                  failureCategory,
+                },
+              },
+            });
+          }
+
+          if (failureCode === "MODERATION_REJECTED") {
+            await tx.usageLog.create({
+              data: {
+                userId,
+                generationId,
+                modelId: request.modelId,
+                action: "moderation_rejected",
+                creditsDelta: 0,
+                metadata: {
+                  reason: "provider_content_rejected",
                 },
               },
             });
           }
         });
 
-        throw new Error(userFacingGenerationError(error));
+        throw new Error(failureMessage);
       }
     },
     {
