@@ -29,14 +29,19 @@ export function friendlyErrorMessage(
     return "当前没有可用模型。请稍后重试，或联系管理员启用模型。";
   }
 
-  if (code === "RATE_LIMITED" || code === "CONCURRENT_LIMIT") {
+  if (
+    code === "RATE_LIMITED" ||
+    code === "CONCURRENT_LIMIT" ||
+    code === "MODERATION_RATE_LIMITED"
+  ) {
     return message || "当前提交太频繁，请稍后再试。";
   }
 
   if (
     code === "MODERATION_REJECTED" ||
     code === "VALIDATION_ERROR" ||
-    code === "UNSUPPORTED_PARAM"
+    code === "UNSUPPORTED_PARAM" ||
+    code === "PROVIDER_REJECTED_REQUEST"
   ) {
     return message || fallback;
   }

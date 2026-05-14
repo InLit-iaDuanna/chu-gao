@@ -40,7 +40,9 @@ import {
 import {
   ConcurrentLimitError,
   DailyLimitError,
+  ModerationRejectionLimitError,
   assertGenerationAllowed,
+  assertModerationRejectionAllowed,
 } from "@/lib/rate-limit";
 import { RedisUnavailableError } from "@/lib/redis";
 import { isDatabaseUnavailableError } from "@/lib/service-errors";
@@ -248,6 +250,7 @@ export async function POST(request: Request) {
     );
     await assertGenerationQueueReady();
     await assertGenerationAllowed(session.id);
+    await assertModerationRejectionAllowed(session.id);
 
     const combinedPrompt = [
       internalRequest.prompt,
@@ -554,6 +557,10 @@ export async function POST(request: Request) {
 
     if (error instanceof DailyLimitError) {
       return fail("RATE_LIMITED", error.message, { status: 429 });
+    }
+
+    if (error instanceof ModerationRejectionLimitError) {
+      return fail("MODERATION_RATE_LIMITED", error.message, { status: 429 });
     }
 
     return fail("INTERNAL_ERROR", "生成请求处理失败", {
