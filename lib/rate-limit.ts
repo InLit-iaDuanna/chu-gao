@@ -18,6 +18,13 @@ export class DailyLimitError extends Error {
   }
 }
 
+export class ModerationRejectionLimitError extends Error {
+  constructor(message = "违规内容提交过于频繁，请稍后再试") {
+    super(message);
+    this.name = "ModerationRejectionLimitError";
+  }
+}
+
 export class LoginRateLimitError extends Error {
   constructor(
     readonly retryAfterSeconds: number,
@@ -148,5 +155,42 @@ export async function assertGenerationAllowed(userId: string): Promise<void> {
 
   if (dailyCount >= user.dailyGenLimit) {
     throw new DailyLimitError();
+  }
+}
+
+export async function assertModerationRejectionAllowed(
+  userId: string,
+): Promise<void> {
+  if (!process.env.DATABASE_URL) {
+    return;
+  }
+
+  const windowMinutes = Number(
+    process.env.MODERATION_REJECTION_WINDOW_MINUTES ?? 10,
+  );
+  const maxRejected = Number(process.env.MODERATION_REJECTION_LIMIT ?? 5);
+
+  if (
+    !Number.isFinite(windowMinutes) ||
+    !Number.isFinite(maxRejected) ||
+    windowMinutes <= 0 ||
+    maxRejected <= 0
+  ) {
+    return;
+  }
+
+  const since = new Date(Date.now() - windowMinutes * 60_000);
+  const recentRejected = await db.usageLog.count({
+    where: {
+      userId,
+      action: "moderation_rejected",
+      createdAt: { gte: since },
+    },
+  });
+
+  if (recentRejected >= maxRejected) {
+    throw new ModerationRejectionLimitError(
+      `违规内容提交过于频繁，请 ${windowMinutes} 分钟后再试。`,
+    );
   }
 }
