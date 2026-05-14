@@ -12,9 +12,9 @@ import {
   supportsProviderChannels,
 } from "@/lib/provider-channels";
 import {
-  ProviderRequestError,
-  isProviderTimeoutError,
-  isUpstreamAccessForbiddenError,
+  ProviderContentRejectedError,
+  ProviderRejectedRequestError,
+  classifyProviderFailure,
   serializeProviderError,
 } from "@/lib/providers/diagnostics";
 import { buildAdapter } from "@/lib/providers/factory";
@@ -126,71 +126,45 @@ export class ProviderUnavailableError extends Error {
 }
 
 function isDowngradable(error: unknown): boolean {
-  if (isProviderTimeoutError(error)) {
-    return true;
-  }
+  const { category } = classifyProviderFailure(error);
 
-  if (error instanceof ProviderRequestError) {
-    return error.diagnostic.status === 429 || error.diagnostic.status >= 500;
-  }
-
-  const message = serializeProviderError(error);
-
-  if (
-    message.includes("Provider error: 429") ||
-    message.includes("request failed: 429")
-  ) {
-    return true;
-  }
-
-  if (
-    message.includes("Provider error: 5") ||
-    /request failed: 5\d\d/.test(message)
-  ) {
-    return true;
-  }
-
-  if (message.includes("超时")) {
-    return true;
-  }
-
-  return false;
+  return category === "RATE_LIMITED" || category === "TRANSIENT_PROVIDER";
 }
 
 function isAuthenticationError(error: unknown): boolean {
-  if (error instanceof ProviderRequestError) {
-    return (
-      error.diagnostic.status === 401 ||
-      error.diagnostic.status === 403 ||
-      error.diagnostic.status === 404
-    );
-  }
-
-  const message = serializeProviderError(error);
-  return (
-    message.includes("Provider error: 401") ||
-    message.includes("Provider error: 403") ||
-    message.includes("Provider error: 404") ||
-    message.includes("request failed: 401") ||
-    message.includes("request failed: 403") ||
-    message.includes("request failed: 404")
-  );
+  return classifyProviderFailure(error).category === "AUTH_ACCOUNT_FATAL";
 }
 
 function isFatalAccountError(error: unknown): boolean {
-  return isAuthenticationError(error) || isUpstreamAccessForbiddenError(error);
+  return isAuthenticationError(error);
 }
 
 function isRateLimited(error: unknown): boolean {
-  if (error instanceof ProviderRequestError) {
-    return error.diagnostic.status === 429;
+  return classifyProviderFailure(error).category === "RATE_LIMITED";
+}
+
+function shouldRecordProviderPoolError(error: unknown): boolean {
+  const { category } = classifyProviderFailure(error);
+
+  return (
+    category === "RATE_LIMITED" ||
+    category === "TRANSIENT_PROVIDER" ||
+    category === "AUTH_ACCOUNT_FATAL"
+  );
+}
+
+function providerRejectedError(error: unknown): Error | null {
+  const { category } = classifyProviderFailure(error);
+
+  if (category === "CONTENT_REJECTED") {
+    return new ProviderContentRejectedError(error);
   }
 
-  const message = serializeProviderError(error);
-  return (
-    message.includes("Provider error: 429") ||
-    message.includes("request failed: 429")
-  );
+  if (category === "BAD_REQUEST") {
+    return new ProviderRejectedRequestError(error);
+  }
+
+  return null;
 }
 
 async function markHealthy(providerId: string): Promise<void> {
@@ -591,11 +565,20 @@ export async function selectAndGenerate(
       };
     } catch (error) {
       clearTimeout(timer);
+      const rejectedError = providerRejectedError(error);
+
+      if (rejectedError) {
+        throw rejectedError;
+      }
+
       const downgradable = isDowngradable(error);
       errors.push(error);
-      const providerErrors = providerPoolErrors.get(target.provider.id) ?? [];
-      providerErrors.push(error);
-      providerPoolErrors.set(target.provider.id, providerErrors);
+
+      if (shouldRecordProviderPoolError(error)) {
+        const providerErrors = providerPoolErrors.get(target.provider.id) ?? [];
+        providerErrors.push(error);
+        providerPoolErrors.set(target.provider.id, providerErrors);
+      }
 
       await markAccountErrored(target.account.id, error, downgradable);
 
@@ -660,6 +643,12 @@ export async function selectAndGenerate(
       };
     } catch (error) {
       clearTimeout(timer);
+      const rejectedError = providerRejectedError(error);
+
+      if (rejectedError) {
+        throw rejectedError;
+      }
+
       const downgradable = isDowngradable(error);
       errors.push(error);
       await markErrored(provider.id, error, downgradable);

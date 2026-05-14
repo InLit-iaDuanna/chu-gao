@@ -9,6 +9,28 @@ import {
   IMAGE_RESOLUTION_OPTIONS,
 } from "@/lib/models/options";
 
+export const DEFAULT_BLOCKED_KEYWORDS = [
+  "blood and gore",
+  "graphic violence",
+  "gore",
+  "gory",
+  "dismemberment",
+  "dismember",
+  "decapitation",
+  "beheading",
+  "mutilation",
+  "torture",
+  "血腥",
+  "血肉模糊",
+  "肢解",
+  "斩首",
+  "砍头",
+  "虐杀",
+  "酷刑",
+  "开膛",
+  "内脏",
+] as const;
+
 export const SYSTEM_CONFIG_DEFAULTS = {
   registration: {
     inviteOnly: true,
@@ -23,7 +45,7 @@ export const SYSTEM_CONFIG_DEFAULTS = {
   },
   moderation: {
     enabled: true,
-    blockedKeywords: [] as string[],
+    blockedKeywords: [...DEFAULT_BLOCKED_KEYWORDS] as string[],
   },
   announcement: {
     enabled: false,
@@ -65,7 +87,7 @@ export const SYSTEM_CONFIG_DEFAULT_ROWS = {
   "generation.image2Resolutions": [...IMAGE_RESOLUTION_OPTIONS],
   "generation.image2MaxN": 4,
   "moderation.enabled": true,
-  "moderation.blockedKeywords": [] as string[],
+  "moderation.blockedKeywords": [...DEFAULT_BLOCKED_KEYWORDS] as string[],
   "announcement.enabled": false,
   "announcement.title": "",
   "announcement.body": "",
