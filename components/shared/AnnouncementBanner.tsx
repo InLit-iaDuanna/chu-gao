@@ -3,21 +3,22 @@
 import { X } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { IconButton } from "@/components/ui";
 import type { PublicAnnouncement } from "@/lib/system-config";
 import { cn } from "@/lib/utils";
 
 const TONE_CLASSES = {
-  info: "border-border bg-surface text-foreground",
-  warning: "border-warning/50 bg-warning/10 text-foreground",
-  success: "border-success/50 bg-success/10 text-foreground",
-  danger: "border-danger/50 bg-danger/10 text-foreground",
+  info: "bg-foreground",
+  warning: "bg-warning",
+  success: "bg-success",
+  danger: "bg-danger",
 } satisfies Record<PublicAnnouncement["tone"], string>;
 
 export function AnnouncementBanner({
   announcement,
 }: {
   announcement: PublicAnnouncement | null;
-}) {
+}): React.ReactElement | null {
   const [isDismissed, setIsDismissed] = useState(false);
 
   useEffect(() => {
@@ -27,8 +28,9 @@ export function AnnouncementBanner({
     }
 
     setIsDismissed(
-      window.localStorage.getItem(`announcement.dismissed.${announcement.id}`) ===
-        "true",
+      window.localStorage.getItem(
+        `announcement.dismissed.${announcement.id}`,
+      ) === "true",
     );
   }, [announcement]);
 
@@ -50,30 +52,33 @@ export function AnnouncementBanner({
 
   return (
     <div
-      className={cn(
-        "border-b px-3 py-2.5 sm:px-5 lg:px-6",
-        TONE_CLASSES[announcement.tone],
-      )}
+      className="border-b border-border px-3 sm:px-5 lg:px-6"
       role={announcement.tone === "danger" ? "alert" : "status"}
     >
-      <div className="mx-auto flex w-full max-w-[1520px] items-start justify-between gap-3">
-        <div className="min-w-0">
+      <div className="mx-auto flex h-9 w-full max-w-[1520px] items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <span
+            className={cn(
+              "h-5 w-0.5 shrink-0 rounded-full",
+              TONE_CLASSES[announcement.tone],
+            )}
+            aria-hidden="true"
+          />
           {announcement.title ? (
-            <p className="text-sm font-medium">{announcement.title}</p>
+            <p className="shrink-0 text-xs font-medium">{announcement.title}</p>
           ) : null}
-          <p className="break-words text-sm leading-6 text-text-muted">
+          <p className="truncate text-xs text-text-muted">
             {announcement.body}
           </p>
         </div>
-        <button
-          className="button-subtle h-8 w-8 shrink-0 px-0"
-          type="button"
+        <IconButton
           aria-label="关闭公告"
-          title="关闭公告"
+          className="shrink-0"
+          size="sm"
           onClick={dismiss}
         >
-          <X className="h-4 w-4 stroke-[1.5]" />
-        </button>
+          <X />
+        </IconButton>
       </div>
     </div>
   );

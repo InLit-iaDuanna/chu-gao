@@ -1,14 +1,15 @@
 import type { ReactNode } from "react";
-import { AlertCircle, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 
+import { Button, Card } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 type ActionableStatusTone = "muted" | "warning" | "danger";
 
 const toneClass: Record<ActionableStatusTone, string> = {
-  muted: "border-border text-text-muted",
-  warning: "border-warning/35 text-warning",
-  danger: "border-danger/35 text-danger",
+  muted: "bg-text-faint",
+  warning: "bg-warning",
+  danger: "bg-danger",
 };
 
 export function ActionableStatus({
@@ -27,41 +28,42 @@ export function ActionableStatus({
   action?: ReactNode;
   onRetry?: () => void;
   className?: string;
-}) {
+}): React.ReactElement {
   return (
-    <div
-      className={cn(
-        "surface-panel px-4 py-4 sm:px-5",
-        toneClass[tone],
-        className,
-      )}
+    <Card
+      className={cn("px-4 py-4 sm:px-5", className)}
       role={tone === "muted" ? "status" : "alert"}
     >
       <div className="flex items-start gap-3">
-        <AlertCircle className="mt-1 h-4 w-4 shrink-0 stroke-[1.5]" />
+        <span
+          className={cn(
+            "mt-2 h-1.5 w-1.5 shrink-0 rounded-full",
+            toneClass[tone],
+          )}
+        />
         <div className="min-w-0 flex-1">
           {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
-          <h2 className="text-base font-medium text-foreground">{title}</h2>
+          <h2 className="text-sm font-semibold text-foreground">{title}</h2>
           <p className="mt-1 text-sm leading-6 text-text-muted">
             {description}
           </p>
           {action || onRetry ? (
             <div className="mt-4 flex flex-wrap gap-2">
               {onRetry ? (
-                <button
+                <Button
                   type="button"
-                  className="tool-button h-9 text-text-muted"
+                  variant="secondary"
                   onClick={onRetry}
+                  leftIcon={<RefreshCw className="h-4 w-4 stroke-[1.5]" />}
                 >
-                  <RefreshCw className="h-4 w-4 stroke-[1.5]" />
                   重试
-                </button>
+                </Button>
               ) : null}
               {action}
             </div>
           ) : null}
         </div>
       </div>
-    </div>
+    </Card>
   );
 }

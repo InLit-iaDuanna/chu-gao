@@ -81,14 +81,12 @@
     --s-128: 128px;
 
     --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.06);
-    --shadow-sm:
-      0 2px 4px -1px rgb(0 0 0 / 0.08), 0 1px 2px rgb(0 0 0 / 0.04);
+    --shadow-sm: 0 2px 4px -1px rgb(0 0 0 / 0.08), 0 1px 2px rgb(0 0 0 / 0.04);
     --shadow-md: 0 8px 24px -8px rgb(0 0 0 / 0.18);
     --shadow-lg: 0 16px 40px -12px rgb(0 0 0 / 0.24);
     --shadow-ring: 0 0 0 1px rgb(var(--border));
     --shadow-ring-strong: 0 0 0 1px rgb(var(--border-strong));
-    --shadow-focus:
-      0 0 0 2px rgb(var(--bg)), 0 0 0 4px rgb(var(--text) / 0.5);
+    --shadow-focus: 0 0 0 2px rgb(var(--bg)), 0 0 0 4px rgb(var(--text) / 0.5);
   }
 
   html.light {
@@ -109,11 +107,9 @@
 
     --shadow-xs: 0 1px 2px rgb(17 17 19 / 0.04);
     --shadow-sm:
-      0 2px 4px -1px rgb(17 17 19 / 0.06),
-      0 1px 2px rgb(17 17 19 / 0.03);
+      0 2px 4px -1px rgb(17 17 19 / 0.06), 0 1px 2px rgb(17 17 19 / 0.03);
     --shadow-md: 0 8px 24px -8px rgb(17 17 19 / 0.1);
     --shadow-lg: 0 16px 40px -12px rgb(17 17 19 / 0.12);
-    --shadow-focus:
-      0 0 0 2px rgb(var(--bg)), 0 0 0 4px rgb(var(--text) / 0.4);
+    --shadow-focus: 0 0 0 2px rgb(var(--bg)), 0 0 0 4px rgb(var(--text) / 0.4);
   }
 }

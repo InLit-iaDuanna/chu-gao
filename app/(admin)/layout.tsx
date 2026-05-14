@@ -51,9 +51,9 @@ export default async function AdminLayout({
     >
       <div className="page-shell grid min-w-0 max-w-full gap-6 py-6 lg:grid-cols-[260px_minmax(0,1fr)]">
         <aside className="surface-panel h-fit min-w-0 max-w-full p-4">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center justify-between gap-3">
             <p className="eyebrow">Admin</p>
-            <AccountMenu />
+            <AccountMenu compact showAdminLink={false} />
           </div>
           <nav className="mt-4 min-w-0 space-y-2 text-sm text-text-muted">
             <Link

@@ -2,17 +2,30 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Eye, EyeOff, ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Eye, EyeOff } from "lucide-react";
+import { motion } from "framer-motion";
 
-export function LoginForm({ nextPath = "/app" }: { nextPath?: string }) {
+import { ActionableStatus } from "@/components/shared/ActionableStatus";
+import { Button, FormField, IconButton, Input, Switch } from "@/components/ui";
+
+interface LoginFormProps {
+  nextPath?: string;
+  className?: string;
+}
+
+export function LoginForm({
+  nextPath = "/app",
+  className,
+}: LoginFormProps): React.ReactElement {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
     setLoading(true);
@@ -37,79 +50,82 @@ export function LoginForm({ nextPath = "/app" }: { nextPath?: string }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1.5">
-        <label
-          htmlFor="email"
-          className="text-[13px] font-medium text-foreground"
-        >
-          邮箱
-        </label>
-        <input
-          id="email"
-          type="email"
-          autoComplete="email"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@example.com"
-          className="h-10 rounded-lg border border-border bg-background px-3 text-[14px] text-foreground placeholder:text-text-faint outline-none ring-offset-0 transition-colors focus:border-foreground/40 focus:ring-2 focus:ring-foreground/10"
-        />
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <label
-          htmlFor="password"
-          className="text-[13px] font-medium text-foreground"
-        >
-          密码
-        </label>
-        <div className="relative">
-          <input
-            id="password"
-            type={showPassword ? "text" : "password"}
-            autoComplete="current-password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
-            className="h-10 w-full rounded-lg border border-border bg-background px-3 pr-10 text-[14px] text-foreground placeholder:text-text-faint outline-none transition-colors focus:border-foreground/40 focus:ring-2 focus:ring-foreground/10"
+    <motion.form
+      animate={{ opacity: 1, y: 0 }}
+      className={className}
+      initial={{ opacity: 0, y: 8 }}
+      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+      onSubmit={handleSubmit}
+    >
+      <div className="flex flex-col gap-4">
+        {error ? (
+          <ActionableStatus
+            tone="danger"
+            title="无法登录"
+            description={error}
+            className="py-3"
           />
-          <button
-            type="button"
-            onClick={() => setShowPassword((v) => !v)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-text-faint hover:text-foreground transition-colors"
-            tabIndex={-1}
-          >
-            {showPassword ? (
-              <EyeOff size={15} strokeWidth={1.5} />
-            ) : (
-              <Eye size={15} strokeWidth={1.5} />
-            )}
-          </button>
+        ) : null}
+
+        <FormField label="邮箱" htmlFor="email">
+          <Input
+            id="email"
+            type="email"
+            inputSize="lg"
+            autoComplete="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            aria-invalid={Boolean(error)}
+          />
+        </FormField>
+
+        <FormField label="密码" htmlFor="password">
+          <div className="relative">
+            <Input
+              id="password"
+              type={showPassword ? "text" : "password"}
+              inputSize="lg"
+              autoComplete="current-password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="输入密码"
+              className="pr-10"
+              aria-invalid={Boolean(error)}
+            />
+            <IconButton
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              className="absolute right-1 top-1/2 -translate-y-1/2"
+              tabIndex={-1}
+              aria-label={showPassword ? "隐藏密码" : "显示密码"}
+            >
+              {showPassword ? <EyeOff /> : <Eye />}
+            </IconButton>
+          </div>
+        </FormField>
+
+        <div className="flex items-center justify-between gap-3">
+          <label className="flex items-center gap-2 text-sm text-text-muted">
+            <Switch checked={remember} size="sm" onChange={setRemember} />
+            记住我
+          </label>
         </div>
+
+        <Button
+          type="submit"
+          className="mt-1 w-full"
+          disabled={loading}
+          loading={loading}
+          rightIcon={<ArrowRight className="h-4 w-4" strokeWidth={1.6} />}
+          size="lg"
+          variant="primary"
+        >
+          登录
+        </Button>
       </div>
-
-      {error && (
-        <p className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-[13px] text-red-500">
-          {error}
-        </p>
-      )}
-
-      <button
-        type="submit"
-        disabled={loading}
-        className="mt-1 flex h-10 items-center justify-center gap-2 rounded-lg bg-foreground px-4 text-[14px] font-medium text-background transition-opacity hover:opacity-85 disabled:opacity-50"
-      >
-        {loading ? (
-          <Loader2 size={15} className="animate-spin" />
-        ) : (
-          <>
-            登录
-            <ArrowRight size={15} strokeWidth={1.5} />
-          </>
-        )}
-      </button>
-    </form>
+    </motion.form>
   );
 }

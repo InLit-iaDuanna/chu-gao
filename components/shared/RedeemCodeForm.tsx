@@ -3,10 +3,12 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-export function RedeemCodeForm() {
+import { Button, FormField, Input, useToast } from "@/components/ui";
+
+export function RedeemCodeForm(): React.ReactElement {
   const router = useRouter();
+  const { toast } = useToast();
   const [code, setCode] = useState("");
-  const [message, setMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const canSubmit = code.trim().length > 0 && !isSubmitting;
 
@@ -17,7 +19,6 @@ export function RedeemCodeForm() {
     }
 
     setIsSubmitting(true);
-    setMessage("兑换中...");
 
     try {
       const response = await fetch("/api/me/redeem-code", {
@@ -31,14 +32,20 @@ export function RedeemCodeForm() {
       } | null;
 
       if (!response.ok) {
-        setMessage(payload?.error?.message ?? "兑换失败");
+        toast({
+          title: "兑换失败",
+          description: payload?.error?.message ?? "请检查兑换码后重试。",
+          variant: "danger",
+        });
         return;
       }
 
       setCode("");
-      setMessage(
-        `已兑换 ${payload?.data?.credits ?? 0} 点，当前余额 ${payload?.data?.balance ?? 0} 点`,
-      );
+      toast({
+        title: "兑换成功",
+        description: `已兑换 ${payload?.data?.credits ?? 0} 点，当前余额 ${payload?.data?.balance ?? 0} 点。`,
+        variant: "success",
+      });
       router.refresh();
     } finally {
       setIsSubmitting(false);
@@ -46,21 +53,30 @@ export function RedeemCodeForm() {
   }
 
   return (
-    <form onSubmit={submit} className="mt-6 rounded-[6px] border border-border p-4">
+    <form
+      onSubmit={submit}
+      className="mt-6 rounded-lg border border-border p-4"
+    >
       <p className="text-sm font-medium">兑换点数码</p>
       <div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
-        <input
-          className="rounded-[6px] border border-border bg-surface px-3 py-2 text-sm"
-          placeholder="输入兑换码"
-          required
-          value={code}
-          onChange={(event) => setCode(event.target.value)}
-        />
-        <button className="tool-button h-10" type="submit" disabled={!canSubmit}>
+        <FormField label="兑换码">
+          <Input
+            inputSize="lg"
+            placeholder="输入兑换码"
+            required
+            value={code}
+            onChange={(event) => setCode(event.target.value)}
+          />
+        </FormField>
+        <Button
+          className="self-end"
+          loading={isSubmitting}
+          type="submit"
+          disabled={!canSubmit}
+        >
           兑换
-        </button>
+        </Button>
       </div>
-      {message ? <p className="mt-3 text-sm text-text-muted">{message}</p> : null}
     </form>
   );
 }

@@ -11,10 +11,17 @@ const sizeClass: Record<NonNullable<SpinnerProps["size"]>, string> = {
   lg: "h-[18px] w-[18px]",
 };
 
-export function Spinner({ size = "md", className }: SpinnerProps): React.ReactElement {
+export function Spinner({
+  size = "md",
+  className,
+}: SpinnerProps): React.ReactElement {
   return (
     <svg
-      className={cn("animate-spin text-current [animation-duration:800ms]", sizeClass[size], className)}
+      className={cn(
+        "animate-spin text-current [animation-duration:800ms]",
+        sizeClass[size],
+        className,
+      )}
       viewBox="0 0 24 24"
       aria-hidden="true"
     >
