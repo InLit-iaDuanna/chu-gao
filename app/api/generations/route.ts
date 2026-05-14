@@ -43,6 +43,7 @@ import {
   ModerationRejectionLimitError,
   assertGenerationAllowed,
   assertModerationRejectionAllowed,
+  recordModerationRejectionAttempt,
 } from "@/lib/rate-limit";
 import { RedisUnavailableError } from "@/lib/redis";
 import { isDatabaseUnavailableError } from "@/lib/service-errors";
@@ -312,6 +313,8 @@ export async function POST(request: Request) {
     }
 
     if (await isPromptBlocked(combinedPrompt)) {
+      await recordModerationRejectionAttempt(request.headers);
+
       await db.usageLog.create({
         data: {
           userId: session.id,
