@@ -1,0 +1,55 @@
+import { firstSupportedResolutionAspectPair } from "@/lib/models/capabilities";
+import type { AspectRatio, PublicModelDefinition } from "@/lib/models/types";
+import { normalizeSelectableProviderChannelId } from "@/lib/provider-channels";
+import type { WorkbenchPreferences } from "@/lib/workbench-preferences";
+
+import type {
+  WorkbenchState,
+  WorkbenchTaskStatus,
+} from "@/components/workbench/types";
+
+export const DEFAULT_MODEL_ID = "gpt-image-2";
+
+export const WORKBENCH_STATUS_LABEL: Record<WorkbenchTaskStatus, string> = {
+  idle: "可输入",
+  pending: "排队中",
+  running: "生成中",
+  succeeded: "已完成",
+  failed: "失败",
+  canceled: "已取消",
+};
+
+export function statusFromGeneration(status: string): WorkbenchTaskStatus {
+  if (status === "PENDING") return "pending";
+  if (status === "RUNNING") return "running";
+  if (status === "SUCCEEDED") return "succeeded";
+  if (status === "FAILED") return "failed";
+  if (status === "CANCELED") return "canceled";
+  return "idle";
+}
+
+export function initialStateFor(
+  model: PublicModelDefinition,
+  preferences: WorkbenchPreferences = {},
+): WorkbenchState {
+  const pair = firstSupportedResolutionAspectPair(model, {
+    aspectRatio: preferences.aspectRatio as AspectRatio | undefined,
+    resolution: preferences.resolution as WorkbenchState["resolution"],
+  });
+
+  return {
+    modelId: model.id,
+    providerChannelId: normalizeSelectableProviderChannelId(
+      model.id,
+      preferences.providerChannelId,
+      model.providerChannels,
+    ),
+    aspectRatio: pair.aspectRatio,
+    resolution: pair.resolution,
+    n: 1,
+    outputFormat: model.defaults.outputFormat,
+    background: model.defaults.background,
+    outputCompression: model.defaults.outputCompression,
+    referenceImageKeys: [],
+  };
+}

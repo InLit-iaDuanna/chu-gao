@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
+import { Download } from "lucide-react";
 
+import { ImageGallery } from "@/components/workbench/ImageGallery";
+import { downloadImageUrl } from "@/components/workbench/gallery-images";
 import {
   generationStatusLabel,
   generationStatusTone,
@@ -90,10 +93,18 @@ export default async function GenerationDetailPage({
 
   const generation = result.generation;
 
-  const firstImage = generation.images[0] as
-    | { src?: string; url?: string }
-    | undefined;
-  const imageUrl = firstImage?.src ?? firstImage?.url;
+  const viewableImages = generation.images
+    .filter((image) => image.src ?? image.url)
+    .map((image) => ({
+      id: image.id,
+      src: image.src,
+      url: image.url,
+      downloadUrl: image.downloadUrl,
+      thumbnailUrl: image.thumbnailUrl,
+      width: image.width,
+      height: image.height,
+      mimeType: image.mimeType,
+    }));
   const credits =
     (generation as { credits?: number; costCredits?: number }).credits ??
     (generation as { credits?: number; costCredits?: number }).costCredits ??
@@ -102,15 +113,14 @@ export default async function GenerationDetailPage({
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
       <div className="surface-panel relative min-h-[380px] overflow-hidden p-3 sm:p-4 lg:min-h-[680px]">
-        {imageUrl ? (
-          <div className="relative h-[380px] overflow-hidden rounded-[8px] lg:h-[680px]">
-            <img
-              src={imageUrl}
-              alt={generation.prompt}
-              className="h-full w-full object-contain"
-              decoding="async"
-            />
-          </div>
+        {viewableImages.length ? (
+          <ImageGallery
+            images={viewableImages}
+            alt={generation.prompt}
+            statusLabel={generationStatusLabel(generation.status)}
+            frameClassName="h-[380px] lg:h-[680px]"
+            minFrameClassName=""
+          />
         ) : (
           <div className="flex min-h-[360px] items-center justify-center px-6 text-center lg:min-h-[640px]">
             <div className="max-w-sm">
@@ -159,6 +169,25 @@ export default async function GenerationDetailPage({
               回到工作台
             </Link>
           )}
+          {viewableImages.length ? (
+            <div className="grid gap-2">
+              {viewableImages.map((image, index) => {
+                const href = downloadImageUrl(image);
+
+                return href ? (
+                  <a
+                    key={image.id ?? `${href}-${index}`}
+                    href={href}
+                    download
+                    className="tool-button h-9 text-text-muted"
+                  >
+                    <Download className="h-4 w-4 stroke-[1.5]" />
+                    下载原图 {index + 1}
+                  </a>
+                ) : null;
+              })}
+            </div>
+          ) : null}
         </div>
         <dl className="mt-6 space-y-4 text-sm">
           <div>

@@ -7,6 +7,16 @@ export interface ConversationMessage {
   generationId?: string;
   imageId?: string;
   imageUrl?: string;
+  images?: Array<{
+    id?: string;
+    src?: string;
+    url?: string;
+    downloadUrl?: string;
+    thumbnailUrl?: string;
+    width?: number | null;
+    height?: number | null;
+    mimeType?: string | null;
+  }>;
   thumbnailUrl?: string;
   generationStatus?: string;
   generationProvider?: string | null;

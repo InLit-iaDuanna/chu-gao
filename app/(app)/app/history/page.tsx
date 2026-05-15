@@ -1,8 +1,13 @@
 import Link from "next/link";
 import { headers } from "next/headers";
+import { Download } from "lucide-react";
 
 import { ActionableStatus } from "@/components/shared/ActionableStatus";
 import { ClearHistoryButton } from "@/components/workbench/ClearHistoryButton";
+import {
+  downloadImageUrl,
+  previewImageUrl,
+} from "@/components/workbench/gallery-images";
 import {
   generationStatusLabel,
   generationStatusTone,
@@ -204,50 +209,76 @@ export default async function HistoryPage() {
             </div>
             <div className="columns-1 gap-4 md:columns-2 xl:columns-3">
               {generations.map((generation) => {
-                const firstImage = generation.images[0] as
-                  | { src?: string; url?: string; thumbnailUrl?: string }
-                  | undefined;
-                const imageUrl =
-                  firstImage?.thumbnailUrl ?? firstImage?.src ?? firstImage?.url;
+                const previewImages = generation.images.filter(
+                  (image) => image.src ?? image.url,
+                );
+                const latestImage = previewImages.at(-1);
+                const imageUrl = previewImageUrl(latestImage);
+                const detailHref = generation.conversationId
+                  ? `/app?conversation=${generation.conversationId}`
+                  : `/app/g/${generation.id}`;
 
                 return (
-                  <Link
+                  <article
                     key={generation.id}
-                    href={
-                      generation.conversationId
-                        ? `/app?conversation=${generation.conversationId}`
-                        : `/app/g/${generation.id}`
-                    }
                     className="surface-panel img-enter mb-4 block break-inside-avoid p-3 transition-all hover:-translate-y-0.5 hover:bg-surface-2"
                   >
-                    <div className="relative mb-3 h-64 overflow-hidden rounded-[8px] bg-surface-2 sm:h-80">
-                      {imageUrl ? (
-                        <img
-                          src={imageUrl}
-                          alt={generation.prompt}
-                          className="h-full w-full object-cover"
-                          loading="lazy"
-                          decoding="async"
-                        />
-                      ) : (
-                        <div className="flex h-full items-center justify-center px-6 text-center text-sm text-text-muted">
-                          {generation.status === "FAILED"
-                            ? (generation.errorMessage ??
-                              "任务失败，可以打开详情查看原因")
-                            : generationStatusLabel(generation.status)}
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex items-center justify-between font-mono text-xs text-text-muted">
-                      <span>{formatDate(generation.createdAt)}</span>
-                      <span className={generationStatusTone(generation.status)}>
-                        {generationStatusLabel(generation.status)}
-                      </span>
-                    </div>
-                    <p className="mt-2 line-clamp-3 text-sm leading-6">
-                      {generation.prompt}
-                    </p>
-                  </Link>
+                    <Link href={detailHref} className="block">
+                      <div className="relative mb-3 h-64 overflow-hidden rounded-[8px] bg-surface-2 sm:h-80">
+                        {imageUrl ? (
+                          <>
+                            <img
+                              src={imageUrl}
+                              alt={generation.prompt}
+                              className="h-full w-full object-cover"
+                              loading="lazy"
+                              decoding="async"
+                            />
+                            {previewImages.length > 1 ? (
+                              <span className="absolute left-3 top-3 rounded-full bg-black/55 px-2.5 py-1 font-mono text-xs text-white">
+                                {previewImages.length} 张
+                              </span>
+                            ) : null}
+                          </>
+                        ) : (
+                          <div className="flex h-full items-center justify-center px-6 text-center text-sm text-text-muted">
+                            {generation.status === "FAILED"
+                              ? (generation.errorMessage ??
+                                "任务失败，可以打开详情查看原因")
+                              : generationStatusLabel(generation.status)}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between font-mono text-xs text-text-muted">
+                        <span>{formatDate(generation.createdAt)}</span>
+                        <span className={generationStatusTone(generation.status)}>
+                          {generationStatusLabel(generation.status)}
+                        </span>
+                      </div>
+                      <p className="mt-2 line-clamp-3 text-sm leading-6">
+                        {generation.prompt}
+                      </p>
+                    </Link>
+                    {previewImages.length ? (
+                      <div className="mt-3 grid gap-2">
+                        {previewImages.map((image, index) => {
+                          const href = downloadImageUrl(image);
+
+                          return href ? (
+                            <a
+                              key={image.id ?? `${href}-${index}`}
+                              href={href}
+                              download
+                              className="tool-button h-9 text-text-muted"
+                            >
+                              <Download className="h-4 w-4 stroke-[1.5]" />
+                              下载原图 {index + 1}
+                            </a>
+                          ) : null;
+                        })}
+                      </div>
+                    ) : null}
+                  </article>
                 );
               })}
             </div>

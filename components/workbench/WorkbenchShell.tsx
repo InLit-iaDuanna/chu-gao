@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ChevronDown,
   Trash2,
@@ -12,7 +11,6 @@ import {
 } from "lucide-react";
 
 import { ActionableStatus } from "@/components/shared/ActionableStatus";
-import { friendlyErrorMessage } from "@/components/shared/error-copy";
 import { Canvas } from "@/components/workbench/Canvas";
 import { ConversationThread } from "@/components/workbench/ConversationThread";
 import { CostPreview } from "@/components/workbench/CostPreview";
@@ -23,274 +21,102 @@ import {
 import { ModelSelector } from "@/components/workbench/ModelSelector";
 import { PromptInput } from "@/components/workbench/PromptInput";
 import { generationStatusLabel } from "@/components/workbench/status";
-import type {
-  WorkbenchGeneration,
-  WorkbenchState,
-  WorkbenchTaskStatus,
-  UploadedReferenceImage,
-} from "@/components/workbench/types";
-import type {
-  ConversationMessage,
-  ConversationSummaryView,
-  ConversationView,
-} from "@/lib/conversation";
+import { useBootstrap } from "@/components/workbench/hooks/useBootstrap";
+import { useWorkbenchActions } from "@/components/workbench/hooks/useWorkbenchActions";
+import { WELCOME_MESSAGE } from "@/components/workbench/lib/messages";
+import {
+  WORKBENCH_STATUS_LABEL,
+  initialStateFor,
+} from "@/components/workbench/lib/workbench-state";
+import { useConversationStore } from "@/components/workbench/stores/conversation-store";
+import {
+  selectAggregatedErrorMessage,
+  useErrorStore,
+} from "@/components/workbench/stores/error-store";
+import { useGenerationStore } from "@/components/workbench/stores/generation-store";
+import { useReferenceImageStore } from "@/components/workbench/stores/reference-image-store";
+import { useWorkbenchStore } from "@/components/workbench/stores/workbench-store";
 import { estimateCost } from "@/lib/credits";
-import { firstSupportedResolutionAspectPair } from "@/lib/models/capabilities";
-import type { AspectRatio, PublicModelDefinition } from "@/lib/models/types";
+import type { AspectRatio } from "@/lib/models/types";
 import {
   readWorkbenchPreferences,
   writeWorkbenchPreferences,
-  type WorkbenchPreferences,
 } from "@/lib/workbench-preferences";
-import {
-  getImage2ProviderChannelName,
-  normalizeSelectableProviderChannelId,
-} from "@/lib/provider-channels";
-
-type ApiResponse<T> =
-  | {
-      ok: true;
-      data: T;
-    }
-  | {
-      ok: false;
-      error: {
-        code: string;
-        message: string;
-        details?: unknown;
-      };
-    };
-
-class ClientApiError extends Error {
-  readonly code: string;
-  readonly status: number;
-
-  constructor(message: string, code: string, status: number) {
-    super(message);
-    this.name = "ClientApiError";
-    this.code = code;
-    this.status = status;
-  }
-}
-
-type UserView = {
-  id: string;
-  credits: number;
-};
-
-type GenerationListView = {
-  items: WorkbenchGeneration[];
-  nextCursor: string | null;
-};
-
-type ConversationListView = {
-  items: ConversationSummaryView[];
-};
-
-type UploadedReferenceImageView = Omit<UploadedReferenceImage, "previewUrl">;
-
-const WELCOME_MESSAGE: ConversationMessage = {
-  id: "welcome",
-  role: "assistant",
-  content: "你想先做哪张图？直接描述目标画面，也可以连续补充修改要求。",
-  createdAt: new Date().toISOString(),
-};
-const DEFAULT_MODEL_ID = "gpt-image-2";
-const WORKBENCH_STATUS_LABEL: Record<WorkbenchTaskStatus, string> = {
-  idle: "可输入",
-  pending: "排队中",
-  running: "生成中",
-  succeeded: "已完成",
-  failed: "失败",
-  canceled: "已取消",
-};
-
-function createMessage(
-  role: ConversationMessage["role"],
-  content: string,
-): ConversationMessage {
-  return {
-    id: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}_${Math.random()}`,
-    role,
-    content,
-    createdAt: new Date().toISOString(),
-  };
-}
-
-function conversationTitleFromText(text: string): string {
-  const normalized = text.replace(/\s+/g, " ").trim();
-
-  if (!normalized) {
-    return "新的创作对话";
-  }
-
-  return normalized.length > 28 ? `${normalized.slice(0, 28)}...` : normalized;
-}
-
-function statusFromGeneration(status: string): WorkbenchTaskStatus {
-  if (status === "PENDING") {
-    return "pending";
-  }
-
-  if (status === "RUNNING") {
-    return "running";
-  }
-
-  if (status === "SUCCEEDED") {
-    return "succeeded";
-  }
-
-  if (status === "FAILED") {
-    return "failed";
-  }
-
-  if (status === "CANCELED") {
-    return "canceled";
-  }
-
-  return "idle";
-}
-
-function initialStateFor(
-  model: PublicModelDefinition,
-  preferences: WorkbenchPreferences = {},
-): WorkbenchState {
-  const pair = firstSupportedResolutionAspectPair(model, {
-    aspectRatio: preferences.aspectRatio as AspectRatio | undefined,
-    resolution: preferences.resolution as WorkbenchState["resolution"],
-  });
-
-  return {
-    modelId: model.id,
-    providerChannelId: normalizeSelectableProviderChannelId(
-      model.id,
-      preferences.providerChannelId,
-      model.providerChannels,
-    ),
-    aspectRatio: pair.aspectRatio,
-    resolution: pair.resolution,
-    n: 1,
-    outputFormat: model.defaults.outputFormat,
-    background: model.defaults.background,
-    outputCompression: model.defaults.outputCompression,
-    referenceImageKeys: [],
-  };
-}
-
-async function readApiResponse<T>(
-  response: Response,
-  fallback: string,
-): Promise<T> {
-  let payload: ApiResponse<T>;
-
-  try {
-    payload = (await response.json()) as ApiResponse<T>;
-  } catch {
-    throw new ClientApiError(
-      friendlyErrorMessage({ code: "SERVICE_UNAVAILABLE" }, fallback),
-      "SERVICE_UNAVAILABLE",
-      response.status,
-    );
-  }
-
-  if (!payload.ok) {
-    throw new ClientApiError(
-      friendlyErrorMessage(payload.error, fallback),
-      payload.error.code,
-      response.status,
-    );
-  }
-
-  return payload.data;
-}
-
-function isClientApiError(error: unknown): error is ClientApiError {
-  return error instanceof ClientApiError;
-}
-
-function isUnauthorizedError(error: unknown): boolean {
-  return (
-    isClientApiError(error) &&
-    (error.status === 401 || error.code === "UNAUTHORIZED")
-  );
-}
-
-function isMissingConversationError(error: unknown): boolean {
-  return (
-    isClientApiError(error) &&
-    (error.status === 404 ||
-      error.code === "NOT_FOUND" ||
-      error.code === "CONVERSATION_NOT_FOUND")
-  );
-}
 
 export function WorkbenchShell({
   initialConversationId = null,
 }: {
   initialConversationId?: string | null;
 }) {
-  const router = useRouter();
   const requestedConversationId = initialConversationId;
-  const [models, setModels] = useState<PublicModelDefinition[]>([]);
-  const [state, setState] = useState<WorkbenchState | null>(null);
+
+  const models = useWorkbenchStore((s) => s.models);
+  const state = useWorkbenchStore((s) => s.state);
+  const credits = useWorkbenchStore((s) => s.credits);
+  const accountId = useWorkbenchStore((s) => s.accountId);
+  const isBooting = useWorkbenchStore((s) => s.isBooting);
+  const setWorkbenchState = useWorkbenchStore((s) => s.setState);
+
+  const conversationId = useConversationStore((s) => s.conversationId);
+  const conversationTitle = useConversationStore((s) => s.conversationTitle);
+  const messages = useConversationStore((s) => s.messages);
+  const conversations = useConversationStore((s) => s.conversations);
+
+  const status = useGenerationStore((s) => s.status);
+  const generationProgress = useGenerationStore((s) => s.progress);
+  const queueNotice = useGenerationStore((s) => s.queueNotice);
+  const history = useGenerationStore((s) => s.history);
+  const activeGeneration = useGenerationStore((s) => s.activeGeneration);
+
+  const uploadedReferenceImages = useReferenceImageStore(
+    (s) => s.uploadedReferenceImages,
+  );
+  const isUploadingReference = useReferenceImageStore(
+    (s) => s.isUploadingReference,
+  );
+  const useCurrentImageAsReference = useReferenceImageStore(
+    (s) => s.useCurrentImageAsReference,
+  );
+  const setUseCurrentImageAsReference = useReferenceImageStore(
+    (s) => s.setUseCurrentImageAsReference,
+  );
+
+  const errors = useErrorStore((s) => s.errors);
+  const referenceUploadError = errors.reference ?? null;
+  const generationError = errors.generation ?? null;
+  const modelsError = errors.models ?? null;
+  const conversationError = errors.conversation ?? null;
+  const historyError = errors.history ?? null;
+  const accountError = errors.account ?? null;
+
   const [draft, setDraft] = useState("");
-  const [status, setStatus] = useState<WorkbenchTaskStatus>("idle");
-  const [credits, setCredits] = useState(0);
-  const [history, setHistory] = useState<WorkbenchGeneration[]>([]);
-  const [conversations, setConversations] = useState<ConversationSummaryView[]>(
-    [],
-  );
-  const [conversationId, setConversationId] = useState<string | null>(
-    requestedConversationId,
-  );
-  const [conversationTitle, setConversationTitle] = useState("新的创作对话");
-  const [activeGeneration, setActiveGeneration] =
-    useState<WorkbenchGeneration | null>(null);
-  const [messages, setMessages] = useState<ConversationMessage[]>([
-    WELCOME_MESSAGE,
-  ]);
-  const [accountId, setAccountId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isUploadingReference, setIsUploadingReference] = useState(false);
-  const [referenceUploadError, setReferenceUploadError] = useState<
-    string | null
-  >(null);
-  const [uploadedReferenceImages, setUploadedReferenceImages] = useState<
-    UploadedReferenceImage[]
-  >([]);
-  const [useCurrentImageAsReference, setUseCurrentImageAsReference] =
-    useState(false);
-  const [generationProgress, setGenerationProgress] = useState(0);
-  const [queueNotice, setQueueNotice] = useState<string | null>(null);
   const [isParamsOpen, setIsParamsOpen] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [modelsError, setModelsError] = useState<string | null>(null);
-  const [accountError, setAccountError] = useState<string | null>(null);
-  const [historyError, setHistoryError] = useState<string | null>(null);
-  const [conversationError, setConversationError] = useState<string | null>(
-    null,
+
+  const actions = useWorkbenchActions();
+  const { closeGenerationStream } = actions;
+  const { loadInitialState } = useBootstrap(
+    requestedConversationId,
+    actions.applyConversation,
+    actions.redirectToLogin,
   );
-  const [isBooting, setIsBooting] = useState(true);
-  const eventSourceRef = useRef<EventSource | null>(null);
-  const uploadedReferenceImagesRef = useRef<UploadedReferenceImage[]>([]);
 
   const availableModels = useMemo(
     () => models.filter((model) => model.available),
     [models],
   );
   const model = state
-    ? (availableModels.find((item) => item.id === state.modelId) ?? null)
+    ? availableModels.find((item) => item.id === state.modelId) ?? null
     : null;
+
   const estimate = useMemo(() => {
-    if (!model || !state) {
-      return 0;
-    }
+    if (!model || !state) return 0;
 
     const usesReference =
       uploadedReferenceImages.length > 0 ||
       Boolean(
         model.capabilities.supportsReferenceImage &&
-          activeGeneration?.images[0]?.id &&
+          activeGeneration?.images.at(-1)?.id &&
           useCurrentImageAsReference,
       );
 
@@ -311,797 +137,9 @@ export function WorkbenchShell({
   ]);
   const hasInsufficientCredits = Boolean(model && state && estimate > credits);
 
-  function clearConversationState() {
-    eventSourceRef.current?.close();
-    eventSourceRef.current = null;
-    setConversationId(null);
-    setConversationTitle("新的创作对话");
-    setMessages([WELCOME_MESSAGE]);
-    setActiveGeneration(null);
-    setStatus("idle");
-    setGenerationProgress(0);
-    setError(null);
-    setDraft("");
-    clearUploadedReferenceImages();
-    setUseCurrentImageAsReference(false);
-  }
-
-  function resetWorkspaceForNewConversation() {
-    clearConversationState();
-    setConversationError(null);
-    router.replace("/app");
-  }
-
-  function redirectToLogin() {
-    clearConversationState();
-    setConversations([]);
-    setHistory([]);
-    setModels([]);
-    setState(null);
-    setCredits(0);
-    setIsBooting(false);
-    const next = `${window.location.pathname}${window.location.search}`;
-    router.replace(`/login?next=${encodeURIComponent(next)}`);
-  }
-
-  async function loadMe() {
-    try {
-      const response = await fetch("/api/me", { cache: "no-store" });
-      const data = await readApiResponse<UserView>(
-        response,
-        "账户状态暂时无法读取。",
-      );
-
-      setCredits(data.credits);
-      setAccountId(data.id);
-      setAccountError(null);
-    } catch (loadError) {
-      if (isUnauthorizedError(loadError)) {
-        redirectToLogin();
-        return;
-      }
-
-      setAccountError(
-        friendlyErrorMessage(
-          loadError instanceof Error ? loadError.message : null,
-          "账户状态暂时无法读取。",
-        ),
-      );
-    }
-  }
-
-  function clearUploadedReferenceImages() {
-    setUploadedReferenceImages((current) => {
-      for (const image of current) {
-        URL.revokeObjectURL(image.previewUrl);
-      }
-
-      return [];
-    });
-    setReferenceUploadError(null);
-  }
-
-  function applyConversation(conversation: ConversationView) {
-    setConversationId(conversation.id);
-    setConversationTitle(conversation.title);
-    setUseCurrentImageAsReference(false);
-    setMessages(
-      conversation.messages.length ? conversation.messages : [WELCOME_MESSAGE],
-    );
-
-    const lastGenerationMessage = [...conversation.messages]
-      .reverse()
-      .find((message) => message.generationId);
-
-    if (lastGenerationMessage?.generationId) {
-      const nextStatus = statusFromGeneration(
-        lastGenerationMessage.generationStatus ?? "SUCCEEDED",
-      );
-      const image =
-        lastGenerationMessage.imageUrl || lastGenerationMessage.imageId
-          ? [
-              {
-                id: lastGenerationMessage.imageId,
-                src: lastGenerationMessage.imageUrl,
-                url: lastGenerationMessage.imageUrl,
-                thumbnailUrl: lastGenerationMessage.thumbnailUrl,
-              },
-            ]
-          : [];
-
-      setActiveGeneration({
-        id: lastGenerationMessage.generationId,
-        conversationId: conversation.id,
-        prompt: lastGenerationMessage.content,
-        status: lastGenerationMessage.generationStatus ?? "SUCCEEDED",
-        createdAt: lastGenerationMessage.createdAt ?? new Date().toISOString(),
-        provider: lastGenerationMessage.generationProvider ?? null,
-        providerChannelId:
-          lastGenerationMessage.generationProviderChannelId ?? null,
-        providerChannelName:
-          lastGenerationMessage.generationProviderChannelName ?? null,
-        providerAccountName:
-          lastGenerationMessage.generationProviderAccountName ?? null,
-        startedAt: lastGenerationMessage.generationStartedAt ?? null,
-        finishedAt: lastGenerationMessage.generationFinishedAt ?? null,
-        progress: lastGenerationMessage.generationProgress ?? null,
-        images: image,
-      });
-      setStatus(nextStatus);
-      setGenerationProgress(
-        lastGenerationMessage.generationProgress ??
-          (nextStatus === "succeeded" ? 100 : 0),
-      );
-
-      if (nextStatus === "pending" || nextStatus === "running") {
-        openGenerationStream(lastGenerationMessage.generationId);
-      }
-    } else {
-      setActiveGeneration(null);
-      setStatus("idle");
-      setGenerationProgress(0);
-    }
-  }
-
-  async function ensureConversation(
-    firstUserMessage: string,
-  ): Promise<string> {
-    if (conversationId) {
-      return conversationId;
-    }
-
-    try {
-      const conversation = await readApiResponse<ConversationView>(
-        await fetch("/api/conversations", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            title: conversationTitleFromText(firstUserMessage),
-          }),
-        }),
-        "对话创建失败。请稍后重试。",
-      );
-
-      setConversationId(conversation.id);
-      setConversationTitle(conversation.title);
-      setConversations((current) => [
-        {
-          id: conversation.id,
-          title: conversation.title,
-          lastMessageAt: conversation.lastMessageAt,
-          createdAt: conversation.createdAt,
-          latestMessage: firstUserMessage,
-          thumbnailUrl: null,
-          generationCount: 0,
-        },
-        ...current.filter((item) => item.id !== conversation.id),
-      ]);
-      router.replace(`/app?conversation=${conversation.id}`);
-
-      return conversation.id;
-    } catch (createError) {
-      const message = friendlyErrorMessage(
-        createError instanceof Error ? createError.message : null,
-        "对话创建失败。请稍后重试。",
-      );
-      setConversationError(message);
-      throw createError;
-    }
-  }
-
-  async function clearCurrentConversationMessages() {
-    if (!conversationId) {
-      setMessages([WELCOME_MESSAGE]);
-      return;
-    }
-
-    const confirmed = window.confirm("确定清空当前对话的聊天消息吗？");
-
-    if (!confirmed) {
-      return;
-    }
-
-    try {
-      await readApiResponse<{ deleted: number }>(
-        await fetch(`/api/conversations/${conversationId}/messages`, {
-          method: "DELETE",
-        }),
-        "聊天记录清空失败。",
-      );
-      setMessages([WELCOME_MESSAGE]);
-      setConversations((current) =>
-        current.map((item) =>
-          item.id === conversationId
-            ? {
-                ...item,
-                latestMessage: null,
-                lastMessageAt: new Date().toISOString(),
-              }
-            : item,
-        ),
-      );
-      setConversationError(null);
-    } catch (clearError) {
-      if (isUnauthorizedError(clearError)) {
-        redirectToLogin();
-        return;
-      }
-
-      setConversationError(
-        friendlyErrorMessage(
-          clearError instanceof Error ? clearError.message : null,
-          "聊天记录清空失败。",
-        ),
-      );
-    }
-  }
-
-  async function updateConversationMessage(messageId: string, content: string) {
-    if (!conversationId || messageId === WELCOME_MESSAGE.id) {
-      return;
-    }
-
-    try {
-      const conversation = await readApiResponse<ConversationView>(
-        await fetch(
-          `/api/conversations/${conversationId}/messages/${messageId}`,
-          {
-            method: "PATCH",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ content }),
-          },
-        ),
-        "消息编辑失败。",
-      );
-
-      applyConversation(conversation);
-      setConversationError(null);
-    } catch (editError) {
-      if (isUnauthorizedError(editError)) {
-        redirectToLogin();
-        return;
-      }
-
-      setConversationError(
-        friendlyErrorMessage(
-          editError instanceof Error ? editError.message : null,
-          "消息编辑失败。",
-        ),
-      );
-      throw editError;
-    }
-  }
-
-  async function archiveConversation(targetConversationId: string) {
-    const confirmed = window.confirm("确定删除这个历史对话吗？");
-
-    if (!confirmed) {
-      return;
-    }
-
-    try {
-      await readApiResponse<ConversationView>(
-        await fetch(`/api/conversations/${targetConversationId}`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ archived: true }),
-        }),
-        "历史对话删除失败。",
-      );
-
-      setConversations((current) =>
-        current.filter((item) => item.id !== targetConversationId),
-      );
-
-      if (targetConversationId === conversationId) {
-        resetWorkspaceForNewConversation();
-      }
-
-      setConversationError(null);
-    } catch (archiveError) {
-      if (isUnauthorizedError(archiveError)) {
-        redirectToLogin();
-        return;
-      }
-
-      setConversationError(
-        friendlyErrorMessage(
-          archiveError instanceof Error ? archiveError.message : null,
-          "历史对话删除失败。",
-        ),
-      );
-    }
-  }
-
-  async function clearAllConversations() {
-    if (conversations.length === 0) {
-      return;
-    }
-
-    const confirmed = window.confirm("确定清空全部历史对话吗？生成记录会保留。");
-
-    if (!confirmed) {
-      return;
-    }
-
-    try {
-      await readApiResponse<{ archived: number }>(
-        await fetch("/api/conversations", {
-          method: "DELETE",
-        }),
-        "历史对话清空失败。",
-      );
-
-      setConversations([]);
-      resetWorkspaceForNewConversation();
-      setConversationError(null);
-    } catch (clearError) {
-      if (isUnauthorizedError(clearError)) {
-        redirectToLogin();
-        return;
-      }
-
-      setConversationError(
-        friendlyErrorMessage(
-          clearError instanceof Error ? clearError.message : null,
-          "历史对话清空失败。",
-        ),
-      );
-    }
-  }
-
-  async function uploadReferenceImage(file: File) {
-    if (!model?.capabilities.supportsReferenceImage) {
-      setReferenceUploadError("当前模型不支持参考图。");
-      return;
-    }
-
-    const reservedCurrentImageSlot =
-      useCurrentImageAsReference && activeGeneration?.images[0]?.id ? 1 : 0;
-    const maxUploadedReferenceImages = Math.max(
-      0,
-      model.capabilities.maxReferenceImages - reservedCurrentImageSlot,
-    );
-
-    if (uploadedReferenceImages.length >= maxUploadedReferenceImages) {
-      setReferenceUploadError(
-        `参考图最多 ${model.capabilities.maxReferenceImages} 张。`,
-      );
-      return;
-    }
-
-    setIsUploadingReference(true);
-    setReferenceUploadError(null);
-
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const uploaded = await readApiResponse<UploadedReferenceImageView>(
-        await fetch("/api/upload", {
-          method: "POST",
-          body: formData,
-        }),
-        "参考图上传失败。",
-      );
-      const previewUrl = URL.createObjectURL(file);
-
-      setUploadedReferenceImages((current) => [
-        ...current,
-        {
-          ...uploaded,
-          previewUrl,
-        },
-      ]);
-    } catch (uploadError) {
-      if (isUnauthorizedError(uploadError)) {
-        redirectToLogin();
-        return;
-      }
-
-      setReferenceUploadError(
-        friendlyErrorMessage(
-          uploadError instanceof Error ? uploadError.message : null,
-          "参考图上传失败。",
-        ),
-      );
-    } finally {
-      setIsUploadingReference(false);
-    }
-  }
-
-  function removeReferenceImage(key: string) {
-    setUploadedReferenceImages((current) => {
-      const image = current.find((item) => item.key === key);
-
-      if (image) {
-        URL.revokeObjectURL(image.previewUrl);
-      }
-
-      return current.filter((item) => item.key !== key);
-    });
-  }
-
-  function mergeGeneration(next: WorkbenchGeneration) {
-    setActiveGeneration(next);
-    setHistory((current) => [
-      next,
-      ...current.filter((item) => item.id !== next.id),
-    ]);
-
-    if (next.conversationId) {
-      const imageUrl = next.images[0]?.src ?? next.images[0]?.url ?? null;
-      const thumbnailUrl = next.images[0]?.thumbnailUrl ?? imageUrl;
-
-      setConversations((current) =>
-        current.map((item) =>
-          item.id === next.conversationId
-            ? {
-                ...item,
-                lastMessageAt: new Date().toISOString(),
-                thumbnailUrl: thumbnailUrl ?? item.thumbnailUrl,
-                generationCount: Math.max(item.generationCount, 1),
-              }
-            : item,
-        ),
-      );
-    }
-  }
-
-  function appendAssistantError(message: string) {
-    setMessages((current) => [...current, createMessage("assistant", message)]);
-  }
-
-  function openGenerationStream(generationId: string) {
-    eventSourceRef.current?.close();
-
-    const events = new EventSource(`/api/generations/${generationId}/stream`);
-    eventSourceRef.current = events;
-
-    events.addEventListener("update", (event) => {
-      const next = JSON.parse(
-        (event as MessageEvent).data,
-      ) as WorkbenchGeneration;
-      mergeGeneration(next);
-      const nextStatus = statusFromGeneration(next.status);
-      setStatus(nextStatus);
-
-      if (nextStatus === "pending") {
-        setGenerationProgress(next.progress ?? 12);
-        setQueueNotice((current) => current ?? "任务正在等待生成 worker 消费。");
-      }
-
-      if (nextStatus === "running") {
-        setGenerationProgress(next.progress ?? 62);
-        setQueueNotice(null);
-      }
-
-      if (nextStatus === "failed") {
-        setGenerationProgress(0);
-        setQueueNotice(null);
-        const message = friendlyErrorMessage(
-          {
-            code: next.errorCode ?? undefined,
-            message: next.errorMessage ?? undefined,
-          },
-          "生成没有完成。请稍后重试，或换一个模型再发送。",
-        );
-        setError(message);
-        appendAssistantError(message);
-      }
-
-      if (nextStatus === "succeeded") {
-        setGenerationProgress(100);
-        setQueueNotice(null);
-        setMessages((current) =>
-          current.map((message) =>
-            message.generationId === next.id
-              ? {
-                  ...message,
-                  imageId: next.images[0]?.id,
-                  imageUrl: next.images[0]?.src ?? next.images[0]?.url,
-                  thumbnailUrl: next.images[0]?.thumbnailUrl,
-                  generationStatus: next.status,
-                  generationProvider: next.provider ?? null,
-                  generationProviderChannelId:
-                    next.providerChannelId ?? null,
-                  generationProviderChannelName:
-                    next.providerChannelName ?? null,
-                  generationProviderAccountName:
-                    next.providerAccountName ?? null,
-                  generationStartedAt: next.startedAt ?? null,
-                  generationFinishedAt: next.finishedAt ?? null,
-                  generationProgress: next.progress ?? 100,
-                }
-              : message,
-          ),
-        );
-      }
-
-      if (
-        nextStatus === "succeeded" ||
-        nextStatus === "failed" ||
-        nextStatus === "canceled"
-      ) {
-        events.close();
-        eventSourceRef.current = null;
-        void loadMe();
-      }
-    });
-
-    events.addEventListener("error", (event) => {
-      let message = "无法继续接收任务状态。请刷新页面查看结果，或稍后重试。";
-      const data = (event as MessageEvent).data;
-
-      if (typeof data === "string" && data) {
-        try {
-          const parsed = JSON.parse(data) as {
-            code?: string;
-            message?: string;
-          };
-          message = friendlyErrorMessage(parsed, message);
-        } catch {
-          message = friendlyErrorMessage(data, message);
-        }
-      }
-
-      setStatus("failed");
-      setGenerationProgress(0);
-      setError(message);
-      appendAssistantError(message);
-      events.close();
-      eventSourceRef.current = null;
-      void loadMe();
-    });
-  }
-
-  const loadInitialState = useCallback(
-    async (isCanceled?: () => boolean) => {
-      setIsBooting(true);
-      setError(null);
-      setModelsError(null);
-      setAccountError(null);
-      setHistoryError(null);
-      setConversationError(null);
-
-      const [
-        modelsResult,
-        meResult,
-        generationsResult,
-        conversationsResult,
-        activeConversationResult,
-      ] = await Promise.allSettled([
-        fetch("/api/public/models", { cache: "no-store" }).then((response) =>
-          readApiResponse<PublicModelDefinition[]>(
-            response,
-            "模型列表暂时无法读取。",
-          ),
-        ),
-        fetch("/api/me", { cache: "no-store" }).then((response) =>
-          readApiResponse<UserView>(response, "账户状态暂时无法读取。"),
-        ),
-        fetch("/api/generations?limit=20", { cache: "no-store" }).then(
-          (response) =>
-            readApiResponse<GenerationListView>(
-              response,
-              "历史记录暂时无法读取。",
-            ),
-        ),
-        fetch("/api/conversations?limit=12", { cache: "no-store" }).then(
-          (response) =>
-            readApiResponse<ConversationListView>(
-              response,
-              "对话列表暂时无法读取。",
-            ),
-        ),
-        requestedConversationId
-          ? fetch(`/api/conversations/${requestedConversationId}`, {
-              cache: "no-store",
-            }).then((response) =>
-              readApiResponse<ConversationView>(response, "对话暂时无法读取。"),
-            )
-          : Promise.resolve(null),
-      ]);
-
-      if (isCanceled?.()) {
-        return;
-      }
-
-      const settledResults = [
-        modelsResult,
-        meResult,
-        generationsResult,
-        conversationsResult,
-        activeConversationResult,
-      ];
-
-      if (
-        settledResults.some(
-          (result) =>
-            result.status === "rejected" && isUnauthorizedError(result.reason),
-        )
-      ) {
-        redirectToLogin();
-        return;
-      }
-
-      if (modelsResult.status === "fulfilled") {
-        setModels(modelsResult.value);
-        const preferenceUserId =
-          meResult.status === "fulfilled" ? meResult.value.id : accountId;
-        const preferences = readWorkbenchPreferences(preferenceUserId);
-        const preferredModelId = preferences.modelId;
-        const preferred = preferredModelId
-          ? modelsResult.value.find(
-              (item) => item.available && item.id === preferredModelId,
-            )
-          : null;
-        const defaultModel = modelsResult.value.find(
-          (item) => item.available && item.id === DEFAULT_MODEL_ID,
-        );
-        const firstAvailable =
-          preferred ??
-          defaultModel ??
-          modelsResult.value.find((item) => item.available);
-        setState(
-          firstAvailable ? initialStateFor(firstAvailable, preferences) : null,
-        );
-      } else {
-        setModels([]);
-        setState(null);
-        setModelsError(
-          friendlyErrorMessage(
-            modelsResult.reason instanceof Error
-              ? modelsResult.reason.message
-              : null,
-            "模型列表暂时无法读取。",
-          ),
-        );
-      }
-
-      if (meResult.status === "fulfilled") {
-        setCredits(meResult.value.credits);
-        setAccountId(meResult.value.id);
-      } else {
-        setCredits(0);
-        setAccountId(null);
-        setAccountError(
-          friendlyErrorMessage(
-            meResult.reason instanceof Error ? meResult.reason.message : null,
-            "账户状态暂时无法读取。",
-          ),
-        );
-      }
-
-      if (generationsResult.status === "fulfilled") {
-        setHistory(generationsResult.value.items);
-      } else {
-        setHistory([]);
-        setHistoryError(
-          friendlyErrorMessage(
-            generationsResult.reason instanceof Error
-              ? generationsResult.reason.message
-              : null,
-            "历史记录暂时无法读取。",
-          ),
-        );
-      }
-
-      if (conversationsResult.status === "fulfilled") {
-        setConversations(conversationsResult.value.items);
-      } else {
-        setConversations([]);
-        setConversationError(
-          friendlyErrorMessage(
-            conversationsResult.reason instanceof Error
-              ? conversationsResult.reason.message
-              : null,
-            "对话列表暂时无法读取。",
-          ),
-        );
-      }
-
-      if (
-        activeConversationResult.status === "fulfilled" &&
-        activeConversationResult.value
-      ) {
-        applyConversation(activeConversationResult.value);
-      } else if (activeConversationResult.status === "rejected") {
-        setConversationId(null);
-        setConversationTitle("新的创作对话");
-        setMessages([WELCOME_MESSAGE]);
-        setActiveGeneration(null);
-        setStatus("idle");
-        setGenerationProgress(0);
-
-        if (isMissingConversationError(activeConversationResult.reason)) {
-          router.replace("/app");
-          setConversationError(
-            "这个对话不存在，或不属于当前账户。已切回新的创作对话。",
-          );
-        } else {
-          setConversationError(
-            friendlyErrorMessage(
-              activeConversationResult.reason instanceof Error
-                ? activeConversationResult.reason.message
-                : null,
-              "对话暂时无法读取。",
-            ),
-          );
-        }
-      } else if (!requestedConversationId) {
-        setConversationId(null);
-        setConversationTitle("新的创作对话");
-        setMessages([WELCOME_MESSAGE]);
-      }
-
-      if (
-        modelsResult.status === "rejected" ||
-        meResult.status === "rejected" ||
-        generationsResult.status === "rejected" ||
-        conversationsResult.status === "rejected" ||
-        activeConversationResult.status === "rejected"
-      ) {
-        setMessages((current) =>
-          current.some((message) => message.id === "service-status")
-            ? current
-            : [
-                ...current,
-                {
-                  id: "service-status",
-                  role: "assistant",
-                  content:
-                    "部分服务暂时不可用。页面会保留可操作区域；恢复后可以重试或刷新。",
-                  createdAt: new Date().toISOString(),
-                },
-              ],
-        );
-      }
-
-      setIsBooting(false);
-    },
-    // The boot loader intentionally runs when the URL-selected conversation changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [requestedConversationId],
-  );
-
+  // Persist preferences
   useEffect(() => {
-    let canceled = false;
-    const timer = window.setTimeout(() => {
-      void loadInitialState(() => canceled);
-    }, 0);
-
-    return () => {
-      canceled = true;
-      window.clearTimeout(timer);
-      eventSourceRef.current?.close();
-    };
-  }, [loadInitialState]);
-
-  useEffect(() => {
-    uploadedReferenceImagesRef.current = uploadedReferenceImages;
-  }, [uploadedReferenceImages]);
-
-  useEffect(
-    () => () => {
-      for (const image of uploadedReferenceImagesRef.current) {
-        URL.revokeObjectURL(image.previewUrl);
-      }
-    },
-    [],
-  );
-
-  useEffect(() => {
-    if (isBooting || !state) {
-      return;
-    }
-
+    if (isBooting || !state) return;
     writeWorkbenchPreferences(
       {
         modelId: state.modelId,
@@ -1113,145 +151,21 @@ export function WorkbenchShell({
     );
   }, [accountId, isBooting, state]);
 
-  async function submitGeneration() {
-    const userText = draft.trim();
+  // Cleanup reference image previews on unmount
+  useEffect(
+    () => () => {
+      closeGenerationStream();
 
-    if (!userText || isSubmitting || !state || !model) {
-      return;
-    }
-
-    const userMessage = createMessage("user", userText);
-    const nextMessages = [...messages, userMessage];
-    const requestState = state;
-
-    setMessages(nextMessages);
-    setDraft("");
-    setError(null);
-    setGenerationProgress(0);
-    setIsSubmitting(true);
-
-    let failureFallback = "生成请求没有提交成功。请稍后重试。";
-
-    try {
-      failureFallback = "对话创建失败。请稍后重试。";
-      const targetConversationId = await ensureConversation(userText);
-
-      setStatus("pending");
-      setGenerationProgress(8);
-      failureFallback = "生成请求没有提交成功。请稍后重试。";
-      const sourceImageId =
-        useCurrentImageAsReference &&
-        activeGeneration?.conversationId === targetConversationId
-          ? activeGeneration.images[0]?.id
-          : undefined;
-      const assistantMessageText = "已收到，开始生成。";
-
-      const payload = await readApiResponse<{
-        generationId: string;
-        status: string;
-        estimatedCredits: number;
-        providerChannelId?: typeof requestState.providerChannelId | null;
-        workerOnline?: boolean;
-        queueWaiting?: number;
-      }>(
-        await fetch("/api/generations", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            conversationId: targetConversationId,
-            userMessage: userText,
-            assistantMessage: assistantMessageText,
-            modelId: requestState.modelId,
-            providerChannelId: requestState.providerChannelId,
-            prompt: userText,
-            aspectRatio: requestState.aspectRatio,
-            resolution: requestState.resolution,
-            n: requestState.n,
-            outputFormat: requestState.outputFormat,
-            background: requestState.background,
-            outputCompression: requestState.outputCompression,
-            referenceImageKeys: uploadedReferenceImages.map(
-              (image) => image.key,
-            ),
-            sourceImageIds: sourceImageId ? [sourceImageId] : [],
-          }),
-        }),
-        "生成请求没有提交成功。请稍后重试。",
-      );
-      const acceptedProviderChannelId = model.providerChannels?.length
-        ? (payload.providerChannelId ??
-          requestState.providerChannelId ??
-          model.providerChannels[0]?.id ??
-          null)
-        : null;
-
-      const pendingGeneration: WorkbenchGeneration = {
-        id: payload.generationId,
-        conversationId: targetConversationId,
-        modelId: requestState.modelId,
-        prompt: userText,
-        status: payload.status,
-        createdAt: new Date().toISOString(),
-        providerChannelId:
-          model.providerChannels?.length ? acceptedProviderChannelId : null,
-        providerChannelName:
-          model.providerChannels?.length
-            ? (model.providerChannels?.find(
-                (channel) => channel.id === acceptedProviderChannelId,
-              )?.displayName ??
-              getImage2ProviderChannelName(acceptedProviderChannelId))
-            : null,
-        progress: 0,
-        images: [],
-      };
-      const assistantMessage = createMessage(
-        "assistant",
-        assistantMessageText,
-      );
-      assistantMessage.generationId = payload.generationId;
-
-      setMessages((current) => [...current, assistantMessage]);
-      setCredits((current) => Math.max(0, current - payload.estimatedCredits));
-      setStatus(statusFromGeneration(payload.status));
-      setGenerationProgress(0);
-      setQueueNotice(
-        payload.status === "PENDING"
-          ? payload.workerOnline
-            ? `任务已入队，前方约 ${payload.queueWaiting ?? 0} 个任务。`
-            : "任务已入队，但生成 worker 未在线；请启动 pnpm worker 或 pnpm dev:all。"
-          : null,
-      );
-      clearUploadedReferenceImages();
-      mergeGeneration(pendingGeneration);
-      openGenerationStream(payload.generationId);
-    } catch (submitError) {
-      if (isUnauthorizedError(submitError)) {
-        redirectToLogin();
-        return;
+      const refs = useReferenceImageStore.getState().uploadedReferenceImages;
+      for (const image of refs) {
+        URL.revokeObjectURL(image.previewUrl);
       }
+    },
+    [closeGenerationStream],
+  );
 
-      const message = friendlyErrorMessage(
-        submitError instanceof Error ? submitError.message : null,
-        failureFallback,
-      );
-      setStatus("failed");
-      setGenerationProgress(0);
-      setQueueNotice(null);
-      setError(message);
-      setMessages((current) =>
-        current.filter((messageItem) => messageItem.id !== userMessage.id),
-      );
-      appendAssistantError(`${message} 你可以修改描述后重新发送。`);
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  const activeImage =
-    activeGeneration?.images[0]?.src ?? activeGeneration?.images[0]?.url;
-  const activeImageId = activeGeneration?.images[0]?.id;
+  const activeImages = activeGeneration?.images ?? [];
+  const activeImageId = activeImages.at(-1)?.id;
   const supportsReferenceImage = Boolean(
     model?.capabilities.supportsReferenceImage,
   );
@@ -1266,54 +180,37 @@ export function WorkbenchShell({
         model.capabilities.maxReferenceImages - currentImageReferenceSlotUsed,
       )
     : 0;
+
   const disabledReason = (() => {
-    if (isBooting) {
-      return "正在读取账户和模型状态。";
-    }
-
-    if (!model || !state) {
+    if (isBooting) return "正在读取账户和模型状态。";
+    if (!model || !state)
       return modelsError ?? "当前没有可用模型。模型恢复后即可发送。";
-    }
-
-    if (hasInsufficientCredits) {
+    if (hasInsufficientCredits)
       return `余额不足，本次预计需要 ${estimate} 点，当前余额 ${credits} 点。`;
-    }
-
-    if (isSubmitting) {
-      return "任务正在提交。";
-    }
-
-    if (isUploadingReference) {
-      return "参考图正在上传。";
-    }
-
-    if (!draft.trim()) {
-      return "描述你想生成或修改的画面后即可发送。";
-    }
-
+    if (isSubmitting) return "任务正在提交。";
+    if (isUploadingReference) return "参考图正在上传。";
+    if (!draft.trim()) return "描述你想生成或修改的画面后即可发送。";
     return null;
   })();
+
   const submitDisabled = Boolean(
     isSubmitting ||
-    isUploadingReference ||
-    !draft.trim() ||
-    !state ||
-    !model ||
-    isBooting ||
-    hasInsufficientCredits,
+      isUploadingReference ||
+      !draft.trim() ||
+      !state ||
+      !model ||
+      isBooting ||
+      hasInsufficientCredits,
   );
   const hasModels = models.length > 0;
   const hasAvailableModels = availableModels.length > 0;
-  const cannotReadServices = Boolean(
-    modelsError || accountError || historyError || conversationError,
-  );
-  const serviceErrorDescription = [
-    ...new Set(
-      [modelsError, accountError, historyError, conversationError].filter(
-        Boolean,
-      ),
-    ),
-  ].join(" ");
+  const aggregatedServiceError = selectAggregatedErrorMessage(errors, [
+    "models",
+    "account",
+    "history",
+    "conversation",
+  ]);
+  const cannotReadServices = Boolean(aggregatedServiceError);
 
   return (
     <div className="workbench-shell space-y-4">
@@ -1321,7 +218,7 @@ export function WorkbenchShell({
         <ActionableStatus
           tone="warning"
           title="部分状态暂时无法读取"
-          description={serviceErrorDescription}
+          description={aggregatedServiceError}
           onRetry={() => void loadInitialState()}
         />
       ) : null}
@@ -1404,32 +301,44 @@ export function WorkbenchShell({
                 finishedAt: activeGeneration?.finishedAt ?? null,
               }}
               onReuseMessage={setDraft}
-              onEditMessage={updateConversationMessage}
-              onClearMessages={clearCurrentConversationMessages}
-              canClearMessages={
-                messages.some((message) => message.id !== WELCOME_MESSAGE.id)
-              }
+              onEditMessage={actions.updateConversationMessage}
+              onClearMessages={actions.clearCurrentConversationMessages}
+              canClearMessages={messages.some(
+                (message) => message.id !== WELCOME_MESSAGE.id,
+              )}
               footer={
                 <PromptInput
                   value={draft}
                   onChange={setDraft}
-                  onSubmit={submitGeneration}
+                  onSubmit={() =>
+                    void actions.submitGeneration({
+                      draft,
+                      isSubmitting,
+                      setIsSubmitting,
+                      setDraft,
+                    })
+                  }
                   referenceImages={uploadedReferenceImages}
                   onUploadReference={
-                    supportsReferenceImage ? uploadReferenceImage : undefined
+                    supportsReferenceImage
+                      ? actions.uploadReferenceImage
+                      : undefined
                   }
-                  onRemoveReference={removeReferenceImage}
+                  onRemoveReference={actions.removeReferenceImage}
                   uploadDisabled={
                     isBooting ||
                     isSubmitting ||
                     isUploadingReference ||
                     !supportsReferenceImage ||
-                    uploadedReferenceImages.length >= maxUploadedReferenceImages
+                    uploadedReferenceImages.length >=
+                      maxUploadedReferenceImages
                   }
                   isUploadingReference={isUploadingReference}
                   referenceUploadError={referenceUploadError}
                   useCurrentImageAsReference={useCurrentImageAsReference}
-                  onToggleCurrentImageReference={setUseCurrentImageAsReference}
+                  onToggleCurrentImageReference={
+                    setUseCurrentImageAsReference
+                  }
                   canUseCurrentImageReference={canUseCurrentImageReference}
                   currentImageReferenceDisabled={isSubmitting}
                   disabled={submitDisabled}
@@ -1445,14 +354,18 @@ export function WorkbenchShell({
               }
             />
 
-            <Canvas imageUrl={activeImage} status={status} error={error} />
+            <Canvas
+              images={activeImages}
+              status={status}
+              error={generationError}
+            />
           </div>
 
-          {error ? (
+          {generationError ? (
             <ActionableStatus
               tone="danger"
               title="生成没有完成"
-              description={`${error} 你可以调整描述、降低张数或稍后重新发送。`}
+              description={`${generationError} 你可以调整描述、降低张数或稍后重新发送。`}
             />
           ) : null}
 
@@ -1470,44 +383,43 @@ export function WorkbenchShell({
               </Link>
             </div>
             <div className="grid gap-2 md:grid-cols-2">
-              {history.slice(0, 4).map((item) => (
-                (() => {
-                  const previewUrl =
-                    item.images[0]?.thumbnailUrl ??
-                    item.images[0]?.src ??
-                    item.images[0]?.url;
+              {history.slice(0, 4).map((item) => {
+                const latestImage = item.images.at(-1);
+                const previewUrl =
+                  latestImage?.thumbnailUrl ??
+                  latestImage?.src ??
+                  latestImage?.url;
 
-                  return (
-                    <Link
-                      key={item.id}
-                      href={
-                        item.conversationId
-                          ? `/app?conversation=${item.conversationId}`
-                          : `/app/g/${item.id}`
-                      }
-                      className="surface-panel block p-3 text-sm leading-6 transition-colors hover:-translate-y-0.5 hover:bg-surface-2"
-                    >
-                      {previewUrl ? (
-                        <div className="mb-2 h-24 overflow-hidden rounded-[6px] bg-surface-2">
-                          <img
-                            src={previewUrl}
-                            alt=""
-                            className="h-full w-full object-cover"
-                            loading="lazy"
-                            decoding="async"
-                          />
-                        </div>
-                      ) : null}
-                      <span className="font-mono text-xs text-text-muted">
-                        {generationStatusLabel(item.status)}
-                      </span>
-                      <span className="mt-1 line-clamp-2 block">
-                        {item.prompt}
-                      </span>
-                    </Link>
-                  );
-                })()
-              ))}
+                return (
+                  <Link
+                    key={item.id}
+                    href={
+                      item.conversationId
+                        ? `/app?conversation=${item.conversationId}`
+                        : `/app/g/${item.id}`
+                    }
+                    className="surface-panel block p-3 text-sm leading-6 transition-colors hover:-translate-y-0.5 hover:bg-surface-2"
+                  >
+                    {previewUrl ? (
+                      <div className="mb-2 h-24 overflow-hidden rounded-[6px] bg-surface-2">
+                        <img
+                          src={previewUrl}
+                          alt=""
+                          className="h-full w-full object-cover"
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      </div>
+                    ) : null}
+                    <span className="font-mono text-xs text-text-muted">
+                      {generationStatusLabel(item.status)}
+                    </span>
+                    <span className="mt-1 line-clamp-2 block">
+                      {item.prompt}
+                    </span>
+                  </Link>
+                );
+              })}
               {history.length === 0 ? (
                 <div className="surface-panel-soft p-3 text-sm leading-6 text-text-muted md:col-span-2">
                   {historyError
@@ -1534,7 +446,7 @@ export function WorkbenchShell({
                   className="tool-button h-9 w-9 px-0 text-text-muted"
                   aria-label="清空历史对话"
                   title="清空历史对话"
-                  onClick={clearAllConversations}
+                  onClick={() => void actions.clearAllConversations()}
                   disabled={conversations.length === 0}
                 >
                   <Trash2 className="h-4 w-4 stroke-[1.5]" />
@@ -1544,7 +456,7 @@ export function WorkbenchShell({
                   className="tool-button h-9 w-9 px-0 text-text-muted"
                   aria-label="新建对话"
                   title="新建对话"
-                  onClick={resetWorkspaceForNewConversation}
+                  onClick={actions.resetWorkspaceForNewConversation}
                 >
                   <MessageSquarePlus className="h-4 w-4 stroke-[1.5]" />
                 </button>
@@ -1578,7 +490,7 @@ export function WorkbenchShell({
                     className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-[6px] border border-border text-text-faint opacity-0 transition-all hover:border-border-strong hover:text-foreground focus:opacity-100 group-hover:opacity-100"
                     aria-label={`删除历史对话 ${item.title}`}
                     title="删除历史对话"
-                    onClick={() => void archiveConversation(item.id)}
+                    onClick={() => void actions.archiveConversation(item.id)}
                   >
                     <Trash2 className="h-3.5 w-3.5 stroke-[1.5]" />
                   </button>
@@ -1601,7 +513,7 @@ export function WorkbenchShell({
                 const selected = availableModels.find(
                   (item) => item.id === modelId,
                 );
-                setState(
+                setWorkbenchState(
                   selected
                     ? initialStateFor(
                         selected,
@@ -1612,7 +524,7 @@ export function WorkbenchShell({
                 return;
               }
 
-              setState((current) =>
+              setWorkbenchState((current) =>
                 current
                   ? normalizeWorkbenchState(modelId, current, models)
                   : current,
@@ -1645,7 +557,7 @@ export function WorkbenchShell({
                 <div id="workbench-params-panel">
                   <DynamicParamsPanel
                     value={state}
-                    onChange={setState}
+                    onChange={setWorkbenchState}
                     models={models}
                   />
                 </div>

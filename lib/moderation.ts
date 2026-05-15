@@ -5,7 +5,10 @@ import {
 
 function normalizeKeywordList(value: unknown): string[] {
   return Array.isArray(value)
-    ? value.filter((item): item is string => typeof item === "string")
+    ? value
+        .filter((item): item is string => typeof item === "string")
+        .map((item) => item.trim())
+        .filter(Boolean)
     : [];
 }
 
@@ -24,7 +27,5 @@ export async function isPromptBlocked(prompt: string): Promise<boolean> {
   );
   const normalized = prompt.toLowerCase();
 
-  return keywords.some((keyword) =>
-    normalized.includes(keyword.trim().toLowerCase()),
-  );
+  return keywords.some((keyword) => normalized.includes(keyword.toLowerCase()));
 }
