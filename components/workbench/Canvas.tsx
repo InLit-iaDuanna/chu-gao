@@ -1,41 +1,13 @@
-import { Download } from "lucide-react";
-
+import { ImageGallery } from "@/components/workbench/ImageGallery";
+import type { GalleryImage } from "@/components/workbench/gallery-images";
 import type { WorkbenchTaskStatus } from "@/components/workbench/types";
 
-function timestampForFilename(date = new Date()): string {
-  const parts = [
-    date.getFullYear(),
-    date.getMonth() + 1,
-    date.getDate(),
-    date.getHours(),
-    date.getMinutes(),
-    date.getSeconds(),
-  ];
-
-  return parts.map((part) => String(part).padStart(2, "0")).join("");
-}
-
-function extensionFromUrl(url: string): string {
-  const pathname = url.split("?")[0] ?? "";
-  const extension = pathname.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase();
-
-  if (extension === "jpg" || extension === "jpeg") {
-    return "jpg";
-  }
-
-  if (extension === "webp") {
-    return "webp";
-  }
-
-  return "png";
-}
-
 export function Canvas({
-  imageUrl,
+  images,
   status,
   error,
 }: {
-  imageUrl?: string;
+  images?: GalleryImage[];
   status: WorkbenchTaskStatus;
   error?: string | null;
   onUseExample?: (prompt: string) => void;
@@ -43,7 +15,9 @@ export function Canvas({
   const frameClass =
     "surface-panel canvas-panel flex min-h-[420px] items-center justify-center p-6 lg:min-h-0";
 
-  if (!imageUrl) {
+  const viewableImages = images?.filter((image) => image.src ?? image.url) ?? [];
+
+  if (viewableImages.length === 0) {
     if (status === "pending" || status === "running") {
       const statusLabel = status === "pending" ? "排队中" : "生成中";
 
@@ -106,31 +80,19 @@ export function Canvas({
 
   return (
     <div className="surface-panel canvas-panel img-enter relative min-h-[420px] overflow-hidden p-3 lg:min-h-0">
-      <div className="absolute left-4 top-4 max-w-[calc(100%-2rem)] truncate rounded-full bg-black/55 px-3 py-1 text-xs text-white">
-        {status === "running"
+      <ImageGallery
+        images={viewableImages}
+        alt="生成结果"
+        statusLabel={
+          status === "running"
           ? "生成中"
           : status === "failed"
             ? "失败"
             : status === "canceled"
               ? "已取消"
-              : "已完成"}
-      </div>
-      <a
-        href={imageUrl}
-        download={`chugao-${timestampForFilename()}.${extensionFromUrl(imageUrl)}`}
-        className="tool-button absolute right-4 top-4 z-10 h-9 bg-black/55 text-white hover:bg-black/70"
-      >
-        <Download className="h-4 w-4 stroke-[1.5]" />
-        下载
-      </a>
-      <div className="relative flex h-full min-h-[390px] items-center justify-center overflow-hidden rounded-[8px] bg-background">
-        <img
-          src={imageUrl}
-          alt="生成结果"
-          className="h-full max-h-full w-full object-contain"
-          decoding="async"
-        />
-      </div>
+              : "已完成"
+        }
+      />
     </div>
   );
 }

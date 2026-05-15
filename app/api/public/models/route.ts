@@ -86,7 +86,8 @@ export async function GET() {
 
         if (
           model.protocol === expectedProtocol &&
-          aliases.some((id) => providerModelIds.has(id))
+          aliases.some((id) => providerModelIds.has(id)) &&
+          (provider._count.accounts === 0 || provider.accounts.length > 0)
         ) {
           availableModelIds.add(model.id);
         }

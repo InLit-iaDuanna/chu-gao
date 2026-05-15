@@ -61,9 +61,10 @@ export interface WorkbenchGeneration {
     id?: string;
     src?: string;
     url?: string;
+    downloadUrl?: string;
     thumbnailUrl?: string;
-    width?: number;
-    height?: number;
-    mimeType?: string;
+    width?: number | null;
+    height?: number | null;
+    mimeType?: string | null;
   }>;
 }

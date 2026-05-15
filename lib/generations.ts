@@ -54,6 +54,7 @@ export function serializeGeneration(
     id: image.id,
     url: privateImageUrl(row.id, image.id),
     src: privateImageUrl(row.id, image.id),
+    downloadUrl: privateImageUrl(row.id, image.id),
     thumbnailUrl: image.thumbnailKey
       ? privateImageThumbnailUrl(row.id, image.id)
       : privateImageUrl(row.id, image.id),

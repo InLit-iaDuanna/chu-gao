@@ -34,7 +34,6 @@ const conversationInclude = {
             orderBy: {
               createdAt: "asc",
             },
-            take: 1,
           },
         },
       },
@@ -127,7 +126,19 @@ function generationMessageMeta(
     return null;
   }
 
-  const image = generation.images[0];
+  const images = generation.images.map((image) => ({
+    id: image.id,
+    src: privateImageUrl(generation.id, image.id),
+    url: privateImageUrl(generation.id, image.id),
+    downloadUrl: privateImageUrl(generation.id, image.id),
+    thumbnailUrl: image.thumbnailKey
+      ? privateImageThumbnailUrl(generation.id, image.id)
+      : privateImageUrl(generation.id, image.id),
+    width: image.width,
+    height: image.height,
+    mimeType: image.mimeType,
+  }));
+  const image = images[0];
   const providerChannelId = resolveImage2ProviderChannelId(
     generation.modelId,
     generation.paramsRaw,
@@ -150,10 +161,9 @@ function generationMessageMeta(
     ...(image
       ? {
           imageId: image.id,
-          imageUrl: privateImageUrl(generation.id, image.id),
-          thumbnailUrl: image.thumbnailKey
-            ? privateImageThumbnailUrl(generation.id, image.id)
-            : privateImageUrl(generation.id, image.id),
+          imageUrl: image.src,
+          images,
+          thumbnailUrl: image.thumbnailUrl,
         }
       : {}),
     generationStatus: generation.status,
