@@ -22,6 +22,7 @@ interface GenerationStoreState {
       | ((current: WorkbenchGeneration[]) => WorkbenchGeneration[]),
   ) => void;
   setActiveGeneration: (next: WorkbenchGeneration | null) => void;
+  selectGeneration: (next: WorkbenchGeneration) => void;
   mergeGeneration: (next: WorkbenchGeneration) => void;
   resetTask: () => void;
 }
@@ -44,6 +45,7 @@ export const useGenerationStore = create<GenerationStoreState>((set) => ({
       history: typeof next === "function" ? next(current.history) : next,
     })),
   setActiveGeneration: (activeGeneration) => set({ activeGeneration }),
+  selectGeneration: (activeGeneration) => set({ activeGeneration }),
   mergeGeneration: (next) =>
     set((current) => ({
       activeGeneration: next,
