@@ -42,6 +42,7 @@ import {
   readWorkbenchPreferences,
   writeWorkbenchPreferences,
 } from "@/lib/workbench-preferences";
+import { cn } from "@/lib/utils";
 
 export function WorkbenchShell({
   initialConversationId = null,
@@ -67,6 +68,7 @@ export function WorkbenchShell({
   const queueNotice = useGenerationStore((s) => s.queueNotice);
   const history = useGenerationStore((s) => s.history);
   const activeGeneration = useGenerationStore((s) => s.activeGeneration);
+  const selectGeneration = useGenerationStore((s) => s.selectGeneration);
 
   const uploadedReferenceImages = useReferenceImageStore(
     (s) => s.uploadedReferenceImages,
@@ -166,6 +168,21 @@ export function WorkbenchShell({
 
   const activeImages = activeGeneration?.images ?? [];
   const activeImageId = activeImages.at(-1)?.id;
+  const currentConversationGenerations = useMemo(
+    () =>
+      history.filter(
+        (item) =>
+          conversationId &&
+          item.conversationId === conversationId &&
+          item.images.some((image) => image.src ?? image.url),
+      ).toReversed(),
+    [conversationId, history],
+  );
+  const activeGenerationIndex = activeGeneration
+    ? currentConversationGenerations.findIndex(
+        (item) => item.id === activeGeneration.id,
+      )
+    : -1;
   const supportsReferenceImage = Boolean(
     model?.capabilities.supportsReferenceImage,
   );
@@ -354,11 +371,58 @@ export function WorkbenchShell({
               }
             />
 
-            <Canvas
-              images={activeImages}
-              status={status}
-              error={generationError}
-            />
+            <div className="min-w-0 space-y-3">
+              <Canvas
+                images={activeImages}
+                status={status}
+                error={generationError}
+              />
+              {currentConversationGenerations.length > 1 ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="rounded-[6px] border border-border bg-surface-2 px-3 py-2 text-sm text-text-muted">
+                      {activeGenerationIndex >= 0
+                        ? `当前第 ${activeGenerationIndex + 1} / ${
+                            currentConversationGenerations.length
+                          } 个生成`
+                        : `${currentConversationGenerations.length} 个生成可切换`}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      className="tool-button h-8 text-xs text-text-muted"
+                      disabled={activeGenerationIndex <= 0}
+                      onClick={() => {
+                        const previous =
+                          currentConversationGenerations[
+                            activeGenerationIndex - 1
+                          ];
+                        if (previous) selectGeneration(previous);
+                      }}
+                    >
+                      上一个
+                    </button>
+                    <button
+                      type="button"
+                      className="tool-button h-8 text-xs text-text-muted"
+                      disabled={
+                        activeGenerationIndex < 0 ||
+                        activeGenerationIndex >=
+                          currentConversationGenerations.length - 1
+                      }
+                      onClick={() => {
+                        const next =
+                          currentConversationGenerations[
+                            activeGenerationIndex + 1
+                          ];
+                        if (next) selectGeneration(next);
+                      }}
+                    >
+                      下一个
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
           </div>
 
           {generationError ? (
@@ -369,7 +433,7 @@ export function WorkbenchShell({
             />
           ) : null}
 
-          <div className="surface-panel p-4">
+          <div className="surface-panel mt-6 p-4">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
                 <p className="eyebrow">历史</p>
@@ -391,33 +455,37 @@ export function WorkbenchShell({
                   latestImage?.url;
 
                 return (
-                  <Link
+                  <button
                     key={item.id}
-                    href={
-                      item.conversationId
-                        ? `/app?conversation=${item.conversationId}`
-                        : `/app/g/${item.id}`
-                    }
-                    className="surface-panel block p-3 text-sm leading-6 transition-colors hover:-translate-y-0.5 hover:bg-surface-2"
+                    type="button"
+                    className={cn(
+                      "surface-panel block w-full p-2 text-left text-sm leading-6 transition-colors hover:-translate-y-0.5 hover:bg-surface-2",
+                      activeGeneration?.id === item.id
+                        ? "border-foreground bg-foreground/10"
+                        : "",
+                    )}
+                    onClick={() => selectGeneration(item)}
                   >
                     {previewUrl ? (
-                      <div className="mb-2 h-24 overflow-hidden rounded-[6px] bg-surface-2">
+                      <div className="mb-2 flex h-20 items-center justify-center overflow-hidden rounded-[6px] bg-background">
                         <img
                           src={previewUrl}
                           alt=""
-                          className="h-full w-full object-cover"
+                          className="h-full w-full object-contain"
                           loading="lazy"
                           decoding="async"
                         />
                       </div>
                     ) : null}
-                    <span className="font-mono text-xs text-text-muted">
-                      {generationStatusLabel(item.status)}
-                    </span>
-                    <span className="mt-1 line-clamp-2 block">
-                      {item.prompt}
-                    </span>
-                  </Link>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono text-xs text-text-muted">
+                        {generationStatusLabel(item.status)}
+                      </span>
+                      <span className="line-clamp-1 min-w-0 text-sm">
+                        {item.prompt}
+                      </span>
+                    </div>
+                  </button>
                 );
               })}
               {history.length === 0 ? (
