@@ -186,6 +186,42 @@ export function getClientIp(headers: Headers): string | null {
   return null;
 }
 
+function configuredAdminIpHeader(): string | null {
+  const value = (process.env.ADMIN_IP_HEADER ?? "x-real-ip")
+    .trim()
+    .toLowerCase();
+
+  return value ? value : null;
+}
+
+function forwardedHeaderFirstIp(value: string): string {
+  return value
+    .split(",")
+    .map((part) => part.trim())
+    .find(Boolean) ?? "";
+}
+
+export function getAdminClientIp(headers: Headers): string | null {
+  const trustedHeader = configuredAdminIpHeader();
+
+  if (!trustedHeader) {
+    return null;
+  }
+
+  const rawValue = headers.get(trustedHeader);
+
+  if (!rawValue) {
+    return null;
+  }
+
+  const candidate =
+    trustedHeader === "x-forwarded-for"
+      ? forwardedHeaderFirstIp(rawValue)
+      : rawValue;
+
+  return normalizeIp(candidate);
+}
+
 export function parseAdminIpAllowlist(value = process.env.ADMIN_IP_ALLOWLIST ?? "") {
   return value
     .split(",")
@@ -223,5 +259,5 @@ export function isIpAllowed(ip: string | null, allowlist: string[]): boolean {
 }
 
 export function isAdminIpAllowed(headers: Headers): boolean {
-  return isIpAllowed(getClientIp(headers), parseAdminIpAllowlist());
+  return isIpAllowed(getAdminClientIp(headers), parseAdminIpAllowlist());
 }

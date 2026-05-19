@@ -12,6 +12,7 @@ import {
 
 import { ActionableStatus } from "@/components/shared/ActionableStatus";
 import { Canvas } from "@/components/workbench/Canvas";
+import { previewImageUrl } from "@/components/workbench/gallery-images";
 import { ConversationThread } from "@/components/workbench/ConversationThread";
 import { CostPreview } from "@/components/workbench/CostPreview";
 import {
@@ -68,7 +69,9 @@ export function WorkbenchShell({
   const queueNotice = useGenerationStore((s) => s.queueNotice);
   const history = useGenerationStore((s) => s.history);
   const activeGeneration = useGenerationStore((s) => s.activeGeneration);
+  const selectedActiveImageId = useGenerationStore((s) => s.activeImageId);
   const selectGeneration = useGenerationStore((s) => s.selectGeneration);
+  const setActiveImageId = useGenerationStore((s) => s.setActiveImageId);
 
   const uploadedReferenceImages = useReferenceImageStore(
     (s) => s.uploadedReferenceImages,
@@ -111,6 +114,27 @@ export function WorkbenchShell({
     ? availableModels.find((item) => item.id === state.modelId) ?? null
     : null;
 
+  const activeImages = activeGeneration?.images ?? [];
+  const activeImage =
+    activeImages.find(
+      (image) => image.id && image.id === selectedActiveImageId,
+    ) ??
+    activeImages.at(-1) ??
+    null;
+  const activeImageId = activeImage?.id;
+  const activeImageIndex = Math.max(
+    activeImages.findIndex(
+      (image) =>
+        image === activeImage ||
+        (activeImageId && image.id && image.id === activeImageId),
+    ),
+    0,
+  );
+  const activeImageReferenceLabel =
+    activeImages.length > 1
+      ? `参考选中图 v${activeImageIndex + 1}`
+      : "参考当前图";
+
   const estimate = useMemo(() => {
     if (!model || !state) return 0;
 
@@ -118,20 +142,21 @@ export function WorkbenchShell({
       uploadedReferenceImages.length > 0 ||
       Boolean(
         model.capabilities.supportsReferenceImage &&
-          activeGeneration?.images.at(-1)?.id &&
+          activeImageId &&
           useCurrentImageAsReference,
       );
 
     return estimateCost(model, {
       n: state.n,
       resolution: state.resolution,
+      image2Mode: state.image2Mode,
       aspectRatio: state.aspectRatio as AspectRatio,
       outputFormat: state.outputFormat,
       background: state.background,
       usesReference,
     });
   }, [
-    activeGeneration?.images,
+    activeImageId,
     model,
     state,
     uploadedReferenceImages.length,
@@ -147,6 +172,7 @@ export function WorkbenchShell({
         modelId: state.modelId,
         aspectRatio: state.aspectRatio,
         resolution: state.resolution,
+        image2Mode: state.image2Mode,
         providerChannelId: state.providerChannelId,
       },
       accountId,
@@ -166,8 +192,6 @@ export function WorkbenchShell({
     [closeGenerationStream],
   );
 
-  const activeImages = activeGeneration?.images ?? [];
-  const activeImageId = activeImages.at(-1)?.id;
   const currentConversationGenerations = useMemo(
     () =>
       history.filter(
@@ -341,6 +365,11 @@ export function WorkbenchShell({
                       ? actions.uploadReferenceImage
                       : undefined
                   }
+                  onUploadReferences={
+                    supportsReferenceImage
+                      ? actions.uploadReferenceImages
+                      : undefined
+                  }
                   onRemoveReference={actions.removeReferenceImage}
                   uploadDisabled={
                     isBooting ||
@@ -357,6 +386,10 @@ export function WorkbenchShell({
                     setUseCurrentImageAsReference
                   }
                   canUseCurrentImageReference={canUseCurrentImageReference}
+                  currentImageReferencePreviewUrl={previewImageUrl(
+                    activeImage ?? undefined,
+                  )}
+                  currentImageReferenceLabel={activeImageReferenceLabel}
                   currentImageReferenceDisabled={isSubmitting}
                   disabled={submitDisabled}
                   disabledReason={disabledReason}
@@ -376,6 +409,8 @@ export function WorkbenchShell({
                 images={activeImages}
                 status={status}
                 error={generationError}
+                selectedImageId={activeImageId ?? null}
+                onSelectedImageIdChange={setActiveImageId}
               />
               {currentConversationGenerations.length > 1 ? (
                 <div className="flex flex-wrap items-center gap-2">

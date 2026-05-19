@@ -19,6 +19,7 @@ export interface PricingSnapshot {
   estimatedCredits: number;
   request: {
     resolution: string;
+    image2Mode?: string | null;
     aspectRatio: string;
     outputFormat: string;
     background: string;
@@ -105,6 +106,7 @@ export function createPricingSnapshot(
     estimatedCredits,
     request: {
       resolution: request.resolution,
+      image2Mode: request.image2Mode ?? null,
       aspectRatio: request.aspectRatio,
       outputFormat: request.outputFormat,
       background: request.background,

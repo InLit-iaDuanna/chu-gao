@@ -1,4 +1,5 @@
 import { fail, ok } from "@/lib/api-response";
+import { readJsonBodySafe } from "@/lib/request-body";
 import { audit } from "@/lib/audit";
 import {
   adminFailureResponse,
@@ -60,7 +61,13 @@ export async function PATCH(request: Request) {
 
   const admin = authenticatedUser(sessionResult);
 
-  const json = (await request.json()) as unknown;
+  const body = await readJsonBodySafe(request);
+
+  if (!body.ok) {
+    return body.response;
+  }
+
+  const json = body.data;
   const parsed = systemConfigPatchSchema.safeParse(json);
 
   if (!parsed.success) {

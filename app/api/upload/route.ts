@@ -41,11 +41,22 @@ export async function POST(request: Request) {
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const saved = await saveUploadedReferenceImage({
-    buffer,
-    mimeType: file.type,
-    userId: authenticatedUser(sessionResult).id,
-  });
+
+  let saved;
+
+  try {
+    saved = await saveUploadedReferenceImage({
+      buffer,
+      mimeType: file.type,
+      userId: authenticatedUser(sessionResult).id,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "invalid uploaded image") {
+      return fail("VALIDATION_ERROR", "上传文件不是有效图片", { status: 400 });
+    }
+
+    throw error;
+  }
 
   return ok({
     key: saved.storageKey,

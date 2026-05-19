@@ -46,6 +46,7 @@ import {
   recordModerationRejectionAttempt,
 } from "@/lib/rate-limit";
 import { RedisUnavailableError } from "@/lib/redis";
+import { readJsonBodySafe } from "@/lib/request-body";
 import { isDatabaseUnavailableError } from "@/lib/service-errors";
 
 class InsufficientCreditsError extends Error {
@@ -140,7 +141,13 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const sessionResult = await checkSession(request);
-  const json = (await request.json()) as unknown;
+  const body = await readJsonBodySafe(request);
+
+  if (!body.ok) {
+    return body.response;
+  }
+
+  const json = body.data;
   const parsed = generationRequestSchema.safeParse(json);
 
   if (!parsed.success) {
@@ -161,6 +168,7 @@ export async function POST(request: Request) {
     const normalizedRequestParams = {
       ...parsed.data,
       providerChannelId: internalRequest.providerChannelId,
+      image2Mode: internalRequest.image2Mode,
     };
 
     if (!process.env.DATABASE_URL) {
@@ -313,18 +321,8 @@ export async function POST(request: Request) {
     }
 
     if (await isPromptBlocked(combinedPrompt)) {
-      await recordModerationRejectionAttempt(request.headers);
-
-      await db.usageLog.create({
-        data: {
-          userId: session.id,
-          modelId: internalRequest.modelId,
-          action: "moderation_rejected",
-          creditsDelta: 0,
-          metadata: {
-            reason: "blocked_keyword",
-          },
-        },
+      await recordModerationRejectionAttempt(session.id, internalRequest.modelId, {
+        reason: "blocked_keyword",
       });
 
       return fail("MODERATION_REJECTED", "提示词包含不允许的内容", {

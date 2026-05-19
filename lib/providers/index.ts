@@ -37,12 +37,12 @@ type ProviderTarget = {
 };
 
 function supportedModelIds(modelId: string): string[] {
-  if (modelId === "gemini-3.1-flash-image-preview") {
-    return [modelId, "gemini-2.5-flash-image"];
+  if (modelId === "gpt-image-2") {
+    return [modelId, "gpt-image-2-standard", "gpt-image-2-high"];
   }
 
-  if (modelId === "gemini-3-pro-image-preview") {
-    return [modelId, "gemini-2.5-flash-image-pro"];
+  if (modelId === "nano-banana-2-512") {
+    return [modelId];
   }
 
   return [modelId];

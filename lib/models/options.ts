@@ -1,4 +1,4 @@
-import type { AspectRatio, Resolution } from "@/lib/models/types";
+import type { AspectRatio, Image2Mode, Resolution } from "@/lib/models/types";
 
 export const IMAGE_ASPECT_RATIO_OPTIONS = [
   "1:1",
@@ -20,5 +20,14 @@ export const IMAGE_RESOLUTION_OPTIONS = [
   "1K",
   "2K",
   "4K",
-  "High",
 ] as const satisfies readonly Resolution[];
+
+export const IMAGE2_MODE_OPTIONS = [
+  "standard",
+  "high",
+] as const satisfies readonly Image2Mode[];
+
+export const IMAGE2_MODE_LABEL: Record<Image2Mode, string> = {
+  standard: "标准版",
+  high: "高推理",
+};

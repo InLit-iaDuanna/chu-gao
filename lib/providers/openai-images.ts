@@ -174,14 +174,33 @@ function sysrvQualityForRequest(req: InternalRequest): string {
   return RESOLUTION_TO_SYSRV_QUALITY[req.resolution] ?? "2k";
 }
 
-function sysrvModelForRequest(req: InternalRequest): string {
+function imageModelForRequest(req: InternalRequest): string {
   if (req.modelId === "gpt-image-2") {
-    return req.resolution === "High"
+    return req.image2Mode === "high"
       ? "gpt-image-2-high"
       : "gpt-image-2-standard";
   }
 
   return req.modelId;
+}
+
+async function generateSingleSysrvImage(
+  adapter: OpenAIImagesAdapter,
+  req: InternalRequest,
+  signal: AbortSignal,
+  onProgress: GenerateProgressCallback | undefined,
+  imageIndex: number,
+): Promise<GenerateResult> {
+  const singleRequest = { ...req, n: 1 };
+  const result = await adapter.generateSingle(singleRequest, signal, onProgress);
+
+  return {
+    ...result,
+    rawProviderResponse: {
+      index: imageIndex,
+      response: result.rawProviderResponse,
+    },
+  };
 }
 
 export class OpenAIImagesAdapter implements ProviderAdapter {
@@ -203,8 +222,33 @@ export class OpenAIImagesAdapter implements ProviderAdapter {
     onProgress?: GenerateProgressCallback,
   ): Promise<GenerateResult> {
     const usesSysrvFormat = isSysrvImagesProvider(this.config.baseUrl);
+
+    if (usesSysrvFormat && req.n > 1) {
+      const results: GenerateResult[] = [];
+
+      for (let index = 0; index < req.n; index += 1) {
+        results.push(
+          await generateSingleSysrvImage(this, req, signal, onProgress, index),
+        );
+      }
+
+      return {
+        images: results.flatMap((result) => result.images),
+        rawProviderResponse: results.map((result) => result.rawProviderResponse),
+      };
+    }
+
+    return this.generateSingle(req, signal, onProgress);
+  }
+
+  async generateSingle(
+    req: InternalRequest,
+    signal: AbortSignal,
+    onProgress?: GenerateProgressCallback,
+  ): Promise<GenerateResult> {
+    const usesSysrvFormat = isSysrvImagesProvider(this.config.baseUrl);
     const size = usesSysrvFormat ? req.aspectRatio : imageSizeForRequest(req);
-    const model = usesSysrvFormat ? sysrvModelForRequest(req) : req.modelId;
+    const model = imageModelForRequest(req);
     const quality = usesSysrvFormat
       ? sysrvQualityForRequest(req)
       : (RESOLUTION_TO_QUALITY[req.resolution] ?? "medium");

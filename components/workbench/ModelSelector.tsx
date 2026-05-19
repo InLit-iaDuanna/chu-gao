@@ -45,9 +45,8 @@ function visibleModels(models: PublicModelDefinition[]): VisibleModel[] {
           providerChannels.length > 0
             ? providerChannels
             : preferred.providerChannels,
-        displayName: "Nano Banana 2 / Pro",
-        tagline:
-          "Google 生图通道，优先使用 Pro，可用性不足时回退到 Nano Banana 2。",
+        displayName: preferred.displayName,
+        tagline: preferred.tagline,
       });
     }
   }

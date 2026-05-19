@@ -11,12 +11,12 @@ import {
 import { providerProtocolToModelProtocol } from "@/lib/providers/protocols";
 
 function modelAliases(modelId: string): string[] {
-  if (modelId === "gemini-3.1-flash-image-preview") {
-    return ["gemini-2.5-flash-image", "gemini-3.1-flash-image-preview"];
+  if (modelId === "gpt-image-2") {
+    return [modelId, "gpt-image-2-standard", "gpt-image-2-high"];
   }
 
-  if (modelId === "gemini-3-pro-image-preview") {
-    return ["gemini-2.5-flash-image-pro", "gemini-3-pro-image-preview"];
+  if (modelId === "nano-banana-2-512") {
+    return [modelId];
   }
 
   return [modelId];

@@ -4,11 +4,13 @@ import type { WorkbenchState } from "@/components/workbench/types";
 import { AspectRatioPicker } from "@/components/workbench/AspectRatioPicker";
 import { ProviderChannelSelector } from "@/components/workbench/ProviderChannelSelector";
 import { ResolutionPicker } from "@/components/workbench/ResolutionPicker";
+import { Segmented } from "@/components/ui";
 import {
   firstSupportedResolutionAspectPair,
   isResolutionAspectRatioSupported,
 } from "@/lib/models/capabilities";
-import type { PublicModelDefinition } from "@/lib/models/types";
+import { IMAGE2_MODE_LABEL } from "@/lib/models/options";
+import type { Image2Mode, PublicModelDefinition } from "@/lib/models/types";
 import { normalizeSelectableProviderChannelId } from "@/lib/provider-channels";
 import { cn } from "@/lib/utils";
 
@@ -56,6 +58,11 @@ export function normalizeWorkbenchState(
         : undefined,
     aspectRatio: pair.aspectRatio,
     resolution: pair.resolution,
+    image2Mode: model.capabilities.image2Modes?.length
+      ? model.capabilities.image2Modes.includes(prev.image2Mode as Image2Mode)
+        ? prev.image2Mode
+        : (model.defaults.image2Mode ?? model.capabilities.image2Modes[0])
+      : undefined,
     n: Math.min(prev.n, model.capabilities.maxN),
     negativePrompt: model.capabilities.supportsNegativePrompt
       ? prev.negativePrompt
@@ -105,6 +112,11 @@ export function DynamicParamsPanel({
 
   const { capabilities } = model;
   const availableResolutions = capabilities.resolutions;
+  const image2Modes = capabilities.image2Modes ?? [];
+  const selectedImage2Mode =
+    value.image2Mode && image2Modes.includes(value.image2Mode)
+      ? value.image2Mode
+      : (model.defaults.image2Mode ?? image2Modes[0]);
   const canCompress =
     capabilities.supportsOutputCompression &&
     (value.outputFormat === "jpeg" || value.outputFormat === "webp");
@@ -122,6 +134,21 @@ export function DynamicParamsPanel({
               onChange({ ...value, providerChannelId })
             }
           />
+        ) : null}
+
+        {selectedImage2Mode ? (
+          <Section title="版本">
+            <Segmented
+              aria-label="Image2 版本"
+              className="grid w-full grid-cols-2"
+              value={selectedImage2Mode}
+              options={image2Modes.map((mode) => ({
+                value: mode,
+                label: IMAGE2_MODE_LABEL[mode],
+              }))}
+              onChange={(image2Mode) => onChange({ ...value, image2Mode })}
+            />
+          </Section>
         ) : null}
 
         <Section title="比例">

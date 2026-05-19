@@ -1,9 +1,12 @@
 import { randomUUID } from "node:crypto";
+import { lookup } from "node:dns/promises";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import net from "node:net";
 import path from "node:path";
 
 import sharp from "sharp";
 
+import { fetchWithTimeout } from "@/lib/http";
 import type { InternalReferenceImage } from "@/lib/models/types";
 import type { GeneratedImageData } from "@/lib/providers/types";
 
@@ -29,6 +32,109 @@ const PRIVATE_STORAGE_DIR = process.env.PRIVATE_STORAGE_DIR
   : path.join(process.cwd(), ".data", "storage");
 const GENERATED_PREFIX = "generated";
 const UPLOADS_PREFIX = "uploads";
+
+function providerImageFetchAllowlist(): string[] {
+  return (process.env.PROVIDER_IMAGE_FETCH_ALLOWLIST ?? "")
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function providerImageDownloadLimitBytes(): number {
+  const configured = Number(process.env.MAX_PROVIDER_IMAGE_DOWNLOAD_MB ?? 20);
+  const sizeMb = Number.isFinite(configured) && configured > 0 ? configured : 20;
+
+  return sizeMb * 1024 * 1024;
+}
+
+function providerImageDownloadTimeoutMs(): number {
+  const configured = Number(process.env.PROVIDER_IMAGE_DOWNLOAD_TIMEOUT_MS ?? 30_000);
+
+  return Number.isFinite(configured) && configured > 0 ? configured : 30_000;
+}
+
+function hostMatchesAllowlist(hostname: string, entry: string): boolean {
+  if (entry.startsWith("*.")) {
+    const suffix = entry.slice(1);
+    return hostname.endsWith(suffix);
+  }
+
+  return hostname === entry;
+}
+
+function isPrivateIpv4(value: string): boolean {
+  const parts = value.split(".").map((part) => Number(part));
+  const [first, second] = parts;
+
+  if (parts.length !== 4 || first === undefined || second === undefined) {
+    return false;
+  }
+
+  return (
+    first === 10 ||
+    first === 127 ||
+    (first === 169 && second === 254) ||
+    (first === 172 && second >= 16 && second <= 31) ||
+    (first === 192 && second === 168)
+  );
+}
+
+function isPrivateIpv6(value: string): boolean {
+  const normalized = value.toLowerCase();
+
+  return (
+    normalized === "::1" ||
+    normalized.startsWith("fc") ||
+    normalized.startsWith("fd") ||
+    normalized.startsWith("fe80:")
+  );
+}
+
+function isPrivateAddress(value: string): boolean {
+  const version = net.isIP(value);
+
+  if (version === 4) {
+    return isPrivateIpv4(value);
+  }
+
+  if (version === 6) {
+    return isPrivateIpv6(value);
+  }
+
+  return false;
+}
+
+async function assertAllowedProviderImageUrl(value: string): Promise<URL> {
+  const url = new URL(value);
+  const allowlist = providerImageFetchAllowlist();
+
+  if (url.protocol !== "https:") {
+    throw new Error("provider image download requires https");
+  }
+
+  if (allowlist.length > 0) {
+    if (
+      !allowlist.some((entry) =>
+        hostMatchesAllowlist(url.hostname.toLowerCase(), entry),
+      )
+    ) {
+      throw new Error("provider image host is not allowlisted");
+    }
+
+    return url;
+  }
+
+  const addresses = await lookup(url.hostname, { all: true });
+
+  if (
+    addresses.length === 0 ||
+    addresses.some((address) => isPrivateAddress(address.address))
+  ) {
+    throw new Error("provider image host resolves to a private address");
+  }
+
+  return url;
+}
 
 export function publicUrlForStorageKey(key: string): string {
   if (key.startsWith("http://") || key.startsWith("https://")) {
@@ -139,13 +245,29 @@ async function imageToBuffer(image: GeneratedImageData): Promise<Buffer> {
   }
 
   if (image.url) {
-    const response = await fetch(image.url);
+    const url = await assertAllowedProviderImageUrl(image.url);
+    const response = await fetchWithTimeout(url, {
+      timeoutMs: providerImageDownloadTimeoutMs(),
+    });
 
     if (!response.ok) {
       throw new Error(`图片下载失败: ${response.status}`);
     }
 
-    return Buffer.from(await response.arrayBuffer());
+    const contentLength = Number(response.headers.get("content-length") ?? 0);
+    const maxBytes = providerImageDownloadLimitBytes();
+
+    if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+      throw new Error("provider image download exceeded size limit");
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+
+    if (buffer.byteLength > maxBytes) {
+      throw new Error("provider image download exceeded size limit");
+    }
+
+    return buffer;
   }
 
   throw new Error("provider response missing image data");
@@ -305,6 +427,11 @@ export async function saveUploadedReferenceImage({
   userId: string;
 }): Promise<PersistedUploadedReferenceImage> {
   const dimensions = readImageSize(buffer);
+
+  if (dimensions.width <= 0 || dimensions.height <= 0) {
+    throw new Error("invalid uploaded image");
+  }
+
   const ext = extensionForMimeType(mimeType);
   const storageKey = `${UPLOADS_PREFIX}/${userId}/${Date.now()}-${randomUUID()}.${ext}`;
   const filePath = resolvePrivateStorageKey(storageKey);

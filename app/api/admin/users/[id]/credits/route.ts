@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 
 import { fail, ok } from "@/lib/api-response";
+import { readJsonBodySafe } from "@/lib/request-body";
 import { audit } from "@/lib/audit";
 import {
   adminFailureResponse,
@@ -26,7 +27,13 @@ export async function POST(
     return fail("SERVICE_UNAVAILABLE", "点数服务未配置数据库", { status: 503 });
   }
 
-  const json = (await request.json()) as unknown;
+  const body = await readJsonBodySafe(request);
+
+  if (!body.ok) {
+    return body.response;
+  }
+
+  const json = body.data;
   const parsed = adminCreditAdjustmentSchema.safeParse(json);
 
   if (!parsed.success) {

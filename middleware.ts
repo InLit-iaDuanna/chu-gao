@@ -1,11 +1,15 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
-import { getClientIp, isAdminIpAllowed, parseAdminIpAllowlist } from "@/lib/network";
+import {
+  getAdminClientIp,
+  isAdminIpAllowed,
+  parseAdminIpAllowlist,
+} from "@/lib/network";
 
 const SECURITY_HEADERS = {
   "Content-Security-Policy":
-    "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://chinese-fonts-cdn.deno.dev; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https: wss:; font-src 'self' data: https://fonts.gstatic.com https://chinese-fonts-cdn.deno.dev; object-src 'none'",
+    "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://chinese-fonts-cdn.deno.dev https://cn-font.claude-code-best.win https://ik.imagekit.io; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https: wss:; font-src 'self' data: https://fonts.gstatic.com https://chinese-fonts-cdn.deno.dev https://cn-font.claude-code-best.win https://ik.imagekit.io; object-src 'none'",
   "Referrer-Policy": "strict-origin-when-cross-origin",
   "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
   "X-Content-Type-Options": "nosniff",
@@ -39,7 +43,8 @@ export function middleware(request: NextRequest) {
               code: "FORBIDDEN",
               message: "当前 IP 不允许访问管理后台",
               details: {
-                ip: getClientIp(request.headers) ?? "unknown",
+                ip: getAdminClientIp(request.headers) ?? "unknown",
+                header: process.env.ADMIN_IP_HEADER ?? null,
               },
             },
           },

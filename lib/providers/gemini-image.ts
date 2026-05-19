@@ -21,6 +21,10 @@ export class GeminiImageAdapter implements ProviderAdapter {
     return this.config.name;
   }
 
+  private endpointForModel(modelId: string): string {
+    return `${this.config.baseUrl}/v1beta/models/${modelId}:generateContent`;
+  }
+
   async generate(
     req: InternalRequest,
     signal: AbortSignal,
@@ -28,8 +32,8 @@ export class GeminiImageAdapter implements ProviderAdapter {
     const parts: Array<
       | { text: string }
       | {
-          inlineData: {
-            mimeType: string;
+          inline_data: {
+            mime_type: string;
             data: string;
           };
         }
@@ -41,14 +45,14 @@ export class GeminiImageAdapter implements ProviderAdapter {
       }
 
       parts.push({
-        inlineData: {
-          mimeType: image.mimeType,
+        inline_data: {
+          mime_type: image.mimeType,
           data: image.b64,
         },
       });
     }
 
-    const endpoint = `${this.config.baseUrl}/v1beta/models/${req.modelId}:generateContent`;
+    const endpoint = this.endpointForModel(req.modelId);
     const response = await fetchWithTimeout(endpoint, {
       method: "POST",
       signal,
@@ -66,12 +70,9 @@ export class GeminiImageAdapter implements ProviderAdapter {
           },
         ],
         generationConfig: {
-          responseModalities: ["IMAGE"],
-          responseFormat: {
-            image: {
-              aspectRatio: req.aspectRatio,
-              imageSize: req.resolution,
-            },
+          responseModalities: ["TEXT", "IMAGE"],
+          imageConfig: {
+            aspectRatio: req.aspectRatio,
           },
         },
       }),
@@ -90,6 +91,7 @@ export class GeminiImageAdapter implements ProviderAdapter {
       candidates?: Array<{
         content?: {
           parts?: Array<{
+            text?: string;
             inlineData?: {
               data?: string;
               mimeType?: string;

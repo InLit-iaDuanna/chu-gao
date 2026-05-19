@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 
+import type { Prisma } from "@prisma/client";
+
 import { db } from "@/lib/db";
 import { getClientIp } from "@/lib/network";
 import { getRedis } from "@/lib/redis";
@@ -196,37 +198,21 @@ export async function assertModerationRejectionAllowed(
 }
 
 export async function recordModerationRejectionAttempt(
-  headers: Headers,
+  userId: string,
+  modelId?: string,
+  metadata?: Record<string, unknown>,
 ): Promise<void> {
-  const windowMinutes = Number(
-    process.env.MODERATION_REJECTION_WINDOW_MINUTES ?? 10,
-  );
-  const maxRejected = Number(process.env.MODERATION_REJECTION_LIMIT ?? 5);
-
-  if (
-    !Number.isFinite(windowMinutes) ||
-    !Number.isFinite(maxRejected) ||
-    windowMinutes <= 0 ||
-    maxRejected <= 0
-  ) {
+  if (!process.env.DATABASE_URL) {
     return;
   }
 
-  const ip = getClientIp(headers);
-
-  if (!ip) {
-    return;
-  }
-
-  const identifier = createHash("sha256").update(ip).digest("hex");
-  const { count } = await incrementRateLimit(
-    `ratelimit:moderation:${identifier}`,
-    Math.round(windowMinutes * 60),
-  );
-
-  if (count > maxRejected) {
-    throw new ModerationRejectionLimitError(
-      `违规内容提交过于频繁，请 ${windowMinutes} 分钟后再试。`,
-    );
-  }
+  await db.usageLog.create({
+    data: {
+      userId,
+      modelId,
+      action: "moderation_rejected",
+      creditsDelta: 0,
+      metadata: metadata as Prisma.InputJsonObject | undefined,
+    },
+  });
 }

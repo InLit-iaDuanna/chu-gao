@@ -30,19 +30,19 @@ export const mockGenerations = [
   },
   {
     id: "gen_2",
-    modelId: "gemini-3-pro-image-preview",
+    modelId: "nano-banana-2-512",
     prompt: "服装立裁工作室，晨雾感，柔和天光，浅灰与米白。",
     status: "RUNNING",
     createdAt: "2026-05-10T01:31:00.000Z",
-    aspectRatio: "4:5",
-    resolution: "2K",
-    credits: 8,
+    aspectRatio: "3:4",
+    resolution: "1K",
+    credits: 2,
     provider: "Gemini Relay CQ",
     images: [],
   },
   {
     id: "gen_3",
-    modelId: "gemini-3.1-flash-image-preview",
+    modelId: "nano-banana-2-512",
     prompt: "赛博重庆夜景，长焦压缩感，霓虹雨丝。",
     status: "PENDING",
     createdAt: "2026-05-10T01:34:00.000Z",
@@ -81,10 +81,7 @@ export const mockProviders = [
     priority: 80,
     health: "DEGRADED",
     lastErrorMsg: "上游 429 较多",
-    modelsSupported: [
-      "gemini-3.1-flash-image-preview",
-      "gemini-3-pro-image-preview",
-    ],
+    modelsSupported: ["nano-banana-2-512"],
     costMultiplier: 1,
   },
 ] as const;
@@ -117,7 +114,7 @@ export const mockSystemConfigEntries = [
       "9:21",
     ],
   },
-  { key: "generation.image2Resolutions", value: ["1K", "2K", "4K", "High"] },
+  { key: "generation.image2Resolutions", value: ["1K", "2K", "4K"] },
   { key: "generation.image2MaxN", value: 4 },
   { key: "moderation.enabled", value: true },
   { key: "moderation.blockedKeywords", value: [] },
@@ -125,6 +122,7 @@ export const mockSystemConfigEntries = [
   { key: "announcement.title", value: "" },
   { key: "announcement.body", value: "" },
   { key: "announcement.tone", value: "info" },
+  { key: "announcement.displayMode", value: "banner" },
 ] as const;
 
 export const mockModelAvailability = Object.values(MODELS).map((model) => ({

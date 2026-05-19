@@ -213,7 +213,7 @@ export const systemConfigPatchSchema = z.discriminatedUnion("key", [
   }),
   z.object({
     key: z.literal("generation.image2Resolutions"),
-    value: z.array(z.enum(["1K", "2K", "4K", "High"])).min(1),
+    value: z.array(z.enum(["1K", "2K", "4K"])).min(1),
   }),
   z.object({
     key: z.literal("generation.image2MaxN"),
@@ -242,5 +242,9 @@ export const systemConfigPatchSchema = z.discriminatedUnion("key", [
   z.object({
     key: z.literal("announcement.tone"),
     value: z.enum(["info", "warning", "success", "danger"]),
+  }),
+  z.object({
+    key: z.literal("announcement.displayMode"),
+    value: z.enum(["banner", "popup", "both"]),
   }),
 ]);

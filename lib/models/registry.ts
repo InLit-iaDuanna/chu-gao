@@ -1,5 +1,8 @@
 import type { ModelDefinition, ProtocolName } from "@/lib/models/types";
-import { IMAGE_ASPECT_RATIO_OPTIONS } from "@/lib/models/options";
+import {
+  IMAGE2_MODE_OPTIONS,
+  IMAGE_ASPECT_RATIO_OPTIONS,
+} from "@/lib/models/options";
 
 export const MODELS: Record<string, ModelDefinition> = {
   "gpt-image-2": {
@@ -9,7 +12,8 @@ export const MODELS: Record<string, ModelDefinition> = {
     protocol: "openai-images",
     capabilities: {
       aspectRatios: [...IMAGE_ASPECT_RATIO_OPTIONS],
-      resolutions: ["1K", "2K", "4K", "High"],
+      resolutions: ["1K", "2K", "4K"],
+      image2Modes: [...IMAGE2_MODE_OPTIONS],
       supportsReferenceImage: true,
       maxReferenceImages: 16,
       supportsNegativePrompt: false,
@@ -36,26 +40,12 @@ export const MODELS: Record<string, ModelDefinition> = {
           "9:21",
         ],
         "4K": ["16:9", "9:16", "2:1", "1:2", "21:9", "9:21"],
-        High: [
-          "1:1",
-          "3:2",
-          "2:3",
-          "4:3",
-          "3:4",
-          "5:4",
-          "4:5",
-          "16:9",
-          "9:16",
-          "2:1",
-          "1:2",
-          "21:9",
-          "9:21",
-        ],
       },
     },
     defaults: {
       aspectRatio: "1:1",
       resolution: "2K",
+      image2Mode: "standard",
       outputFormat: "png",
       background: "auto",
     },
@@ -64,18 +54,17 @@ export const MODELS: Record<string, ModelDefinition> = {
       "1K": 2,
       "2K": 8,
       "4K": 20,
-      High: 30,
     },
     tagline: "指令精准，适合海报、字体与排版类画面。",
   },
-  "gemini-3.1-flash-image-preview": {
-    id: "gemini-3.1-flash-image-preview",
+  "nano-banana-2-512": {
+    id: "nano-banana-2-512",
     selectorId: "nano-banana",
     displayName: "Nano Banana 2",
     vendor: "Google",
     protocol: "gemini-image",
     capabilities: {
-      aspectRatios: ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4"],
+      aspectRatios: ["1:1", "2:3", "3:2", "3:4", "4:3", "9:16", "16:9"],
       resolutions: ["1K"],
       supportsReferenceImage: true,
       maxReferenceImages: 4,
@@ -95,42 +84,8 @@ export const MODELS: Record<string, ModelDefinition> = {
     costAxis: "resolution",
     costTable: {
       "1K": 2,
-      "2K": 6,
-      "4K": 14,
     },
     tagline: "风格自然，长于氛围、人物与材质。",
-  },
-  "gemini-3-pro-image-preview": {
-    id: "gemini-3-pro-image-preview",
-    selectorId: "nano-banana",
-    displayName: "Nano Banana Pro",
-    vendor: "Google",
-    protocol: "gemini-image",
-    capabilities: {
-      aspectRatios: ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4"],
-      resolutions: ["1K", "2K", "4K"],
-      supportsReferenceImage: true,
-      maxReferenceImages: 6,
-      supportsNegativePrompt: false,
-      supportsSeed: false,
-      maxN: 1,
-      outputFormats: ["png"],
-      backgrounds: ["auto"],
-      supportsOutputCompression: false,
-    },
-    defaults: {
-      aspectRatio: "1:1",
-      resolution: "2K",
-      outputFormat: "png",
-      background: "auto",
-    },
-    costAxis: "resolution",
-    costTable: {
-      "1K": 4,
-      "2K": 8,
-      "4K": 20,
-    },
-    tagline: "高分辨率输出，适合打样、印刷与精修。",
   },
 };
 

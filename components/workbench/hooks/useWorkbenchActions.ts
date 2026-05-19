@@ -36,6 +36,27 @@ interface UserView {
   credits: number;
 }
 
+const ALLOWED_REFERENCE_IMAGE_TYPES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+]);
+
+function selectedActiveImage(
+  generation: WorkbenchGeneration | null,
+  imageId: string | null,
+): WorkbenchGeneration["images"][number] | null {
+  if (!generation) {
+    return null;
+  }
+
+  return (
+    generation.images.find((image) => image.id && image.id === imageId) ??
+    generation.images.at(-1) ??
+    null
+  );
+}
+
 export function useWorkbenchActions() {
   const router = useRouter();
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -197,6 +218,7 @@ export function useWorkbenchActions() {
                       next.providerChannelName ?? null,
                     generationProviderAccountName:
                       next.providerAccountName ?? null,
+                    generationPrompt: next.prompt,
                     generationStartedAt: next.startedAt ?? null,
                     generationFinishedAt: next.finishedAt ?? null,
                     generationProgress: next.progress ?? 100,
@@ -260,6 +282,30 @@ export function useWorkbenchActions() {
           : [WELCOME_MESSAGE],
       );
 
+      const conversationGenerations = conversation.messages
+        .filter((message) => message.generationId)
+        .map((message) => {
+          const images = message.images ?? [];
+          return {
+            id: message.generationId!,
+            conversationId: conversation.id,
+            prompt: message.generationPrompt ?? message.content,
+            status: message.generationStatus ?? "SUCCEEDED",
+            createdAt:
+              message.createdAt ?? new Date().toISOString(),
+            provider: message.generationProvider ?? null,
+            providerChannelId:
+              message.generationProviderChannelId ?? null,
+            providerChannelName:
+              message.generationProviderChannelName ?? null,
+            providerAccountName:
+              message.generationProviderAccountName ?? null,
+            startedAt: message.generationStartedAt ?? null,
+            finishedAt: message.generationFinishedAt ?? null,
+            progress: message.generationProgress ?? null,
+            images,
+          } satisfies WorkbenchGeneration;
+        });
       const lastGenerationMessage = [...conversation.messages]
         .reverse()
         .find((message) => message.generationId);
@@ -287,7 +333,9 @@ export function useWorkbenchActions() {
         gen.setActiveGeneration({
           id: lastGenerationMessage.generationId,
           conversationId: conversation.id,
-          prompt: lastGenerationMessage.content,
+          prompt:
+            lastGenerationMessage.generationPrompt ??
+            lastGenerationMessage.content,
           status: lastGenerationMessage.generationStatus ?? "SUCCEEDED",
           createdAt:
             lastGenerationMessage.createdAt ?? new Date().toISOString(),
@@ -316,6 +364,22 @@ export function useWorkbenchActions() {
         gen.setActiveGeneration(null);
         gen.setStatus("idle");
         gen.setProgress(0);
+      }
+
+      if (conversationGenerations.length > 0) {
+        gen.setHistory((current) => {
+          const merged = [...conversationGenerations, ...current];
+          const unique = new Map<string, WorkbenchGeneration>();
+
+          for (const item of merged) {
+            unique.set(item.id, item);
+          }
+
+          return [...unique.values()].sort(
+            (a, b) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+          );
+        });
       }
     },
     [closeGenerationStream, openGenerationStream],
@@ -522,20 +586,38 @@ export function useWorkbenchActions() {
     }
   }, [redirectToLogin, resetWorkspaceForNewConversation, setError]);
 
-  const uploadReferenceImage = useCallback(
-    async (file: File) => {
+  const uploadReferenceImages = useCallback(
+    async (files: File[]) => {
+      if (files.length === 0) return;
+
       const { state, models } = useWorkbenchStore.getState();
       const model = models.find((m) => m.id === state?.modelId);
       const ref = useReferenceImageStore.getState();
       const gen = useGenerationStore.getState();
+
+      if (ref.isUploadingReference) {
+        setError("reference", "参考图正在上传。");
+        return;
+      }
 
       if (!model?.capabilities.supportsReferenceImage) {
         setError("reference", "当前模型不支持参考图。");
         return;
       }
 
+      const validFiles = files.filter((file) =>
+        ALLOWED_REFERENCE_IMAGE_TYPES.has(file.type),
+      );
+      const invalidCount = files.length - validFiles.length;
+
+      if (validFiles.length === 0) {
+        setError("reference", "请拖入 PNG、JPEG 或 WEBP 参考图。");
+        return;
+      }
+
       const reservedCurrentImageSlot =
-        ref.useCurrentImageAsReference && gen.activeGeneration?.images.at(-1)?.id
+        ref.useCurrentImageAsReference &&
+        selectedActiveImage(gen.activeGeneration, gen.activeImageId)?.id
           ? 1
           : 0;
       const maxUploadedReferenceImages = Math.max(
@@ -551,22 +633,38 @@ export function useWorkbenchActions() {
         return;
       }
 
+      const availableSlots =
+        maxUploadedReferenceImages - ref.uploadedReferenceImages.length;
+      const uploadableFiles = validFiles.slice(0, availableSlots);
+      const exceededLimit = validFiles.length > availableSlots;
+
       ref.setIsUploadingReference(true);
       setError("reference", null);
 
       try {
-        const formData = new FormData();
-        formData.append("file", file);
+        for (const file of uploadableFiles) {
+          const formData = new FormData();
+          formData.append("file", file);
 
-        const uploaded = await readApiResponse<UploadedReferenceImageView>(
-          await fetch("/api/upload", { method: "POST", body: formData }),
-          "参考图上传失败。",
-        );
-        const previewUrl = URL.createObjectURL(file);
+          const uploaded = await readApiResponse<UploadedReferenceImageView>(
+            await fetch("/api/upload", { method: "POST", body: formData }),
+            "参考图上传失败。",
+          );
+          const previewUrl = URL.createObjectURL(file);
 
-        useReferenceImageStore
-          .getState()
-          .addReferenceImage({ ...uploaded, previewUrl });
+          useReferenceImageStore
+            .getState()
+            .addReferenceImage({ ...uploaded, previewUrl });
+        }
+
+        if (exceededLimit) {
+          setError(
+            "reference",
+            `参考图最多 ${model.capabilities.maxReferenceImages} 张。`,
+          );
+        } else if (invalidCount > 0) {
+          setError("reference", "请拖入 PNG、JPEG 或 WEBP 参考图。");
+        }
       } catch (uploadError) {
         if (isUnauthorizedError(uploadError)) {
           redirectToLogin();
@@ -584,6 +682,13 @@ export function useWorkbenchActions() {
       }
     },
     [redirectToLogin, setError],
+  );
+
+  const uploadReferenceImage = useCallback(
+    async (file: File) => {
+      await uploadReferenceImages([file]);
+    },
+    [uploadReferenceImages],
   );
 
   const removeReferenceImage = useCallback((key: string) => {
@@ -636,7 +741,7 @@ export function useWorkbenchActions() {
         const sourceImageId =
           ref.useCurrentImageAsReference &&
           gen.activeGeneration?.conversationId === targetConversationId
-            ? gen.activeGeneration.images.at(-1)?.id
+            ? selectedActiveImage(gen.activeGeneration, gen.activeImageId)?.id
             : undefined;
         const assistantMessageText = "已收到，开始生成。";
 
@@ -662,6 +767,7 @@ export function useWorkbenchActions() {
               prompt: userText,
               aspectRatio: requestState.aspectRatio,
               resolution: requestState.resolution,
+              image2Mode: requestState.image2Mode,
               n: requestState.n,
               outputFormat: requestState.outputFormat,
               background: requestState.background,
@@ -706,6 +812,7 @@ export function useWorkbenchActions() {
           assistantMessageText,
         );
         assistantMessage.generationId = payload.generationId;
+        assistantMessage.generationPrompt = userText;
 
         useConversationStore.getState().appendMessage(assistantMessage);
         useWorkbenchStore
@@ -770,6 +877,7 @@ export function useWorkbenchActions() {
     archiveConversation,
     clearAllConversations,
     uploadReferenceImage,
+    uploadReferenceImages,
     removeReferenceImage,
     submitGeneration,
     clearAllErrors,

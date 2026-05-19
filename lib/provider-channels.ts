@@ -71,8 +71,7 @@ export function isImage2ModelId(modelId?: string | null): boolean {
 export function supportsProviderChannels(modelId?: string | null): boolean {
   return (
     modelId === "gpt-image-2" ||
-    modelId === "gemini-3.1-flash-image-preview" ||
-    modelId === "gemini-3-pro-image-preview"
+    modelId === "nano-banana-2-512"
   );
 }
 

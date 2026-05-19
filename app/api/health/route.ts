@@ -175,10 +175,9 @@ async function checkProvider(): Promise<CheckResult> {
             health: { not: "DOWN" },
             OR: [
               { modelsSupported: { has: "gpt-image-2" } },
-              { modelsSupported: { has: "gemini-3.1-flash-image-preview" } },
-              { modelsSupported: { has: "gemini-2.5-flash-image" } },
-              { modelsSupported: { has: "gemini-3-pro-image-preview" } },
-              { modelsSupported: { has: "gemini-2.5-flash-image-pro" } },
+              { modelsSupported: { has: "gpt-image-2-standard" } },
+              { modelsSupported: { has: "gpt-image-2-high" } },
+              { modelsSupported: { has: "nano-banana-2-512" } },
             ],
           },
           select: {
@@ -227,8 +226,9 @@ async function checkProvider(): Promise<CheckResult> {
           activeProviders,
           supportedModels: [
             "gpt-image-2",
-            "gemini-3.1-flash-image-preview",
-            "gemini-3-pro-image-preview",
+            "gpt-image-2-standard",
+            "gpt-image-2-high",
+            "nano-banana-2-512",
           ],
           imageProviderCount: imageProviders.length,
           providerChannels,

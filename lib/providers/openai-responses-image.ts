@@ -71,7 +71,13 @@ function upstreamModelForRequest(): string {
   );
 }
 
-function imageToolModelForRequest(): string | undefined {
+function imageToolModelForRequest(req: InternalRequest): string | undefined {
+  if (req.modelId === "gpt-image-2") {
+    return req.image2Mode === "high"
+      ? "gpt-image-2-high"
+      : "gpt-image-2-standard";
+  }
+
   return (
     process.env.SUB2API_IMAGE_TOOL_MODEL ??
     process.env.OPENAI_RESPONSES_IMAGE_TOOL_MODEL
@@ -252,7 +258,7 @@ export class OpenAIResponsesImageAdapter implements ProviderAdapter {
       output_format: req.outputFormat,
       background: req.background,
     };
-    const toolModel = imageToolModelForRequest();
+    const toolModel = imageToolModelForRequest(req);
 
     if (toolModel) {
       tool.model = toolModel;

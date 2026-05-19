@@ -13,7 +13,8 @@ export type AspectRatio =
   | "21:9"
   | "9:21";
 
-export type Resolution = "1K" | "2K" | "4K" | "High";
+export type Resolution = "1K" | "2K" | "4K";
+export type Image2Mode = "standard" | "high";
 export type ProviderChannelId = string;
 export type Image2ProviderChannelId = ProviderChannelId;
 export type ProtocolName =
@@ -39,6 +40,7 @@ export interface PricingRule {
 export interface ModelCapabilities {
   aspectRatios: AspectRatio[];
   resolutions: Resolution[];
+  image2Modes?: Image2Mode[];
   resolutionAspectRatios?: Partial<Record<Resolution, AspectRatio[]>>;
   supportsReferenceImage: boolean;
   maxReferenceImages: number;
@@ -60,6 +62,7 @@ export interface ModelDefinition {
   defaults: {
     aspectRatio: AspectRatio;
     resolution: Resolution;
+    image2Mode?: Image2Mode;
     outputFormat: OutputFormat;
     background: ImageBackground;
     outputCompression?: number;
@@ -96,6 +99,7 @@ export interface InternalRequest {
   negativePrompt?: string;
   aspectRatio: AspectRatio;
   resolution: Resolution;
+  image2Mode?: Image2Mode;
   n: number;
   seed?: number;
   outputFormat: OutputFormat;

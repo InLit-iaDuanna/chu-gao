@@ -4,11 +4,18 @@ import { fail, ok } from "@/lib/api-response";
 import type { SessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { LoginRateLimitError, assertLoginAllowed } from "@/lib/rate-limit";
+import { readJsonBodySafe } from "@/lib/request-body";
 import { attachSessionCookie } from "@/lib/session-cookie";
 import { loginSchema } from "@/lib/validators";
 
 export async function POST(request: Request) {
-  const json = (await request.json()) as unknown;
+  const body = await readJsonBodySafe(request);
+
+  if (!body.ok) {
+    return body.response;
+  }
+
+  const json = body.data;
   const parsed = loginSchema.safeParse(json);
 
   if (!parsed.success) {
