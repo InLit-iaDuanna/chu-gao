@@ -24,7 +24,7 @@ export function ResolutionPicker({
               key={option}
               type="button"
               className={cn(
-                "selection-card rounded-[10px] border px-3 py-2.5 font-mono text-sm",
+                "selection-card rounded-[10px] border px-3 py-2.5 font-mono text-sm uppercase",
                 value === option && "selection-card-active text-foreground",
                 disabled &&
                   "cursor-not-allowed opacity-35 hover:border-border hover:bg-surface",

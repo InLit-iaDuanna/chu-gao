@@ -1,6 +1,7 @@
 "use client";
 
 import { ImagePlus, SendHorizonal, X } from "lucide-react";
+import { useRef, useState, type DragEvent } from "react";
 
 import type { UploadedReferenceImage } from "@/components/workbench/types";
 import { cn } from "@/lib/utils";
@@ -35,6 +36,7 @@ export function PromptInput({
   onSubmit,
   referenceImages = [],
   onUploadReference,
+  onUploadReferences,
   onRemoveReference,
   uploadDisabled,
   isUploadingReference,
@@ -42,6 +44,8 @@ export function PromptInput({
   useCurrentImageAsReference,
   onToggleCurrentImageReference,
   canUseCurrentImageReference,
+  currentImageReferencePreviewUrl,
+  currentImageReferenceLabel,
   currentImageReferenceDisabled,
   disabled,
   disabledReason,
@@ -54,6 +58,7 @@ export function PromptInput({
   onSubmit: () => void;
   referenceImages?: UploadedReferenceImage[];
   onUploadReference?: (file: File) => void;
+  onUploadReferences?: (files: File[]) => void | Promise<void>;
   onRemoveReference?: (key: string) => void;
   uploadDisabled?: boolean;
   isUploadingReference?: boolean;
@@ -61,6 +66,8 @@ export function PromptInput({
   useCurrentImageAsReference?: boolean;
   onToggleCurrentImageReference?: (value: boolean) => void;
   canUseCurrentImageReference?: boolean;
+  currentImageReferencePreviewUrl?: string | null;
+  currentImageReferenceLabel?: string | null;
   currentImageReferenceDisabled?: boolean;
   disabled?: boolean;
   disabledReason?: string | null;
@@ -70,10 +77,75 @@ export function PromptInput({
 }) {
   const hasValue = value.trim().length > 0;
   const label = submitLabel({ disabled, hasValue, isBusy });
-  const canUpload = Boolean(onUploadReference) && !uploadDisabled;
+  const canUpload =
+    (Boolean(onUploadReference) || Boolean(onUploadReferences)) &&
+    !uploadDisabled;
+  const [isDraggingReference, setIsDraggingReference] = useState(false);
+  const dragDepthRef = useRef(0);
+
+  const droppedFilesFrom = (event: DragEvent<HTMLElement>) =>
+    Array.from(event.dataTransfer.files);
+
+  const onDragEnter = (event: DragEvent<HTMLDivElement>) => {
+    if (!event.dataTransfer.types.includes("Files")) return;
+    event.preventDefault();
+    event.stopPropagation();
+    dragDepthRef.current += 1;
+    setIsDraggingReference(true);
+  };
+
+  const onDragOver = (event: DragEvent<HTMLDivElement>) => {
+    if (!event.dataTransfer.types.includes("Files")) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = canUpload ? "copy" : "none";
+    dragDepthRef.current = Math.max(dragDepthRef.current, 1);
+    setIsDraggingReference(true);
+  };
+
+  const onDragLeave = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) {
+      setIsDraggingReference(false);
+    }
+  };
+
+  const onDrop = (event: DragEvent<HTMLDivElement>) => {
+    if (!event.dataTransfer.types.includes("Files")) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDraggingReference(false);
+
+    if (!canUpload) return;
+
+    const files = droppedFilesFrom(event);
+    if (files.length === 0) return;
+
+    if (onUploadReferences) {
+      void onUploadReferences(files);
+    } else {
+      files.forEach((file) => onUploadReference?.(file));
+    }
+  };
 
   return (
-    <div className="mx-auto w-full space-y-2">
+    <div
+      className={cn(
+        "relative mx-auto w-full space-y-2 rounded-[8px] transition-colors",
+        isDraggingReference && "bg-info/[0.04]",
+      )}
+      onDragEnter={onDragEnter}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+    >
+      {isDraggingReference ? (
+        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-[8px] border border-info/50 bg-surface/85 text-xs font-medium text-foreground shadow-[var(--shadow-sm)] backdrop-blur-sm">
+          {canUpload ? "松开上传为参考图" : "当前不可上传参考图"}
+        </div>
+      ) : null}
       {referenceImages.length || canUseCurrentImageReference ? (
         <div className="space-y-2 px-1">
           {referenceImages.length ? (
@@ -105,7 +177,7 @@ export function PromptInput({
           ) : null}
 
           {canUseCurrentImageReference ? (
-            <label className="inline-flex items-center gap-2 text-xs text-text-muted">
+            <label className="inline-flex items-center gap-2 rounded-[6px] border border-border bg-surface-2/70 p-1 pr-2 text-xs text-text-muted">
               <input
                 type="checkbox"
                 className="accent-foreground"
@@ -115,7 +187,14 @@ export function PromptInput({
                   onToggleCurrentImageReference?.(event.target.checked)
                 }
               />
-              参考当前画布
+              {currentImageReferencePreviewUrl ? (
+                <img
+                  src={currentImageReferencePreviewUrl}
+                  alt=""
+                  className="h-8 w-8 rounded-[4px] object-cover"
+                />
+              ) : null}
+              <span>{currentImageReferenceLabel ?? "参考选中图"}</span>
             </label>
           ) : null}
         </div>
@@ -125,6 +204,7 @@ export function PromptInput({
         className={cn(
           "chat-input flex min-w-0 items-end gap-2 p-2 transition-colors sm:gap-3",
           disabled ? "border-border" : "focus-within:border-border-strong",
+          isDraggingReference && "border-info/60 shadow-[var(--shadow-sm)]",
         )}
         onSubmit={(event) => {
           event.preventDefault();

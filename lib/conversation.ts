@@ -5,6 +5,7 @@ export interface ConversationMessage {
   role: ConversationRole;
   content: string;
   generationId?: string;
+  generationPrompt?: string;
   imageId?: string;
   imageUrl?: string;
   images?: Array<{

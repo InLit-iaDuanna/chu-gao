@@ -47,7 +47,9 @@ export function Button({
   ...props
 }: ButtonProps): React.ReactElement {
   const classes = cn(
-    "inline-flex shrink-0 items-center justify-center gap-2 rounded-md font-medium transition-colors duration-[var(--duration-fast)] ease-out",
+    "inline-flex shrink-0 items-center justify-center gap-2 rounded-md font-medium",
+    "transition-[background-color,color,border-color,box-shadow,transform,opacity] duration-[var(--duration-fast)] ease-[var(--ease-out)]",
+    "active:scale-[0.97] motion-reduce:active:scale-100",
     "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-45",
     variant !== "link" && sizeClass[size],
     variantClass[variant],

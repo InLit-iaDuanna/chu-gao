@@ -37,7 +37,8 @@ export const generationRequestSchema = z.object({
   prompt: z.string().min(1).max(4000),
   negativePrompt: z.string().max(4000).optional(),
   aspectRatio: z.string().min(1),
-  resolution: z.enum(["1K", "2K", "4K", "High"]).optional(),
+  resolution: z.enum(["1K", "2K", "4K"]).optional(),
+  image2Mode: z.enum(["standard", "high"]).optional(),
   n: z.number().int().min(1),
   seed: z.number().int().optional(),
   outputFormat: z.enum(["png", "jpeg", "webp"]).optional(),
@@ -73,6 +74,7 @@ export function validateAgainstModelDefinition(
   const capabilities = model.capabilities;
   const aspectRatio = input.aspectRatio as AspectRatio;
   const resolution = input.resolution as Resolution | undefined;
+  const image2Mode = input.image2Mode ?? model.defaults.image2Mode;
   const outputFormat = (input.outputFormat ??
     model.defaults.outputFormat) as OutputFormat;
   const background = (input.background ?? model.defaults.background) as
@@ -91,6 +93,14 @@ export function validateAgainstModelDefinition(
 
   if (!capabilities.resolutions.includes(resolution)) {
     throw new UnsupportedParamError(`resolution ${resolution} 不被支持`);
+  }
+
+  if (
+    image2Mode &&
+    capabilities.image2Modes &&
+    !capabilities.image2Modes.includes(image2Mode)
+  ) {
+    throw new UnsupportedParamError(`image2Mode ${image2Mode} 不被支持`);
   }
 
   if (
@@ -166,6 +176,7 @@ export function validateAgainstModelDefinition(
     negativePrompt: input.negativePrompt,
     aspectRatio,
     resolution,
+    image2Mode,
     n: input.n,
     seed: input.seed,
     outputFormat,

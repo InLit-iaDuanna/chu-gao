@@ -126,18 +126,20 @@ function generationMessageMeta(
     return null;
   }
 
-  const images = generation.images.map((image) => ({
-    id: image.id,
-    src: privateImageUrl(generation.id, image.id),
-    url: privateImageUrl(generation.id, image.id),
-    downloadUrl: privateImageUrl(generation.id, image.id),
-    thumbnailUrl: image.thumbnailKey
-      ? privateImageThumbnailUrl(generation.id, image.id)
-      : privateImageUrl(generation.id, image.id),
-    width: image.width,
-    height: image.height,
-    mimeType: image.mimeType,
-  }));
+  const images = [...generation.images]
+    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+    .map((image) => ({
+      id: image.id,
+      src: privateImageUrl(generation.id, image.id),
+      url: privateImageUrl(generation.id, image.id),
+      downloadUrl: privateImageUrl(generation.id, image.id),
+      thumbnailUrl: image.thumbnailKey
+        ? privateImageThumbnailUrl(generation.id, image.id)
+        : privateImageUrl(generation.id, image.id),
+      width: image.width,
+      height: image.height,
+      mimeType: image.mimeType,
+    }));
   const image = images[0];
   const providerChannelId = resolveImage2ProviderChannelId(
     generation.modelId,
@@ -166,6 +168,7 @@ function generationMessageMeta(
           thumbnailUrl: image.thumbnailUrl,
         }
       : {}),
+    generationPrompt: generation.prompt,
     generationStatus: generation.status,
     generationProvider: generation.provider?.name ?? null,
     generationProviderChannelId: providerChannelId,

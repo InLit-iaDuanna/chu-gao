@@ -50,7 +50,9 @@ export function serializeGeneration(
   row: GenerationWithRelations,
   options: { displayNameMap?: Image2ChannelDisplayNameMap } = {},
 ) {
-  const images = row.images.map((image) => ({
+  const images = [...row.images].sort(
+    (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
+  ).map((image) => ({
     id: image.id,
     url: privateImageUrl(row.id, image.id),
     src: privateImageUrl(row.id, image.id),
@@ -127,6 +129,9 @@ export function serializeAdminGeneration(
   options: { displayNameMap?: Image2ChannelDisplayNameMap } = {},
 ) {
   const generation = serializeGeneration(row, options);
+  const sortedImages = [...row.images].sort(
+    (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
+  );
 
   return {
     ...generation,
@@ -134,7 +139,7 @@ export function serializeAdminGeneration(
     jobId: row.jobId,
     images: generation.images.map((image, index) => ({
       ...image,
-      storageKey: row.images[index]?.storageKey,
+      storageKey: sortedImages[index]?.storageKey,
     })),
   };
 }

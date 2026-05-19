@@ -99,9 +99,9 @@ export function DialogContent({
           "relative w-[calc(100%-32px)] max-w-[480px] rounded-lg border border-border bg-surface shadow-[var(--shadow-lg)] outline-none",
           className,
         )}
-        role="dialog"
         tabIndex={-1}
         {...props}
+        role={props.role ?? "dialog"}
       >
         <div className="absolute right-3 top-3">
           <IconButton

@@ -30,11 +30,11 @@ IMAGE2_PROVIDER_PROTOCOL=OPENAI_IMAGES
 IMAGE2_WIRE_API=images
 IMAGE2_BASE_URL=https://api.xpzhao.top
 IMAGE2_API_KEY=<IMAGE2_API_KEY>
-IMAGE2_MODELS_SUPPORTED=gpt-image-2
+IMAGE2_MODELS_SUPPORTED=gpt-image-2-standard,gpt-image-2-high
 pnpm db:seed
 ```
 
-默认的 OpenAI Images 兼容通道会调用 `POST {baseUrl}/v1/images/generations`；有参考图时会走 `POST {baseUrl}/v1/images/edits`。`IMAGE2_BASE_URL` 可以写成 `https://host`、`https://host/v1` 或 `https://host/v1/images/generations`；URL 会统一规整，避免 `/v1/v1` 双拼。4K 像素尺寸按 OpenAI `gpt-image-2` 约束使用 UHD 规格，最大边不超过 `3840px`，总像素不超过 `8,294,400`，因此 `16:9` 为 `3840x2160`、`9:16` 为 `2160x3840`。`pnpm dev:doctor` 会检查 `DATABASE_URL`、Redis、Provider 表里是否有支持 `gpt-image-2` 的可用 Images 渠道，且不会输出密钥。
+默认的 OpenAI Images 兼容通道会调用 `POST {baseUrl}/v1/images/generations`；有参考图时会走 `POST {baseUrl}/v1/images/edits`。`IMAGE2_BASE_URL` 可以写成 `https://host`、`https://host/v1` 或 `https://host/v1/images/generations`；URL 会统一规整，避免 `/v1/v1` 双拼。前台 Image2 的“标准版 / 高推理”会分别映射到后台 `gpt-image-2-standard` 和 `gpt-image-2-high`，尺寸再单独选择 `1K/2K/4K`。4K 像素尺寸按 OpenAI `gpt-image-2` 约束使用 UHD 规格，最大边不超过 `3840px`，总像素不超过 `8,294,400`，因此 `16:9` 为 `3840x2160`、`9:16` 为 `2160x3840`。`pnpm dev:doctor` 会检查 `DATABASE_URL`、Redis、Provider 表里是否有支持 `gpt-image-2` 或其 standard/high 真实模型名的可用 Images 渠道，且不会输出密钥。
 
 Responses 通道仍可用：把 `IMAGE2_PROVIDER_PROTOCOL` 设为 `OPENAI_RESPONSES_IMAGE`，`IMAGE2_WIRE_API` 设为 `responses`，并把 `IMAGE2_MODELS_SUPPORTED` 设为 `sub2api-image`。它会调用 `POST {baseUrl}/v1/responses`，使用 Responses API 的 `image_generation` tool，不会探测 `/v1/models`。`SUB2API_RESPONSES_MODEL` 是 Responses 外层模型，默认 `gpt-5.5`；如果上游要求 tool 内也带模型，可设置 `SUB2API_IMAGE_TOOL_MODEL=<IMAGE_TOOL_MODEL>`。Responses 通道默认把用户选择的 `1K/2K/4K` 原样传给中转；如中转要求像素尺寸，可设置 `SUB2API_RESPONSES_SIZE_MODE=pixels`，此时同样使用上面的 4K 尺寸约束。如果切到 Responses，也要同步确认 UI 默认模型和 `/api/health` 的检查目标。
 

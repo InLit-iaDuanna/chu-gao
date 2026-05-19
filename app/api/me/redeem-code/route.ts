@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 
 import { fail, ok } from "@/lib/api-response";
+import { readJsonBodySafe } from "@/lib/request-body";
 import { authenticatedUser, checkSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { redeemCodeSchema } from "@/lib/validators";
@@ -31,7 +32,13 @@ export async function POST(request: Request) {
     return fail("SERVICE_UNAVAILABLE", "兑换服务未配置数据库", { status: 503 });
   }
 
-  const json = (await request.json()) as unknown;
+  const body = await readJsonBodySafe(request);
+
+  if (!body.ok) {
+    return body.response;
+  }
+
+  const json = body.data;
   const parsed = redeemCodeSchema.safeParse(json);
 
   if (!parsed.success) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Download } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Download } from "lucide-react";
 
 import {
   downloadImageUrl,
@@ -21,6 +21,9 @@ export function ImageGallery({
   frameClassName,
   minFrameClassName = "min-h-[390px]",
   defaultIndex,
+  selectedIndex: controlledSelectedIndex,
+  onSelectedIndexChange,
+  variant = "single",
 }: {
   images: GalleryImage[];
   alt: string;
@@ -30,6 +33,9 @@ export function ImageGallery({
   frameClassName?: string;
   minFrameClassName?: string;
   defaultIndex?: number;
+  selectedIndex?: number;
+  onSelectedIndexChange?: (index: number) => void;
+  variant?: "single" | "grid";
 }) {
   const viewableImages = useMemo(
     () => images.filter((image) => primaryImageUrl(image)),
@@ -39,18 +45,111 @@ export function ImageGallery({
     typeof defaultIndex === "number"
       ? Math.min(Math.max(defaultIndex, 0), Math.max(viewableImages.length - 1, 0))
       : Math.max(viewableImages.length - 1, 0);
-  const [selectedIndex, setSelectedIndex] = useState(initialIndex);
+  const [uncontrolledSelectedIndex, setUncontrolledSelectedIndex] =
+    useState(initialIndex);
+  const selectedIndex =
+    typeof controlledSelectedIndex === "number"
+      ? Math.min(
+          Math.max(controlledSelectedIndex, 0),
+          Math.max(viewableImages.length - 1, 0),
+        )
+      : uncontrolledSelectedIndex;
   const selectedImage = viewableImages[selectedIndex] ?? viewableImages[0];
   const selectedUrl = primaryImageUrl(selectedImage);
   const downloadUrl = downloadImageUrl(selectedImage);
   const hasMultiple = viewableImages.length > 1;
 
   useEffect(() => {
-    setSelectedIndex(initialIndex);
-  }, [initialIndex, viewableImages.length]);
+    if (typeof controlledSelectedIndex !== "number") {
+      setUncontrolledSelectedIndex(initialIndex);
+    }
+  }, [controlledSelectedIndex, initialIndex, viewableImages.length]);
+
+  useEffect(() => {
+    if (
+      typeof controlledSelectedIndex === "number" &&
+      viewableImages.length > 0 &&
+      controlledSelectedIndex >= viewableImages.length
+    ) {
+      onSelectedIndexChange?.(viewableImages.length - 1);
+    }
+  }, [controlledSelectedIndex, onSelectedIndexChange, viewableImages.length]);
 
   if (!selectedImage || !selectedUrl) {
     return null;
+  }
+
+  const setSelectedIndex = (nextIndex: number) => {
+    if (typeof controlledSelectedIndex !== "number") {
+      setUncontrolledSelectedIndex(nextIndex);
+    }
+
+    onSelectedIndexChange?.(nextIndex);
+  };
+
+  if (variant === "grid" && hasMultiple) {
+    return (
+      <div className={cn("relative h-full", className)}>
+        <div className="grid h-full grid-cols-2 gap-3 p-3">
+          {viewableImages.slice(0, 4).map((image, index) => {
+            const imageUrl = primaryImageUrl(image);
+            const href = downloadImageUrl(image);
+            const isSelected = index === selectedIndex;
+
+            return (
+              <div
+                key={image.id ?? `${imageUrl}-${index}`}
+                className={cn(
+                  "group relative min-h-0 overflow-hidden rounded-xl border bg-surface-2 transition-all hover:-translate-y-0.5 hover:border-border-strong hover:shadow-[var(--shadow-md)]",
+                  isSelected
+                    ? "border-foreground shadow-[var(--shadow-ring-strong)]"
+                    : "border-border",
+                )}
+              >
+                <button
+                  type="button"
+                  className="absolute inset-0 z-10 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/60"
+                  aria-label={`查看第 ${index + 1} 张`}
+                  title={`第 ${index + 1} 张`}
+                  onClick={() => setSelectedIndex(index)}
+                />
+                {imageUrl ? (
+                  <img
+                    src={imageUrl}
+                    alt={alt}
+                    className="pointer-events-none h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                    loading={index === 0 ? undefined : "lazy"}
+                    decoding="async"
+                  />
+                ) : null}
+                <span className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-md border border-border bg-background/80 px-2 py-1 font-mono text-[11px] text-foreground shadow-[var(--shadow-xs)] backdrop-blur-sm">
+                  v{index + 1}
+                </span>
+                {isSelected ? (
+                  <span className="pointer-events-none absolute right-3 top-3 z-10 flex h-7 w-7 items-center justify-center rounded-md border border-foreground/30 bg-foreground text-background shadow-[var(--shadow-xs)]">
+                    <Check className="h-3.5 w-3.5 stroke-[2]" />
+                  </span>
+                ) : null}
+                {href ? (
+                  <a
+                    href={href}
+                    download={filenameForImage(image, index)}
+                    className={cn(
+                      "absolute top-3 z-20 flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background/80 text-foreground opacity-0 shadow-[var(--shadow-xs)] backdrop-blur-sm transition-opacity hover:bg-surface group-hover:opacity-100 focus:opacity-100",
+                      isSelected ? "right-12" : "right-3",
+                    )}
+                    aria-label={`下载第 ${index + 1} 张原图`}
+                    title="下载原图"
+                  >
+                    <Download className="h-4 w-4 stroke-[1.5]" />
+                  </a>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
   }
 
   const goTo = (nextIndex: number) => {

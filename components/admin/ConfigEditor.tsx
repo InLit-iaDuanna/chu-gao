@@ -3,11 +3,15 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
+import { Switch } from "@/components/ui";
 import {
   IMAGE_ASPECT_RATIO_OPTIONS,
   IMAGE_RESOLUTION_OPTIONS,
 } from "@/lib/models/options";
-import type { AnnouncementTone } from "@/lib/system-config";
+import type {
+  AnnouncementDisplayMode,
+  AnnouncementTone,
+} from "@/lib/system-config";
 
 type ConfigEntry = { key: string; value: unknown };
 
@@ -47,6 +51,12 @@ function toneValue(value: unknown): AnnouncementTone {
     : "info";
 }
 
+function displayModeValue(value: unknown): AnnouncementDisplayMode {
+  return value === "popup" || value === "both" || value === "banner"
+    ? value
+    : "banner";
+}
+
 function stringArrayValue(
   value: unknown,
   allowed: readonly string[],
@@ -82,6 +92,15 @@ const TONE_OPTIONS: Array<{ value: AnnouncementTone; label: string }> = [
   { value: "danger", label: "紧急" },
 ];
 
+const DISPLAY_MODE_OPTIONS: Array<{
+  value: AnnouncementDisplayMode;
+  label: string;
+}> = [
+  { value: "banner", label: "顶部横幅" },
+  { value: "popup", label: "弹窗" },
+  { value: "both", label: "横幅 + 弹窗" },
+];
+
 export function ConfigEditor({
   entries,
 }: {
@@ -94,6 +113,19 @@ export function ConfigEditor({
       title: stringValue(entryValue(entries, "announcement.title")),
       body: stringValue(entryValue(entries, "announcement.body")),
       tone: toneValue(entryValue(entries, "announcement.tone")),
+      displayMode: displayModeValue(
+        entryValue(entries, "announcement.displayMode"),
+      ),
+    }),
+    [entries],
+  );
+  const initialRegistration = useMemo(
+    () => ({
+      inviteOnly: booleanValue(entryValue(entries, "registration.inviteOnly")),
+      defaultCredits: numberValue(
+        entryValue(entries, "registration.defaultCredits"),
+        100,
+      ),
     }),
     [entries],
   );
@@ -113,10 +145,17 @@ export function ConfigEditor({
     }),
     [entries],
   );
+  const [inviteOnly, setInviteOnly] = useState(initialRegistration.inviteOnly);
+  const [defaultCredits, setDefaultCredits] = useState(
+    initialRegistration.defaultCredits,
+  );
   const [enabled, setEnabled] = useState(initialAnnouncement.enabled);
   const [title, setTitle] = useState(initialAnnouncement.title);
   const [body, setBody] = useState(initialAnnouncement.body);
   const [tone, setTone] = useState<AnnouncementTone>(initialAnnouncement.tone);
+  const [displayMode, setDisplayMode] = useState<AnnouncementDisplayMode>(
+    initialAnnouncement.displayMode,
+  );
   const [image2AspectRatios, setImage2AspectRatios] = useState(
     initialImage2Limits.aspectRatios,
   );
@@ -126,6 +165,11 @@ export function ConfigEditor({
   const [image2MaxN, setImage2MaxN] = useState(initialImage2Limits.maxN);
   const [message, setMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const canSubmitRegistration =
+    Number.isInteger(defaultCredits) &&
+    defaultCredits >= 0 &&
+    defaultCredits <= 1_000_000 &&
+    !isSubmitting;
   const canSubmit = body.length <= 500 && title.length <= 80 && !isSubmitting;
   const canSubmitImage2 =
     image2AspectRatios.length > 0 &&
@@ -146,6 +190,29 @@ export function ConfigEditor({
     return next.length > 0 ? next : [fallback[0] as string];
   }
 
+  async function submitRegistration(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canSubmitRegistration) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setMessage("保存中...");
+
+    try {
+      await Promise.all([
+        patchSystemConfig("registration.inviteOnly", inviteOnly),
+        patchSystemConfig("registration.defaultCredits", defaultCredits),
+      ]);
+      setMessage(inviteOnly ? "已开启邀请码注册" : "已关闭邀请码注册");
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "保存失败");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canSubmit) {
@@ -161,6 +228,7 @@ export function ConfigEditor({
         patchSystemConfig("announcement.title", title.trim()),
         patchSystemConfig("announcement.body", body.trim()),
         patchSystemConfig("announcement.tone", tone),
+        patchSystemConfig("announcement.displayMode", displayMode),
       ]);
       setMessage("公告已保存");
       router.refresh();
@@ -215,12 +283,65 @@ export function ConfigEditor({
             这里展示注册、点数、并发和内容审核相关配置。修改配置会写入审计记录。
           </p>
         </div>
+        <form onSubmit={submitRegistration} className="surface-panel-soft p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium">注册策略</p>
+              <p className="mt-1 text-xs text-text-muted">
+                关闭后，新用户无需邀请码即可注册。
+              </p>
+            </div>
+            <label className="inline-flex items-center gap-2 text-sm text-text-muted">
+              <Switch
+                checked={inviteOnly}
+                onChange={setInviteOnly}
+                aria-label="注册需要邀请码"
+              />
+              需要邀请码
+            </label>
+          </div>
+
+          <label className="mt-4 grid gap-1 sm:max-w-xs">
+            <span className="field-label">无邀请码注册默认点数</span>
+            <input
+              className="h-10 rounded-[6px] border border-border bg-surface px-3 text-sm"
+              type="number"
+              min={0}
+              max={1_000_000}
+              value={defaultCredits}
+              onChange={(event) =>
+                setDefaultCredits(
+                  Math.max(
+                    0,
+                    Math.min(
+                      1_000_000,
+                      Number.parseInt(event.target.value, 10) || 0,
+                    ),
+                  ),
+                )
+              }
+            />
+          </label>
+
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button
+              className="tool-button h-10"
+              type="submit"
+              disabled={!canSubmitRegistration}
+            >
+              保存注册策略
+            </button>
+            {message ? (
+              <span className="text-sm text-text-muted">{message}</span>
+            ) : null}
+          </div>
+        </form>
         <form onSubmit={submit} className="surface-panel-soft p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-sm font-medium">全站公告</p>
               <p className="mt-1 text-xs text-text-muted">
-                开启后会显示在全站顶部。
+                开启后会按展示方式显示在全站页面。
               </p>
             </div>
             <label className="inline-flex items-center gap-2 text-sm text-text-muted">
@@ -261,6 +382,22 @@ export function ConfigEditor({
                 }
               >
                 {TONE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-1 sm:max-w-xs">
+              <span className="field-label">展示方式</span>
+              <select
+                className="rounded-[6px] border border-border bg-surface px-3 py-2 text-sm"
+                value={displayMode}
+                onChange={(event) =>
+                  setDisplayMode(event.target.value as AnnouncementDisplayMode)
+                }
+              >
+                {DISPLAY_MODE_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>

@@ -52,18 +52,21 @@ export const SYSTEM_CONFIG_DEFAULTS = {
     title: "",
     body: "",
     tone: "info",
+    displayMode: "banner",
   },
 } as const;
 
 export type SystemConfig = typeof SYSTEM_CONFIG_DEFAULTS;
 
 export type AnnouncementTone = "info" | "warning" | "success" | "danger";
+export type AnnouncementDisplayMode = "banner" | "popup" | "both";
 
 export type PublicAnnouncement = {
   id: string;
   title: string;
   body: string;
   tone: AnnouncementTone;
+  displayMode: AnnouncementDisplayMode;
 };
 
 export function getPublicConfig(): {
@@ -92,6 +95,7 @@ export const SYSTEM_CONFIG_DEFAULT_ROWS = {
   "announcement.title": "",
   "announcement.body": "",
   "announcement.tone": "info" as AnnouncementTone,
+  "announcement.displayMode": "banner" as AnnouncementDisplayMode,
 } as const;
 
 export type SystemConfigKey = keyof typeof SYSTEM_CONFIG_DEFAULT_ROWS;
@@ -239,6 +243,12 @@ function toAnnouncementTone(value: unknown): AnnouncementTone {
     : "info";
 }
 
+function toAnnouncementDisplayMode(value: unknown): AnnouncementDisplayMode {
+  return value === "popup" || value === "both" || value === "banner"
+    ? value
+    : "banner";
+}
+
 function publicAnnouncementFromValues(
   values: Record<SystemConfigKey, unknown>,
 ): PublicAnnouncement | null {
@@ -246,13 +256,16 @@ function publicAnnouncementFromValues(
   const title = toStringValue(values["announcement.title"]);
   const body = toStringValue(values["announcement.body"]);
   const tone = toAnnouncementTone(values["announcement.tone"]);
+  const displayMode = toAnnouncementDisplayMode(
+    values["announcement.displayMode"],
+  );
 
   if (!enabled || !body) {
     return null;
   }
 
   const hash = createHash("sha256")
-    .update(JSON.stringify({ title, body, tone }))
+    .update(JSON.stringify({ title, body, tone, displayMode }))
     .digest("hex")
     .slice(0, 16);
 
@@ -261,6 +274,7 @@ function publicAnnouncementFromValues(
     title,
     body,
     tone,
+    displayMode,
   };
 }
 

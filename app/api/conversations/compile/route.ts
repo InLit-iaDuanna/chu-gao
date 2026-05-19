@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { fail, ok } from "@/lib/api-response";
+import { readJsonBodySafe } from "@/lib/request-body";
 import { checkSession } from "@/lib/auth";
 import {
   compilePromptFallback,
@@ -231,7 +232,13 @@ export async function POST(request: Request) {
     return fail("UNAUTHORIZED", "请先登录", { status: 401 });
   }
 
-  const json = (await request.json()) as unknown;
+  const body = await readJsonBodySafe(request);
+
+  if (!body.ok) {
+    return body.response;
+  }
+
+  const json = body.data;
   const parsed = compileSchema.safeParse(json);
 
   if (!parsed.success) {

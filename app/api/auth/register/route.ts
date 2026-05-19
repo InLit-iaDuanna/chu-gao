@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { fail, ok } from "@/lib/api-response";
 import type { SessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { readJsonBodySafe } from "@/lib/request-body";
 import { attachSessionCookie } from "@/lib/session-cookie";
 import {
   getRequiredSystemConfigValue,
@@ -26,7 +27,13 @@ export async function POST(request: Request) {
     return fail("AUTH_UNAVAILABLE", "认证服务暂时不可用", { status: 503 });
   }
 
-  const json = (await request.json()) as unknown;
+  const body = await readJsonBodySafe(request);
+
+  if (!body.ok) {
+    return body.response;
+  }
+
+  const json = body.data;
   const parsed = registerSchema.safeParse(json);
 
   if (!parsed.success) {

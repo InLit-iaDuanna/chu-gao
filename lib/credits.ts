@@ -4,7 +4,11 @@ type CostRequest = Pick<InternalRequest, "n" | "resolution"> &
   Partial<
     Pick<
       InternalRequest,
-      "aspectRatio" | "outputFormat" | "background" | "referenceImages"
+      | "aspectRatio"
+      | "image2Mode"
+      | "outputFormat"
+      | "background"
+      | "referenceImages"
     >
   > & {
     usesReference?: boolean;

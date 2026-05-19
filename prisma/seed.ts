@@ -41,9 +41,15 @@ function image2ModelIds(): string[] {
     return configured;
   }
 
-  return modelsByProtocol(
+  const modelIds = modelsByProtocol(
     providerProtocolToModelProtocol(image2Protocol()),
-  ).map((model) => model.id);
+  ).flatMap((model) =>
+    model.id === "gpt-image-2"
+      ? ["gpt-image-2-standard", "gpt-image-2-high"]
+      : [model.id],
+  );
+
+  return modelIds;
 }
 
 function apiKeyFingerprint(value: string): string {

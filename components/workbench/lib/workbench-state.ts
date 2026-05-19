@@ -1,5 +1,9 @@
 import { firstSupportedResolutionAspectPair } from "@/lib/models/capabilities";
-import type { AspectRatio, PublicModelDefinition } from "@/lib/models/types";
+import type {
+  AspectRatio,
+  Image2Mode,
+  PublicModelDefinition,
+} from "@/lib/models/types";
 import { normalizeSelectableProviderChannelId } from "@/lib/provider-channels";
 import type { WorkbenchPreferences } from "@/lib/workbench-preferences";
 
@@ -9,6 +13,19 @@ import type {
 } from "@/components/workbench/types";
 
 export const DEFAULT_MODEL_ID = "gpt-image-2";
+
+function image2ModeFor(
+  model: PublicModelDefinition,
+  preferred?: string,
+): Image2Mode | undefined {
+  if (!model.capabilities.image2Modes?.length) {
+    return undefined;
+  }
+
+  return model.capabilities.image2Modes.includes(preferred as Image2Mode)
+    ? (preferred as Image2Mode)
+    : (model.defaults.image2Mode ?? model.capabilities.image2Modes[0]);
+}
 
 export const WORKBENCH_STATUS_LABEL: Record<WorkbenchTaskStatus, string> = {
   idle: "可输入",
@@ -46,6 +63,7 @@ export function initialStateFor(
     ),
     aspectRatio: pair.aspectRatio,
     resolution: pair.resolution,
+    image2Mode: image2ModeFor(model, preferences.image2Mode),
     n: 1,
     outputFormat: model.defaults.outputFormat,
     background: model.defaults.background,

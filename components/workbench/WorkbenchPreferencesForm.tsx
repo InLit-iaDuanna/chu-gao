@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 
-import type { PublicModelDefinition } from "@/lib/models/types";
+import { Segmented } from "@/components/ui";
+import { IMAGE2_MODE_LABEL } from "@/lib/models/options";
+import type { Image2Mode, PublicModelDefinition } from "@/lib/models/types";
 import {
   readWorkbenchPreferences,
   writeWorkbenchPreferences,
@@ -12,6 +14,7 @@ type PreferenceFormState = {
   modelId: string;
   aspectRatio: string;
   resolution: string;
+  image2Mode?: Image2Mode;
 };
 function initialFormState(
   models: PublicModelDefinition[],
@@ -27,6 +30,7 @@ function initialFormState(
       modelId: "",
       aspectRatio: "1:1",
       resolution: "2K",
+      image2Mode: "standard",
     };
   }
 
@@ -44,6 +48,13 @@ function initialFormState(
       selectedModel.capabilities.resolutions.includes(saved.resolution as never)
         ? saved.resolution
         : selectedModel.defaults.resolution,
+    image2Mode:
+      saved.image2Mode &&
+      selectedModel.capabilities.image2Modes?.includes(
+        saved.image2Mode as Image2Mode,
+      )
+        ? (saved.image2Mode as Image2Mode)
+        : selectedModel.defaults.image2Mode,
   };
 }
 
@@ -62,6 +73,7 @@ export function WorkbenchPreferencesForm({
       modelId: form.modelId,
       aspectRatio: form.aspectRatio,
       resolution: form.resolution,
+      image2Mode: form.image2Mode,
     });
     setStatus("saved");
     window.setTimeout(() => setStatus("idle"), 1200);
@@ -107,6 +119,7 @@ export function WorkbenchPreferencesForm({
                 modelId: nextId,
                 aspectRatio: nextModel.defaults.aspectRatio,
                 resolution: nextModel.defaults.resolution,
+                image2Mode: nextModel.defaults.image2Mode,
               });
             }}
           >
@@ -117,6 +130,26 @@ export function WorkbenchPreferencesForm({
             ))}
           </select>
         </label>
+
+        {selectedModel?.capabilities.image2Modes?.length ? (
+          <label className="block space-y-2">
+            <span className="field-label">默认版本</span>
+            <Segmented
+              aria-label="默认 Image2 版本"
+              className="grid w-full grid-cols-2"
+              value={
+                form.image2Mode ?? selectedModel.defaults.image2Mode ?? "standard"
+              }
+              options={selectedModel.capabilities.image2Modes.map((mode) => ({
+                value: mode,
+                label: IMAGE2_MODE_LABEL[mode],
+              }))}
+              onChange={(image2Mode) =>
+                setForm((current) => ({ ...current, image2Mode }))
+              }
+            />
+          </label>
+        ) : null}
 
         <div className="grid gap-4 md:grid-cols-2">
           <label className="block space-y-2">

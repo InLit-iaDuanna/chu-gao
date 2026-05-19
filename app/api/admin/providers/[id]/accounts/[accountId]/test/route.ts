@@ -12,6 +12,20 @@ import { buildAdapter } from "@/lib/providers/factory";
 import { providerProtocolToModelProtocol } from "@/lib/providers/protocols";
 import { serializeProviderError } from "@/lib/providers/diagnostics";
 
+function image2ModeForSupportedModel(
+  modelId: string,
+): "standard" | "high" | undefined {
+  if (modelId === "gpt-image-2-high") {
+    return "high";
+  }
+
+  if (modelId === "gpt-image-2-standard") {
+    return "standard";
+  }
+
+  return undefined;
+}
+
 export async function POST(
   request: Request,
   context: { params: Promise<{ id: string; accountId: string }> },
@@ -37,9 +51,17 @@ export async function POST(
     return fail("NOT_FOUND", "账号不存在", { status: 404 });
   }
 
-  const modelProtocol = providerProtocolToModelProtocol(account.provider.protocol);
+  const modelProtocol = providerProtocolToModelProtocol(
+    account.provider.protocol,
+  );
   const model = modelsByProtocol(modelProtocol).find((item) =>
-    account.provider.modelsSupported.includes(item.id),
+    account.provider.modelsSupported.some(
+      (modelId) =>
+        modelId === item.id ||
+        (item.id === "gpt-image-2" &&
+          (modelId === "gpt-image-2-standard" ||
+            modelId === "gpt-image-2-high")),
+    ),
   );
 
   if (!model) {
@@ -65,6 +87,10 @@ export async function POST(
         prompt: "health check",
         aspectRatio: model.defaults.aspectRatio,
         resolution: model.defaults.resolution,
+        image2Mode:
+          account.provider.modelsSupported
+            .map(image2ModeForSupportedModel)
+            .find(Boolean) ?? model.defaults.image2Mode,
         n: 1,
         outputFormat: model.defaults.outputFormat,
         background: model.defaults.background,

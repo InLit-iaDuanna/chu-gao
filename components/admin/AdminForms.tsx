@@ -492,7 +492,9 @@ export function ProviderCreateForm({
   const [apiKey, setApiKey] = useState("");
   const [priority, setPriority] = useState(100);
   const [costMultiplier, setCostMultiplier] = useState(1);
-  const [modelsText, setModelsText] = useState("gpt-image-2");
+  const [modelsText, setModelsText] = useState(
+    "gpt-image-2-standard, gpt-image-2-high",
+  );
   const [message, setMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const normalizedModels = modelsText
@@ -524,7 +526,16 @@ export function ProviderCreateForm({
         apiKey: apiKey.trim(),
         priority,
         costMultiplier,
-        modelsSupported: normalizedModels,
+        modelsSupported:
+          protocol === "OPENAI_IMAGES" &&
+          normalizedModels.every(
+            (modelId) =>
+              modelId === "gpt-image-2-standard" ||
+              modelId === "gpt-image-2-high" ||
+              modelId === "gpt-image-2",
+          )
+            ? ["gpt-image-2-standard", "gpt-image-2-high"]
+            : normalizedModels,
       });
       setMessage("渠道已创建，可继续添加下一个");
       setApiKey("");
@@ -580,7 +591,11 @@ export function ProviderCreateForm({
                 return model.protocol === "openai-responses-image";
               })
               .map((model) => model.id);
-            setModelsText(nextModels.join(", "));
+            const normalizedNextModels =
+              nextProtocol === "OPENAI_IMAGES"
+                ? ["gpt-image-2-standard", "gpt-image-2-high"]
+                : nextModels;
+            setModelsText(normalizedNextModels.join(", "));
             if (nextProtocol === "GEMINI_IMAGE" && name === "image2") {
               setName("nano-banana");
             }
@@ -637,8 +652,8 @@ export function ProviderCreateForm({
         ))}
       </datalist>
       <p className="mt-3 text-xs leading-5 text-text-muted">
-        Nano Banana 请选择 GEMINI_IMAGE，并填写 gemini-3.1-flash-image-preview,
-        gemini-3-pro-image-preview。不同 Base URL 会在前台显示为不同大渠道。
+        Nano Banana 请选择 GEMINI_IMAGE，并填写 nano-banana-2-512。不同 Base
+        URL 会在前台显示为不同大渠道。
       </p>
       {message ? (
         <p className="mt-3 text-sm text-text-muted">{message}</p>
@@ -1733,7 +1748,6 @@ export function PricingRuleForm({ models }: { models: Array<{ id: string }> }) {
           <option value="1K">1K</option>
           <option value="2K">2K</option>
           <option value="4K">4K</option>
-          <option value="High">High</option>
         </select>
         <input
           className="rounded-[6px] border border-border bg-surface px-3 py-2 text-sm"

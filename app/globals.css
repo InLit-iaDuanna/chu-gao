@@ -39,8 +39,13 @@ body {
   font-family: var(--font-stack-sans);
   line-height: var(--lh-normal);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
-  font-feature-settings: normal;
+  font-feature-settings:
+    "ss01" on,
+    "cv11" on,
+    "tnum" on;
+  font-synthesis: none;
 }
 
 a {
@@ -215,6 +220,21 @@ select {
     animation: imageEnter var(--duration-image) var(--ease-out) both;
     animation-delay: calc(var(--i, 0) * 60ms);
   }
+
+  .img-reveal {
+    animation: revealBlur 480ms var(--ease-out) both;
+  }
+
+  .ambient-drift {
+    animation: ambientDrift 18s ease-in-out infinite;
+  }
+
+  .noise-overlay {
+    background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.5 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.6'/></svg>");
+    opacity: 0.025;
+    mix-blend-mode: overlay;
+    pointer-events: none;
+  }
 }
 
 @keyframes skeletonPulse {
@@ -225,6 +245,41 @@ select {
 
   50% {
     opacity: 1;
+  }
+}
+
+@keyframes skeletonShimmer {
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes ambientDrift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  50% {
+    transform: translate3d(2%, -1%, 0) scale(1.04);
+  }
+}
+
+@keyframes revealBlur {
+  from {
+    opacity: 0;
+    filter: blur(20px);
+    transform: scale(1.02);
+  }
+
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: scale(1);
   }
 }
 

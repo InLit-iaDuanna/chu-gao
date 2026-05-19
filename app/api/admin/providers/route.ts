@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import type { ProviderProtocol } from "@prisma/client";
 
 import { fail, ok } from "@/lib/api-response";
+import { readJsonBodySafe } from "@/lib/request-body";
 import { audit } from "@/lib/audit";
 import {
   adminFailureResponse,
@@ -19,6 +20,14 @@ import {
 import { serializeProvider } from "@/lib/providers/serialize";
 import { providerSchema } from "@/lib/validators";
 
+function modelIdForValidation(modelId: string): string {
+  if (modelId === "gpt-image-2-standard" || modelId === "gpt-image-2-high") {
+    return "gpt-image-2";
+  }
+
+  return modelId;
+}
+
 function validateProviderModels(
   protocol: ProviderProtocol,
   modelIds: string[],
@@ -26,7 +35,7 @@ function validateProviderModels(
   const expectedProtocol = providerProtocolToModelProtocol(protocol);
 
   for (const modelId of modelIds) {
-    const model = getModel(modelId);
+    const model = getModel(modelIdForValidation(modelId));
 
     if (!model) {
       return `未知模型 ${modelId}`;
@@ -91,7 +100,13 @@ export async function POST(request: Request) {
 
   const admin = authenticatedUser(sessionResult);
 
-  const json = (await request.json()) as unknown;
+  const body = await readJsonBodySafe(request);
+
+  if (!body.ok) {
+    return body.response;
+  }
+
+  const json = body.data;
   const parsed = providerSchema.safeParse(json);
 
   if (!parsed.success) {

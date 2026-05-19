@@ -1,4 +1,5 @@
 import { fail, ok } from "@/lib/api-response";
+import { readJsonBodySafe } from "@/lib/request-body";
 import { audit } from "@/lib/audit";
 import {
   adminFailureResponse,
@@ -29,7 +30,13 @@ export async function PATCH(
     return fail("SERVICE_UNAVAILABLE", "渠道服务未配置数据库", { status: 503 });
   }
 
-  const json = (await request.json()) as unknown;
+  const body = await readJsonBodySafe(request);
+
+  if (!body.ok) {
+    return body.response;
+  }
+
+  const json = body.data;
   const parsed = providerChannelPatchSchema.safeParse(json);
 
   if (!parsed.success) {
@@ -149,7 +156,13 @@ export async function DELETE(
     return fail("SERVICE_UNAVAILABLE", "渠道服务未配置数据库", { status: 503 });
   }
 
-  const json = (await request.json()) as unknown;
+  const body = await readJsonBodySafe(request);
+
+  if (!body.ok) {
+    return body.response;
+  }
+
+  const json = body.data;
   const parsed = providerChannelDeleteSchema.safeParse(json);
 
   if (!parsed.success) {

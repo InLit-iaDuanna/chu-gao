@@ -6,10 +6,14 @@ export function Canvas({
   images,
   status,
   error,
+  selectedImageId,
+  onSelectedImageIdChange,
 }: {
   images?: GalleryImage[];
   status: WorkbenchTaskStatus;
   error?: string | null;
+  selectedImageId?: string | null;
+  onSelectedImageIdChange?: (imageId: string | null) => void;
   onUseExample?: (prompt: string) => void;
 }) {
   const frameClass =
@@ -83,6 +87,15 @@ export function Canvas({
       <ImageGallery
         images={viewableImages}
         alt="生成结果"
+        selectedIndex={Math.max(
+          viewableImages.findIndex(
+            (image) => image.id && image.id === selectedImageId,
+          ),
+          0,
+        )}
+        onSelectedIndexChange={(index) =>
+          onSelectedImageIdChange?.(viewableImages[index]?.id ?? null)
+        }
         statusLabel={
           status === "running"
           ? "生成中"

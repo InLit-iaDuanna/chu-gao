@@ -13,8 +13,28 @@ import { serializeProviderError } from "@/lib/providers/diagnostics";
 import { buildAdapter } from "@/lib/providers/factory";
 import { providerProtocolToModelProtocol } from "@/lib/providers/protocols";
 
+function modelIdForRequest(modelId: string): string {
+  if (modelId === "gpt-image-2-standard" || modelId === "gpt-image-2-high") {
+    return "gpt-image-2";
+  }
+
+  return modelId;
+}
+
+function image2ModeForRequest(modelId: string): "standard" | "high" | undefined {
+  if (modelId === "gpt-image-2-high") {
+    return "high";
+  }
+
+  if (modelId === "gpt-image-2-standard") {
+    return "standard";
+  }
+
+  return undefined;
+}
+
 function smokeRequestForModel(modelId: string): InternalRequest | null {
-  const model = getModel(modelId);
+  const model = getModel(modelIdForRequest(modelId));
 
   if (!model) {
     return null;
@@ -28,6 +48,8 @@ function smokeRequestForModel(modelId: string): InternalRequest | null {
     resolution: model.capabilities.resolutions.includes("1K")
       ? "1K"
       : model.defaults.resolution,
+    image2Mode:
+      image2ModeForRequest(modelId) ?? model.defaults.image2Mode,
     n: 1,
     outputFormat: model.defaults.outputFormat,
     background: model.defaults.background,

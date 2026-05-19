@@ -1,5 +1,6 @@
 import type {
   ImageBackground,
+  Image2Mode,
   OutputFormat,
   ProviderChannelId,
   Resolution,
@@ -11,6 +12,7 @@ export interface WorkbenchState {
   negativePrompt?: string;
   aspectRatio: string;
   resolution: Resolution;
+  image2Mode?: Image2Mode;
   n: number;
   seed?: number;
   outputFormat: OutputFormat;
