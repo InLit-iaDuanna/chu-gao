@@ -7,6 +7,29 @@ import { requireAdminSessionFromHeaders } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { generationQueueStats } from "@/lib/queue";
 
+function formatDuration(start: Date | null, end: Date | null) {
+  if (!start) {
+    return null;
+  }
+
+  const startMs = start.getTime();
+  const endMs = (end ?? new Date()).getTime();
+
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < startMs) {
+    return null;
+  }
+
+  const seconds = Math.max(1, Math.round((endMs - startMs) / 1000));
+
+  if (seconds >= 60) {
+    const minutes = Math.floor(seconds / 60);
+    const rest = seconds % 60;
+    return `${minutes}分${rest}秒`;
+  }
+
+  return `${seconds}秒`;
+}
+
 async function getDashboardData(recentLimit: number) {
   const admin = await requireAdminSessionFromHeaders(await headers());
 
@@ -82,6 +105,7 @@ async function getDashboardData(recentLimit: number) {
           errorMessage: true,
           createdAt: true,
           startedAt: true,
+          finishedAt: true,
           user: { select: { email: true } },
         },
       }),
@@ -185,10 +209,7 @@ export default async function AdminDashboardPage({
         <StatCard label="今日失败" value={stats.failedToday} />
         <StatCard label="今日消耗" value={`${stats.creditsToday} 点`} />
         <StatCard label="号池占用" value={stats.slots} />
-        <StatCard
-          label="Worker"
-          value={stats.workerOnline ? "在线" : "离线"}
-        />
+        <StatCard label="Worker" value={stats.workerOnline ? "在线" : "离线"} />
         <StatCard label="Redis 等待" value={stats.queueWaiting} />
         <StatCard label="Redis 活跃" value={stats.queueActive} />
         <StatCard label="疑似卡单" value={stats.stuckGenerations} />
@@ -197,7 +218,8 @@ export default async function AdminDashboardPage({
         <section className="surface-panel border-warning/40 p-4">
           <p className="text-sm font-medium text-warning">生成 worker 未在线</p>
           <p className="mt-2 text-sm leading-6 text-text-muted">
-            当前只启动 UI 时，任务会停留在排队中。请使用 pnpm dev:all，或另开终端运行 pnpm worker。
+            当前只启动 UI 时，任务会停留在排队中。请使用 pnpm
+            dev:all，或另开终端运行 pnpm worker。
           </p>
         </section>
       ) : null}
@@ -216,32 +238,51 @@ export default async function AdminDashboardPage({
           </div>
         </div>
         <div className="grid gap-4">
-            {providers.map((provider) => (
-              <ProviderCard key={provider.id} provider={provider} />
-            ))}
-          </div>
-        </section>
+          {providers.map((provider) => (
+            <ProviderCard key={provider.id} provider={provider} />
+          ))}
+        </div>
+      </section>
       <section className="surface-panel p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-text-muted">最近 {recentLimit} 条生成</p>
           <DashboardRecentControls limit={recentLimit} />
         </div>
-            <div className="mt-4 space-y-3">
-              {generations.map((generation) => (
-                <div
-                  key={generation.id}
-                  className="surface-panel-soft grid gap-2 px-4 py-3 text-sm lg:grid-cols-[minmax(0,1fr)_auto]"
-                >
-                  <span className="min-w-0 break-words">{generation.prompt}</span>
-                  <span className="break-words text-text-muted">
-                    {generation.user.email} · {generation.modelId} ·{" "}
-                    {generation.status}
-                    {generation.status === "PENDING" && !stats.workerOnline
-                  ? " · 等待 worker 消费"
-                  : ""}
-              </span>
-            </div>
-          ))}
+        <div className="mt-4 space-y-3">
+          {generations.map((generation) => {
+            const duration = formatDuration(
+              generation.startedAt,
+              generation.finishedAt,
+            );
+
+            return (
+              <div
+                key={generation.id}
+                className="surface-panel-soft grid gap-2 px-4 py-3 text-sm lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start"
+              >
+                <span className="min-w-0 break-words">{generation.prompt}</span>
+                <div className="flex flex-wrap items-center gap-2 text-text-muted">
+                  <span className="break-words">{generation.user.email}</span>
+                  <span>·</span>
+                  <span>{generation.modelId}</span>
+                  <span>·</span>
+                  <span>{generation.status}</span>
+                  {duration ? (
+                    <>
+                      <span>·</span>
+                      <span>耗时 {duration}</span>
+                    </>
+                  ) : null}
+                  {generation.status === "PENDING" && !stats.workerOnline ? (
+                    <>
+                      <span>·</span>
+                      <span>等待 worker 消费</span>
+                    </>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </section>
     </div>

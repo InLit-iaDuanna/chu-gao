@@ -7,34 +7,34 @@
 ### 背景
 
 ```tsx
-className="bg-background"        // 页面底色
-className="bg-surface"          // 卡片/面板
-className="bg-surface-2"        // 输入框/次级容器
-className="bg-surface-3"        // 按钮 hover
+className = "bg-background"; // 页面底色
+className = "bg-surface"; // 卡片/面板
+className = "bg-surface-2"; // 输入框/次级容器
+className = "bg-surface-3"; // 按钮 hover
 ```
 
 ### 文本
 
 ```tsx
-className="text-foreground"     // 主文本（默认）
-className="text-text-muted"     // 次要文本
-className="text-text-faint"     // 辅助文本/禁用
+className = "text-foreground"; // 主文本（默认）
+className = "text-text-muted"; // 次要文本
+className = "text-text-faint"; // 辅助文本/禁用
 ```
 
 ### 边框
 
 ```tsx
-className="border-border"       // 默认边框
-className="border-border-strong" // hover/焦点边框
+className = "border-border"; // 默认边框
+className = "border-border-strong"; // hover/焦点边框
 ```
 
 ### 语义色
 
 ```tsx
-className="text-success"        // 成功 #4CAF82
-className="text-danger"         // 危险 #E85A4F
-className="text-warning"        // 警告 #E6AF54
-className="text-info"           // 信息 #82AAE6
+className = "text-success"; // 成功 #4CAF82
+className = "text-danger"; // 危险 #E85A4F
+className = "text-warning"; // 警告 #E6AF54
+className = "text-info"; // 信息 #82AAE6
 ```
 
 ---
@@ -57,17 +57,17 @@ rounded-[var(--radius-pill)] // 999px - 胶囊按钮
 
 ```tsx
 // 常用间距
-gap-2    // 8px  - 图标与文字
-gap-3    // 12px - 按钮内元素
-gap-4    // 16px - 表单字段
-gap-6    // 24px - 卡片间距
-gap-8    // 32px - 区块间距
+gap - 2; // 8px  - 图标与文字
+gap - 3; // 12px - 按钮内元素
+gap - 4; // 16px - 表单字段
+gap - 6; // 24px - 卡片间距
+gap - 8; // 32px - 区块间距
 
 // 内边距
-p-3      // 12px - 按钮
-p-4      // 16px - 小卡片
-p-5      // 20px - 标准卡片
-p-6      // 24px - 大卡片
+p - 3; // 12px - 按钮
+p - 4; // 16px - 小卡片
+p - 5; // 20px - 标准卡片
+p - 6; // 24px - 大卡片
 ```
 
 ---
@@ -230,9 +230,9 @@ style={{ backgroundColor: '#1a1a1a' }}
 
 // ✅ 标准过渡
 <button className="
-  bg-surface-2 
-  border border-border 
-  rounded-[var(--radius-md)] 
+  bg-surface-2
+  border border-border
+  rounded-[var(--radius-md)]
   px-3 py-2
   transition-colors duration-[var(--duration-fast)]
   hover:bg-surface-3 hover:border-border-strong

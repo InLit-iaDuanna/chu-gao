@@ -1,10 +1,7 @@
 import { fail, ok } from "@/lib/api-response";
 import { adminFailureResponse, checkSession } from "@/lib/auth";
 import { db } from "@/lib/db";
-import {
-  GENERATION_STATUSES,
-  isGenerationStatus,
-} from "@/lib/generations";
+import { GENERATION_STATUSES, isGenerationStatus } from "@/lib/generations";
 
 function msBetween(start: Date | null, end: Date | null) {
   if (!start) {

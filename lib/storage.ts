@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { lookup } from "node:dns/promises";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { createReadStream } from "node:fs";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import net from "node:net";
 import path from "node:path";
 
@@ -42,13 +43,16 @@ function providerImageFetchAllowlist(): string[] {
 
 function providerImageDownloadLimitBytes(): number {
   const configured = Number(process.env.MAX_PROVIDER_IMAGE_DOWNLOAD_MB ?? 20);
-  const sizeMb = Number.isFinite(configured) && configured > 0 ? configured : 20;
+  const sizeMb =
+    Number.isFinite(configured) && configured > 0 ? configured : 20;
 
   return sizeMb * 1024 * 1024;
 }
 
 function providerImageDownloadTimeoutMs(): number {
-  const configured = Number(process.env.PROVIDER_IMAGE_DOWNLOAD_TIMEOUT_MS ?? 30_000);
+  const configured = Number(
+    process.env.PROVIDER_IMAGE_DOWNLOAD_TIMEOUT_MS ?? 30_000,
+  );
 
   return Number.isFinite(configured) && configured > 0 ? configured : 30_000;
 }
@@ -214,6 +218,17 @@ function resolvePrivateStorageKey(key: string): string {
 
 export async function readPrivateStorageKey(key: string): Promise<Buffer> {
   return readFile(resolvePrivateStorageKey(key));
+}
+
+export async function statPrivateStorageKey(key: string) {
+  return stat(resolvePrivateStorageKey(key));
+}
+
+export function createPrivateStorageReadStream(
+  key: string,
+  options?: { start?: number; end?: number },
+) {
+  return createReadStream(resolvePrivateStorageKey(key), options);
 }
 
 export function extensionForMimeType(mimeType: string): string {

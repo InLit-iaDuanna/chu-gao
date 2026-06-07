@@ -40,7 +40,9 @@ export function ProviderChannelSelector({
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-sm font-medium">{channel.displayName}</div>
+                  <div className="text-sm font-medium">
+                    {channel.displayName}
+                  </div>
                   <div className="mt-1 text-xs text-text-muted">
                     {disabled
                       ? "暂无可用账号"

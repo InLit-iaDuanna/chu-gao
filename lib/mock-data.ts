@@ -1,4 +1,5 @@
 import { MODELS } from "@/lib/models/registry";
+import { IMAGE2_DEFAULT_RESOLUTION_ASPECT_RATIOS } from "@/lib/models/options";
 
 export const mockUser = {
   id: "user_demo",
@@ -115,6 +116,14 @@ export const mockSystemConfigEntries = [
     ],
   },
   { key: "generation.image2Resolutions", value: ["1K", "2K", "4K"] },
+  {
+    key: "generation.image2ResolutionAspectRatios",
+    value: {
+      "1K": [...IMAGE2_DEFAULT_RESOLUTION_ASPECT_RATIOS["1K"]],
+      "2K": [...IMAGE2_DEFAULT_RESOLUTION_ASPECT_RATIOS["2K"]],
+      "4K": [...IMAGE2_DEFAULT_RESOLUTION_ASPECT_RATIOS["4K"]],
+    },
+  },
   { key: "generation.image2MaxN", value: 4 },
   { key: "moderation.enabled", value: true },
   { key: "moderation.blockedKeywords", value: [] },

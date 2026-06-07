@@ -20,7 +20,9 @@ export async function DELETE(
   }
 
   if (!process.env.DATABASE_URL) {
-    return fail("SERVICE_UNAVAILABLE", "兑换码服务未配置数据库", { status: 503 });
+    return fail("SERVICE_UNAVAILABLE", "兑换码服务未配置数据库", {
+      status: 503,
+    });
   }
 
   const admin = authenticatedUser(sessionResult);

@@ -44,7 +44,11 @@ async function getRows() {
       `${user.generations.length} 活跃 / ${user._count.generations} 总`,
       `每日 ${user.dailyGenLimit}`,
       user.createdAt.toLocaleString("zh-CN"),
-      <Link key={user.id} href={`/admin/users/${user.id}`} className="underline">
+      <Link
+        key={user.id}
+        href={`/admin/users/${user.id}`}
+        className="underline"
+      >
         查看
       </Link>,
     ]);

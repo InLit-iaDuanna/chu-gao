@@ -32,63 +32,62 @@ export async function GET(request: Request) {
       providerSlots,
       stuckGenerations,
       queueStatsResult,
-    ] =
-      await Promise.all([
-        db.generation.count({
-          where: { createdAt: { gte: today } },
-        }),
-        db.user.count({
-          where: { status: "ACTIVE" },
-        }),
-        db.provider.count({
-          where: { isActive: true, health: { not: "DOWN" } },
-        }),
-        db.generation.count({
-          where: { status: "PENDING" },
-        }),
-        db.generation.count({
-          where: { status: "RUNNING" },
-        }),
-        db.generation.count({
-          where: { status: "FAILED", createdAt: { gte: today } },
-        }),
-        db.generation.count({
-          where: { status: "SUCCEEDED", createdAt: { gte: today } },
-        }),
-        db.usageLog.aggregate({
-          where: {
-            createdAt: { gte: today },
-            creditsDelta: { lt: 0 },
-          },
-          _sum: { creditsDelta: true },
-        }),
-        db.providerAccount.aggregate({
-          where: {
-            isActive: true,
-            health: { not: "DOWN" },
-          },
-          _sum: {
-            maxConcurrency: true,
-            inFlight: true,
-          },
-        }),
-        db.generation.count({
-          where: {
-            deletedAt: null,
-            OR: [
-              {
-                status: "PENDING",
-                createdAt: { lt: new Date(Date.now() - 2 * 60_000) },
-              },
-              {
-                status: "RUNNING",
-                startedAt: { lt: new Date(Date.now() - 10 * 60_000) },
-              },
-            ],
-          },
-        }),
-        generationQueueStats().catch(() => null),
-      ]);
+    ] = await Promise.all([
+      db.generation.count({
+        where: { createdAt: { gte: today } },
+      }),
+      db.user.count({
+        where: { status: "ACTIVE" },
+      }),
+      db.provider.count({
+        where: { isActive: true, health: { not: "DOWN" } },
+      }),
+      db.generation.count({
+        where: { status: "PENDING" },
+      }),
+      db.generation.count({
+        where: { status: "RUNNING" },
+      }),
+      db.generation.count({
+        where: { status: "FAILED", createdAt: { gte: today } },
+      }),
+      db.generation.count({
+        where: { status: "SUCCEEDED", createdAt: { gte: today } },
+      }),
+      db.usageLog.aggregate({
+        where: {
+          createdAt: { gte: today },
+          creditsDelta: { lt: 0 },
+        },
+        _sum: { creditsDelta: true },
+      }),
+      db.providerAccount.aggregate({
+        where: {
+          isActive: true,
+          health: { not: "DOWN" },
+        },
+        _sum: {
+          maxConcurrency: true,
+          inFlight: true,
+        },
+      }),
+      db.generation.count({
+        where: {
+          deletedAt: null,
+          OR: [
+            {
+              status: "PENDING",
+              createdAt: { lt: new Date(Date.now() - 2 * 60_000) },
+            },
+            {
+              status: "RUNNING",
+              startedAt: { lt: new Date(Date.now() - 10 * 60_000) },
+            },
+          ],
+        },
+      }),
+      generationQueueStats().catch(() => null),
+    ]);
     const queueStats = queueStatsResult ?? {
       waiting: queueDepth,
       active: running,

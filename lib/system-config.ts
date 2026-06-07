@@ -5,6 +5,7 @@ import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import {
+  IMAGE2_DEFAULT_RESOLUTION_ASPECT_RATIOS,
   IMAGE_ASPECT_RATIO_OPTIONS,
   IMAGE_RESOLUTION_OPTIONS,
 } from "@/lib/models/options";
@@ -41,6 +42,11 @@ export const SYSTEM_CONFIG_DEFAULTS = {
     defaultDailyLimit: 50,
     image2AspectRatios: [...IMAGE_ASPECT_RATIO_OPTIONS],
     image2Resolutions: [...IMAGE_RESOLUTION_OPTIONS],
+    image2ResolutionAspectRatios: {
+      "1K": [...IMAGE2_DEFAULT_RESOLUTION_ASPECT_RATIOS["1K"]],
+      "2K": [...IMAGE2_DEFAULT_RESOLUTION_ASPECT_RATIOS["2K"]],
+      "4K": [...IMAGE2_DEFAULT_RESOLUTION_ASPECT_RATIOS["4K"]],
+    },
     image2MaxN: 4,
   },
   moderation: {
@@ -88,6 +94,11 @@ export const SYSTEM_CONFIG_DEFAULT_ROWS = {
   "generation.defaultDailyLimit": 50,
   "generation.image2AspectRatios": [...IMAGE_ASPECT_RATIO_OPTIONS],
   "generation.image2Resolutions": [...IMAGE_RESOLUTION_OPTIONS],
+  "generation.image2ResolutionAspectRatios": {
+    "1K": [...IMAGE2_DEFAULT_RESOLUTION_ASPECT_RATIOS["1K"]],
+    "2K": [...IMAGE2_DEFAULT_RESOLUTION_ASPECT_RATIOS["2K"]],
+    "4K": [...IMAGE2_DEFAULT_RESOLUTION_ASPECT_RATIOS["4K"]],
+  },
   "generation.image2MaxN": 4,
   "moderation.enabled": true,
   "moderation.blockedKeywords": [...DEFAULT_BLOCKED_KEYWORDS] as string[],

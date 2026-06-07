@@ -111,9 +111,7 @@ async function checkEnv(): Promise<void> {
   add(
     "DATABASE_URL",
     process.env.DATABASE_URL ? "ok" : "fail",
-    process.env.DATABASE_URL
-      ? "configured"
-      : "missing; set it in .env",
+    process.env.DATABASE_URL ? "configured" : "missing; set it in .env",
   );
   add(
     "REDIS_URL",
@@ -175,11 +173,7 @@ async function checkEnv(): Promise<void> {
 
 async function checkDb(): Promise<void> {
   if (!process.env.DATABASE_URL) {
-    add(
-      "db",
-      "fail",
-      "DATABASE_URL is missing",
-    );
+    add("db", "fail", "DATABASE_URL is missing");
     return;
   }
 
@@ -188,11 +182,7 @@ async function checkDb(): Promise<void> {
     databaseReachable = true;
     add("db", "ok", "reachable");
   } catch (error) {
-    add(
-      "db",
-      "fail",
-      `unreachable: ${dbHint(error)} (${shortError(error)})`,
-    );
+    add("db", "fail", `unreachable: ${dbHint(error)} (${shortError(error)})`);
   }
 }
 
@@ -223,11 +213,7 @@ async function checkProviderSeed(): Promise<void> {
   const providerCheckName = `provider:${expectedModel}`;
 
   if (!process.env.DATABASE_URL) {
-    add(
-      providerCheckName,
-      "fail",
-      "DATABASE_URL is missing",
-    );
+    add(providerCheckName, "fail", "DATABASE_URL is missing");
     return;
   }
 

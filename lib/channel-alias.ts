@@ -1,6 +1,4 @@
-import {
-  normalizeProviderChannelBaseUrl,
-} from "@/lib/provider-channels";
+import { normalizeProviderChannelBaseUrl } from "@/lib/provider-channels";
 
 const AQUATIC_CHANNEL_ALIASES = [
   "海豚",

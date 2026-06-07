@@ -61,9 +61,23 @@ export function middleware(request: NextRequest) {
     );
   }
 
-  return withSecurityHeaders(NextResponse.next());
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set(
+    "x-current-path",
+    `${request.nextUrl.pathname}${request.nextUrl.search}`,
+  );
+
+  return withSecurityHeaders(
+    NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    }),
+  );
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml).*)",
+  ],
 };

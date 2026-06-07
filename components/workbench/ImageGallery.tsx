@@ -43,7 +43,10 @@ export function ImageGallery({
   );
   const initialIndex =
     typeof defaultIndex === "number"
-      ? Math.min(Math.max(defaultIndex, 0), Math.max(viewableImages.length - 1, 0))
+      ? Math.min(
+          Math.max(defaultIndex, 0),
+          Math.max(viewableImages.length - 1, 0),
+        )
       : Math.max(viewableImages.length - 1, 0);
   const [uncontrolledSelectedIndex, setUncontrolledSelectedIndex] =
     useState(initialIndex);
@@ -219,7 +222,10 @@ export function ImageGallery({
         <img
           src={selectedUrl}
           alt={alt}
-          className={cn("h-full max-h-full w-full object-contain", imageClassName)}
+          className={cn(
+            "h-full max-h-full w-full object-contain",
+            imageClassName,
+          )}
           decoding="async"
         />
       </div>

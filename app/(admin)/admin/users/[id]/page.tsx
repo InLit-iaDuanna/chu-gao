@@ -35,7 +35,11 @@ async function getUser(id: string) {
       },
     }),
     db.generation.count({
-      where: { userId: id, createdAt: { gte: today }, status: { not: "CANCELED" } },
+      where: {
+        userId: id,
+        createdAt: { gte: today },
+        status: { not: "CANCELED" },
+      },
     }),
     db.usageLog.findMany({
       where: { userId: id },
@@ -127,7 +131,16 @@ export default async function AdminUserDetailPage({
         <AdminDangerActions userId={user.id} />
       </section>
       <DataTable
-        headers={["任务", "模型", "状态", "渠道", "账号", "耗时", "点数", "错误"]}
+        headers={[
+          "任务",
+          "模型",
+          "状态",
+          "渠道",
+          "账号",
+          "耗时",
+          "点数",
+          "错误",
+        ]}
         rows={user.generations.map((generation) => [
           <Link
             key={generation.id}
@@ -139,7 +152,9 @@ export default async function AdminUserDetailPage({
           generation.modelId,
           generation.status,
           generation.provider?.name ?? "-",
-          generation.providerAccount?.name ?? generation.providerAccount?.baseUrl ?? "-",
+          generation.providerAccount?.name ??
+            generation.providerAccount?.baseUrl ??
+            "-",
           duration(generation.startedAt, generation.finishedAt),
           generation.costCredits,
           generation.errorMessage ?? "-",

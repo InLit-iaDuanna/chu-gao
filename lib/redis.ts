@@ -31,9 +31,7 @@ export function getRedis(): IORedis {
     // Readiness checks convert connection failures into actionable errors.
   });
 
-  if (process.env.NODE_ENV !== "production") {
-    globalThis.__redis__ = connection;
-  }
+  globalThis.__redis__ = connection;
 
   return connection;
 }

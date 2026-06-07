@@ -66,10 +66,7 @@ function retryDelayMs(
   return Math.min(retry.maxDelayMs, jitteredDelay);
 }
 
-function waitWithAbort(
-  ms: number,
-  signal?: AbortSignal | null,
-): Promise<void> {
+function waitWithAbort(ms: number, signal?: AbortSignal | null): Promise<void> {
   if (signal?.aborted) {
     return Promise.reject(signal.reason ?? new Error("AbortError"));
   }
@@ -151,10 +148,7 @@ export async function fetchWithTimeout(
         isRetryableNetworkError(normalizedError) &&
         !signal?.aborted
       ) {
-        await waitWithAbort(
-          retryDelayMs(undefined, retry, attempt),
-          signal,
-        );
+        await waitWithAbort(retryDelayMs(undefined, retry, attempt), signal);
         continue;
       }
 

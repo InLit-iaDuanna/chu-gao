@@ -28,6 +28,7 @@ export type CostAxis = "resolution" | "flat";
 export interface PricingRule {
   id: string;
   modelId: string;
+  image2Mode?: Image2Mode | null;
   resolution?: string | null;
   aspectRatio?: string | null;
   outputFormat?: string | null;

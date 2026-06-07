@@ -59,7 +59,9 @@ async function getRows(q?: string) {
       generation.modelId,
       generation.status,
       generation.provider?.name ?? generation.providerId ?? "-",
-      generation.providerAccount?.name ?? generation.providerAccount?.baseUrl ?? "-",
+      generation.providerAccount?.name ??
+        generation.providerAccount?.baseUrl ??
+        "-",
       generation.costCredits,
       generation.attempts,
       generation.errorCode ?? "-",

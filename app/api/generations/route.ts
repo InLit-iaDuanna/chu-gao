@@ -197,14 +197,15 @@ export async function POST(request: Request) {
     const conversationId = parsed.data.conversationId;
     const providerChannelId = internalRequest.providerChannelId;
     const displayNameMap = await getProviderChannelDisplayNameMap();
-    let selectedProviderChannel:
-      | {
-          baseUrl: string;
-          displayName: string | null;
-        }
-      | null = null;
+    let selectedProviderChannel: {
+      baseUrl: string;
+      displayName: string | null;
+    } | null = null;
 
-    if (supportsProviderChannels(internalRequest.modelId) && providerChannelId) {
+    if (
+      supportsProviderChannels(internalRequest.modelId) &&
+      providerChannelId
+    ) {
       const modelIds = supportedModelIds(internalRequest.modelId);
       const candidateAccounts = await db.providerAccount.findMany({
         where: {
@@ -321,9 +322,13 @@ export async function POST(request: Request) {
     }
 
     if (await isPromptBlocked(combinedPrompt)) {
-      await recordModerationRejectionAttempt(session.id, internalRequest.modelId, {
-        reason: "blocked_keyword",
-      });
+      await recordModerationRejectionAttempt(
+        session.id,
+        internalRequest.modelId,
+        {
+          reason: "blocked_keyword",
+        },
+      );
 
       return fail("MODERATION_REJECTED", "提示词包含不允许的内容", {
         status: 400,

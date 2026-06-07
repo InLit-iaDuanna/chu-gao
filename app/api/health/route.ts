@@ -1,9 +1,7 @@
 import { fail, ok } from "@/lib/api-response";
 import { db } from "@/lib/db";
 import { getProviderChannelDisplayNameMap } from "@/lib/provider-channel-config";
-import {
-  buildProviderChannelsFromAccounts,
-} from "@/lib/provider-channels";
+import { buildProviderChannelsFromAccounts } from "@/lib/provider-channels";
 import { safeUrlForDiagnostics } from "@/lib/providers/diagnostics";
 import { generationQueueStats } from "@/lib/queue";
 import { getRedis } from "@/lib/redis";
@@ -161,8 +159,8 @@ async function checkProvider(): Promise<CheckResult> {
   }
 
   try {
-    const [activeProviders, imageProviders, displayNameMap] =
-      await Promise.all([
+    const [activeProviders, imageProviders, displayNameMap] = await Promise.all(
+      [
         db.provider.count({
           where: {
             isActive: true,
@@ -196,7 +194,8 @@ async function checkProvider(): Promise<CheckResult> {
           },
         }),
         getProviderChannelDisplayNameMap(),
-      ]);
+      ],
+    );
     const providerChannels = buildProviderChannelsFromAccounts(
       imageProviders.flatMap((provider) =>
         provider.accounts.map((account) => ({

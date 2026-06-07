@@ -63,12 +63,12 @@ export async function PATCH(
   const account = await db.providerAccount.update({
     where: { id: accountId },
     data: {
-      name:
-        parsed.data.name === null
-          ? null
-          : parsed.data.name,
+      name: parsed.data.name === null ? null : parsed.data.name,
       baseUrl: parsed.data.baseUrl
-        ? normalizeProviderBaseUrl(parsed.data.baseUrl, current.provider.protocol)
+        ? normalizeProviderBaseUrl(
+            parsed.data.baseUrl,
+            current.provider.protocol,
+          )
         : undefined,
       apiKeyEnc: parsed.data.apiKey ? encrypt(parsed.data.apiKey) : undefined,
       apiKeyFingerprint: parsed.data.apiKey
@@ -78,9 +78,7 @@ export async function PATCH(
       weight: parsed.data.weight,
       maxConcurrency: parsed.data.maxConcurrency,
       dailyLimit:
-        parsed.data.dailyLimit === null
-          ? null
-          : parsed.data.dailyLimit,
+        parsed.data.dailyLimit === null ? null : parsed.data.dailyLimit,
       isActive: parsed.data.isActive,
       health: parsed.data.health,
       consecutiveErrors: parsed.data.consecutiveErrors,

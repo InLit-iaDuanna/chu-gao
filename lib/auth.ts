@@ -160,3 +160,25 @@ export async function requireAdminSessionFromHeaders(
 
   return session;
 }
+
+export function isDevAuthDbBypassEnabled(): boolean {
+  return process.env.NODE_ENV === "development" && !process.env.DATABASE_URL;
+}
+
+export function devBypassSession(
+  account?: "student" | "admin",
+): SessionUser | null {
+  if (!isDevAuthDbBypassEnabled()) {
+    return null;
+  }
+
+  const isAdmin = account === "admin";
+
+  return {
+    id: isAdmin ? "dev-admin-id" : "dev-student-id",
+    email: isAdmin ? "admin@dev.local" : "student@dev.local",
+    role: isAdmin ? "ADMIN" : "USER",
+    status: "ACTIVE",
+    sessionVersion: 0,
+  };
+}

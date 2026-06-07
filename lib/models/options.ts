@@ -22,6 +22,12 @@ export const IMAGE_RESOLUTION_OPTIONS = [
   "4K",
 ] as const satisfies readonly Resolution[];
 
+export const IMAGE2_DEFAULT_RESOLUTION_ASPECT_RATIOS = {
+  "1K": ["1:1", "3:2", "2:3"],
+  "2K": [...IMAGE_ASPECT_RATIO_OPTIONS],
+  "4K": ["16:9", "9:16", "2:1", "1:2", "21:9", "9:21"],
+} as const satisfies Record<Resolution, readonly AspectRatio[]>;
+
 export const IMAGE2_MODE_OPTIONS = [
   "standard",
   "high",

@@ -12,11 +12,12 @@ interface WorkbenchStoreState {
   isBooting: boolean;
   setModels: (models: PublicModelDefinition[]) => void;
   setState: (
-    next: WorkbenchState | null | ((current: WorkbenchState | null) => WorkbenchState | null),
+    next:
+      | WorkbenchState
+      | null
+      | ((current: WorkbenchState | null) => WorkbenchState | null),
   ) => void;
-  setCredits: (
-    credits: number | ((current: number) => number),
-  ) => void;
+  setCredits: (credits: number | ((current: number) => number)) => void;
   setAccountId: (id: string | null) => void;
   setIsBooting: (isBooting: boolean) => void;
   reset: () => void;
@@ -40,6 +41,5 @@ export const useWorkbenchStore = create<WorkbenchStoreState>((set) => ({
     })),
   setAccountId: (accountId) => set({ accountId }),
   setIsBooting: (isBooting) => set({ isBooting }),
-  reset: () =>
-    set({ models: [], state: null, credits: 0, accountId: null }),
+  reset: () => set({ models: [], state: null, credits: 0, accountId: null }),
 }));

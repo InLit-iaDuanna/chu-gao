@@ -99,7 +99,9 @@ function parseCsvRows(text: string, defaultBaseUrl: string): ParsedImportRow[] {
     return [];
   }
 
-  const header = splitCsvLine(lines[0]).map((cell) => cell.trim().toLowerCase());
+  const header = splitCsvLine(lines[0]).map((cell) =>
+    cell.trim().toLowerCase(),
+  );
   const required = ["api_key"];
 
   if (required.some((cell) => !header.includes(cell))) {
@@ -196,8 +198,8 @@ export async function POST(
   const admin = authenticatedUser(sessionResult);
   const sourceText =
     parsed.data.mode === "csv"
-      ? parsed.data.csvText ?? ""
-      : parsed.data.text ?? "";
+      ? (parsed.data.csvText ?? "")
+      : (parsed.data.text ?? "");
   const rows: ParsedImportRow[] =
     parsed.data.mode === "csv"
       ? parseCsvRows(sourceText, provider.baseUrl)
@@ -229,7 +231,8 @@ export async function POST(
   let created = 0;
   let skipped = 0;
   let failed = 0;
-  const errors: Array<{ lineNumber: number; name?: string; reason: string }> = [];
+  const errors: Array<{ lineNumber: number; name?: string; reason: string }> =
+    [];
 
   for (const row of rows) {
     if (!row.ok) {

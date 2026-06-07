@@ -19,7 +19,8 @@ export function Canvas({
   const frameClass =
     "surface-panel canvas-panel flex min-h-[420px] items-center justify-center p-6 lg:min-h-0";
 
-  const viewableImages = images?.filter((image) => image.src ?? image.url) ?? [];
+  const viewableImages =
+    images?.filter((image) => image.src ?? image.url) ?? [];
 
   if (viewableImages.length === 0) {
     if (status === "pending" || status === "running") {
@@ -71,9 +72,7 @@ export function Canvas({
       <div className={frameClass}>
         <div className="max-w-md text-center">
           <p className="eyebrow">画布</p>
-          <h3 className="mt-2 text-xl font-medium">
-            结果会出现在这里
-          </h3>
+          <h3 className="mt-2 text-xl font-medium">结果会出现在这里</h3>
           <p className="mt-3 break-words text-sm leading-6 text-text-muted">
             可以直接写目标图，也可以像对话一样补充用途、风格、构图、参考约束和需要避开的内容。生成后继续发送消息即可迭代同一张图。
           </p>
@@ -98,12 +97,12 @@ export function Canvas({
         }
         statusLabel={
           status === "running"
-          ? "生成中"
-          : status === "failed"
-            ? "失败"
-            : status === "canceled"
-              ? "已取消"
-              : "已完成"
+            ? "生成中"
+            : status === "failed"
+              ? "失败"
+              : status === "canceled"
+                ? "已取消"
+                : "已完成"
         }
       />
     </div>

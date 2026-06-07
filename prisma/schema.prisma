@@ -66,25 +66,25 @@ model User {
 
   generations   Generation[]
   conversations Conversation[]
-  inviteCode     InviteCode? @relation(fields: [inviteCodeId], references: [id])
-  auditLogs      AuditLog[]  @relation("ActorAudits")
-  redemptions    CreditRedemption[]
+  inviteCode    InviteCode?        @relation(fields: [inviteCodeId], references: [id])
+  auditLogs     AuditLog[]         @relation("ActorAudits")
+  redemptions   CreditRedemption[]
 
   @@index([createdAt])
   @@index([status])
 }
 
 model InviteCode {
-  id             String   @id @default(cuid())
-  code           String   @unique
-  maxUses        Int      @default(1)
-  usedCount      Int      @default(0)
-  initialCredits Int      @default(100)
+  id             String    @id @default(cuid())
+  code           String    @unique
+  maxUses        Int       @default(1)
+  usedCount      Int       @default(0)
+  initialCredits Int       @default(100)
   note           String?
   expiresAt      DateTime?
   revokedAt      DateTime?
   createdBy      String?
-  createdAt      DateTime @default(now())
+  createdAt      DateTime  @default(now())
 
   users User[]
 
@@ -152,12 +152,12 @@ model Generation {
   deletedAt          DateTime?
   createdAt          DateTime         @default(now())
 
-  user         User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  conversation Conversation?         @relation(fields: [conversationId], references: [id], onDelete: SetNull)
-  provider     Provider?             @relation(fields: [providerId], references: [id])
-  providerAccount ProviderAccount?    @relation(fields: [providerAccountId], references: [id])
-  images       GeneratedImage[]
-  messages     ConversationMessage[]
+  user            User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation    Conversation?         @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  provider        Provider?             @relation(fields: [providerId], references: [id])
+  providerAccount ProviderAccount?      @relation(fields: [providerAccountId], references: [id])
+  images          GeneratedImage[]
+  messages        ConversationMessage[]
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([conversationId, createdAt(sort: Desc)])
@@ -184,24 +184,24 @@ model GeneratedImage {
 }
 
 model Provider {
-  id                String         @id @default(cuid())
-  name              String
-  protocol          ProviderProtocol
-  baseUrl           String
-  apiKeyEnc         String
-  priority          Int            @default(0)
-  health            ProviderHealth @default(HEALTHY)
-  modelsSupported   String[]
-  costMultiplier    Float          @default(1)
-  selectionStrategy ProviderSelectionStrategy @default(LEAST_IN_FLIGHT)
+  id                 String                    @id @default(cuid())
+  name               String
+  protocol           ProviderProtocol
+  baseUrl            String
+  apiKeyEnc          String
+  priority           Int                       @default(0)
+  health             ProviderHealth            @default(HEALTHY)
+  modelsSupported    String[]
+  costMultiplier     Float                     @default(1)
+  selectionStrategy  ProviderSelectionStrategy @default(LEAST_IN_FLIGHT)
   poolMaxConcurrency Int?
-  isActive          Boolean        @default(true)
-  consecutiveErrors Int            @default(0)
-  lastErrorAt       DateTime?
-  lastErrorMsg      String?
-  lastHealthyAt     DateTime?
-  note              String?
-  createdAt         DateTime       @default(now())
+  isActive           Boolean                   @default(true)
+  consecutiveErrors  Int                       @default(0)
+  lastErrorAt        DateTime?
+  lastErrorMsg       String?
+  lastHealthyAt      DateTime?
+  note               String?
+  createdAt          DateTime                  @default(now())
 
   generations Generation[]
   accounts    ProviderAccount[]
@@ -242,37 +242,39 @@ model ProviderAccount {
 }
 
 model ModelPricing {
-  id           String   @id @default(cuid())
-  modelId      String
-  resolution   String?
-  aspectRatio  String?
-  outputFormat String?
-  background   String?
+  id            String   @id @default(cuid())
+  modelId       String
+  image2Mode    String?
+  resolution    String?
+  aspectRatio   String?
+  outputFormat  String?
+  background    String?
   usesReference Boolean?
-  credits      Int
-  priority     Int      @default(0)
-  isActive     Boolean  @default(true)
-  note         String?
-  updatedBy    String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  credits       Int
+  priority      Int      @default(0)
+  isActive      Boolean  @default(true)
+  note          String?
+  updatedBy     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   @@index([modelId])
+  @@index([image2Mode])
   @@index([isActive])
 }
 
 model CreditRedemptionCode {
-  id           String   @id @default(cuid())
-  code         String   @unique
+  id           String    @id @default(cuid())
+  code         String    @unique
   credits      Int
-  maxUses      Int      @default(1)
-  usedCount    Int      @default(0)
-  perUserLimit Int      @default(1)
+  maxUses      Int       @default(1)
+  usedCount    Int       @default(0)
+  perUserLimit Int       @default(1)
   note         String?
   expiresAt    DateTime?
   revokedAt    DateTime?
   createdBy    String?
-  createdAt    DateTime @default(now())
+  createdAt    DateTime  @default(now())
 
   redemptions CreditRedemption[]
 
@@ -290,22 +292,22 @@ model CreditRedemption {
   code CreditRedemptionCode @relation(fields: [codeId], references: [id], onDelete: Cascade)
   user User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@unique([codeId, userId])
   @@index([userId, createdAt])
   @@index([codeId, createdAt])
-  @@unique([codeId, userId])
 }
 
 model UsageLog {
-  id           String   @id @default(cuid())
-  userId       String
-  generationId String?
-  providerId   String?
+  id                String   @id @default(cuid())
+  userId            String
+  generationId      String?
+  providerId        String?
   providerAccountId String?
-  modelId      String?
-  action       String
-  creditsDelta Int
-  metadata     Json?
-  createdAt    DateTime @default(now())
+  modelId           String?
+  action            String
+  creditsDelta      Int
+  metadata          Json?
+  createdAt         DateTime @default(now())
 
   @@index([userId, createdAt(sort: Desc)])
 }

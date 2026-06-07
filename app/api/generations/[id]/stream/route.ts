@@ -122,12 +122,14 @@ export async function GET(
             return;
           }
 
-          if (!safeEnqueue(
-            controller,
-            encoder.encode(
-              `event: update\ndata: ${JSON.stringify(serializeGeneration(generation, { displayNameMap }))}\n\n`,
-            ),
-          )) {
+          if (
+            !safeEnqueue(
+              controller,
+              encoder.encode(
+                `event: update\ndata: ${JSON.stringify(serializeGeneration(generation, { displayNameMap }))}\n\n`,
+              ),
+            )
+          ) {
             close();
             return;
           }
@@ -146,7 +148,10 @@ export async function GET(
             return;
           }
 
-          safeEnqueue(controller, errorEvent("INTERNAL_ERROR", "任务状态读取失败"));
+          safeEnqueue(
+            controller,
+            errorEvent("INTERNAL_ERROR", "任务状态读取失败"),
+          );
           close();
           return;
         }

@@ -1,6 +1,7 @@
 import type { ModelDefinition, ProtocolName } from "@/lib/models/types";
 import {
   IMAGE2_MODE_OPTIONS,
+  IMAGE2_DEFAULT_RESOLUTION_ASPECT_RATIOS,
   IMAGE_ASPECT_RATIO_OPTIONS,
 } from "@/lib/models/options";
 
@@ -23,23 +24,9 @@ export const MODELS: Record<string, ModelDefinition> = {
       backgrounds: ["auto", "opaque"],
       supportsOutputCompression: true,
       resolutionAspectRatios: {
-        "1K": ["1:1", "3:2", "2:3"],
-        "2K": [
-          "1:1",
-          "3:2",
-          "2:3",
-          "4:3",
-          "3:4",
-          "5:4",
-          "4:5",
-          "16:9",
-          "9:16",
-          "2:1",
-          "1:2",
-          "21:9",
-          "9:21",
-        ],
-        "4K": ["16:9", "9:16", "2:1", "1:2", "21:9", "9:21"],
+        "1K": [...IMAGE2_DEFAULT_RESOLUTION_ASPECT_RATIOS["1K"]],
+        "2K": [...IMAGE2_DEFAULT_RESOLUTION_ASPECT_RATIOS["2K"]],
+        "4K": [...IMAGE2_DEFAULT_RESOLUTION_ASPECT_RATIOS["4K"]],
       },
     },
     defaults: {

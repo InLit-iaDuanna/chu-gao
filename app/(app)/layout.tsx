@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Grid3X3, ImagePlus, Settings } from "lucide-react";
+import { Frame, Grid3X3, ImagePlus, Settings } from "lucide-react";
 import { ActionableStatus } from "@/components/shared/ActionableStatus";
 import { AccountMenu } from "@/components/shared/AccountMenu";
 import { Logo } from "@/components/shared/Logo";
@@ -11,10 +11,13 @@ import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
   { href: "/app", label: "创作", icon: ImagePlus },
+  { href: "/app/canvas", label: "无限画布", icon: Frame },
   { href: "/app/history", label: "历史", icon: Grid3X3 },
 ];
 
-const BOTTOM_NAV_ITEMS = [{ href: "/app/settings", label: "设置", icon: Settings }];
+const BOTTOM_NAV_ITEMS = [
+  { href: "/app/settings", label: "设置", icon: Settings },
+];
 
 function isActivePath(current: string, href: string) {
   if (href === "/app") return current === "/app" || current === "/app/";

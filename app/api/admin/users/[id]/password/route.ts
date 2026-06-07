@@ -65,5 +65,9 @@ export async function POST(
     request,
   });
 
-  return ok({ id: user.id, email: user.email, sessionVersion: user.sessionVersion });
+  return ok({
+    id: user.id,
+    email: user.email,
+    sessionVersion: user.sessionVersion,
+  });
 }

@@ -120,7 +120,11 @@ export class ProviderUnavailableError extends Error {
     readonly cause?: unknown,
     readonly details?: ProviderFailureDetails,
   ) {
-    super(channelLabel ? `${channelLabel} 暂不可用` : `模型 ${modelId} 的渠道暂不可用`);
+    super(
+      channelLabel
+        ? `${channelLabel} 暂不可用`
+        : `模型 ${modelId} 的渠道暂不可用`,
+    );
     this.name = "ProviderUnavailableError";
   }
 }
@@ -386,9 +390,8 @@ async function findAvailableProviderAccounts(
   });
 
   return accounts
-    .filter(
-      (account) =>
-        providerChannelMatchesBaseUrl(channelId, account.baseUrl),
+    .filter((account) =>
+      providerChannelMatchesBaseUrl(channelId, account.baseUrl),
     )
     .sort((left, right) => {
       const leftProviderPriority = left.provider.priority;
@@ -496,12 +499,11 @@ export async function selectAndGenerate(
   const providerPoolErrors = new Map<string, unknown[]>();
   let accountAttempts = 0;
   const filteredAccountCandidates = request.providerChannelId
-    ? accountCandidates.filter(
-        (account) =>
-          providerChannelMatchesBaseUrl(
-            request.providerChannelId,
-            account.baseUrl,
-          ),
+    ? accountCandidates.filter((account) =>
+        providerChannelMatchesBaseUrl(
+          request.providerChannelId,
+          account.baseUrl,
+        ),
       )
     : accountCandidates;
   const maxAccountAttempts = maxAttemptsForAccounts(
@@ -552,7 +554,9 @@ export async function selectAndGenerate(
       clearTimeout(timer);
       await Promise.all([
         markHealthy(target.provider.id),
-        target.account ? markAccountHealthy(target.account.id) : Promise.resolve(),
+        target.account
+          ? markAccountHealthy(target.account.id)
+          : Promise.resolve(),
       ]);
 
       return {
@@ -593,8 +597,9 @@ export async function selectAndGenerate(
   }
 
   await Promise.all(
-    Array.from(providerPoolErrors.entries()).map(([providerId, providerErrors]) =>
-      markProviderPoolErrored(providerId, providerErrors),
+    Array.from(providerPoolErrors.entries()).map(
+      ([providerId, providerErrors]) =>
+        markProviderPoolErrored(providerId, providerErrors),
     ),
   );
 
@@ -721,7 +726,10 @@ export async function assertProviderAvailable(
     throw new ModelNotAvailableError(
       modelId,
       providerChannel?.displayName ??
-        displayNameForProviderChannel(accounts[0]?.baseUrl, accounts[0]?.provider.name) ??
+        displayNameForProviderChannel(
+          accounts[0]?.baseUrl,
+          accounts[0]?.provider.name,
+        ) ??
         null,
     );
   }

@@ -179,9 +179,9 @@ export async function PATCH(
         const nextStatus = parsed.data.status;
         const invalidatesSession = Boolean(
           parsed.data.email ||
-            parsed.data.role ||
-            parsed.data.status ||
-            parsed.data.bannedReason,
+          parsed.data.role ||
+          parsed.data.status ||
+          parsed.data.bannedReason,
         );
 
         return tx.user.update({
@@ -193,9 +193,7 @@ export async function PATCH(
             status: nextStatus,
             dailyGenLimit: parsed.data.dailyGenLimit,
             concurrentLimit: parsed.data.concurrentLimit,
-            sessionVersion: invalidatesSession
-              ? { increment: 1 }
-              : undefined,
+            sessionVersion: invalidatesSession ? { increment: 1 } : undefined,
             bannedReason: parsed.data.bannedReason,
             bannedAt:
               nextStatus === "BANNED"

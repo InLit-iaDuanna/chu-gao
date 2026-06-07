@@ -89,10 +89,7 @@ export function useBootstrap(
           ? fetch(`/api/conversations/${requestedConversationId}`, {
               cache: "no-store",
             }).then((response) =>
-              readApiResponse<ConversationView>(
-                response,
-                "对话暂时无法读取。",
-              ),
+              readApiResponse<ConversationView>(response, "对话暂时无法读取。"),
             )
           : Promise.resolve(null),
       ]);

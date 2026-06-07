@@ -79,28 +79,22 @@ export function AnnouncementBanner({
 
     setIsBannerDismissed(bannerDismissed);
     setIsPopupDismissed(popupDismissed);
-    setIsPopupOpen(showPopup && !popupDismissed);
+    setIsPopupOpen(Boolean(showPopup && !popupDismissed));
   }, [announcement, showPopup]);
 
   if (!announcement) {
     return null;
   }
 
-  function dismissBanner() {
-    if (!announcement) {
-      return;
-    }
+  const currentAnnouncement = announcement;
 
-    window.localStorage.setItem(bannerDismissKey(announcement), "true");
+  function dismissBanner() {
+    window.localStorage.setItem(bannerDismissKey(currentAnnouncement), "true");
     setIsBannerDismissed(true);
   }
 
   function dismissPopup() {
-    if (!announcement) {
-      return;
-    }
-
-    window.localStorage.setItem(popupDismissKey(announcement), "true");
+    window.localStorage.setItem(popupDismissKey(currentAnnouncement), "true");
     setIsPopupDismissed(true);
     setIsPopupOpen(false);
   }
@@ -109,42 +103,45 @@ export function AnnouncementBanner({
     setIsPopupOpen(true);
   }
 
-  const banner = showBanner && !isBannerDismissed ? (
-    <div
-      className="border-b border-border px-3 sm:px-5 lg:px-6"
-      role={announcement.tone === "danger" ? "alert" : "status"}
-    >
-      <div className="mx-auto flex min-h-9 w-full max-w-[1520px] items-center justify-between gap-3 py-1">
-        <button
-          className="flex min-w-0 items-center gap-3 text-left"
-          type="button"
-          onClick={showPopup ? reopenPopup : undefined}
-        >
-          <span
-            className={cn(
-              "h-5 w-0.5 shrink-0 rounded-full",
-              TONE_CLASSES[announcement.tone],
-            )}
-            aria-hidden="true"
-          />
-          {announcement.title ? (
-            <p className="shrink-0 text-xs font-medium">{announcement.title}</p>
-          ) : null}
-          <p className="truncate text-xs text-text-muted">
-            {announcement.body}
-          </p>
-        </button>
-        <IconButton
-          aria-label="关闭公告"
-          className="shrink-0"
-          size="sm"
-          onClick={dismissBanner}
-        >
-          <X />
-        </IconButton>
+  const banner =
+    showBanner && !isBannerDismissed ? (
+      <div
+        className="border-b border-border px-3 sm:px-5 lg:px-6"
+        role={announcement.tone === "danger" ? "alert" : "status"}
+      >
+        <div className="mx-auto flex min-h-9 w-full max-w-[1520px] items-center justify-between gap-3 py-1">
+          <button
+            className="flex min-w-0 items-center gap-3 text-left"
+            type="button"
+            onClick={showPopup ? reopenPopup : undefined}
+          >
+            <span
+              className={cn(
+                "h-5 w-0.5 shrink-0 rounded-full",
+                TONE_CLASSES[announcement.tone],
+              )}
+              aria-hidden="true"
+            />
+            {announcement.title ? (
+              <p className="shrink-0 text-xs font-medium">
+                {announcement.title}
+              </p>
+            ) : null}
+            <p className="truncate text-xs text-text-muted">
+              {announcement.body}
+            </p>
+          </button>
+          <IconButton
+            aria-label="关闭公告"
+            className="shrink-0"
+            size="sm"
+            onClick={dismissBanner}
+          >
+            <X />
+          </IconButton>
+        </div>
       </div>
-    </div>
-  ) : null;
+    ) : null;
 
   const popup = showPopup ? (
     <Dialog
