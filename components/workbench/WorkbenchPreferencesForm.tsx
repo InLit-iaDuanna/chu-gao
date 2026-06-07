@@ -138,7 +138,9 @@ export function WorkbenchPreferencesForm({
               aria-label="默认 Image2 版本"
               className="grid w-full grid-cols-2"
               value={
-                form.image2Mode ?? selectedModel.defaults.image2Mode ?? "standard"
+                form.image2Mode ??
+                selectedModel.defaults.image2Mode ??
+                "standard"
               }
               options={selectedModel.capabilities.image2Modes.map((mode) => ({
                 value: mode,

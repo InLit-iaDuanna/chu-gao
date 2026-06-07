@@ -49,11 +49,29 @@ function positiveInteger(
     : fallback;
 }
 
+function configuredResolutionAspectRatios(
+  base: ModelCapabilities,
+  value: unknown,
+  resolution: Resolution,
+): AspectRatio[] {
+  const record =
+    value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Partial<Record<Resolution, unknown>>)
+      : null;
+
+  return uniqueKnownValues<AspectRatio>(
+    record?.[resolution],
+    IMAGE_ASPECT_RATIO_OPTIONS,
+    aspectRatiosForResolution(base, resolution),
+  );
+}
+
 function configuredImage2Capabilities(
   base: ModelCapabilities,
   config: {
     aspectRatios: unknown;
     resolutions: unknown;
+    resolutionAspectRatios: unknown;
     maxN: unknown;
   },
 ): ModelCapabilities {
@@ -70,8 +88,14 @@ function configuredImage2Capabilities(
   const resolutionAspectRatios: ModelCapabilities["resolutionAspectRatios"] =
     {};
   const resolutions = requestedResolutions.filter((resolution) => {
-    const supported = aspectRatiosForResolution(base, resolution).filter(
-      (aspectRatio) => allowedAspectRatios.includes(aspectRatio),
+    const supported = configuredResolutionAspectRatios(
+      base,
+      config.resolutionAspectRatios,
+      resolution,
+    ).filter(
+      (aspectRatio) =>
+        allowedAspectRatios.includes(aspectRatio) &&
+        isResolutionAspectRatioSupported(base, resolution, aspectRatio),
     );
 
     if (supported.length === 0) {
@@ -139,17 +163,20 @@ export async function applyRuntimeModelConfig(
     return model;
   }
 
-  const [aspectRatios, resolutions, maxN] = await Promise.all([
-    getSystemConfigValue("generation.image2AspectRatios"),
-    getSystemConfigValue("generation.image2Resolutions"),
-    getSystemConfigValue("generation.image2MaxN"),
-  ]);
+  const [aspectRatios, resolutions, resolutionAspectRatios, maxN] =
+    await Promise.all([
+      getSystemConfigValue("generation.image2AspectRatios"),
+      getSystemConfigValue("generation.image2Resolutions"),
+      getSystemConfigValue("generation.image2ResolutionAspectRatios"),
+      getSystemConfigValue("generation.image2MaxN"),
+    ]);
 
   return withValidDefaults({
     ...model,
     capabilities: configuredImage2Capabilities(model.capabilities, {
       aspectRatios,
       resolutions,
+      resolutionAspectRatios,
       maxN,
     }),
   });

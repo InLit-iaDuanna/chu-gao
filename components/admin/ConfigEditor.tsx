@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 
 import { Switch } from "@/components/ui";
 import {
+  IMAGE2_DEFAULT_RESOLUTION_ASPECT_RATIOS,
   IMAGE_ASPECT_RATIO_OPTIONS,
   IMAGE_RESOLUTION_OPTIONS,
 } from "@/lib/models/options";
@@ -14,6 +15,8 @@ import type {
 } from "@/lib/system-config";
 
 type ConfigEntry = { key: string; value: unknown };
+type Image2Resolution = (typeof IMAGE_RESOLUTION_OPTIONS)[number];
+type Image2ResolutionAspectRatioMap = Record<Image2Resolution, string[]>;
 
 async function patchSystemConfig(key: string, value: unknown) {
   const response = await fetch("/api/admin/system-config", {
@@ -77,12 +80,79 @@ function stringArrayValue(
   return unique.length > 0 ? unique : [...fallback];
 }
 
+function imageResolutionArrayValue(
+  value: unknown,
+  fallback: readonly Image2Resolution[],
+): Image2Resolution[] {
+  if (!Array.isArray(value)) {
+    return [...fallback];
+  }
+
+  const allowedSet = new Set<string>(IMAGE_RESOLUTION_OPTIONS);
+  const unique = value.filter(
+    (item, index): item is Image2Resolution =>
+      typeof item === "string" &&
+      allowedSet.has(item) &&
+      value.indexOf(item) === index,
+  );
+
+  return unique.length > 0 ? unique : [...fallback];
+}
+
 function numberValue(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
 function clampImage2MaxN(value: unknown): number {
   return Math.max(1, Math.min(4, numberValue(value, 4)));
+}
+
+function resolutionAspectRatioMapValue(
+  value: unknown,
+): Image2ResolutionAspectRatioMap {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {
+      "1K": [...IMAGE2_DEFAULT_RESOLUTION_ASPECT_RATIOS["1K"]],
+      "2K": [...IMAGE2_DEFAULT_RESOLUTION_ASPECT_RATIOS["2K"]],
+      "4K": [...IMAGE2_DEFAULT_RESOLUTION_ASPECT_RATIOS["4K"]],
+    };
+  }
+
+  const record = value as Record<string, unknown>;
+
+  return {
+    "1K": stringArrayValue(
+      record["1K"],
+      IMAGE_ASPECT_RATIO_OPTIONS,
+      IMAGE2_DEFAULT_RESOLUTION_ASPECT_RATIOS["1K"],
+    ),
+    "2K": stringArrayValue(
+      record["2K"],
+      IMAGE_ASPECT_RATIO_OPTIONS,
+      IMAGE2_DEFAULT_RESOLUTION_ASPECT_RATIOS["2K"],
+    ),
+    "4K": stringArrayValue(
+      record["4K"],
+      IMAGE_ASPECT_RATIO_OPTIONS,
+      IMAGE2_DEFAULT_RESOLUTION_ASPECT_RATIOS["4K"],
+    ),
+  };
+}
+
+function hasSupportedImage2Combination(
+  aspectRatios: readonly string[],
+  resolutions: readonly Image2Resolution[],
+  resolutionAspectRatios: Image2ResolutionAspectRatioMap,
+): boolean {
+  const allowedAspectRatios = new Set(aspectRatios);
+
+  return resolutions.some((resolution) =>
+    IMAGE2_DEFAULT_RESOLUTION_ASPECT_RATIOS[resolution].some(
+      (aspectRatio) =>
+        allowedAspectRatios.has(aspectRatio) &&
+        resolutionAspectRatios[resolution].includes(aspectRatio),
+    ),
+  );
 }
 
 const TONE_OPTIONS: Array<{ value: AnnouncementTone; label: string }> = [
@@ -136,10 +206,12 @@ export function ConfigEditor({
         IMAGE_ASPECT_RATIO_OPTIONS,
         IMAGE_ASPECT_RATIO_OPTIONS,
       ),
-      resolutions: stringArrayValue(
+      resolutions: imageResolutionArrayValue(
         entryValue(entries, "generation.image2Resolutions"),
         IMAGE_RESOLUTION_OPTIONS,
-        IMAGE_RESOLUTION_OPTIONS,
+      ),
+      resolutionAspectRatios: resolutionAspectRatioMapValue(
+        entryValue(entries, "generation.image2ResolutionAspectRatios"),
       ),
       maxN: clampImage2MaxN(entryValue(entries, "generation.image2MaxN")),
     }),
@@ -162,6 +234,8 @@ export function ConfigEditor({
   const [image2Resolutions, setImage2Resolutions] = useState(
     initialImage2Limits.resolutions,
   );
+  const [image2ResolutionAspectRatios, setImage2ResolutionAspectRatios] =
+    useState(initialImage2Limits.resolutionAspectRatios);
   const [image2MaxN, setImage2MaxN] = useState(initialImage2Limits.maxN);
   const [message, setMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -176,6 +250,11 @@ export function ConfigEditor({
     image2Resolutions.length > 0 &&
     image2MaxN >= 1 &&
     image2MaxN <= 4 &&
+    hasSupportedImage2Combination(
+      image2AspectRatios,
+      image2Resolutions,
+      image2ResolutionAspectRatios,
+    ) &&
     !isSubmitting;
 
   function toggleListValue(
@@ -188,6 +267,17 @@ export function ConfigEditor({
       : [...values, value];
 
     return next.length > 0 ? next : [fallback[0] as string];
+  }
+
+  function toggleResolutionValue(
+    values: Image2Resolution[],
+    value: Image2Resolution,
+  ) {
+    const next = values.includes(value)
+      ? values.filter((item) => item !== value)
+      : [...values, value];
+
+    return next.length > 0 ? next : [IMAGE_RESOLUTION_OPTIONS[0]];
   }
 
   async function submitRegistration(event: React.FormEvent<HTMLFormElement>) {
@@ -252,6 +342,10 @@ export function ConfigEditor({
       await Promise.all([
         patchSystemConfig("generation.image2AspectRatios", image2AspectRatios),
         patchSystemConfig("generation.image2Resolutions", image2Resolutions),
+        patchSystemConfig(
+          "generation.image2ResolutionAspectRatios",
+          image2ResolutionAspectRatios,
+        ),
         patchSystemConfig("generation.image2MaxN", image2MaxN),
       ]);
       setMessage("Image2 限制已保存");
@@ -484,16 +578,59 @@ export function ConfigEditor({
                       checked={image2Resolutions.includes(resolution)}
                       onChange={() =>
                         setImage2Resolutions((current) =>
-                          toggleListValue(
-                            current,
-                            resolution,
-                            IMAGE_RESOLUTION_OPTIONS,
-                          ),
+                          toggleResolutionValue(current, resolution),
                         )
                       }
                     />
                     {resolution}
                   </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <p className="field-label">分辨率 / 比例</p>
+              <div className="grid gap-3 md:grid-cols-3">
+                {IMAGE_RESOLUTION_OPTIONS.map((resolution) => (
+                  <div
+                    key={resolution}
+                    className="rounded-[6px] border border-border bg-surface p-3"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-medium">{resolution}</p>
+                      <span className="text-xs text-text-muted">
+                        {image2ResolutionAspectRatios[resolution].length} 项
+                      </span>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {IMAGE_ASPECT_RATIO_OPTIONS.map((ratio) => (
+                        <label
+                          key={`${resolution}-${ratio}`}
+                          className="inline-flex items-center gap-2 rounded-[6px] border border-border bg-surface px-2.5 py-1.5 text-xs"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={image2ResolutionAspectRatios[
+                              resolution
+                            ].includes(ratio)}
+                            onChange={() =>
+                              setImage2ResolutionAspectRatios((current) => ({
+                                ...current,
+                                [resolution]: toggleListValue(
+                                  current[resolution],
+                                  ratio,
+                                  IMAGE2_DEFAULT_RESOLUTION_ASPECT_RATIOS[
+                                    resolution
+                                  ],
+                                ),
+                              }))
+                            }
+                          />
+                          {ratio}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>

@@ -1,3 +1,5 @@
+import { Readable } from "node:stream";
+
 import { fail } from "@/lib/api-response";
 import {
   adminFailureResponse,
@@ -6,7 +8,10 @@ import {
 } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { isDatabaseUnavailableError } from "@/lib/service-errors";
-import { readPrivateStorageKey } from "@/lib/storage";
+import {
+  createPrivateStorageReadStream,
+  statPrivateStorageKey,
+} from "@/lib/storage";
 
 function extensionForMimeType(mimeType: string): string {
   if (mimeType === "image/jpeg") {
@@ -31,6 +36,47 @@ function timestampForFilename(date = new Date()): string {
   ];
 
   return parts.map((part) => String(part).padStart(2, "0")).join("");
+}
+
+function parseRangeHeader(
+  rangeHeader: string | null,
+  sizeBytes: number,
+): { start: number; end: number } | null {
+  if (!rangeHeader) return null;
+
+  const match = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader.trim());
+  if (!match) return null;
+
+  const [, rawStart, rawEnd] = match;
+  if (!rawStart && !rawEnd) return null;
+
+  if (!rawStart && rawEnd) {
+    const suffixLength = Number(rawEnd);
+    if (!Number.isFinite(suffixLength) || suffixLength <= 0) return null;
+
+    return {
+      start: Math.max(sizeBytes - suffixLength, 0),
+      end: sizeBytes - 1,
+    };
+  }
+
+  const start = Number(rawStart);
+  const end = rawEnd ? Number(rawEnd) : sizeBytes - 1;
+
+  if (
+    !Number.isFinite(start) ||
+    !Number.isFinite(end) ||
+    start < 0 ||
+    end < start ||
+    start >= sizeBytes
+  ) {
+    return null;
+  }
+
+  return {
+    start,
+    end: Math.min(end, sizeBytes - 1),
+  };
 }
 
 export async function GET(
@@ -67,7 +113,6 @@ export async function GET(
         storageKey: true,
         thumbnailKey: true,
         mimeType: true,
-        sizeBytes: true,
       },
     });
 
@@ -78,24 +123,51 @@ export async function GET(
     const { searchParams } = new URL(request.url);
     const wantsThumbnail = searchParams.get("variant") === "thumb";
     const storageKey =
-      wantsThumbnail && image.thumbnailKey ? image.thumbnailKey : image.storageKey;
+      wantsThumbnail && image.thumbnailKey
+        ? image.thumbnailKey
+        : image.storageKey;
     const mimeType =
       wantsThumbnail && image.thumbnailKey ? "image/webp" : image.mimeType;
-    const buffer = await readPrivateStorageKey(storageKey);
+    const stats = await statPrivateStorageKey(storageKey);
+    const sizeBytes = stats.size;
+    const range = parseRangeHeader(request.headers.get("range"), sizeBytes);
 
-    return new Response(new Uint8Array(buffer), {
-      headers: {
-        "Content-Type": mimeType,
-        "Content-Length": String(
-          wantsThumbnail ? buffer.byteLength : image.sizeBytes || buffer.byteLength,
-        ),
-        "Content-Disposition": wantsThumbnail
-          ? "inline"
-          : `attachment; filename="chugao-${timestampForFilename()}.${extensionForMimeType(image.mimeType)}"`,
-        "Cache-Control": wantsThumbnail
-          ? "private, max-age=3600"
-          : "private, max-age=300",
-      },
+    if (request.headers.get("range") && !range) {
+      return new Response(null, {
+        status: 416,
+        headers: {
+          "Accept-Ranges": "bytes",
+          "Content-Range": `bytes */${sizeBytes}`,
+        },
+      });
+    }
+
+    const stream = createPrivateStorageReadStream(
+      storageKey,
+      range ?? undefined,
+    );
+    const responseBody = Readable.toWeb(stream) as ReadableStream<Uint8Array>;
+    const contentLength = range ? range.end - range.start + 1 : sizeBytes;
+    const headers: Record<string, string> = {
+      "Accept-Ranges": "bytes",
+      "Content-Type": mimeType,
+      "Content-Length": String(contentLength),
+      "Content-Disposition": wantsThumbnail
+        ? "inline"
+        : `attachment; filename="chugao-${timestampForFilename()}.${extensionForMimeType(image.mimeType)}"`,
+      "Cache-Control": wantsThumbnail
+        ? "private, max-age=3600"
+        : "private, max-age=300",
+    };
+
+    if (range) {
+      headers["Content-Range"] =
+        `bytes ${range.start}-${range.end}/${sizeBytes}`;
+    }
+
+    return new Response(responseBody, {
+      status: range ? 206 : 200,
+      headers,
     });
   } catch (error) {
     if (isDatabaseUnavailableError(error)) {

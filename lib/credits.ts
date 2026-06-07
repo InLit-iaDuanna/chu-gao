@@ -14,8 +14,11 @@ type CostRequest = Pick<InternalRequest, "n" | "resolution"> &
     usesReference?: boolean;
   };
 
-function ruleSpecificity(rule: NonNullable<ModelDefinition["pricingRules"]>[number]) {
+function ruleSpecificity(
+  rule: NonNullable<ModelDefinition["pricingRules"]>[number],
+) {
   return [
+    rule.image2Mode,
     rule.resolution,
     rule.aspectRatio,
     rule.outputFormat,
@@ -29,9 +32,11 @@ function matchesRule(
   req: CostRequest,
 ) {
   const usesReference =
-    req.usesReference ?? Boolean(req.referenceImages && req.referenceImages.length > 0);
+    req.usesReference ??
+    Boolean(req.referenceImages && req.referenceImages.length > 0);
 
   return (
+    (!rule.image2Mode || rule.image2Mode === req.image2Mode) &&
     (!rule.resolution || rule.resolution === req.resolution) &&
     (!rule.aspectRatio || rule.aspectRatio === req.aspectRatio) &&
     (!rule.outputFormat || rule.outputFormat === req.outputFormat) &&

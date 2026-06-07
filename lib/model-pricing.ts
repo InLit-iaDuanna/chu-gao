@@ -2,11 +2,13 @@ import type { Prisma } from "@prisma/client";
 
 import { estimateCost, resolvePerImageCredits } from "@/lib/credits";
 import { db } from "@/lib/db";
+import { logger } from "@/lib/logger";
 import {
   getConfiguredModel,
   listConfiguredModels,
 } from "@/lib/models/runtime-config";
 import type {
+  Image2Mode,
   InternalRequest,
   ModelDefinition,
   PricingRule,
@@ -31,6 +33,7 @@ export interface PricingSnapshot {
 function serializeRule(rule: {
   id: string;
   modelId: string;
+  image2Mode: string | null;
   resolution: string | null;
   aspectRatio: string | null;
   outputFormat: string | null;
@@ -42,6 +45,10 @@ function serializeRule(rule: {
   return {
     id: rule.id,
     modelId: rule.modelId,
+    image2Mode:
+      rule.image2Mode === "standard" || rule.image2Mode === "high"
+        ? (rule.image2Mode as Image2Mode)
+        : null,
     resolution: rule.resolution,
     aspectRatio: rule.aspectRatio,
     outputFormat: rule.outputFormat,
@@ -57,12 +64,17 @@ export async function listModelPricingRules(): Promise<PricingRule[]> {
     return [];
   }
 
-  const rules = await db.modelPricing.findMany({
-    where: { isActive: true },
-    orderBy: [{ priority: "desc" }, { updatedAt: "desc" }],
-  });
+  try {
+    const rules = await db.modelPricing.findMany({
+      where: { isActive: true },
+      orderBy: [{ priority: "desc" }, { updatedAt: "desc" }],
+    });
 
-  return rules.map(serializeRule);
+    return rules.map(serializeRule);
+  } catch (error) {
+    logger.error({ error }, "Model pricing rules read failed.");
+    return [];
+  }
 }
 
 export async function listModelsWithPricing(): Promise<ModelDefinition[]> {

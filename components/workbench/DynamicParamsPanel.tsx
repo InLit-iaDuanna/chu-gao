@@ -48,14 +48,13 @@ export function normalizeWorkbenchState(
   return {
     ...prev,
     modelId,
-    providerChannelId:
-      model.providerChannels?.length
-        ? normalizeSelectableProviderChannelId(
-            modelId,
-            prev.providerChannelId,
-            model.providerChannels,
-          )
-        : undefined,
+    providerChannelId: model.providerChannels?.length
+      ? normalizeSelectableProviderChannelId(
+          modelId,
+          prev.providerChannelId,
+          model.providerChannels,
+        )
+      : undefined,
     aspectRatio: pair.aspectRatio,
     resolution: pair.resolution,
     image2Mode: model.capabilities.image2Modes?.length

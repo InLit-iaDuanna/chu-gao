@@ -10,9 +10,7 @@ import type {
   Resolution,
 } from "@/lib/models/types";
 import { getConfiguredModel } from "@/lib/models/runtime-config";
-import {
-  normalizeProviderChannelIdForModel,
-} from "@/lib/provider-channels";
+import { normalizeProviderChannelIdForModel } from "@/lib/provider-channels";
 import { normalizeUploadedReferenceKey } from "@/lib/storage";
 
 export class ValidationError extends Error {

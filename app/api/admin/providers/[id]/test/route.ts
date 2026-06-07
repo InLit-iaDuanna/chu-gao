@@ -21,7 +21,9 @@ function modelIdForRequest(modelId: string): string {
   return modelId;
 }
 
-function image2ModeForRequest(modelId: string): "standard" | "high" | undefined {
+function image2ModeForRequest(
+  modelId: string,
+): "standard" | "high" | undefined {
   if (modelId === "gpt-image-2-high") {
     return "high";
   }
@@ -48,8 +50,7 @@ function smokeRequestForModel(modelId: string): InternalRequest | null {
     resolution: model.capabilities.resolutions.includes("1K")
       ? "1K"
       : model.defaults.resolution,
-    image2Mode:
-      image2ModeForRequest(modelId) ?? model.defaults.image2Mode,
+    image2Mode: image2ModeForRequest(modelId) ?? model.defaults.image2Mode,
     n: 1,
     outputFormat: model.defaults.outputFormat,
     background: model.defaults.background,

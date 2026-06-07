@@ -111,7 +111,10 @@ export async function POST(
   }
 
   const admin = authenticatedUser(sessionResult);
-  const baseUrl = normalizeProviderBaseUrl(parsed.data.baseUrl, provider.protocol);
+  const baseUrl = normalizeProviderBaseUrl(
+    parsed.data.baseUrl,
+    provider.protocol,
+  );
   const account = await db.providerAccount.create({
     data: {
       providerId: id,

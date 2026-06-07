@@ -24,7 +24,9 @@ export async function GET(request: Request) {
   }
 
   if (!process.env.DATABASE_URL) {
-    return fail("SERVICE_UNAVAILABLE", "兑换码服务未配置数据库", { status: 503 });
+    return fail("SERVICE_UNAVAILABLE", "兑换码服务未配置数据库", {
+      status: 503,
+    });
   }
 
   const codes = await db.creditRedemptionCode.findMany({
@@ -49,7 +51,9 @@ export async function POST(request: Request) {
   }
 
   if (!process.env.DATABASE_URL) {
-    return fail("SERVICE_UNAVAILABLE", "兑换码服务未配置数据库", { status: 503 });
+    return fail("SERVICE_UNAVAILABLE", "兑换码服务未配置数据库", {
+      status: 503,
+    });
   }
 
   const body = await readJsonBodySafe(request);

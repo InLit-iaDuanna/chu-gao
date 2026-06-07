@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+import {
+  IMAGE_ASPECT_RATIO_OPTIONS,
+  IMAGE_RESOLUTION_OPTIONS,
+} from "@/lib/models/options";
+
 export const loginSchema = z.object({
   email: z.email("邮箱格式不正确"),
   password: z.string().min(8, "密码至少 8 位"),
@@ -132,6 +137,7 @@ export const inviteBatchSchema = z.object({
 
 export const modelPricingSchema = z.object({
   modelId: z.string().min(1),
+  image2Mode: z.enum(["standard", "high"]).nullable().optional(),
   resolution: z.string().min(1).nullable().optional(),
   aspectRatio: z.string().min(1).nullable().optional(),
   outputFormat: z.string().min(1).nullable().optional(),
@@ -213,7 +219,15 @@ export const systemConfigPatchSchema = z.discriminatedUnion("key", [
   }),
   z.object({
     key: z.literal("generation.image2Resolutions"),
-    value: z.array(z.enum(["1K", "2K", "4K"])).min(1),
+    value: z.array(z.enum(IMAGE_RESOLUTION_OPTIONS)).min(1),
+  }),
+  z.object({
+    key: z.literal("generation.image2ResolutionAspectRatios"),
+    value: z.object({
+      "1K": z.array(z.enum(IMAGE_ASPECT_RATIO_OPTIONS)).min(1),
+      "2K": z.array(z.enum(IMAGE_ASPECT_RATIO_OPTIONS)).min(1),
+      "4K": z.array(z.enum(IMAGE_ASPECT_RATIO_OPTIONS)).min(1),
+    }),
   }),
   z.object({
     key: z.literal("generation.image2MaxN"),

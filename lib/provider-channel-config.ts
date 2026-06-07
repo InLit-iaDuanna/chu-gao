@@ -42,15 +42,16 @@ export async function getProviderChannelDisplayNameMap(): Promise<ProviderChanne
   };
 }
 
-export const getImage2ChannelDisplayNameMap =
-  getProviderChannelDisplayNameMap;
+export const getImage2ChannelDisplayNameMap = getProviderChannelDisplayNameMap;
 
 export async function setProviderChannelDisplayName(
   baseUrl: string,
   displayName: string,
 ): Promise<ProviderChannelDisplayNameMap> {
   if (!process.env.DATABASE_URL) {
-    throw new Error("DATABASE_URL is required to update channel display names.");
+    throw new Error(
+      "DATABASE_URL is required to update channel display names.",
+    );
   }
 
   const normalizedBaseUrl = normalizeProviderChannelBaseUrl(baseUrl);

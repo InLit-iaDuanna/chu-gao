@@ -69,10 +69,7 @@ export function isImage2ModelId(modelId?: string | null): boolean {
 }
 
 export function supportsProviderChannels(modelId?: string | null): boolean {
-  return (
-    modelId === "gpt-image-2" ||
-    modelId === "nano-banana-2-512"
-  );
+  return modelId === "gpt-image-2" || modelId === "nano-banana-2-512";
 }
 
 export function normalizeProviderChannelBaseUrl(
@@ -119,7 +116,8 @@ export function resolveImage2ProviderChannelBaseUrl(
     return null;
   }
 
-  const legacy = LEGACY_IMAGE2_CHANNELS[channelId as keyof typeof LEGACY_IMAGE2_CHANNELS];
+  const legacy =
+    LEGACY_IMAGE2_CHANNELS[channelId as keyof typeof LEGACY_IMAGE2_CHANNELS];
 
   if (legacy) {
     return normalizeProviderChannelBaseUrl(legacy.baseUrl);
@@ -150,7 +148,8 @@ export const inferImage2ProviderChannelIdFromBaseUrl =
 function defaultDisplayNameForBaseUrl(baseUrl: string): string {
   const normalized = normalizeProviderChannelBaseUrl(baseUrl) ?? baseUrl;
   const legacy = Object.values(LEGACY_IMAGE2_CHANNELS).find(
-    (channel) => normalizeProviderChannelBaseUrl(channel.baseUrl) === normalized,
+    (channel) =>
+      normalizeProviderChannelBaseUrl(channel.baseUrl) === normalized,
   );
 
   if (legacy) {
@@ -209,8 +208,7 @@ export function displayNameForProviderChannelWithMap(
     : null;
 
   return (
-    customDisplayName ??
-    displayNameForProviderChannel(normalized, fallbackName)
+    customDisplayName ?? displayNameForProviderChannel(normalized, fallbackName)
   );
 }
 
@@ -228,7 +226,8 @@ export function displayNameForProviderChannel(
   }
 
   const legacyName = Object.values(LEGACY_IMAGE2_CHANNELS).find(
-    (channel) => normalizeProviderChannelBaseUrl(channel.baseUrl) === normalized,
+    (channel) =>
+      normalizeProviderChannelBaseUrl(channel.baseUrl) === normalized,
   )?.displayName;
 
   const fallback = fallbackName?.trim();
@@ -236,10 +235,12 @@ export function displayNameForProviderChannel(
     ? GENERIC_PROVIDER_NAMES.has(fallback.toLowerCase())
     : false;
 
-  return legacyName ??
+  return (
+    legacyName ??
     (fallback && !isGenericFallback
       ? fallback
-      : defaultDisplayNameForBaseUrl(normalized));
+      : defaultDisplayNameForBaseUrl(normalized))
+  );
 }
 
 export const displayNameForImage2Channel = displayNameForProviderChannel;
@@ -257,7 +258,10 @@ function isAccountAvailable(account: {
 }
 
 export function buildProviderChannelsFromAccounts<
-  T extends Pick<ProviderAccount, "baseUrl" | "isActive" | "health" | "cooldownUntil"> & {
+  T extends Pick<
+    ProviderAccount,
+    "baseUrl" | "isActive" | "health" | "cooldownUntil"
+  > & {
     provider?: { name?: string | null } | null;
   },
 >(
@@ -283,14 +287,12 @@ export function buildProviderChannelsFromAccounts<
       continue;
     }
 
-    const current =
-      groups.get(normalized) ??
-      {
-        baseUrl: normalized,
-        providerName: account.provider?.name ?? null,
-        accountCount: 0,
-        availableAccountCount: 0,
-      };
+    const current = groups.get(normalized) ?? {
+      baseUrl: normalized,
+      providerName: account.provider?.name ?? null,
+      accountCount: 0,
+      availableAccountCount: 0,
+    };
 
     current.accountCount += 1;
 
@@ -346,13 +348,8 @@ export function toPublicProviderChannels(
   }));
 }
 
-type ProviderChannelChoice = Pick<
-  ProviderChannel,
-  "id" | "displayName"
-> &
-  Partial<
-    Pick<ProviderChannel, "baseUrl" | "availableAccountCount">
-  >;
+type ProviderChannelChoice = Pick<ProviderChannel, "id" | "displayName"> &
+  Partial<Pick<ProviderChannel, "baseUrl" | "availableAccountCount">>;
 
 export function withDefaultImage2ProviderChannels(
   channels: Image2ProviderChannel[],
@@ -379,7 +376,8 @@ export function getImage2ProviderChannel(
     return null;
   }
 
-  const normalizedLegacyBaseUrl = resolveImage2ProviderChannelBaseUrl(channelId);
+  const normalizedLegacyBaseUrl =
+    resolveImage2ProviderChannelBaseUrl(channelId);
   const normalizedChannelId = normalizedLegacyBaseUrl
     ? channelIdFromBaseUrl(normalizedLegacyBaseUrl)
     : channelId;
@@ -440,7 +438,9 @@ export function normalizeProviderChannelIdForModel(
 
   if (isImage2ProviderChannelId(channelId)) {
     const legacyBaseUrl = resolveImage2ProviderChannelBaseUrl(channelId);
-    return legacyBaseUrl ? channelIdFromBaseUrl(legacyBaseUrl) : channelId.trim();
+    return legacyBaseUrl
+      ? channelIdFromBaseUrl(legacyBaseUrl)
+      : channelId.trim();
   }
 
   return undefined;
@@ -464,8 +464,7 @@ export function isProviderChannelSelectable(
     : true;
 }
 
-export const isImage2ProviderChannelSelectable =
-  isProviderChannelSelectable;
+export const isImage2ProviderChannelSelectable = isProviderChannelSelectable;
 
 export function normalizeSelectableProviderChannelId(
   modelId?: string | null,

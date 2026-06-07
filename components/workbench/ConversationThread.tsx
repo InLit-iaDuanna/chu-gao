@@ -219,7 +219,9 @@ export function ConversationThread({
                   <div className="w-[min(520px,86vw)] rounded-[8px] border border-border-strong bg-surface-2 p-2">
                     <textarea
                       value={editingContent}
-                      onChange={(event) => setEditingContent(event.target.value)}
+                      onChange={(event) =>
+                        setEditingContent(event.target.value)
+                      }
                       className="min-h-24 w-full resize-y bg-transparent text-sm leading-6 outline-none"
                       maxLength={4000}
                     />

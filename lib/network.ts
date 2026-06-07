@@ -8,7 +8,9 @@ function isValidIpv4Candidate(value: string): boolean {
     return false;
   }
 
-  return parts.every((part) => /^\d+$/.test(part) && Number(part) >= 0 && Number(part) <= 255);
+  return parts.every(
+    (part) => /^\d+$/.test(part) && Number(part) >= 0 && Number(part) <= 255,
+  );
 }
 
 function stripIpPort(value: string): string {
@@ -47,12 +49,8 @@ function expandIpv6(value: string): string[] | null {
     return null;
   }
 
-  const left = head
-    ? head.split(":").filter((part) => part.length > 0)
-    : [];
-  const right = tail
-    ? tail.split(":").filter((part) => part.length > 0)
-    : [];
+  const left = head ? head.split(":").filter((part) => part.length > 0) : [];
+  const right = tail ? tail.split(":").filter((part) => part.length > 0) : [];
 
   const maybeIpv4 = right[right.length - 1] ?? left[left.length - 1];
 
@@ -107,7 +105,11 @@ function normalizeIp(value: string | null | undefined): string | null {
   }
 
   if (version === 6) {
-    return expandIpv6(raw)?.map((part) => part.padStart(4, "0").toLowerCase()).join(":") ?? null;
+    return (
+      expandIpv6(raw)
+        ?.map((part) => part.padStart(4, "0").toLowerCase())
+        .join(":") ?? null
+    );
   }
 
   return null;
@@ -120,7 +122,9 @@ function parseIpv4ToNumber(value: string): number {
     .reduce((result, segment) => result * 256 + segment, 0);
 }
 
-function parseAllowlistEntry(entry: string):
+function parseAllowlistEntry(
+  entry: string,
+):
   | { kind: "exact"; value: string }
   | { kind: "cidr4"; network: number; mask: number }
   | null {
@@ -195,10 +199,12 @@ function configuredAdminIpHeader(): string | null {
 }
 
 function forwardedHeaderFirstIp(value: string): string {
-  return value
-    .split(",")
-    .map((part) => part.trim())
-    .find(Boolean) ?? "";
+  return (
+    value
+      .split(",")
+      .map((part) => part.trim())
+      .find(Boolean) ?? ""
+  );
 }
 
 export function getAdminClientIp(headers: Headers): string | null {
@@ -222,7 +228,9 @@ export function getAdminClientIp(headers: Headers): string | null {
   return normalizeIp(candidate);
 }
 
-export function parseAdminIpAllowlist(value = process.env.ADMIN_IP_ALLOWLIST ?? "") {
+export function parseAdminIpAllowlist(
+  value = process.env.ADMIN_IP_ALLOWLIST ?? "",
+) {
   return value
     .split(",")
     .map((entry) => entry.trim())

@@ -111,7 +111,7 @@ export function WorkbenchShell({
     [models],
   );
   const model = state
-    ? availableModels.find((item) => item.id === state.modelId) ?? null
+    ? (availableModels.find((item) => item.id === state.modelId) ?? null)
     : null;
 
   const activeImages = activeGeneration?.images ?? [];
@@ -142,8 +142,8 @@ export function WorkbenchShell({
       uploadedReferenceImages.length > 0 ||
       Boolean(
         model.capabilities.supportsReferenceImage &&
-          activeImageId &&
-          useCurrentImageAsReference,
+        activeImageId &&
+        useCurrentImageAsReference,
       );
 
     return estimateCost(model, {
@@ -194,12 +194,14 @@ export function WorkbenchShell({
 
   const currentConversationGenerations = useMemo(
     () =>
-      history.filter(
-        (item) =>
-          conversationId &&
-          item.conversationId === conversationId &&
-          item.images.some((image) => image.src ?? image.url),
-      ).toReversed(),
+      history
+        .filter(
+          (item) =>
+            conversationId &&
+            item.conversationId === conversationId &&
+            item.images.some((image) => image.src ?? image.url),
+        )
+        .toReversed(),
     [conversationId, history],
   );
   const activeGenerationIndex = activeGeneration
@@ -236,12 +238,12 @@ export function WorkbenchShell({
 
   const submitDisabled = Boolean(
     isSubmitting ||
-      isUploadingReference ||
-      !draft.trim() ||
-      !state ||
-      !model ||
-      isBooting ||
-      hasInsufficientCredits,
+    isUploadingReference ||
+    !draft.trim() ||
+    !state ||
+    !model ||
+    isBooting ||
+    hasInsufficientCredits,
   );
   const hasModels = models.length > 0;
   const hasAvailableModels = availableModels.length > 0;
@@ -376,15 +378,12 @@ export function WorkbenchShell({
                     isSubmitting ||
                     isUploadingReference ||
                     !supportsReferenceImage ||
-                    uploadedReferenceImages.length >=
-                      maxUploadedReferenceImages
+                    uploadedReferenceImages.length >= maxUploadedReferenceImages
                   }
                   isUploadingReference={isUploadingReference}
                   referenceUploadError={referenceUploadError}
                   useCurrentImageAsReference={useCurrentImageAsReference}
-                  onToggleCurrentImageReference={
-                    setUseCurrentImageAsReference
-                  }
+                  onToggleCurrentImageReference={setUseCurrentImageAsReference}
                   canUseCurrentImageReference={canUseCurrentImageReference}
                   currentImageReferencePreviewUrl={previewImageUrl(
                     activeImage ?? undefined,
@@ -415,11 +414,11 @@ export function WorkbenchShell({
               {currentConversationGenerations.length > 1 ? (
                 <div className="flex flex-wrap items-center gap-2">
                   <div className="rounded-[6px] border border-border bg-surface-2 px-3 py-2 text-sm text-text-muted">
-                      {activeGenerationIndex >= 0
-                        ? `当前第 ${activeGenerationIndex + 1} / ${
-                            currentConversationGenerations.length
-                          } 个生成`
-                        : `${currentConversationGenerations.length} 个生成可切换`}
+                    {activeGenerationIndex >= 0
+                      ? `当前第 ${activeGenerationIndex + 1} / ${
+                          currentConversationGenerations.length
+                        } 个生成`
+                      : `${currentConversationGenerations.length} 个生成可切换`}
                   </div>
                   <div className="flex items-center gap-2">
                     <button

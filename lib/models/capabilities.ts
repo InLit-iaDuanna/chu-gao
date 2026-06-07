@@ -51,12 +51,8 @@ export function firstSupportedResolutionAspectPair(
     ].filter((value): value is AspectRatio =>
       Boolean(
         value &&
-          model.capabilities.aspectRatios.includes(value) &&
-          isResolutionAspectRatioSupported(
-            model.capabilities,
-            resolution,
-            value,
-          ),
+        model.capabilities.aspectRatios.includes(value) &&
+        isResolutionAspectRatioSupported(model.capabilities, resolution, value),
       ),
     );
 

@@ -135,8 +135,7 @@ export async function GET() {
       models.map((model) => ({
         ...model,
         available: availableModelIds.has(model.id),
-        providerChannels:
-          providerChannelsByModelId.get(model.id) ?? undefined,
+        providerChannels: providerChannelsByModelId.get(model.id) ?? undefined,
       })),
     );
   } catch {

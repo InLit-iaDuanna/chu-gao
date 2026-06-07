@@ -192,7 +192,11 @@ async function generateSingleSysrvImage(
   imageIndex: number,
 ): Promise<GenerateResult> {
   const singleRequest = { ...req, n: 1 };
-  const result = await adapter.generateSingle(singleRequest, signal, onProgress);
+  const result = await adapter.generateSingle(
+    singleRequest,
+    signal,
+    onProgress,
+  );
 
   return {
     ...result,
@@ -234,7 +238,9 @@ export class OpenAIImagesAdapter implements ProviderAdapter {
 
       return {
         images: results.flatMap((result) => result.images),
-        rawProviderResponse: results.map((result) => result.rawProviderResponse),
+        rawProviderResponse: results.map(
+          (result) => result.rawProviderResponse,
+        ),
       };
     }
 

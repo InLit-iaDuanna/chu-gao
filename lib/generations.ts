@@ -50,21 +50,21 @@ export function serializeGeneration(
   row: GenerationWithRelations,
   options: { displayNameMap?: Image2ChannelDisplayNameMap } = {},
 ) {
-  const images = [...row.images].sort(
-    (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
-  ).map((image) => ({
-    id: image.id,
-    url: privateImageUrl(row.id, image.id),
-    src: privateImageUrl(row.id, image.id),
-    downloadUrl: privateImageUrl(row.id, image.id),
-    thumbnailUrl: image.thumbnailKey
-      ? privateImageThumbnailUrl(row.id, image.id)
-      : privateImageUrl(row.id, image.id),
-    width: image.width,
-    height: image.height,
-    mimeType: image.mimeType,
-    createdAt: image.createdAt,
-  }));
+  const images = [...row.images]
+    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+    .map((image) => ({
+      id: image.id,
+      url: privateImageUrl(row.id, image.id),
+      src: privateImageUrl(row.id, image.id),
+      downloadUrl: privateImageUrl(row.id, image.id),
+      thumbnailUrl: image.thumbnailKey
+        ? privateImageThumbnailUrl(row.id, image.id)
+        : privateImageUrl(row.id, image.id),
+      width: image.width,
+      height: image.height,
+      mimeType: image.mimeType,
+      createdAt: image.createdAt,
+    }));
 
   const providerChannelId = resolveImage2ProviderChannelId(
     row.modelId,

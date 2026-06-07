@@ -61,16 +61,16 @@ grep -r "border-gray-" components/
 
 #### 替换规则
 
-| 旧写法 | 新写法 | 说明 |
-|--------|--------|------|
-| `bg-gray-900` | `bg-background` | 页面底色 |
-| `bg-gray-800` | `bg-surface` | 卡片背景 |
-| `bg-gray-700` | `bg-surface-2` | 输入框背景 |
-| `text-white` | `text-foreground` | 主文本 |
-| `text-gray-400` | `text-text-muted` | 次要文本 |
-| `text-gray-500` | `text-text-faint` | 辅助文本 |
-| `border-gray-700` | `border-border` | 默认边框 |
-| `border-gray-600` | `border-border-strong` | 强调边框 |
+| 旧写法            | 新写法                 | 说明       |
+| ----------------- | ---------------------- | ---------- |
+| `bg-gray-900`     | `bg-background`        | 页面底色   |
+| `bg-gray-800`     | `bg-surface`           | 卡片背景   |
+| `bg-gray-700`     | `bg-surface-2`         | 输入框背景 |
+| `text-white`      | `text-foreground`      | 主文本     |
+| `text-gray-400`   | `text-text-muted`      | 次要文本   |
+| `text-gray-500`   | `text-text-faint`      | 辅助文本   |
+| `border-gray-700` | `border-border`        | 默认边框   |
+| `border-gray-600` | `border-border-strong` | 强调边框   |
 
 #### 示例
 
@@ -97,14 +97,14 @@ grep -r "rounded-" components/ | grep -v "rounded-\[var"
 
 #### 替换规则
 
-| 旧写法 | 新写法 | 适用组件 |
-|--------|--------|----------|
-| `rounded` | `rounded-[var(--radius-sm)]` | 小元素 |
-| `rounded-sm` | `rounded-[var(--radius-sm)]` | Badge, Tag |
-| `rounded-md` | `rounded-[var(--radius-md)]` | Button, Input |
-| `rounded-lg` | `rounded-[var(--radius-md)]` | Card（统一为 6px）|
-| `rounded-xl` | `rounded-[var(--radius-lg)]` | Modal |
-| `rounded-full` | `rounded-[var(--radius-pill)]` | 头像、胶囊按钮 |
+| 旧写法         | 新写法                         | 适用组件           |
+| -------------- | ------------------------------ | ------------------ |
+| `rounded`      | `rounded-[var(--radius-sm)]`   | 小元素             |
+| `rounded-sm`   | `rounded-[var(--radius-sm)]`   | Badge, Tag         |
+| `rounded-md`   | `rounded-[var(--radius-md)]`   | Button, Input      |
+| `rounded-lg`   | `rounded-[var(--radius-md)]`   | Card（统一为 6px） |
+| `rounded-xl`   | `rounded-[var(--radius-lg)]`   | Modal              |
+| `rounded-full` | `rounded-[var(--radius-pill)]` | 头像、胶囊按钮     |
 
 #### 示例
 
@@ -133,10 +133,10 @@ grep -r "\[.*px\]" components/ | grep -E "(p-|m-|gap-)"
 
 ```tsx
 // ❌ 任意值
-className="p-[13px] gap-[7px]"
+className = "p-[13px] gap-[7px]";
 
 // ✅ 使用标准刻度
-className="p-3 gap-2"  // 12px, 8px
+className = "p-3 gap-2"; // 12px, 8px
 ```
 
 ### 4. 统一动画时长
@@ -152,10 +152,10 @@ grep -r "duration-" components/ | grep -v "duration-\[var"
 
 ```tsx
 // ❌ 硬编码时长
-className="transition-all duration-150"
+className = "transition-all duration-150";
 
 // ✅ 使用 Token
-className="transition-all duration-[var(--duration-base)]"
+className = "transition-all duration-[var(--duration-base)]";
 ```
 
 ---
@@ -176,7 +176,12 @@ className="transition-all duration-[var(--duration-base)]"
 **修复**：
 
 ```tsx
-<div className={cn("rounded-[var(--radius-md)] border border-border bg-surface", className)} />
+<div
+  className={cn(
+    "rounded-[var(--radius-md)] border border-border bg-surface",
+    className,
+  )}
+/>
 ```
 
 ### 问题 2：Button 圆角不一致
@@ -185,7 +190,7 @@ className="transition-all duration-[var(--duration-base)]"
 
 ```tsx
 // components/ui/Button.tsx:50
-className="rounded-md"  // 6px，符合规范
+className = "rounded-md"; // 6px，符合规范
 ```
 
 **状态**：✅ 已符合，但建议显式使用 Token
@@ -193,7 +198,7 @@ className="rounded-md"  // 6px，符合规范
 **优化**：
 
 ```tsx
-className="rounded-[var(--radius-md)]"
+className = "rounded-[var(--radius-md)]";
 ```
 
 ### 问题 3：双重设计系统冲突
@@ -291,24 +296,24 @@ git diff  # 检查更改
 ```js
 // eslint-local-rules.js
 module.exports = {
-  'no-hardcoded-colors': {
+  "no-hardcoded-colors": {
     create(context) {
       return {
         JSXAttribute(node) {
-          if (node.name.name === 'className') {
-            const value = node.value.value
+          if (node.name.name === "className") {
+            const value = node.value.value;
             if (/bg-gray-|text-gray-|border-gray-/.test(value)) {
               context.report({
                 node,
-                message: '禁止使用硬编码颜色，请使用 Design Tokens'
-              })
+                message: "禁止使用硬编码颜色，请使用 Design Tokens",
+              });
             }
           }
-        }
-      }
-    }
-  }
-}
+        },
+      };
+    },
+  },
+};
 ```
 
 ---
@@ -352,13 +357,13 @@ grep -r "\[.*px\]" components/ | grep -E "(p-|m-|gap-)"
 
 ## 迁移时间表
 
-| 阶段 | 任务 | 预计时间 | 负责人 |
-|------|------|----------|--------|
-| 第一阶段 | 核心组件迁移 | 1-2天 | - |
-| 第二阶段 | 辅助组件迁移 | 2-3天 | - |
-| 第三阶段 | 页面组件迁移 | 3-5天 | - |
-| 验收 | 全局检查 + 测试 | 1天 | - |
-| **总计** | | **7-11天** | |
+| 阶段     | 任务            | 预计时间   | 负责人 |
+| -------- | --------------- | ---------- | ------ |
+| 第一阶段 | 核心组件迁移    | 1-2天      | -      |
+| 第二阶段 | 辅助组件迁移    | 2-3天      | -      |
+| 第三阶段 | 页面组件迁移    | 3-5天      | -      |
+| 验收     | 全局检查 + 测试 | 1天        | -      |
+| **总计** |                 | **7-11天** |        |
 
 ---
 
@@ -370,7 +375,8 @@ A: 不需要。建议按优先级分阶段迁移，每个阶段完成后进行�
 
 ### Q: 迁移后如何确保不引入新的不一致？
 
-A: 
+A:
+
 1. 使用 ESLint 规则检测硬编码颜色
 2. Code Review 时检查设计规范
 3. 定期运行检查脚本
@@ -388,13 +394,14 @@ A: 不建议移除。管理后台需要更高的视觉区分度，保留独立�
 ## 下一步行动
 
 1. **立即执行**：
+
    ```bash
    # 1. 备份当前代码
    git checkout -b design-system-migration
-   
+
    # 2. 修复 Card 组件圆角
    # 编辑 components/ui/Card.tsx
-   
+
    # 3. 提交第一个迁移
    git add components/ui/Card.tsx
    git commit -m "fix: 统一 Card 组件圆角为 --radius-md"

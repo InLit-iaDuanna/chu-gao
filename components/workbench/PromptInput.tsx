@@ -264,7 +264,9 @@ export function PromptInput({
       </form>
       <div className="flex items-center justify-between gap-3 px-1 font-mono text-xs text-text-faint">
         <span>{value.length}/4000</span>
-        <span>{isUploadingReference ? "上传参考图..." : "Ctrl Enter 发送"}</span>
+        <span>
+          {isUploadingReference ? "上传参考图..." : "Ctrl Enter 发送"}
+        </span>
       </div>
       {referenceUploadError ? (
         <p className="px-1 text-xs leading-5 text-danger">

@@ -11,11 +11,13 @@
 ## 0. 全局约束
 
 ### 0.1 技术栈
+
 - Next.js 15 (App Router) + React 19 + Tailwind v4 + framer-motion + next-themes + lucide-react。
 - **允许新增**：`class-variance-authority` (cva)、`tailwind-variants`（二选一，推荐 cva）。
 - **禁止新增**：UI 库（shadcn 整套引入除外，但本项目不引入，自己写）、CSS-in-JS、图标包替换。
 
 ### 0.2 TypeScript 风格（来自 `~/.claude/rules/typescript/coding-style.md`）
+
 - 所有 exported 组件/函数显式标注 props 与返回类型。
 - 组件 props 用 `interface XxxProps`，不要 `React.FC`。
 - 回调 prop 显式签名：`onChange: (value: string) => void`。
@@ -24,6 +26,7 @@
 - 文件头不写注释块；组件内不写 JSDoc 除非 prop 含义不直观。
 
 ### 0.3 视觉绝对禁令
+
 - ❌ 任何 inline `style={{ color/background/border }}` —— 必须走 tokens。
 - ❌ 任何硬编码十六进制色（`#xxxxxx`），SVG 内单色用 `currentColor`。
 - ❌ 任何半径 > 16px（除登录页 hero 装饰可破例）。
@@ -47,7 +50,7 @@
     --bg: 8 8 9;
     --surface: 14 14 16;
     --surface-2: 22 22 25;
-    --surface-3: 32 32 36;            /* 新增，hover 态用 */
+    --surface-3: 32 32 36; /* 新增，hover 态用 */
 
     /* 描边 */
     --border: 32 32 36;
@@ -59,7 +62,7 @@
     --text-faint: 95 95 102;
 
     /* 状态色（克制：仅在 badge/icon 用，不做大面积背景） */
-    --accent: 237 237 240;             /* 保持中性 */
+    --accent: 237 237 240; /* 保持中性 */
     --success: 76 175 130;
     --danger: 232 90 79;
     --warning: 230 175 84;
@@ -78,22 +81,29 @@
     --duration-modal: 200ms;
     --duration-image: 180ms;
     --duration-slow: 240ms;
-    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);     /* ease-out-expo */
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1); /* ease-out-expo */
     --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
 
     /* 字体（H1/H2 改回 sans，仅登录 hero 用 serif） */
     --font-stack-sans:
-      "Geist", "HarmonyOS Sans SC", "PingFang SC", system-ui,
-      -apple-system, BlinkMacSystemFont, sans-serif;
-    --font-stack-serif:
-      "Fraunces", "LXGW WenKai", Georgia, serif;
-    --font-stack-mono:
-      "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
+      "Geist", "HarmonyOS Sans SC", "PingFang SC", system-ui, -apple-system,
+      BlinkMacSystemFont, sans-serif;
+    --font-stack-serif: "Fraunces", "LXGW WenKai", Georgia, serif;
+    --font-stack-mono: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
 
     /* 字号 */
-    --fs-11: 11px; --fs-12: 12px; --fs-13: 13px; --fs-14: 14px;
-    --fs-15: 15px; --fs-16: 16px; --fs-18: 18px; --fs-20: 20px;
-    --fs-24: 24px; --fs-30: 30px; --fs-36: 36px; --fs-48: 48px;
+    --fs-11: 11px;
+    --fs-12: 12px;
+    --fs-13: 13px;
+    --fs-14: 14px;
+    --fs-15: 15px;
+    --fs-16: 16px;
+    --fs-18: 18px;
+    --fs-20: 20px;
+    --fs-24: 24px;
+    --fs-30: 30px;
+    --fs-36: 36px;
+    --fs-48: 48px;
     --fs-60: 60px;
 
     /* 行高/字距 */
@@ -101,17 +111,29 @@
     --lh-snug: 1.3;
     --lh-normal: 1.5;
     --lh-loose: 1.7;
-    --ls-tight: -0.02em;              /* H1/H2 */
-    --ls-snug: -0.01em;               /* H3/H4 */
+    --ls-tight: -0.02em; /* H1/H2 */
+    --ls-snug: -0.01em; /* H3/H4 */
     --ls-normal: 0;
     --ls-wide: 0.04em;
     --ls-eyebrow: 0.12em;
 
     /* 间距（8 倍数 + 4） */
-    --s-2: 2px; --s-4: 4px; --s-6: 6px; --s-8: 8px;
-    --s-10: 10px; --s-12: 12px; --s-16: 16px; --s-20: 20px;
-    --s-24: 24px; --s-32: 32px; --s-40: 40px; --s-48: 48px;
-    --s-64: 64px; --s-80: 80px; --s-96: 96px; --s-128: 128px;
+    --s-2: 2px;
+    --s-4: 4px;
+    --s-6: 6px;
+    --s-8: 8px;
+    --s-10: 10px;
+    --s-12: 12px;
+    --s-16: 16px;
+    --s-20: 20px;
+    --s-24: 24px;
+    --s-32: 32px;
+    --s-40: 40px;
+    --s-48: 48px;
+    --s-64: 64px;
+    --s-80: 80px;
+    --s-96: 96px;
+    --s-128: 128px;
 
     /* 阴影（新增） */
     --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.06);
@@ -140,8 +162,9 @@
     --info: 56 110 196;
 
     --shadow-xs: 0 1px 2px rgb(17 17 19 / 0.04);
-    --shadow-sm: 0 2px 4px -1px rgb(17 17 19 / 0.06), 0 1px 2px rgb(17 17 19 / 0.03);
-    --shadow-md: 0 8px 24px -8px rgb(17 17 19 / 0.10);
+    --shadow-sm:
+      0 2px 4px -1px rgb(17 17 19 / 0.06), 0 1px 2px rgb(17 17 19 / 0.03);
+    --shadow-md: 0 8px 24px -8px rgb(17 17 19 / 0.1);
     --shadow-lg: 0 16px 40px -12px rgb(17 17 19 / 0.12);
     --shadow-focus: 0 0 0 2px rgb(var(--bg)), 0 0 0 4px rgb(var(--text) / 0.4);
   }
@@ -164,7 +187,7 @@ Admin 区域不再单独令牌，与主站统一。删除文件并去除 `app/gl
 
 ### 1.4 `app/layout.tsx`
 
-- 保留逻辑，仅调整 `` className：去掉 `antialiased`（已在 html）；保留 `min-h-full bg-background text-foreground`。
+- 保留逻辑，仅调整 ``className：去掉`antialiased`（已在 html）；保留 `min-h-full bg-background text-foreground`。
 - 新增 `<Suspense fallback={null}>` 包裹 `` 防止 SSR 抖动。
 - 标题保留 `Chūgǎo Studio`。
 
@@ -208,13 +231,13 @@ components/ui/
 ### 2.1 Button.tsx 规范
 
 ```typescript
-interface ButtonProps extends React.ButtonHTMLAttributes{
+interface ButtonProps extends React.ButtonHTMLAttributes {
   variant?: "primary" | "secondary" | "ghost" | "danger" | "link";
   size?: "sm" | "md" | "lg";
   loading?: boolean;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
-  asChild?: boolean;          // 用 Radix Slot 或自实现的 Slot
+  asChild?: boolean; // 用 Radix Slot 或自实现的 Slot
 }
 ```
 
@@ -230,9 +253,11 @@ interface ButtonProps extends React.ButtonHTMLAttributes{
 - 所有交互 `transition-colors duration-[var(--duration-fast)] ease-out`。
 
 ### 2.2 IconButton.tsx
+
 `square` 按钮，尺寸 `sm h-7 w-7 / md h-8 w-8 / lg h-10 w-10`，强制 children 是单个 lucide icon，size 12/14/16。
 
 ### 2.3 Input.tsx / Textarea.tsx 规范
+
 - 高度 sm 28 / md 32 / lg 40。
 - `bg-surface text-foreground placeholder:text-text-faint`。
 - 边框 1px `border-border`，`hover:border-border-strong`，`focus:border-foreground focus:shadow-focus`，无 ring outline。
@@ -242,6 +267,7 @@ interface ButtonProps extends React.ButtonHTMLAttributes{
 - Textarea 默认 `min-h-[80px] resize-none`，支持 `autoResize?: boolean` prop（用 `useLayoutEffect` 同步高度）。
 
 ### 2.4 FormField.tsx
+
 ```typescript
 interface FormFieldProps {
   label?: string;
@@ -252,16 +278,19 @@ interface FormFieldProps {
   htmlFor?: string;
 }
 ```
+
 - label：`text-xs font-medium text-foreground`。
 - description：`text-xs text-text-muted mt-1`。
 - error：`text-xs text-[rgb(var(--danger))] mt-1.5`。
 
 ### 2.5 Badge.tsx
+
 - variants: neutral / success / warning / danger / info / outline。
 - 实现：仅文字色 + 1px 同色 30% border + 同色 8% 背景。不要大面积色块。
 - 高度 20，圆角 4，文字 11。
 
 ### 2.6 Card.tsx
+
 - Card：`bg-surface border border-border rounded-lg`。
 - 不带阴影（仅 hover 时 `hover:shadow-sm` 可选）。
 - CardHeader：`px-5 pt-5 pb-3`。
@@ -271,7 +300,8 @@ interface FormFieldProps {
 - CardFooter：`px-5 py-3 border-t border-border flex items-center justify-end gap-2`。
 
 ### 2.7 Dialog.tsx
-- 自实现（不引入 Radix）：`` 原生 + `useEffect` 控制 `showModal()`。
+
+- 自实现（不引入 Radix）：``原生 +`useEffect`控制`showModal()`。
 - 或用 portal + 自己的 backdrop。
 - backdrop：`bg-background/70 backdrop-blur-[2px]`，淡入 160ms。
 - content：`bg-surface border border-border rounded-lg shadow-lg max-w-[480px] w-[calc(100%-32px)]`，进场 `scale-[0.98]→1 + opacity 0→1`。
@@ -279,34 +309,41 @@ interface FormFieldProps {
 - 必须 trap focus、`role=dialog`、`aria-modal=true`。
 
 ### 2.8 Tooltip.tsx
+
 - 纯 CSS hover 实现（`group-hover` 配合）即可，无需 portal。
 - 内容：`bg-foreground text-background text-[11px] px-2 py-1 rounded shadow-sm`。
 - 延迟 200ms 显现。
 
 ### 2.9 DropdownMenu.tsx
+
 - portal + 定位（用 `getBoundingClientRect`）。
 - 菜单项 h-8 px-2.5 text-sm，hover `bg-surface-2`。
 - 分隔线：1px border-border。
 - 支持快捷键尾部对齐显示（用 Kbd）。
 
 ### 2.10 Tabs.tsx
+
 - TabsList：底部 1px hairline 容器。
 - TabsTrigger：h-9 px-3 text-sm，active 时下方 2px `bg-foreground` 条。
 
 ### 2.11 Segmented.tsx
+
 - 受控 chip 组：`bg-surface-2 p-0.5 rounded-md inline-flex`，每项 `h-7 px-2.5 text-xs rounded-[4px]`，激活态 `bg-surface shadow-xs text-foreground`。
 
 ### 2.12 Toast.tsx
+
 - 上下文 `ToastProvider`，全局放在 `app/layout.tsx`。
 - 右下角堆叠，每条 `bg-surface border border-border rounded-md shadow-md p-3 min-w-[280px]`。
 - 自动消失 4s，可手动 ✕。
 - 暴露 `useToast()` 返回 `{ toast: (opts: { title; description?; variant?: "default"|"success"|"danger" }) => void }`。
 
 ### 2.13 Skeleton.tsx
+
 - `bg-surface-2 rounded` + `animate-pulse`（自定义关键帧，opacity 0.5→1，1.2s linear infinite）。
 - 不要 shimmer 滑光。
 
 ### 2.14 Spinner.tsx
+
 - 14/16/18 三档；纯 SVG 圆环，1.5px 描边，`animate-spin` 800ms linear。
 
 **Phase 2 验收**：`pnpm lint` 0 error；`pnpm tsc --noEmit` 0 error；新建 `app/_dev/ui/page.tsx`（临时 showcase 页，最后删除）确认所有组件视觉对。
@@ -316,46 +353,56 @@ interface FormFieldProps {
 ## 3. shared 组件改造（Phase 3）
 
 ### 3.1 `components/shared/Logo.tsx`
+
 - 现状：自定义 wordmark。改为：左侧 16×16 几何 mark（两个方块嵌套，纯 currentColor SVG）+ 右侧文字 `Chūgǎo`（`text-[14px] font-semibold tracking-[-0.01em]`）。
 - prop：`size?: "sm" | "md"`，sm 仅显示 mark。
 
 ### 3.2 `components/shared/ThemeToggle.tsx`
+
 - 改为 Segmented（system / light / dark），尺寸 sm。
 - 用 lucide 图标 Sun / Moon / Monitor，icon-only mode（带 tooltip）。
 
 ### 3.3 `components/shared/AccountMenu.tsx`
+
 - 用新 `DropdownMenu`。
 - 触发：头像（用户首字母圆形 28×28）+ 右侧 ChevronDown。
 - 菜单项：账户设置 / 兑换码 / 主题切换（嵌套） / 登出。
 - 顶部展示：用户名 + email（text-xs muted） + 积分余额 `Badge`。
 
 ### 3.4 `components/shared/AnnouncementBanner.tsx`
+
 - 改为顶部贴边 1px hairline 条，无背景色。
 - 内容左侧 2px 强调色竖条（`bg-foreground` 默认；`bg-[rgb(var(--warning))]` for warn 等）。
 - 高度 36px，垂直居中，右侧 ✕ 关闭按钮（IconButton ghost sm）。
 - 关闭状态用 localStorage 记忆（key 用 announcement hash）。
 
 ### 3.5 `components/shared/ProgressIndicator.tsx`
+
 - 线性进度：`h-0.5 bg-surface-2 overflow-hidden rounded-full`，内条 `bg-foreground`。
 - 支持 indeterminate：用 `@keyframes indeterminate` 平移。
 
 ### 3.6 `components/shared/EmptyState.tsx`
+
 - props：`icon?: React.ReactNode; title: string; description?: string; action?: React.ReactNode`。
 - icon 默认：48×48 圆角方框 + 内部线条几何（虚线圆 / 斜线等纯 CSS）。
 - 文本居中，title `text-sm font-semibold`，description `text-xs text-text-muted max-w-[320px]`。
 
 ### 3.7 `components/shared/LoadingSkeleton.tsx`
+
 - 整文件用 `Skeleton` 重新实现：导出 `SkeletonText`、`SkeletonCard`、`SkeletonRow`。
 
 ### 3.8 `components/shared/ActionableStatus.tsx`
+
 - 保留 API（`tone`, `title`, `description`, `action`）。
 - 重写视觉：用 `Card` + 顶部 1 个 4px 圆点（颜色按 tone）+ 标题 + 描述 + action 区。无大面积色块。
 
 ### 3.9 `components/shared/RedeemCodeForm.tsx`
+
 - 用新 `FormField` + `Input` + `Button`。
 - 成功后用 `useToast()` 提示，不再用内嵌 banner。
 
 ### 3.10 `components/shared/AppThemeProvider.tsx`
+
 - 不变（仅 next-themes Provider）。
 
 **Phase 3 验收**：各 shared 组件单独导入到 showcase 页能正常显示；现有页面引用处不破。
@@ -380,7 +427,9 @@ interface FormFieldProps {
       <Logo />
       <div>
         <h1 className="font-serif text-[clamp(40px,5vw,60px)] leading-[1.05] tracking-[-0.02em]">
-          为设计学生<br/>而生的工作台
+          为设计学生
+          <br />
+          而生的工作台
         </h1>
         <p className="mt-6 max-w-[420px] text-sm text-text-muted leading-relaxed">
           统一接入海外主流图像生成模型，专注创作，无需切换工具。
@@ -403,6 +452,7 @@ interface FormFieldProps {
 ```
 
 ### 4.2 `components/auth/LoginForm.tsx`
+
 - 用 `FormField` + `Input` + `Button` 重写。
 - 字段：邮箱、密码、记住我（Switch sm 隐藏标签 + label 文字）。
 - 主按钮全宽（`className="w-full"`），loading 时显示 Spinner。
@@ -411,6 +461,7 @@ interface FormFieldProps {
 - 入场动效：表单容器 `motion.div` `initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} transition={{ duration: 0.22, ease: [0.16,1,0.3,1] }}`。
 
 ### 4.3 `components/auth/RegisterForm.tsx`
+
 - 同上，字段：邮箱、用户名、密码、确认密码、邀请码（可选）、同意条款（Checkbox）。
 - 密码字段下方实时强度指示（4 段细条：弱/中/强/极强，仅灰阶渲染，不上色）。
 - 表单顶端：返回登录 link。
@@ -447,6 +498,7 @@ components/workbench/
 ```
 
 **步骤**：
+
 1. 先把 state/effect 原样搬到 `useWorkbenchState.ts`，Shell 用 Context Provider 包裹。
 2. 把 JSX 按区域剪到 5 个子组件文件，**不改样式**。
 3. 跑 lint + tsc 验证无错。
@@ -455,13 +507,14 @@ components/workbench/
 ### 5.2 视觉规范
 
 **外层布局**：
+
 ```tsx
 <div className="flex h-full flex-col">
-  <WorkbenchTopBar />              {/* h-12 border-b */}
+  <WorkbenchTopBar /> {/* h-12 border-b */}
   <div className="grid flex-1 min-h-0 grid-cols-[240px_1fr_320px]">
-    <WorkbenchLeftRail />          {/* border-r */}
-    <WorkbenchCenter />            {/* relative，内部贴底 Composer */}
-    <WorkbenchInspector />         {/* border-l */}
+    <WorkbenchLeftRail /> {/* border-r */}
+    <WorkbenchCenter /> {/* relative，内部贴底 Composer */}
+    <WorkbenchInspector /> {/* border-l */}
   </div>
 </div>
 ```
@@ -469,22 +522,26 @@ components/workbench/
 左右栏可折叠（按钮在 TopBar 上）：折叠后 0px（用 grid template 切换 `[240px_1fr_320px]` ↔ `[0px_1fr_320px]` ↔ `[240px_1fr_0px]`），加 `transition: grid-template-columns 200ms`。
 
 ### 5.3 WorkbenchTopBar.tsx
+
 - 高 48px，`border-b border-border bg-surface px-3`。
 - 左：折叠左栏 IconButton + 当前对话标题（可点编辑） + ModelSelector（chip 风格）。
 - 中：留白。
 - 右：折叠右栏 IconButton + CostPreview（紧凑） + ThemeToggle + AccountMenu。
 
 ### 5.4 WorkbenchLeftRail.tsx
+
 - 宽 240px。
 - 顶部：`新建对话` 主按钮全宽 + 下方搜索 Input（h-8 ghost 风格，带 Search icon）。
 - 列表：按"今天 / 昨天 / 更早"分组，每项 h-8 px-2 rounded-md hover bg-surface-2，active 时 `bg-surface-2 shadow-ring`。每项右侧 hover 显示 IconButton 删除/重命名。
 - 空状态：`EmptyState`。
 
 ### 5.5 WorkbenchCenter.tsx
+
 - 内部纵向：`ConversationThread`（滚动） + 贴底 `WorkbenchComposer`（fixed-like 内部相对定位）。
 - 画布有图时：图像走 `Canvas.tsx`。
 
 #### 5.5.1 `ConversationThread.tsx` 重写
+
 - 消息列表 max-width 720，居中。
 - user 消息：`border-l-2 border-foreground pl-3 py-2`，无背景。
 - assistant 消息：`border-l-2 border-border pl-3 py-2`，无背景。
@@ -495,11 +552,13 @@ components/workbench/
 - 进场：每条 `motion.div` y 4→0, opacity 0→1, duration 160ms。
 
 #### 5.5.2 `Canvas.tsx` 重写
+
 - 单图模式 vs 网格模式切换（Segmented）。
 - 单图：居中显示，最大 80vh，aspect 自适应；下方一行 metadata（模型、尺寸、用时、积分），text-xs muted。
 - 操作浮层：右上角 IconButton 组（下载 / 复制 prompt / 重新生成 / 删除），仅 hover 显示，背景 `bg-surface/80 backdrop-blur-sm`。
 
 #### 5.5.3 `WorkbenchComposer.tsx`（替代 `PromptInput.tsx` 编排）
+
 - 容器：`absolute bottom-4 left-1/2 -translate-x-1/2 w-[calc(100%-32px)] max-w-[760px]`。
 - 卡片：`bg-surface border border-border rounded-xl shadow-md hover:shadow-lg focus-within:border-foreground focus-within:shadow-lg transition`。
 - Textarea：自适应高度 1→6 行，无 border 无 outline，`bg-transparent px-4 pt-3`。
@@ -510,17 +569,21 @@ components/workbench/
 - 附件预览：textarea 上方一行 chip 列表，每个 chip 显示文件名 + ✕ 移除。
 
 #### 5.5.4 `AspectRatioPicker.tsx` / `ResolutionPicker.tsx`
+
 - 重写为 `Segmented`，紧凑模式（每项仅显示比例如 `1:1` / `16:9` / `9:16`）。
 - 选项随模型 `capabilities` 动态改变。
 
 #### 5.5.5 `ModelSelector.tsx`
+
 - 改为 `DropdownMenu` 触发按钮：`<Button variant="secondary" size="sm" rightIcon={<ChevronDown />}>{model.name}`。
 - 下拉每项：模型图标（小方块色） + 名称 + 描述（text-xs muted） + 右侧定价 chip。
 
 #### 5.5.6 `ProviderChannelSelector.tsx`
+
 - 同上 DropdownMenu，仅在 image-to-image 模型显示。
 
 ### 5.6 WorkbenchInspector.tsx（右栏）
+
 - 宽 320px，`border-l border-border bg-surface overflow-y-auto`。
 - 内部 `Tabs`：参数 / 预设 / 偏好。
 - "参数" tab：包 `DynamicParamsPanel.tsx`。
@@ -528,6 +591,7 @@ components/workbench/
 - "偏好" tab：包 `WorkbenchPreferencesForm.tsx`（沟通 form 控件全换成 ui/）。
 
 #### 5.6.1 `DynamicParamsPanel.tsx` 重写
+
 - 按字段分组（用 `Separator` 分隔），每个字段用 `FormField`。
 - 数字字段：`Input type=number` + 右侧 ▲▼ 微调按钮 + 滑块（如适用）。
 - 选择字段：`Select` 或 `Segmented`（≤4 选项时用 Segmented）。
@@ -537,6 +601,7 @@ components/workbench/
 ### 5.7 子页面
 
 #### 5.7.1 `app/(app)/app/history/page.tsx`
+
 - 顶部 PageHeader（标题"历史" + 右侧筛选 chip + 搜索 Input）。
 - 网格 `grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3`。
 - 每项卡片：`aspect-square` 缩略图 + 底部一行 metadata（模型 + 时间）。
@@ -545,17 +610,20 @@ components/workbench/
 - 分页：底部 `Button ghost` 加载更多。
 
 #### 5.7.2 `app/(app)/app/settings/page.tsx`
+
 - 仿 Vercel Settings：左侧二级导航（Tabs 垂直版）+ 右侧内容。
 - 分组：账户 / 安全 / 偏好 / 兑换码 / 关于。
 - 每项：左侧 label + description（text-xs muted），右侧控件，行间 `Separator`。
 - 危险操作（如清空历史）：`Button variant="danger"` 带 Dialog 二次确认。
 
 #### 5.7.3 `app/(app)/app/g/[id]/page.tsx`
+
 - 左大图（最大 70vh）+ 右侧 320px 元信息面板（Card）。
 - 元信息：模型、prompt（可复制）、参数列表、用时、积分、创建时间。
 - 操作区：下载 / 重新生成 / 删除（danger）。
 
 ### 5.8 `app/(app)/layout.tsx`
+
 - 保留鉴权逻辑。
 - Sidebar 60px 改为 56px，icon 18 → 16。
 - 各 nav item：active 时 `bg-surface-2 text-foreground shadow-ring`，inactive `text-text-faint hover:text-foreground hover:bg-surface-2`。
@@ -568,6 +636,7 @@ components/workbench/
 ## 6. (admin) 重构（Phase 6）
 
 ### 6.1 新建 `components/admin/AdminShell.tsx`
+
 - 提供 `AdminShell` 包装组件，包含 sidebar + content area。
 - `app/(admin)/layout.tsx` 重写为：
 
@@ -578,6 +647,7 @@ components/workbench/
 ```
 
 ### 6.2 AdminShell Sidebar
+
 - 宽 240px（可折叠到 56），固定，`border-r bg-surface`。
 - 顶部：Logo 完整 + 环境徽章（`Badge` 显示 `prod`/`dev`，从 NODE_ENV 推断）。
 - 导航分组：
@@ -601,6 +671,7 @@ components/workbench/
 - 底部：AccountMenu + "回到工作台"链接。
 
 ### 6.3 AdminShell Content
+
 - 顶部 PageHeader 组件（新建 `components/admin/PageHeader.tsx`）：
   - 面包屑（text-xs muted）
   - 标题（H1 24px font-semibold tracking-tight）
@@ -609,8 +680,9 @@ components/workbench/
 - 主体 padding 24，最大宽 1280。
 
 ### 6.4 `components/admin/DataTable.tsx` 重写
+
 - props：`columns: ColumnDef[]; data: T[]; loading?; emptyState?; pagination?`。
-- 表头：`` h-9 px-3 `text-[11px] font-mono uppercase tracking-wider text-text-faint`，底部 1px hairline。
+- 表头：``h-9 px-3`text-[11px] font-mono uppercase tracking-wider text-text-faint`，底部 1px hairline。
 - 行：h-11 hover `bg-surface-2/50`，cell `px-3 text-sm`。
 - 列对齐由 column def 控制（数字/状态默认右对齐）。
 - 加载态：用 `Skeleton` 占位行（5 行）。
@@ -618,6 +690,7 @@ components/workbench/
 - 分页底部右侧：`Button ghost sm` 前/后 + 页码 + 每页数量 `Select`。
 
 ### 6.5 `components/admin/StatCard.tsx` 重写
+
 ```tsx
 interface StatCardProps {
   label: string;
@@ -626,6 +699,7 @@ interface StatCardProps {
   hint?: string;
 }
 ```
+
 - 容器：Card padding 5。
 - label：eyebrow 风格 11px。
 - value：30px font-semibold tracking-tight `mt-2`。
@@ -633,18 +707,23 @@ interface StatCardProps {
 - hint：text-xs muted 底部。
 
 ### 6.6 `components/admin/ProviderCard.tsx` 重写
+
 - 用 Card；左侧 logo（圆角方块） + 中间名字/描述 + 右侧 ProviderHealthBadge + DropdownMenu。
 
 ### 6.7 `components/admin/ProviderHealthBadge.tsx`
+
 - 用新 `Badge` variant。
 
 ### 6.8 `components/admin/ConfigEditor.tsx`
+
 - form 内全部换 ui/，分组用 Card。
 
 ### 6.9 `components/admin/AdminForms.tsx`
+
 - 通用 form 字段全部换 ui/，导出的 helper 调整签名（保留外部 API）。
 
 ### 6.10 `components/admin/ProviderEditDialog.tsx`
+
 - 用新 `Dialog` 重写。
 - 字段表单同上。
 - 底部 DialogFooter：取消 ghost + 保存 primary。
@@ -652,6 +731,7 @@ interface StatCardProps {
 ### 6.11 各管理页统一改造
 
 模板：
+
 ```tsx
 export default async function XxxPage() {
   const data = await fetchData();
@@ -670,6 +750,7 @@ export default async function XxxPage() {
 ```
 
 要改的页面：
+
 - `app/(admin)/admin/page.tsx`：4 个 StatCard 横排 + 最近活动表格。
 - `app/(admin)/admin/users/page.tsx`：DataTable。
 - `app/(admin)/admin/users/[id]/page.tsx`：左侧用户卡 + 右侧 Tabs（信息/会话/积分/审计）。
@@ -698,16 +779,16 @@ export default async function XxxPage() {
 
 ## 8. 动效准则
 
-| 场景 | 时长 | 缓动 | 实现 |
-|---|---|---|---|
-| 页面进场 | 220ms | ease-out-expo | motion.div opacity+y |
-| 列表交错 | 30ms/项，最多 10 项 | linear delay | motion.div + custom |
-| 按钮 hover | 120ms | ease-out | CSS transition |
-| Modal / Dialog | 200ms | ease-out-expo | scale 0.98→1 + opacity |
-| Dropdown 展开 | 160ms | ease-out | opacity + y -4→0 |
-| 图像入场 | 180ms | ease-out-expo | img-enter keyframe |
-| 主题切换 | 0ms | — | next-themes 默认 |
-| 折叠/展开栏 | 200ms | ease-in-out | grid-template-columns |
+| 场景           | 时长                | 缓动          | 实现                   |
+| -------------- | ------------------- | ------------- | ---------------------- |
+| 页面进场       | 220ms               | ease-out-expo | motion.div opacity+y   |
+| 列表交错       | 30ms/项，最多 10 项 | linear delay  | motion.div + custom    |
+| 按钮 hover     | 120ms               | ease-out      | CSS transition         |
+| Modal / Dialog | 200ms               | ease-out-expo | scale 0.98→1 + opacity |
+| Dropdown 展开  | 160ms               | ease-out      | opacity + y -4→0       |
+| 图像入场       | 180ms               | ease-out-expo | img-enter keyframe     |
+| 主题切换       | 0ms                 | —             | next-themes 默认       |
+| 折叠/展开栏    | 200ms               | ease-in-out   | grid-template-columns  |
 
 **全部尊重 `prefers-reduced-motion: reduce`** — `globals.css` 已有，保留。
 
@@ -715,24 +796,26 @@ export default async function XxxPage() {
 
 ## 9. 执行顺序与 PR 划分
 
-| # | 标题 | 大致文件数 | 验收 |
-|---|---|---|---|
-| 1 | tokens + globals + layout 基础 | 4 | 全站颜色更新，无功能破坏 |
-| 2 | components/ui/ 原子层 | 25 | showcase 页通过，lint+tsc 0 error |
-| 3 | components/shared/* 重写 | 10 | 现有页面引用处显示正常 |
-| 4 | (auth) login + register | 4 | 登录/注册流程通过 |
-| 5 | workbench 拆分（纯重构） | ~15 | 功能 100% 等价，行数收敛 |
-| 6 | workbench 视觉重写 | ~15 | 视觉验收 |
-| 7 | workbench 子页面（history/settings/g） | 3 | 各子页面验收 |
-| 8 | admin Shell + DataTable + StatCard + PageHeader | 5 | 通用组件就位 |
-| 9 | admin 各页面接入 | 11 | 每页验收 |
-| 10 | 首页 + 清理 + 验收 | 3 | 整体走查 |
+| #   | 标题                                            | 大致文件数 | 验收                              |
+| --- | ----------------------------------------------- | ---------- | --------------------------------- |
+| 1   | tokens + globals + layout 基础                  | 4          | 全站颜色更新，无功能破坏          |
+| 2   | components/ui/ 原子层                           | 25         | showcase 页通过，lint+tsc 0 error |
+| 3   | components/shared/\* 重写                       | 10         | 现有页面引用处显示正常            |
+| 4   | (auth) login + register                         | 4          | 登录/注册流程通过                 |
+| 5   | workbench 拆分（纯重构）                        | ~15        | 功能 100% 等价，行数收敛          |
+| 6   | workbench 视觉重写                              | ~15        | 视觉验收                          |
+| 7   | workbench 子页面（history/settings/g）          | 3          | 各子页面验收                      |
+| 8   | admin Shell + DataTable + StatCard + PageHeader | 5          | 通用组件就位                      |
+| 9   | admin 各页面接入                                | 11         | 每页验收                          |
+| 10  | 首页 + 清理 + 验收                              | 3          | 整体走查                          |
 
 **每个阶段结束必跑**：
+
 ```bash
 pnpm lint
 pnpm tsc --noEmit
 ```
+
 不通过不进入下一阶段。
 
 **禁止**：跨阶段批量改动；同一 commit 同时改业务逻辑和样式。

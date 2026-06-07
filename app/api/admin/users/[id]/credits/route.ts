@@ -49,47 +49,49 @@ export async function POST(
   try {
     user = await db.$transaction(
       async (tx) => {
-      const existing = await tx.user.findUnique({
-        where: { id },
-        select: { id: true, credits: true },
-      });
+        const existing = await tx.user.findUnique({
+          where: { id },
+          select: { id: true, credits: true },
+        });
 
-      if (!existing) {
-        throw new Error("NOT_FOUND");
-      }
+        if (!existing) {
+          throw new Error("NOT_FOUND");
+        }
 
-      if (existing.credits + parsed.data.amount < 0) {
-        throw new Error("NEGATIVE_BALANCE");
-      }
+        if (existing.credits + parsed.data.amount < 0) {
+          throw new Error("NEGATIVE_BALANCE");
+        }
 
-      const updated = await tx.user.update({
-        where: { id },
-        data: {
-          credits: {
-            increment: parsed.data.amount,
+        const updated = await tx.user.update({
+          where: { id },
+          data: {
+            credits: {
+              increment: parsed.data.amount,
+            },
           },
-        },
-        select: {
-          id: true,
-          email: true,
-          credits: true,
-        },
-      });
-
-      await tx.usageLog.create({
-        data: {
-          userId: id,
-          action:
-            parsed.data.amount > 0 ? "admin_credit_recharge" : "admin_credit_adjust",
-          creditsDelta: parsed.data.amount,
-          metadata: {
-            adminId: admin.id,
-            note: parsed.data.note,
+          select: {
+            id: true,
+            email: true,
+            credits: true,
           },
-        },
-      });
+        });
 
-      return updated;
+        await tx.usageLog.create({
+          data: {
+            userId: id,
+            action:
+              parsed.data.amount > 0
+                ? "admin_credit_recharge"
+                : "admin_credit_adjust",
+            creditsDelta: parsed.data.amount,
+            metadata: {
+              adminId: admin.id,
+              note: parsed.data.note,
+            },
+          },
+        });
+
+        return updated;
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
@@ -114,7 +116,9 @@ export async function POST(
   await audit({
     actorId: admin.id,
     action:
-      parsed.data.amount > 0 ? "admin.user.recharge" : "admin.user.credit_adjust",
+      parsed.data.amount > 0
+        ? "admin.user.recharge"
+        : "admin.user.credit_adjust",
     target: id,
     diff: parsed.data,
     request,

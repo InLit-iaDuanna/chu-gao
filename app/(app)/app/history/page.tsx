@@ -113,8 +113,8 @@ export default async function HistoryPage() {
   ]);
   const hasHistory = Boolean(
     conversations &&
-      generations &&
-      (conversations.length > 0 || generations.length > 0),
+    generations &&
+    (conversations.length > 0 || generations.length > 0),
   );
 
   return (
@@ -251,7 +251,9 @@ export default async function HistoryPage() {
                       </div>
                       <div className="flex items-center justify-between font-mono text-xs text-text-muted">
                         <span>{formatDate(generation.createdAt)}</span>
-                        <span className={generationStatusTone(generation.status)}>
+                        <span
+                          className={generationStatusTone(generation.status)}
+                        >
                           {generationStatusLabel(generation.status)}
                         </span>
                       </div>

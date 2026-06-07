@@ -83,6 +83,16 @@ type ProviderChannelGroupRecord = {
   dailyLimit: number | null;
 };
 
+type Image2ModeValue = "standard" | "high";
+type Image2ResolutionValue = "1K" | "2K" | "4K";
+
+const IMAGE2_MODE_LABELS: Record<Image2ModeValue, string> = {
+  standard: "标准版",
+  high: "高推理",
+};
+
+const IMAGE2_RESOLUTIONS: Image2ResolutionValue[] = ["1K", "2K", "4K"];
+
 export function AdminUserProfileForm({
   user,
 }: {
@@ -652,8 +662,8 @@ export function ProviderCreateForm({
         ))}
       </datalist>
       <p className="mt-3 text-xs leading-5 text-text-muted">
-        Nano Banana 请选择 GEMINI_IMAGE，并填写 nano-banana-2-512。不同 Base
-        URL 会在前台显示为不同大渠道。
+        Nano Banana 请选择 GEMINI_IMAGE，并填写 nano-banana-2-512。不同 Base URL
+        会在前台显示为不同大渠道。
       </p>
       {message ? (
         <p className="mt-3 text-sm text-text-muted">{message}</p>
@@ -1689,6 +1699,7 @@ export function ProviderAccountEditForm({
 export function PricingRuleForm({ models }: { models: Array<{ id: string }> }) {
   const router = useRouter();
   const [modelId, setModelId] = useState(models[0]?.id ?? "");
+  const [image2Mode, setImage2Mode] = useState("");
   const [resolution, setResolution] = useState("1K");
   const [credits, setCredits] = useState(2);
   const [message, setMessage] = useState<string | null>(null);
@@ -1711,6 +1722,7 @@ export function PricingRuleForm({ models }: { models: Array<{ id: string }> }) {
     try {
       await postJson("/api/admin/pricing", {
         modelId,
+        image2Mode: image2Mode || null,
         resolution: resolution || null,
         credits,
         priority: 10,
@@ -1727,7 +1739,7 @@ export function PricingRuleForm({ models }: { models: Array<{ id: string }> }) {
   return (
     <form onSubmit={submit} className="surface-panel p-4">
       <p className="text-sm font-medium">新增定价规则</p>
-      <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_120px_120px_auto]">
+      <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_120px_120px_120px_auto]">
         <select
           className="rounded-[6px] border border-border bg-surface px-3 py-2 text-sm"
           value={modelId}
@@ -1738,6 +1750,15 @@ export function PricingRuleForm({ models }: { models: Array<{ id: string }> }) {
               {model.id}
             </option>
           ))}
+        </select>
+        <select
+          className="rounded-[6px] border border-border bg-surface px-3 py-2 text-sm"
+          value={image2Mode}
+          onChange={(event) => setImage2Mode(event.target.value)}
+        >
+          <option value="">全部模式</option>
+          <option value="standard">标准版</option>
+          <option value="high">高推理</option>
         </select>
         <select
           className="rounded-[6px] border border-border bg-surface px-3 py-2 text-sm"
@@ -1768,5 +1789,140 @@ export function PricingRuleForm({ models }: { models: Array<{ id: string }> }) {
         <p className="mt-3 text-sm text-text-muted">{message}</p>
       ) : null}
     </form>
+  );
+}
+
+export function Image2PricingMatrix({
+  initialPrices,
+}: {
+  initialPrices: Record<Image2ModeValue, Record<Image2ResolutionValue, number>>;
+}) {
+  const router = useRouter();
+  const [prices, setPrices] = useState(initialPrices);
+  const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [messageByKey, setMessageByKey] = useState<Record<string, string>>({});
+
+  function updatePrice(
+    mode: Image2ModeValue,
+    resolution: Image2ResolutionValue,
+    value: number,
+  ) {
+    setPrices((current) => ({
+      ...current,
+      [mode]: {
+        ...current[mode],
+        [resolution]: value,
+      },
+    }));
+  }
+
+  async function savePrice(
+    mode: Image2ModeValue,
+    resolution: Image2ResolutionValue,
+  ) {
+    const key = `${mode}:${resolution}`;
+    const credits = prices[mode][resolution];
+
+    if (!Number.isFinite(credits) || credits < 0) {
+      setMessageByKey((current) => ({ ...current, [key]: "请输入有效点数" }));
+      return;
+    }
+
+    setSavingKey(key);
+    setMessageByKey((current) => ({ ...current, [key]: "保存中..." }));
+
+    try {
+      await postJson("/api/admin/pricing", {
+        modelId: "gpt-image-2",
+        image2Mode: mode,
+        resolution,
+        credits,
+        priority: 100,
+        isActive: true,
+      });
+      setMessageByKey((current) => ({ ...current, [key]: "已保存" }));
+      router.refresh();
+    } catch (error) {
+      setMessageByKey((current) => ({
+        ...current,
+        [key]: error instanceof Error ? error.message : "保存失败",
+      }));
+    } finally {
+      setSavingKey(null);
+    }
+  }
+
+  return (
+    <section className="surface-panel overflow-hidden">
+      <div className="border-b border-border px-4 py-4">
+        <p className="text-sm font-medium">Image2 价格矩阵</p>
+        <p className="mt-1 text-sm text-text-muted">
+          直接修改标准版和高推理在不同分辨率下的每张消耗点数。
+        </p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="min-w-[680px] w-full text-left text-sm">
+          <thead className="bg-surface-2 text-text-muted">
+            <tr>
+              <th className="w-36 px-4 py-3 font-medium">版本</th>
+              {IMAGE2_RESOLUTIONS.map((resolution) => (
+                <th key={resolution} className="px-4 py-3 font-medium">
+                  {resolution}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {(Object.keys(IMAGE2_MODE_LABELS) as Image2ModeValue[]).map(
+              (mode) => (
+                <tr key={mode} className="border-t border-border">
+                  <td className="px-4 py-4 align-top">
+                    <p className="font-medium">{IMAGE2_MODE_LABELS[mode]}</p>
+                    <p className="mt-1 text-xs text-text-muted">{mode}</p>
+                  </td>
+                  {IMAGE2_RESOLUTIONS.map((resolution) => {
+                    const key = `${mode}:${resolution}`;
+                    const isSaving = savingKey === key;
+
+                    return (
+                      <td key={resolution} className="px-4 py-4 align-top">
+                        <div className="flex items-center gap-2">
+                          <input
+                            className="h-10 w-24 rounded-[6px] border border-border bg-surface px-3 text-sm"
+                            type="number"
+                            min={0}
+                            value={prices[mode][resolution]}
+                            onChange={(event) =>
+                              updatePrice(
+                                mode,
+                                resolution,
+                                Number(event.target.value),
+                              )
+                            }
+                          />
+                          <button
+                            className="tool-button h-10 px-3"
+                            type="button"
+                            disabled={isSaving}
+                            onClick={() => void savePrice(mode, resolution)}
+                          >
+                            保存
+                          </button>
+                        </div>
+                        {messageByKey[key] ? (
+                          <p className="mt-2 text-xs text-text-muted">
+                            {messageByKey[key]}
+                          </p>
+                        ) : null}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ),
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }

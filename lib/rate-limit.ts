@@ -37,7 +37,10 @@ export class LoginRateLimitError extends Error {
   }
 }
 
-const localRateLimitStore = new Map<string, { count: number; expiresAt: number }>();
+const localRateLimitStore = new Map<
+  string,
+  { count: number; expiresAt: number }
+>();
 
 function loginLimitPerMinute(): number {
   const configured = Number(process.env.RATE_LIMIT_LOGIN_PER_MIN ?? 5);
@@ -103,7 +106,9 @@ export async function assertLoginAllowed(
   }
 
   const identifier = createHash("sha256")
-    .update(`${(getClientIp(headers) ?? "unknown").toLowerCase()}|${email.trim().toLowerCase()}`)
+    .update(
+      `${(getClientIp(headers) ?? "unknown").toLowerCase()}|${email.trim().toLowerCase()}`,
+    )
     .digest("hex");
   const windowSeconds = 60;
   const { count, retryAfterSeconds } = await incrementRateLimit(

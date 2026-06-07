@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 
 import { ImageGallery } from "@/components/workbench/ImageGallery";
+import { InfiniteCanvas } from "@/components/workbench/InfiniteCanvas";
 import {
   DynamicParamsPanel,
   normalizeWorkbenchState,
@@ -52,12 +53,14 @@ import { cn } from "@/lib/utils";
 
 interface WorkbenchShellV2Props {
   initialConversationId?: string | null;
+  initialMode?: "studio" | "canvas";
 }
 
 const SUBMIT_HINT = "⌘ Enter";
 
 export function WorkbenchShellV2({
   initialConversationId = null,
+  initialMode = "studio",
 }: WorkbenchShellV2Props): React.ReactElement {
   const models = useWorkbenchStore((s) => s.models);
   const state = useWorkbenchStore((s) => s.state);
@@ -106,6 +109,7 @@ export function WorkbenchShellV2({
   const [completionToast, setCompletionToast] = useState<string | null>(null);
   const previousStatusRef = useRef(status);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const isCanvasMode = initialMode === "canvas";
 
   const actions = useWorkbenchActions();
   const { closeGenerationStream } = actions;
@@ -120,7 +124,7 @@ export function WorkbenchShellV2({
     [models],
   );
   const model = state
-    ? availableModels.find((m) => m.id === state.modelId) ?? null
+    ? (availableModels.find((m) => m.id === state.modelId) ?? null)
     : null;
 
   const activeImages = activeGeneration?.images ?? [];
@@ -133,7 +137,9 @@ export function WorkbenchShellV2({
     activeImages.findIndex(
       (image) =>
         image === activeImage ||
-        (activeSelectedImageId && image.id && image.id === activeSelectedImageId),
+        (activeSelectedImageId &&
+          image.id &&
+          image.id === activeSelectedImageId),
     ),
     0,
   );
@@ -148,8 +154,8 @@ export function WorkbenchShellV2({
       uploadedReferenceImages.length > 0 ||
       Boolean(
         model.capabilities.supportsReferenceImage &&
-          activeSelectedImageId &&
-          useCurrentImageAsReference,
+        activeSelectedImageId &&
+        useCurrentImageAsReference,
       );
     return estimateCost(model, {
       n: state.n,
@@ -271,6 +277,7 @@ export function WorkbenchShellV2({
   const activeGenIndex = activeGeneration
     ? conversationGenerations.findIndex((g) => g.id === activeGeneration.id)
     : -1;
+  const hasActivePrompt = Boolean(activeGeneration?.prompt);
 
   const submitDisabled =
     isSubmitting ||
@@ -280,6 +287,9 @@ export function WorkbenchShellV2({
     !model ||
     isBooting ||
     hasInsufficientCredits;
+  const submitDisabledReason = hasInsufficientCredits
+    ? `余额不足，本次预计需要 ${estimate} 点，当前余额 ${credits} 点。请降低张数或分辨率，或联系管理员充值。`
+    : null;
 
   const submit = useCallback(() => {
     if (submitDisabled) return;
@@ -404,7 +414,12 @@ export function WorkbenchShellV2({
       </div>
 
       {/* Conversation timeline (left rail) */}
-      <div className="pointer-events-none absolute bottom-72 left-4 top-20 z-20 hidden w-10 flex-col items-center justify-center md:flex">
+      <div
+        className={cn(
+          "pointer-events-none absolute left-4 top-20 z-20 hidden w-10 flex-col items-center justify-center md:flex",
+          hasActivePrompt ? "bottom-[31rem]" : "bottom-72",
+        )}
+      >
         <ConversationTimeline
           messages={messages}
           generations={conversationGenerations}
@@ -414,82 +429,103 @@ export function WorkbenchShellV2({
       </div>
 
       {/* Stage / Canvas */}
-      <main className="relative flex flex-1 items-center justify-center px-4 pb-80 pt-20 md:px-20">
-        <Stage
-          status={status}
-          progress={generationProgress}
-          images={activeImages}
-          selectedImageId={activeSelectedImageId}
-          onSelectedImageIdChange={setActiveImageId}
-          aspect={stageAspect}
-          error={generationError}
-          isBusy={isBusy}
-        />
+      <main
+        className={cn(
+          "relative flex min-h-0 flex-1 pt-20",
+          isCanvasMode
+            ? "items-stretch justify-stretch px-3 md:px-4"
+            : "items-center justify-center px-4 md:px-20",
+          hasActivePrompt ? "pb-[23rem] md:pb-[31rem]" : "pb-72 md:pb-80",
+        )}
+      >
+        {isCanvasMode ? (
+          <InfiniteCanvas
+            accountId={accountId}
+            conversationId={conversationId}
+            generations={conversationGenerations}
+            activeGeneration={activeGeneration}
+            activeImage={activeImage}
+            className="h-full"
+          />
+        ) : (
+          <Stage
+            status={status}
+            progress={generationProgress}
+            images={activeImages}
+            selectedImageId={activeSelectedImageId}
+            onSelectedImageIdChange={setActiveImageId}
+            aspect={stageAspect}
+            error={generationError}
+            isBusy={isBusy}
+          />
+        )}
       </main>
 
-      {activeGeneration?.prompt ? (
-        <ActivePromptStrip
-          prompt={activeGeneration.prompt}
-          activeIndex={activeGenIndex}
-          total={conversationGenerations.length}
-          onPrevious={() => {
-            const prev = conversationGenerations[activeGenIndex - 1];
-            if (prev) selectGeneration(prev);
-          }}
-          onNext={() => {
-            const next = conversationGenerations[activeGenIndex + 1];
-            if (next) selectGeneration(next);
-          }}
-        />
-      ) : null}
-
       {/* Bottom command bar */}
-      <div className="absolute bottom-0 left-0 right-0 z-20 px-4 pb-5 pt-2">
-        <div className="pointer-events-none absolute inset-x-0 -top-12 h-12 bg-gradient-to-t from-background to-transparent" />
-        <CommandBar
-          textareaRef={textareaRef}
-          value={draft}
-          onChange={setDraft}
-          onSubmit={submit}
-          submitDisabled={submitDisabled}
-          inputDisabled={isBooting || isSubmitting}
-          isBusy={isSubmitting || isBusy}
-          referenceImages={uploadedReferenceImages}
-          onUploadReference={
-            supportsReferenceImage ? actions.uploadReferenceImage : undefined
-          }
-          onUploadReferences={
-            supportsReferenceImage ? actions.uploadReferenceImages : undefined
-          }
-          onRemoveReference={actions.removeReferenceImage}
-          uploadDisabled={
-            isBooting ||
-            isSubmitting ||
-            isUploadingReference ||
-            !supportsReferenceImage ||
-            uploadedReferenceImages.length >= maxUploadedReferenceImages
-          }
-          isUploadingReference={isUploadingReference}
-          referenceUploadError={referenceUploadError}
-          canUseCurrentImageReference={canUseCurrentImageReference}
-          useCurrentImageAsReference={useCurrentImageAsReference}
-          onToggleCurrentImageReference={setUseCurrentImageAsReference}
-          currentImageReferencePreviewUrl={previewImageUrl(
-            activeImage ?? undefined,
-          )}
-          currentImageReferenceLabel={activeImageReferenceLabel}
-          credits={credits}
-          estimate={estimate}
-          aspectLabel={aspectLabel}
-          modelName={model?.displayName ?? null}
-          status={WORKBENCH_STATUS_LABEL[status]}
-          queueNotice={queueNotice}
-          serviceError={
-            aggregatedServiceError ??
-            (modelsError && !model ? modelsError : null)
-          }
-          generationError={generationError}
-        />
+      <div className="absolute bottom-0 left-0 right-0 z-20 px-4 pb-5 pt-2 md:px-20">
+        <div className="pointer-events-none absolute inset-x-0 -top-16 h-16 bg-gradient-to-t from-background to-transparent" />
+        <div className="mx-auto flex w-full max-w-4xl flex-col gap-3">
+          {activeGeneration?.prompt ? (
+            <ActivePromptStrip
+              prompt={activeGeneration.prompt}
+              activeIndex={activeGenIndex}
+              total={conversationGenerations.length}
+              onPrevious={() => {
+                const prev = conversationGenerations[activeGenIndex - 1];
+                if (prev) selectGeneration(prev);
+              }}
+              onNext={() => {
+                const next = conversationGenerations[activeGenIndex + 1];
+                if (next) selectGeneration(next);
+              }}
+            />
+          ) : null}
+          <CommandBar
+            textareaRef={textareaRef}
+            value={draft}
+            onChange={setDraft}
+            onSubmit={submit}
+            submitDisabled={submitDisabled}
+            submitDisabledReason={submitDisabledReason}
+            inputDisabled={isBooting || isSubmitting}
+            isBusy={isSubmitting || isBusy}
+            referenceImages={uploadedReferenceImages}
+            onUploadReference={
+              supportsReferenceImage ? actions.uploadReferenceImage : undefined
+            }
+            onUploadReferences={
+              supportsReferenceImage ? actions.uploadReferenceImages : undefined
+            }
+            onRemoveReference={actions.removeReferenceImage}
+            uploadDisabled={
+              isBooting ||
+              isSubmitting ||
+              isUploadingReference ||
+              !supportsReferenceImage ||
+              uploadedReferenceImages.length >= maxUploadedReferenceImages
+            }
+            isUploadingReference={isUploadingReference}
+            referenceUploadError={referenceUploadError}
+            canUseCurrentImageReference={canUseCurrentImageReference}
+            useCurrentImageAsReference={useCurrentImageAsReference}
+            onToggleCurrentImageReference={setUseCurrentImageAsReference}
+            currentImageReferencePreviewUrl={previewImageUrl(
+              activeImage ?? undefined,
+            )}
+            currentImageReferenceLabel={activeImageReferenceLabel}
+            credits={credits}
+            estimate={estimate}
+            aspectLabel={aspectLabel}
+            modelName={model?.displayName ?? null}
+            status={WORKBENCH_STATUS_LABEL[status]}
+            queueNotice={queueNotice}
+            serviceError={
+              aggregatedServiceError ??
+              (modelsError && !model ? modelsError : null)
+            }
+            generationError={generationError}
+          />
+        </div>
       </div>
 
       {/* Right edge: history rail trigger */}
@@ -664,7 +700,12 @@ export function WorkbenchShellV2({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-            className="pointer-events-none absolute bottom-44 left-1/2 z-40 -translate-x-1/2 rounded-full border border-border bg-surface px-4 py-2 text-[12.5px] text-foreground shadow-[var(--shadow-md)]"
+            className={cn(
+              "pointer-events-none absolute left-1/2 z-40 -translate-x-1/2 rounded-full border border-border bg-surface px-4 py-2 text-[12.5px] text-foreground shadow-[var(--shadow-md)]",
+              hasActivePrompt
+                ? "bottom-[22rem] md:bottom-[30rem]"
+                : "bottom-44",
+            )}
           >
             <span className="font-mono">{completionToast}</span>
           </motion.div>
@@ -724,9 +765,7 @@ function ToolbarPill({
   );
 }
 
-function ConversationTimeline<
-  G extends { id: string; prompt: string },
->({
+function ConversationTimeline<G extends { id: string; prompt: string }>({
   messages,
   generations,
   activeGenId,
@@ -790,47 +829,45 @@ function ActivePromptStrip({
     total > 0 && activeIndex >= 0 ? `${activeIndex + 1} / ${total}` : null;
 
   return (
-    <div className="pointer-events-none absolute bottom-52 left-0 right-0 z-20 px-4 md:px-20">
-      <div className="pointer-events-auto mx-auto w-full max-w-4xl rounded-2xl border border-border bg-surface/90 px-4 py-3 shadow-[var(--shadow-md)] backdrop-blur-md">
-        <div className="flex items-start gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-text-faint">
-                当前提示词
+    <div className="pointer-events-auto w-full rounded-2xl border border-border bg-surface/90 px-4 py-3 shadow-[var(--shadow-md)] backdrop-blur-md">
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-text-faint">
+              当前提示词
+            </span>
+            {positionLabel ? (
+              <span className="rounded-full border border-border bg-surface-2 px-2 py-0.5 font-mono text-[10.5px] text-text-muted">
+                {positionLabel}
               </span>
-              {positionLabel ? (
-                <span className="rounded-full border border-border bg-surface-2 px-2 py-0.5 font-mono text-[10.5px] text-text-muted">
-                  {positionLabel}
-                </span>
-              ) : null}
-            </div>
-            <p className="mt-1 max-h-20 overflow-y-auto whitespace-pre-wrap break-words text-[12.5px] leading-relaxed text-foreground">
-              {prompt}
-            </p>
+            ) : null}
           </div>
-          {total > 1 ? (
-            <div className="flex shrink-0 items-center gap-1 pt-1">
-              <button
-                type="button"
-                aria-label="上一个提示词"
-                onClick={onPrevious}
-                disabled={!hasPrevious}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-text-muted transition-colors hover:border-border-strong hover:bg-surface-2 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-35"
-              >
-                <ChevronLeft size={14} strokeWidth={1.5} />
-              </button>
-              <button
-                type="button"
-                aria-label="下一个提示词"
-                onClick={onNext}
-                disabled={!hasNext}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-text-muted transition-colors hover:border-border-strong hover:bg-surface-2 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-35"
-              >
-                <ChevronRight size={14} strokeWidth={1.5} />
-              </button>
-            </div>
-          ) : null}
+          <p className="mt-1 max-h-16 overflow-y-auto whitespace-pre-wrap break-words text-[12.5px] leading-relaxed text-foreground">
+            {prompt}
+          </p>
         </div>
+        {total > 1 ? (
+          <div className="flex shrink-0 items-center gap-1 pt-1">
+            <button
+              type="button"
+              aria-label="上一个提示词"
+              onClick={onPrevious}
+              disabled={!hasPrevious}
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-text-muted transition-colors hover:border-border-strong hover:bg-surface-2 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-35"
+            >
+              <ChevronLeft size={14} strokeWidth={1.5} />
+            </button>
+            <button
+              type="button"
+              aria-label="下一个提示词"
+              onClick={onNext}
+              disabled={!hasNext}
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-text-muted transition-colors hover:border-border-strong hover:bg-surface-2 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-35"
+            >
+              <ChevronRight size={14} strokeWidth={1.5} />
+            </button>
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -870,7 +907,7 @@ function Stage({
     0,
   );
   const ratio = aspect.w / aspect.h;
-  const maxStageVh = ratio > 1.4 ? 54 : 60;
+  const maxStageVh = ratio > 1.4 ? 50 : ratio < 0.8 ? 46 : 54;
   const maxStageWidth = ratio > 1.4 ? 920 : 760;
   const useGridGallery = viewable.length > 1;
   const aspectStyle = {
@@ -971,12 +1008,11 @@ function StageEmpty({
         aria-hidden
         className="absolute inset-0 overflow-hidden"
         style={{
-          background:
-            isFailed
-              ? "radial-gradient(120% 80% at 50% 0%, rgb(var(--danger) / 0.08), transparent 60%), radial-gradient(120% 80% at 50% 100%, rgb(var(--surface-2)), rgb(var(--surface)))"
-              : isRunning || isPending
-                ? "radial-gradient(120% 80% at 30% 0%, rgb(var(--info) / 0.16), transparent 60%), radial-gradient(120% 80% at 70% 100%, rgb(var(--warning) / 0.08), transparent 60%), rgb(var(--surface))"
-                : "radial-gradient(120% 80% at 50% 0%, rgb(var(--info) / 0.06), transparent 60%), radial-gradient(120% 80% at 50% 100%, rgb(var(--surface-2)), rgb(var(--surface)))",
+          background: isFailed
+            ? "radial-gradient(120% 80% at 50% 0%, rgb(var(--danger) / 0.08), transparent 60%), radial-gradient(120% 80% at 50% 100%, rgb(var(--surface-2)), rgb(var(--surface)))"
+            : isRunning || isPending
+              ? "radial-gradient(120% 80% at 30% 0%, rgb(var(--info) / 0.16), transparent 60%), radial-gradient(120% 80% at 70% 100%, rgb(var(--warning) / 0.08), transparent 60%), rgb(var(--surface))"
+              : "radial-gradient(120% 80% at 50% 0%, rgb(var(--info) / 0.06), transparent 60%), radial-gradient(120% 80% at 50% 100%, rgb(var(--surface-2)), rgb(var(--surface)))",
         }}
       />
       {(isRunning || isPending) && (
@@ -1078,6 +1114,7 @@ interface CommandBarProps {
   onChange: (v: string) => void;
   onSubmit: () => void;
   submitDisabled: boolean;
+  submitDisabledReason: string | null;
   inputDisabled: boolean;
   isBusy: boolean;
   referenceImages: Array<{ key: string; previewUrl: string }>;
@@ -1108,6 +1145,7 @@ function CommandBar({
   onChange,
   onSubmit,
   submitDisabled,
+  submitDisabledReason,
   inputDisabled,
   isBusy,
   referenceImages,
@@ -1196,7 +1234,7 @@ function CommandBar({
   return (
     <div
       className={cn(
-        "relative mx-auto w-full max-w-4xl rounded-2xl transition-colors",
+        "relative w-full rounded-2xl transition-colors",
         isDraggingReference && "bg-info/[0.04]",
       )}
       onDragEnter={onDragEnter}
@@ -1327,6 +1365,7 @@ function CommandBar({
           type="submit"
           disabled={submitDisabled}
           aria-label="发送"
+          title={submitDisabledReason ?? undefined}
           className={cn(
             "relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-all active:scale-[0.95]",
             submitDisabled
@@ -1362,11 +1401,18 @@ function CommandBar({
             </>
           ) : null}
         </div>
-        <span>{value.length} / 4000 · {SUBMIT_HINT}</span>
+        <span>
+          {value.length} / 4000 · {SUBMIT_HINT}
+        </span>
       </div>
       {referenceUploadError ? (
         <p className="mt-1 px-1 text-[11px] text-danger">
           {referenceUploadError}
+        </p>
+      ) : null}
+      {submitDisabledReason ? (
+        <p className="mt-1 px-1 text-[11px] leading-5 text-warning">
+          {submitDisabledReason}
         </p>
       ) : null}
     </div>

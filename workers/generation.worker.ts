@@ -28,6 +28,9 @@ import { hydrateReferenceImages, saveGeneratedImage } from "@/lib/storage";
 const STUCK_PENDING_MS = Number(process.env.STUCK_PENDING_MS ?? 2 * 60_000);
 const STUCK_RUNNING_MS = Number(process.env.STUCK_RUNNING_MS ?? 10 * 60_000);
 const STUCK_MAX_ATTEMPTS = Number(process.env.STUCK_MAX_ATTEMPTS ?? 3);
+const WORKER_HEARTBEAT_INTERVAL_MS = Number(
+  process.env.WORKER_HEARTBEAT_INTERVAL_MS ?? 15_000,
+);
 
 function clampProgress(value?: number): number {
   if (!Number.isFinite(value)) {
@@ -292,6 +295,7 @@ async function main() {
   await touchGenerationWorkerHeartbeat();
   await recoverStuckGenerations();
 
+  const redis = getRedis();
   const worker = new Worker<GenerationJobPayload>(
     "generation",
     async (job) => {
@@ -629,7 +633,7 @@ async function main() {
       }
     },
     {
-      connection: getRedis(),
+      connection: redis,
       concurrency: Number(process.env.WORKER_CONCURRENCY ?? 4),
     },
   );
@@ -641,7 +645,14 @@ async function main() {
         "Generation worker heartbeat failed.",
       );
     });
-  }, 15_000);
+  }, WORKER_HEARTBEAT_INTERVAL_MS);
+
+  worker.on("error", (error) => {
+    logger.error(
+      { error: serializeProviderError(error) },
+      "Generation worker queue connection error.",
+    );
+  });
 
   worker.on("failed", (job, error) => {
     logger.error(
@@ -658,6 +669,27 @@ async function main() {
     clearInterval(heartbeat);
   });
 
+  let shuttingDown = false;
+  const shutdown = async (signal: NodeJS.Signals) => {
+    if (shuttingDown) {
+      return;
+    }
+
+    shuttingDown = true;
+    clearInterval(heartbeat);
+    logger.info({ signal }, "Generation worker shutting down.");
+
+    try {
+      await worker.close();
+    } finally {
+      redis.disconnect();
+      await db.$disconnect();
+    }
+  };
+
+  process.once("SIGINT", shutdown);
+  process.once("SIGTERM", shutdown);
+
   logger.info("Generation worker started.");
 }
 
@@ -668,5 +700,5 @@ assertRedisReady()
       { error: serializeProviderError(error) },
       "Generation worker failed to start.",
     );
-    process.exitCode = 1;
+    process.exit(1);
   });

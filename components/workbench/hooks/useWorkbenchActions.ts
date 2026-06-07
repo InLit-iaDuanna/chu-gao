@@ -23,10 +23,7 @@ import type {
   UploadedReferenceImage,
   WorkbenchGeneration,
 } from "@/components/workbench/types";
-import type {
-  ConversationMessage,
-  ConversationView,
-} from "@/lib/conversation";
+import type { ConversationMessage, ConversationView } from "@/lib/conversation";
 import { getImage2ProviderChannelName } from "@/lib/provider-channels";
 
 type UploadedReferenceImageView = Omit<UploadedReferenceImage, "previewUrl">;
@@ -55,6 +52,18 @@ function selectedActiveImage(
     generation.images.at(-1) ??
     null
   );
+}
+
+function currentWorkbenchPath(): "/app" | "/app/canvas" {
+  if (typeof window === "undefined") return "/app";
+
+  return window.location.pathname.startsWith("/app/canvas")
+    ? "/app/canvas"
+    : "/app";
+}
+
+function currentWorkbenchConversationUrl(conversationId: string): string {
+  return `${currentWorkbenchPath()}?conversation=${encodeURIComponent(conversationId)}`;
 }
 
 export function useWorkbenchActions() {
@@ -102,7 +111,7 @@ export function useWorkbenchActions() {
   const resetWorkspaceForNewConversation = useCallback(() => {
     clearConversationState();
     setError("conversation", null);
-    router.replace("/app");
+    router.replace(currentWorkbenchPath());
   }, [clearConversationState, router, setError]);
 
   const loadMe = useCallback(async () => {
@@ -159,9 +168,7 @@ export function useWorkbenchActions() {
     (generationId: string) => {
       eventSourceRef.current?.close();
 
-      const events = new EventSource(
-        `/api/generations/${generationId}/stream`,
-      );
+      const events = new EventSource(`/api/generations/${generationId}/stream`);
       eventSourceRef.current = events;
 
       events.addEventListener("update", (event) => {
@@ -175,7 +182,9 @@ export function useWorkbenchActions() {
 
         if (nextStatus === "pending") {
           gen.setProgress(next.progress ?? 12);
-          gen.setQueueNotice((current) => current ?? "任务正在等待生成 worker 消费。");
+          gen.setQueueNotice(
+            (current) => current ?? "任务正在等待生成 worker 消费。",
+          );
         }
 
         if (nextStatus === "running") {
@@ -212,8 +221,7 @@ export function useWorkbenchActions() {
                     thumbnailUrl: latestImage?.thumbnailUrl,
                     generationStatus: next.status,
                     generationProvider: next.provider ?? null,
-                    generationProviderChannelId:
-                      next.providerChannelId ?? null,
+                    generationProviderChannelId: next.providerChannelId ?? null,
                     generationProviderChannelName:
                       next.providerChannelName ?? null,
                     generationProviderAccountName:
@@ -291,15 +299,11 @@ export function useWorkbenchActions() {
             conversationId: conversation.id,
             prompt: message.generationPrompt ?? message.content,
             status: message.generationStatus ?? "SUCCEEDED",
-            createdAt:
-              message.createdAt ?? new Date().toISOString(),
+            createdAt: message.createdAt ?? new Date().toISOString(),
             provider: message.generationProvider ?? null,
-            providerChannelId:
-              message.generationProviderChannelId ?? null,
-            providerChannelName:
-              message.generationProviderChannelName ?? null,
-            providerAccountName:
-              message.generationProviderAccountName ?? null,
+            providerChannelId: message.generationProviderChannelId ?? null,
+            providerChannelName: message.generationProviderChannelName ?? null,
+            providerAccountName: message.generationProviderAccountName ?? null,
             startedAt: message.generationStartedAt ?? null,
             finishedAt: message.generationFinishedAt ?? null,
             progress: message.generationProgress ?? null,
@@ -417,7 +421,7 @@ export function useWorkbenchActions() {
           },
           ...current.filter((item) => item.id !== conversation.id),
         ]);
-        router.replace(`/app?conversation=${conversation.id}`);
+        router.replace(currentWorkbenchConversationUrl(conversation.id));
 
         return conversation.id;
       } catch (createError) {
@@ -707,7 +711,7 @@ export function useWorkbenchActions() {
       const wb = useWorkbenchStore.getState();
       const state = wb.state;
       const model = state
-        ? wb.models.find((m) => m.available && m.id === state.modelId) ?? null
+        ? (wb.models.find((m) => m.available && m.id === state.modelId) ?? null)
         : null;
 
       if (!userText || isSubmitting || !state || !model) return;
@@ -749,9 +753,7 @@ export function useWorkbenchActions() {
           generationId: string;
           status: string;
           estimatedCredits: number;
-          providerChannelId?:
-            | typeof requestState.providerChannelId
-            | null;
+          providerChannelId?: typeof requestState.providerChannelId | null;
           workerOnline?: boolean;
           queueWaiting?: number;
         }>(
@@ -782,10 +784,10 @@ export function useWorkbenchActions() {
         );
 
         const acceptedProviderChannelId = model.providerChannels?.length
-          ? payload.providerChannelId ??
+          ? (payload.providerChannelId ??
             requestState.providerChannelId ??
             model.providerChannels[0]?.id ??
-            null
+            null)
           : null;
 
         const pendingGeneration: WorkbenchGeneration = {
@@ -799,10 +801,10 @@ export function useWorkbenchActions() {
             ? acceptedProviderChannelId
             : null,
           providerChannelName: model.providerChannels?.length
-            ? model.providerChannels?.find(
+            ? (model.providerChannels?.find(
                 (channel) => channel.id === acceptedProviderChannelId,
               )?.displayName ??
-              getImage2ProviderChannelName(acceptedProviderChannelId)
+              getImage2ProviderChannelName(acceptedProviderChannelId))
             : null,
           progress: 0,
           images: [],

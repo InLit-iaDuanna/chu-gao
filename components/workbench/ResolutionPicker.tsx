@@ -15,7 +15,7 @@ export function ResolutionPicker({
 }) {
   return (
     <div className="grid grid-cols-3 gap-2">
-      {options.map((option) => (
+      {options.map((option) =>
         (() => {
           const disabled = disabledOptions.includes(option);
 
@@ -37,8 +37,8 @@ export function ResolutionPicker({
               {option}
             </button>
           );
-        })()
-      ))}
+        })(),
+      )}
     </div>
   );
 }
