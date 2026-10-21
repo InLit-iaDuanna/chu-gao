@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
@@ -15,6 +16,12 @@ enum UserRole {
 enum UserStatus {
   ACTIVE
   BANNED
+}
+
+enum SessionDeviceType {
+  WEB
+  MOBILE
+  IPAD
 }
 
 enum GenerationStatus {
@@ -47,31 +54,386 @@ enum ConversationMessageRole {
   ASSISTANT
 }
 
-model User {
-  id              String     @id @default(cuid())
-  email           String     @unique
-  passwordHash    String
-  name            String?
-  role            UserRole   @default(USER)
-  status          UserStatus @default(ACTIVE)
-  sessionVersion  Int        @default(1)
-  credits         Int        @default(100)
-  dailyGenLimit   Int        @default(50)
-  concurrentLimit Int        @default(2)
-  inviteCodeId    String?
-  bannedAt        DateTime?
-  bannedReason    String?
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
+// Design inspiration community -------------------------------------------------
+// Keep these enums in the Prisma schema (rather than accepting arbitrary strings)
+// so public filters and moderation queues have a stable vocabulary.
+enum PostShape {
+  WORK
+  TEARDOWN
+  PATTERN
+  QUESTION
+  REFERENCE
+  PROCESS
+}
 
-  generations   Generation[]
-  conversations Conversation[]
-  inviteCode    InviteCode?        @relation(fields: [inviteCodeId], references: [id])
-  auditLogs     AuditLog[]         @relation("ActorAudits")
-  redemptions   CreditRedemption[]
+enum Discipline {
+  GRAPHIC
+  PRODUCT
+  INDUSTRIAL
+  SERVICE
+  SPATIAL
+  BRAND
+  MOTION
+  DATAVIZ
+}
+
+enum PostStatus {
+  DRAFT
+  PENDING
+  PUBLISHED
+  HIDDEN
+}
+
+enum PostOrigin {
+  ORIGINAL
+  STUDY
+  REPOST
+}
+
+enum PostSourceType {
+  STANDARD
+  CANVAS
+  NODES
+  PPT
+}
+
+enum PromptVisibility {
+  PUBLIC
+  STRUCTURE_ONLY
+  PRIVATE
+}
+
+enum MediaRole {
+  FINAL
+  PROCESS
+}
+
+enum TagKind {
+  CATEGORY
+  STYLE
+}
+
+enum TrustTier {
+  NEW
+  TRUSTED
+  RESTRICTED
+}
+
+enum FollowTargetType {
+  USER
+  DISCIPLINE
+  TAG
+}
+
+enum ContentReportStatus {
+  OPEN
+  REVIEWING
+  RESOLVED
+  DISMISSED
+}
+
+enum ContentReportReason {
+  COPYRIGHT
+  HARASSMENT
+  SPAM
+  NSFW
+  MISINFORMATION
+  OTHER
+}
+
+enum DailyPromptStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+  ARCHIVED
+}
+
+model User {
+  id                String       @id @default(cuid())
+  email             String       @unique
+  passwordHash      String
+  name              String?
+  avatarKey         String?
+  bio               String?      @db.Text
+  designerTitle     String?
+  designerLocation  String?
+  designerWebsite   String?
+  designDisciplines Discipline[] @default([])
+  role              UserRole     @default(USER)
+  status            UserStatus   @default(ACTIVE)
+  sessionVersion    Int          @default(1)
+  credits           Float        @default(100)
+  dailyGenLimit     Int          @default(50)
+  concurrentLimit   Int          @default(2)
+  materialInboxBeta Boolean      @default(false)
+  inviteCodeId      String?
+  bannedAt          DateTime?
+  bannedReason      String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  generations                  Generation[]
+  conversations                Conversation[]
+  chatTurns                    ChatTurn[]
+  researchProjects             ResearchProject[]
+  pptGenerations               PPTGeneration[]
+  inviteCode                   InviteCode?                   @relation(fields: [inviteCodeId], references: [id])
+  auditLogs                    AuditLog[]                    @relation("ActorAudits")
+  redemptions                  CreditRedemption[]
+  wishes                       Wish[]
+  wishComments                 WishComment[]
+  designPosts                  DesignPost[]                  @relation("DesignPostAuthor")
+  postComments                 PostComment[]                 @relation("PostCommentAuthor")
+  postLikes                    PostLike[]
+  postBookmarks                PostBookmark[]
+  bookmarkCollections          BookmarkCollection[]
+  inspirationNotificationReads InspirationNotificationRead[]
+  follows                      UserFollow[]                  @relation("FollowFollower")
+  followers                    UserFollow[]                  @relation("FollowUserTarget")
+  contentReports               ContentReport[]               @relation("ReportReporter")
+  reviewedReports              ContentReport[]               @relation("ReportReviewer")
+  deviceSessions               DeviceSession[]
+  agentAuthorizations          AgentAuthorization[]
+  apiKeys                      ApiKey[]
 
   @@index([createdAt])
   @@index([status])
+}
+
+model ResearchProject {
+  id             String   @id @default(cuid())
+  userId         String
+  title          String
+  conversationId String?
+  archivedAt     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user      User               @relation(fields: [userId], references: [id])
+  briefs    ResearchBrief[]
+  tasks     ResearchTask[]
+  evidence  ResearchEvidence[]
+  artifacts ResearchArtifact[]
+  attachments ResearchAttachment[]
+
+  @@index([userId, updatedAt(sort: Desc)])
+}
+
+model ResearchAttachment {
+  id          String    @id @default(cuid())
+  projectId   String
+  sourceKey   String
+  filename    String
+  mimeType    String
+  storageKey  String
+  sizeBytes   Int
+  sha256      String
+  expiresAt   DateTime
+  purgedAt    DateTime?
+  createdAt   DateTime  @default(now())
+
+  project ResearchProject @relation(fields: [projectId], references: [id])
+
+  @@unique([projectId, sourceKey])
+}
+
+model ResearchBrief {
+  id        String   @id @default(cuid())
+  projectId String
+  revision  Int
+  content   Json
+  createdAt DateTime @default(now())
+
+  project ResearchProject @relation(fields: [projectId], references: [id])
+  tasks   ResearchTask[]
+
+  @@unique([projectId, revision])
+}
+
+model ResearchTask {
+  id               String    @id @default(cuid())
+  projectId        String
+  briefId          String
+  userId           String
+  clientRequestId  String
+  inputHash        String
+  sourceTaskId     String?
+  preset           String
+  scope            String
+  modelId          String
+  reasoningEffort  String
+  plan             Json
+  configSnapshot   Json
+  status           String    @default("queued")
+  nextSeq          Int       @default(0)
+  llmCalls         Int       @default(0)
+  searchCalls      Int       @default(0)
+  crawlCalls       Int       @default(0)
+  executionToken   String?
+  heartbeatAt      DateTime?
+  deadlineAt       DateTime?
+  startedAt        DateTime?
+  finishedAt       DateTime?
+  expiresAt        DateTime?
+  error            Json?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  project   ResearchProject    @relation(fields: [projectId], references: [id])
+  brief     ResearchBrief      @relation(fields: [briefId], references: [id])
+  stages    ResearchStage[]
+  events    ResearchEvent[]
+  evidence  ResearchEvidence[]
+  artifacts ResearchArtifact[]
+  calls     ResearchCall[]
+
+  @@unique([userId, clientRequestId])
+  @@index([status, createdAt])
+  @@index([projectId, createdAt(sort: Desc)])
+  @@index([expiresAt])
+}
+
+model ResearchStage {
+  id              String   @id @default(cuid())
+  taskId          String
+  kind            String
+  engine          String
+  ordinal         Int
+  status          String   @default("pending")
+  activeAttemptId String?
+  text            String   @default("") @db.Text
+  result          Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  task     ResearchTask      @relation(fields: [taskId], references: [id])
+  attempts ResearchAttempt[]
+
+  @@unique([taskId, ordinal])
+}
+
+model ResearchAttempt {
+  id             String    @id @default(cuid())
+  stageId        String
+  ordinal        Int
+  retryRequestId String?   @unique
+  status         String    @default("queued")
+  remoteRunId    String?
+  remoteCursor   Int       @default(0)
+  text           String    @default("") @db.Text
+  error          Json?
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  createdAt      DateTime  @default(now())
+
+  stage ResearchStage @relation(fields: [stageId], references: [id])
+  calls ResearchCall[]
+
+  @@unique([stageId, ordinal])
+}
+
+model ResearchEvent {
+  id        String   @id @default(cuid())
+  taskId    String
+  seq       Int
+  type      String
+  payload   Json
+  createdAt DateTime @default(now())
+
+  task ResearchTask @relation(fields: [taskId], references: [id])
+
+  @@unique([taskId, seq])
+}
+
+model ResearchEvidence {
+  id               String    @id @default(cuid())
+  projectId        String
+  taskId           String
+  sourceKey        String
+  canonicalUrl     String
+  originalUrl      String
+  title            String
+  excerpt          String    @default("") @db.Text
+  contentKey       String?
+  screenshotKey    String?
+  media            Json?
+  contentHash      String?
+  originUrl        String?
+  status           String    @default("link_only")
+  claims           Json?
+  fetchedAt        DateTime?
+  expiresAt        DateTime?
+  purgedAt         DateTime?
+  createdAt        DateTime  @default(now())
+
+  project ResearchProject @relation(fields: [projectId], references: [id])
+  task    ResearchTask    @relation(fields: [taskId], references: [id])
+
+  @@unique([taskId, sourceKey])
+  @@index([projectId, createdAt])
+}
+
+model ResearchArtifact {
+  id           String    @id @default(cuid())
+  projectId    String
+  taskId       String
+  basisTaskId  String
+  briefId      String
+  kind         String
+  title        String
+  filename     String
+  mimeType     String
+  storageKey   String
+  sizeBytes    Int
+  sha256       String
+  evidenceIds  Json
+  expiresAt    DateTime?
+  purgedAt     DateTime?
+  createdAt    DateTime  @default(now())
+
+  project ResearchProject @relation(fields: [projectId], references: [id])
+  task    ResearchTask    @relation(fields: [taskId], references: [id])
+
+  @@unique([taskId, filename])
+  @@index([projectId, createdAt])
+}
+
+model ResearchCall {
+  id           String    @id @default(cuid())
+  taskId       String
+  attemptId    String
+  kind         String
+  requestHash  String
+  status       String    @default("running")
+  usage        Json?
+  continuationEnc String?
+  costUsd      Decimal?  @db.Decimal(18, 6)
+  costBasis    String    @default("unknown")
+  errorCode    String?
+  startedAt    DateTime  @default(now())
+  finishedAt   DateTime?
+
+  task    ResearchTask    @relation(fields: [taskId], references: [id])
+  attempt ResearchAttempt @relation(fields: [attemptId], references: [id])
+
+  @@index([taskId, kind, status])
+}
+
+model DeviceSession {
+  userId     String
+  deviceType SessionDeviceType
+  deviceId   String
+  version    Int               @default(1)
+  expiresAt  DateTime
+  userAgent  String?           @db.Text
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, deviceType])
+  @@index([deviceId])
+  @@index([expiresAt])
 }
 
 model InviteCode {
@@ -92,17 +454,21 @@ model InviteCode {
 }
 
 model Conversation {
-  id            String    @id @default(cuid())
-  userId        String
-  title         String
-  lastMessageAt DateTime  @default(now())
-  archivedAt    DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id              String    @id @default(cuid())
+  userId          String
+  title           String
+  lastMessageAt   DateTime  @default(now())
+  archivedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  contextRevision Int       @default(0)
 
-  user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages    ConversationMessage[]
-  generations Generation[]
+  user             User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages         ConversationMessage[]
+  generations      Generation[]
+  pptGenerations   PPTGeneration[]
+  chatTurns        ChatTurn[]
+  contextSnapshots ContextSnapshot[]
 
   @@index([userId, lastMessageAt(sort: Desc)])
   @@index([archivedAt])
@@ -114,6 +480,13 @@ model ConversationMessage {
   role           ConversationMessageRole
   content        String                  @db.Text
   generationId   String?
+  chatTurnId     String?
+  chatAttemptId  String?
+  chatStatus     String?
+  chatReferences Json?
+  chatSources    Json?
+  chatUsage      Json?
+  chatError      Json?
   createdAt      DateTime                @default(now())
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
@@ -121,12 +494,219 @@ model ConversationMessage {
 
   @@index([conversationId, createdAt])
   @@index([generationId])
+  @@index([chatTurnId])
+  @@index([chatAttemptId])
+}
+
+model ChatTurn {
+  id                   String   @id @default(cuid())
+  userId               String
+  conversationId       String
+  clientRequestId      String
+  inputHash            String
+  input                Json
+  configSnapshot       Json
+  modelId              String
+  priceCredits         Float    @default(0.2)
+  chargedCredits       Float    @default(0)
+  status               String   @default("queued")
+  activeConversationId String?  @unique
+  activeAttemptId      String?
+  nextSeq              Int      @default(0)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  attempts     ChatAttempt[]
+  events       ChatEvent[]
+
+  @@unique([userId, clientRequestId])
+  @@index([conversationId, createdAt])
+}
+
+// Queued rows are the durable outbox. Workers atomically claim each row once;
+// a lost running lease becomes interrupted, never an automatic new generation.
+model ChatAttempt {
+  id                  String    @id @default(cuid())
+  turnId              String
+  ordinal             Int
+  retryRequestId      String?   @unique
+  status              String    @default("queued")
+  mode                String    @default("native_responses")
+  protocolVersion     Int       @default(2)
+  queueDeadline       DateTime?
+  activity            String    @default("queued")
+  heldCredits         Float     @default(0)
+  billingState        String    @default("reserved")
+  rawText             String    @default("") @db.Text
+  parts               Json?
+  sources             Json?
+  usage               Json?
+  error               Json?
+  responseId          String?
+  requestId           String?
+  requestHash         String?
+  contextSnapshotId   String?
+  contextManifest     Json?
+  timings             Json?
+  firstTextSentAt     DateTime?
+  firstTextRenderedAt DateTime?
+  executionToken      String?
+  heartbeatAt         DateTime?
+  startedAt           DateTime?
+  finishedAt          DateTime?
+  createdAt           DateTime  @default(now())
+
+  turn   ChatTurn    @relation(fields: [turnId], references: [id], onDelete: Cascade)
+  events ChatEvent[]
+
+  @@unique([turnId, ordinal])
+  @@index([status, createdAt])
+  @@index([status, heartbeatAt])
+  @@index([status, protocolVersion, createdAt])
+}
+
+// These receipts outlive chat content. No cascading content foreign keys.
+model ChatRequestReceipt {
+  id               String    @id @default(cuid())
+  userId           String
+  scope            String
+  clientRequestId  String
+  inputHash        String
+  conversationId   String
+  turnId           String
+  attemptId        String?
+  contentClearedAt DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@unique([userId, scope, clientRequestId])
+  @@index([conversationId])
+  @@index([turnId])
+}
+
+// Chat holds/admin adjustments only; not the authoritative ledger for all products.
+model CreditEntry {
+  id                String   @id @default(cuid())
+  operationKey      String   @unique
+  payloadHash       String?
+  kind              String
+  userId            String
+  actorId           String?
+  turnId            String?
+  attemptId         String?
+  turnSettlementKey String?  @unique
+  availableDelta    Decimal  @db.Decimal(18, 6)
+  heldDelta         Decimal  @db.Decimal(18, 6)
+  consumedDelta     Decimal  @default(0) @db.Decimal(18, 6)
+  balanceAfter      Decimal? @db.Decimal(18, 6)
+  result            Json?
+  createdAt         DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([attemptId])
+  @@index([turnId])
+}
+
+model ContextSnapshot {
+  id                       String   @id @default(cuid())
+  conversationId           String
+  revision                 Int
+  throughTurnId            String?
+  sourceHash               String
+  summary                  String   @db.Text
+  pinnedConstraints        Json?
+  attachmentManifest       Json?
+  toolResultManifest       Json?
+  summarizerProfileVersion String
+  estimatorVersion         String
+  createdAt                DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, sourceHash, summarizerProfileVersion, estimatorVersion])
+  @@index([conversationId, revision])
+}
+
+model ChatEvent {
+  id        String   @id @default(cuid())
+  turnId    String
+  attemptId String
+  seq       Int
+  type      String
+  payload   Json
+  createdAt DateTime @default(now())
+
+  turn    ChatTurn    @relation(fields: [turnId], references: [id], onDelete: Cascade)
+  attempt ChatAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  @@unique([turnId, seq])
+}
+
+model AgentDeviceAuthorization {
+  id                String    @id @default(cuid())
+  deviceCodeHash    String    @unique
+  userCodeHash      String    @unique
+  clientName        String
+  status            String    @default("pending")
+  expiresAt         DateTime
+  lastPolledAt      DateTime?
+  pollInterval      Int       @default(5)
+  authorizationId   String?   @unique
+  createdAt         DateTime  @default(now())
+
+  authorization AgentAuthorization? @relation(fields: [authorizationId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+}
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  userId      String
+  name        String
+  keyHash     String    @unique
+  keyPrefix   String
+  usedCredits Float     @default(0)
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  generations Generation[]
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([expiresAt])
+}
+
+model AgentAuthorization {
+  id                 String    @id @default(cuid())
+  userId             String
+  clientName         String
+  mode               String
+  tokenHash          String?   @unique
+  sessionVersion     Int
+  expiresAt          DateTime
+  revokedAt          DateTime?
+  lastUsedAt         DateTime?
+  boundGenerationId  String?
+  createdAt          DateTime  @default(now())
+
+  user          User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceRequest AgentDeviceAuthorization?
+  generations   Generation[]
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([expiresAt])
 }
 
 model Generation {
   id                 String           @id @default(cuid())
   userId             String
   conversationId     String?
+  agentAuthorizationId String?
+  apiKeyId           String?
   modelId            String
   prompt             String           @db.Text
   negativePrompt     String?          @db.Text
@@ -147,17 +727,23 @@ model Generation {
   costCredits        Int              @default(0)
   pricingSnapshot    Json?
   attempts           Int              @default(0)
+  executionToken     String?
+  heartbeatAt        DateTime?
   startedAt          DateTime?
   finishedAt         DateTime?
   deletedAt          DateTime?
   createdAt          DateTime         @default(now())
 
-  user            User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  conversation    Conversation?         @relation(fields: [conversationId], references: [id], onDelete: SetNull)
-  provider        Provider?             @relation(fields: [providerId], references: [id])
-  providerAccount ProviderAccount?      @relation(fields: [providerAccountId], references: [id])
+  user            User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agentAuthorization AgentAuthorization? @relation(fields: [agentAuthorizationId], references: [id], onDelete: SetNull)
+  apiKey          ApiKey?                @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
+  conversation    Conversation?          @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  provider        Provider?              @relation(fields: [providerId], references: [id])
+  providerAccount ProviderAccount?       @relation(fields: [providerAccountId], references: [id])
   images          GeneratedImage[]
   messages        ConversationMessage[]
+  pptSlides       PPTSlide[]
+  providerLeases  ProviderAccountLease[]
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([conversationId, createdAt(sort: Desc)])
@@ -165,6 +751,9 @@ model Generation {
   @@index([deletedAt])
   @@index([modelId])
   @@index([providerAccountId])
+  @@index([agentAuthorizationId])
+  @@index([apiKeyId])
+  @@index([status, heartbeatAt])
 }
 
 model GeneratedImage {
@@ -178,7 +767,8 @@ model GeneratedImage {
   mimeType     String   @default("image/png")
   createdAt    DateTime @default(now())
 
-  generation Generation @relation(fields: [generationId], references: [id], onDelete: Cascade)
+  generation      Generation        @relation(fields: [generationId], references: [id], onDelete: Cascade)
+  designPostMedia DesignPostMedia[] @relation("GeneratedImageDesignPostMedia")
 
   @@index([generationId])
 }
@@ -232,8 +822,9 @@ model ProviderAccount {
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 
-  provider    Provider     @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  provider    Provider               @relation(fields: [providerId], references: [id], onDelete: Cascade)
   generations Generation[]
+  leases      ProviderAccountLease[]
 
   @@unique([providerId, baseUrl, apiKeyFingerprint])
   @@index([providerId])
@@ -241,24 +832,43 @@ model ProviderAccount {
   @@index([isActive])
 }
 
+model ProviderAccountLease {
+  id                String    @id @default(cuid())
+  providerAccountId String
+  generationId      String
+  executionToken    String
+  acquiredAt        DateTime  @default(now())
+  releasedAt        DateTime?
+  releaseReason     String?
+
+  providerAccount ProviderAccount @relation(fields: [providerAccountId], references: [id], onDelete: Cascade)
+  generation      Generation      @relation(fields: [generationId], references: [id], onDelete: Cascade)
+
+  @@index([providerAccountId, releasedAt])
+  @@index([generationId, releasedAt])
+  @@index([executionToken])
+}
+
 model ModelPricing {
-  id            String   @id @default(cuid())
-  modelId       String
-  image2Mode    String?
-  resolution    String?
-  aspectRatio   String?
-  outputFormat  String?
-  background    String?
-  usesReference Boolean?
-  credits       Int
-  priority      Int      @default(0)
-  isActive      Boolean  @default(true)
-  note          String?
-  updatedBy     String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                String   @id @default(cuid())
+  modelId           String
+  providerChannelId String?
+  image2Mode        String?
+  resolution        String?
+  aspectRatio       String?
+  outputFormat      String?
+  background        String?
+  usesReference     Boolean?
+  credits           Int
+  priority          Int      @default(0)
+  isActive          Boolean  @default(true)
+  note              String?
+  updatedBy         String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   @@index([modelId])
+  @@index([providerChannelId])
   @@index([image2Mode])
   @@index([isActive])
 }
@@ -305,7 +915,7 @@ model UsageLog {
   providerAccountId String?
   modelId           String?
   action            String
-  creditsDelta      Int
+  creditsDelta      Float
   metadata          Json?
   createdAt         DateTime @default(now())
 
@@ -317,6 +927,37 @@ model SystemConfig {
   value     Json
   updatedAt DateTime @updatedAt
   updatedBy String?
+}
+
+enum AnnouncementTone {
+  INFO
+  WARNING
+  SUCCESS
+  DANGER
+}
+
+enum AnnouncementDisplayMode {
+  BANNER
+  POPUP
+  BOTH
+}
+
+model Announcement {
+  id          String                  @id @default(cuid())
+  title       String                  @default("")
+  body        String                  @db.Text
+  tone        AnnouncementTone        @default(INFO)
+  displayMode AnnouncementDisplayMode @default(BANNER)
+  linkLabel   String?
+  linkUrl     String?
+  enabled     Boolean                 @default(true)
+  startsAt    DateTime?
+  endsAt      DateTime?
+  createdBy   String?
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+
+  @@index([enabled, createdAt(sort: Desc)])
 }
 
 model AuditLog {
@@ -333,4 +974,453 @@ model AuditLog {
 
   @@index([actorId, createdAt(sort: Desc)])
   @@index([action, createdAt(sort: Desc)])
+}
+
+enum PPTGenerationStatus {
+  PREPARING
+  ENHANCING
+  GENERATING
+  COMPLETED
+  FAILED
+}
+
+enum PPTSlideStatus {
+  PENDING
+  ENHANCING
+  GENERATING
+  COMPLETED
+  FAILED
+}
+
+model PPTGeneration {
+  id             String              @id @default(cuid())
+  userId         String
+  conversationId String?
+  title          String?
+  // 出图模型 id（手动构建器选用）
+  modelId        String?
+  // 不变提示词：一次性设定，应用到所有页面（如风格 / 配色 / 版式约束）
+  fixedPrompt    String?             @db.Text
+  // 以下为旧版「主题自动生成」字段，新版手动构建器不再使用，保留以兼容历史数据
+  theme          String?             @db.Text
+  style          String?
+  slideCount     Int?
+  seed           Int?
+  status         PPTGenerationStatus @default(PREPARING)
+  progress       Int                 @default(0)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  slides       PPTSlide[]
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([conversationId])
+  @@index([status])
+}
+
+model PPTSlide {
+  id              String         @id @default(cuid())
+  pptGenerationId String
+  index           Int
+  type            String         @default("content")
+  title           String?
+  // 该页「变的提示词」（用户逐页输入的内容）
+  originalContent String         @db.Text
+  // DeepSeek 以系统提示词为指令，将（不变 + 该页变的）优化后的最终出图 prompt
+  enhancedPrompt  String         @db.Text
+  imageUrl        String?
+  thumbnailUrl    String?
+  generationId    String?
+  status          PPTSlideStatus @default(PENDING)
+  error           String?
+  seed            Int?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  pptGeneration PPTGeneration @relation(fields: [pptGenerationId], references: [id], onDelete: Cascade)
+  generation    Generation?   @relation(fields: [generationId], references: [id], onDelete: SetNull)
+
+  @@index([pptGenerationId, index])
+  @@index([status])
+}
+
+model ModerationRejection {
+  id        String   @id @default(cuid())
+  userId    String?
+  ip        String
+  prompt    String   @db.Text
+  reason    String
+  createdAt DateTime @default(now())
+
+  @@index([ip, createdAt])
+  @@index([userId, createdAt])
+}
+
+enum WishStatus {
+  OPEN
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  DECLINED
+}
+
+model Wish {
+  id            String     @id @default(cuid())
+  title         String
+  content       String     @db.Text
+  authorName    String
+  authorKeyHash String?
+  authorIpHash  String
+  userId        String?
+  status        WishStatus @default(OPEN)
+  isPinned      Boolean    @default(false)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  user     User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  comments WishComment[]
+
+  @@index([createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([userId])
+}
+
+model WishComment {
+  id            String   @id @default(cuid())
+  wishId        String
+  parentId      String?
+  content       String   @db.Text
+  authorName    String
+  authorKeyHash String?
+  authorIpHash  String
+  userId        String?
+  isAdmin       Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  wish    Wish          @relation(fields: [wishId], references: [id], onDelete: Cascade)
+  parent  WishComment?  @relation("WishCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies WishComment[] @relation("WishCommentReplies")
+  user    User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([wishId, createdAt])
+  @@index([parentId])
+  @@index([userId])
+}
+
+model WishDailyQuota {
+  ipHash    String
+  day       String
+  count     Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@id([ipHash, day])
+}
+
+// -----------------------------------------------------------------------------
+// Design inspiration community models
+
+model DesignPost {
+  id                 String           @id @default(cuid())
+  authorId           String?
+  // Keep a snapshot so a deleted account does not turn a public post into an
+  // anonymous, broken card.
+  authorNameSnapshot String
+  shape              PostShape
+  discipline         Discipline
+  title              String
+  story              String?          @db.Text
+  origin             PostOrigin       @default(ORIGINAL)
+  sourceType         PostSourceType   @default(STANDARD)
+  externalUrl        String?
+  sourceNote         String?          @db.Text
+  promptVisibility   PromptVisibility @default(STRUCTURE_ONLY)
+  status             PostStatus       @default(PENDING)
+  trustTier          TrustTier        @default(NEW)
+  moderationNote     String?          @db.Text
+  derivedFromPostId  String?
+  dailyPromptId      String?
+  hasMedia           Boolean          @default(false)
+  likeCount          Int              @default(0)
+  bookmarkCount      Int              @default(0)
+  commentCount       Int              @default(0)
+  derivedCount       Int              @default(0)
+  rankScore          Float            @default(0)
+  publishedAt        DateTime?
+  hiddenAt           DateTime?
+  deletedAt          DateTime?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  author                  User?                    @relation("DesignPostAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  media                   DesignPostMedia[]
+  likes                   PostLike[]
+  bookmarks               PostBookmark[]
+  bookmarkCollectionItems BookmarkCollectionItem[]
+  comments                PostComment[]
+  tags                    PostTag[]
+  reports                 ContentReport[]
+  derivedFrom             DesignPost?              @relation("DesignPostDerivations", fields: [derivedFromPostId], references: [id], onDelete: SetNull)
+  derivations             DesignPost[]             @relation("DesignPostDerivations")
+  dailyPrompt             DailyPrompt?             @relation("DailyPromptResponses", fields: [dailyPromptId], references: [id], onDelete: SetNull)
+  officialDailyPrompt     DailyPrompt?             @relation("DailyPromptQuestion")
+  dailyFeatures           DailyPromptFeature[]
+
+  @@index([status, rankScore(sort: Desc)])
+  @@index([discipline, status, rankScore(sort: Desc)])
+  @@index([status, publishedAt(sort: Desc)])
+  @@index([authorId, createdAt(sort: Desc)])
+  @@index([shape, status, publishedAt(sort: Desc)])
+  @@index([sourceType, status, publishedAt(sort: Desc)])
+  @@index([dailyPromptId])
+  @@index([derivedFromPostId])
+  @@index([deletedAt])
+}
+
+model DesignPostMedia {
+  id                     String    @id @default(cuid())
+  postId                 String
+  // Public snapshot prefix. This must never point at generated/ or uploads/.
+  storageKey             String
+  thumbnailKey           String?
+  width                  Int
+  height                 Int
+  mimeType               String
+  sizeBytes              Int
+  order                  Int       @default(0)
+  role                   MediaRole @default(FINAL)
+  isCover                Boolean   @default(false)
+  sourceGeneratedImageId String?
+  // Snapshot of the explicitly whitelisted recipe fields. Never expose
+  // Generation.paramsRaw or provider/account identifiers directly.
+  recipe                 Json?
+  createdAt              DateTime  @default(now())
+  deletedAt              DateTime?
+
+  post                 DesignPost      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  sourceGeneratedImage GeneratedImage? @relation("GeneratedImageDesignPostMedia", fields: [sourceGeneratedImageId], references: [id], onDelete: SetNull)
+
+  @@index([postId, order])
+  @@index([postId, isCover])
+  @@index([sourceGeneratedImageId])
+  @@index([deletedAt])
+}
+
+model PostLike {
+  postId        String
+  userId        String
+  // New accounts can interact without influencing ranking. The API may set
+  // this false after checking the account's trust/usage history.
+  countsForRank Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  post DesignPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([postId, userId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([postId, countsForRank])
+}
+
+model PostBookmark {
+  postId        String
+  userId        String
+  countsForRank Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  post DesignPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([postId, userId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([postId, countsForRank])
+}
+
+// A bookmark remains the canonical, countable relationship between a user and
+// a post. Collections layer on top of it so one post can live in multiple
+// named folders without inflating the public bookmark count.
+model BookmarkCollection {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  description String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user  User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items BookmarkCollectionItem[]
+
+  @@unique([userId, name])
+  @@index([userId, updatedAt(sort: Desc)])
+}
+
+model BookmarkCollectionItem {
+  collectionId String
+  postId       String
+  createdAt    DateTime @default(now())
+
+  collection BookmarkCollection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  post       DesignPost         @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@id([collectionId, postId])
+  @@index([postId, createdAt(sort: Desc)])
+}
+
+// Notifications are aggregated from the existing interaction rows. Persisting
+// only their read state keeps historical behavior backward compatible while
+// allowing individual and batch acknowledgement.
+model InspirationNotificationRead {
+  userId          String
+  notificationKey String
+  readAt          DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, notificationKey])
+  @@index([userId, readAt(sort: Desc)])
+}
+
+model PostComment {
+  id                 String    @id @default(cuid())
+  postId             String
+  parentId           String?
+  authorId           String?
+  authorNameSnapshot String
+  content            String    @db.Text
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  deletedAt          DateTime?
+
+  post    DesignPost      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  parent  PostComment?    @relation("PostCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies PostComment[]   @relation("PostCommentReplies")
+  author  User?           @relation("PostCommentAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  reports ContentReport[]
+
+  @@index([postId, createdAt])
+  @@index([parentId])
+  @@index([authorId])
+  @@index([deletedAt])
+}
+
+model UserFollow {
+  id           String           @id @default(cuid())
+  followerId   String
+  targetType   FollowTargetType
+  // Canonical target key: a User.id for USER, enum value (e.g. GRAPHIC) for
+  // DISCIPLINE, and DesignTag.id for TAG. Using one validated key avoids a
+  // fragile polymorphic foreign key while retaining a single follow table.
+  targetKey    String
+  targetUserId String?
+  discipline   Discipline?
+  tagId        String?
+  createdAt    DateTime         @default(now())
+
+  follower   User       @relation("FollowFollower", fields: [followerId], references: [id], onDelete: Cascade)
+  targetUser User?      @relation("FollowUserTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+  tag        DesignTag? @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, targetType, targetKey])
+  @@index([targetType, targetKey, createdAt(sort: Desc)])
+  @@index([followerId, createdAt(sort: Desc)])
+  @@index([targetUserId])
+  @@index([tagId])
+}
+
+model DesignTag {
+  id         String   @id @default(cuid())
+  slug       String   @unique
+  name       String
+  kind       TagKind
+  usageCount Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  posts     PostTag[]
+  followers UserFollow[]
+
+  @@index([kind, usageCount(sort: Desc)])
+  @@index([name])
+}
+
+model PostTag {
+  postId String
+  tagId  String
+
+  post DesignPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tag  DesignTag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([postId, tagId])
+  @@index([tagId, postId])
+}
+
+model DailyPrompt {
+  id             String            @id @default(cuid())
+  day            DateTime          @db.Date
+  discipline     Discipline
+  title          String
+  prompt         String            @db.Text
+  keywords       String[]
+  status         DailyPromptStatus @default(DRAFT)
+  publishedAt    DateTime?
+  questionPostId String?           @unique
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  questionPost DesignPost?          @relation("DailyPromptQuestion", fields: [questionPostId], references: [id], onDelete: SetNull)
+  responses    DesignPost[]         @relation("DailyPromptResponses")
+  features     DailyPromptFeature[]
+
+  @@unique([day])
+  @@index([day])
+  @@index([status, day])
+  @@index([discipline, day])
+}
+
+model DailyPromptFeature {
+  dailyPromptId String
+  postId        String
+  order         Int      @default(0)
+  selectedAt    DateTime @default(now())
+
+  dailyPrompt DailyPrompt @relation(fields: [dailyPromptId], references: [id], onDelete: Cascade)
+  post        DesignPost  @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@id([dailyPromptId, postId])
+  @@index([dailyPromptId, order])
+}
+
+model ContentReport {
+  id         String              @id @default(cuid())
+  postId     String?
+  commentId  String?
+  reporterId String?
+  reason     ContentReportReason
+  note       String?             @db.Text
+  status     ContentReportStatus @default(OPEN)
+  reviewerId String?
+  resolution String?             @db.Text
+  createdAt  DateTime            @default(now())
+  reviewedAt DateTime?
+
+  post     DesignPost?  @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment  PostComment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  reporter User?        @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: SetNull)
+  reviewer User?        @relation("ReportReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([postId, createdAt(sort: Desc)])
+  @@index([commentId, createdAt(sort: Desc)])
+  @@index([reporterId, createdAt(sort: Desc)])
+}
+
+model PostDailyQuota {
+  ipHash    String
+  day       String
+  count     Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@id([ipHash, day])
 }
