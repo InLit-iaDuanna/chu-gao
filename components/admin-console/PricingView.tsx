@@ -1,10 +1,9 @@
 "use client";
 
-import { Button, Input, Select } from "@/components/ui";
-
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Plus } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
 
+import { Button, Input } from "@/components/ui";
 import type { ModelInfo } from "@/components/studio/lib/types";
 
 import {
@@ -16,264 +15,369 @@ import {
   patchAdminPricingRule,
 } from "./lib/api";
 import type { ConversationPricing, PricingRule } from "./lib/types";
-import {
-  AdminField,
-  AdminPageHeader,
-  AdminTable,
-  EmptyPanel,
-  ErrorText,
-} from "./ui";
+import { AdminPageHeader, ErrorText } from "./ui";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type Tab = "image" | "chat";
+
+// resolution × mode → rule
+type RuleGrid = Map<string, Map<string | null, PricingRule>>;
+
+function buildGrid(rules: PricingRule[], modelId: string): RuleGrid {
+  const grid: RuleGrid = new Map();
+  for (const rule of rules) {
+    if (rule.modelId !== modelId || !rule.isActive) continue;
+    const res = rule.resolution ?? "auto";
+    if (!grid.has(res)) grid.set(res, new Map());
+    grid.get(res)!.set(rule.image2Mode, rule);
+  }
+  return grid;
+}
+
+const RESOLUTION_ORDER = ["auto", "1K", "2K", "4K", "High"];
+
+function sortedResolutions(grid: RuleGrid): string[] {
+  const all = Array.from(grid.keys());
+  return all.sort(
+    (a, b) =>
+      (RESOLUTION_ORDER.indexOf(a) === -1
+        ? 99
+        : RESOLUTION_ORDER.indexOf(a)) -
+      (RESOLUTION_ORDER.indexOf(b) === -1 ? 99 : RESOLUTION_ORDER.indexOf(b)),
+  );
+}
+
+function modesForGrid(grid: RuleGrid): Array<string | null> {
+  const modes = new Set<string | null>();
+  for (const row of grid.values()) {
+    for (const mode of row.keys()) modes.add(mode);
+  }
+  if (modes.size === 1 && modes.has(null)) return [null];
+  return [null, "standard", "high"].filter((m) => modes.has(m));
+}
+
+// ─── Main view ────────────────────────────────────────────────────────────────
 
 export function PricingView() {
+  const [tab, setTab] = useState<Tab>("image");
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [rules, setRules] = useState<PricingRule[]>([]);
   const [pricing, setPricing] = useState<ConversationPricing | null>(null);
   const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [pricingError, setPricingError] = useState<string | null>(null);
 
   const reload = useCallback(() => {
+    setError(null);
     Promise.all([getAdminPricing(), getAdminConversationPricing()])
-      .then(([pricingData, conversationPricing]) => {
-        setModels(pricingData.models);
-        setRules(pricingData.rules);
-        setPricing(conversationPricing);
-        setPricingError(null);
+      .then(([pd, cp]) => {
+        setModels(pd.models);
+        setRules(pd.rules);
+        setPricing(cp);
       })
-      .catch((err) => {
-        setPricingError(
-          err instanceof Error ? err.message : "定价数据加载失败",
-        );
-      })
+      .catch((err) =>
+        setError(isAdminApiError(err) ? err.message : "加载失败"),
+      )
       .finally(() => setLoading(false));
   }, []);
 
   useEffect(reload, [reload]);
 
-  async function run(action: () => Promise<unknown>, okMessage: string) {
-    setError(null);
-    setNotice(null);
-    try {
-      await action();
-      setNotice(okMessage);
-      reload();
-    } catch (actionError) {
-      setError(isAdminApiError(actionError) ? actionError.message : "操作失败");
-    }
-  }
+  const showNotice = (msg: string) => {
+    setNotice(msg);
+    setTimeout(() => setNotice(null), 3000);
+  };
 
   if (loading) {
-    return <div className="surface-panel h-64 animate-pulse" />;
-  }
-
-  const rulesByModel = new Map<string, PricingRule[]>();
-  for (const rule of rules) {
-    const list = rulesByModel.get(rule.modelId) ?? [];
-    list.push(rule);
-    rulesByModel.set(rule.modelId, list);
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <Loader2 className="h-5 w-5 animate-spin text-text-muted" />
+      </div>
+    );
   }
 
   return (
     <div>
       <AdminPageHeader
         eyebrow="Pricing"
-        title="定价"
-        description="模型出图点数规则与对话计费"
+        title="定价管理"
+        description="生图点数规则与对话计费"
         actions={
           <Button
             type="button"
-            className="h-9 px-3 text-xs text-text-muted"
-            onClick={() => setCreating((value) => !value)}
+            className="h-8 w-8 p-0 text-text-muted"
+            onClick={reload}
+            title="刷新"
           >
-            <Plus className="h-3.5 w-3.5 stroke-[1.5]" />
-            新建规则
+            <RefreshCw className="h-3.5 w-3.5" />
           </Button>
         }
       />
 
       <ErrorText message={error} />
-      {notice ? <p className="mb-3 text-sm text-success">{notice}</p> : null}
 
-      {creating ? (
-        <CreateRuleForm
+      {notice && (
+        <p className="mb-4 text-sm text-success">{notice}</p>
+      )}
+
+      {/* Tab bar */}
+      <div className="mb-6 flex gap-1 rounded-lg border border-border bg-surface p-1 w-fit">
+        {(["image", "chat"] as Tab[]).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setTab(t)}
+            className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+              tab === t
+                ? "bg-foreground/10 text-foreground"
+                : "text-text-muted hover:text-foreground"
+            }`}
+          >
+            {t === "image" ? "生图定价" : "对话计费"}
+          </button>
+        ))}
+      </div>
+
+      {tab === "image" && (
+        <ImagePricingTab
           models={models}
-          onCreate={(input) =>
-            run(() => createAdminPricingRule(input), "规则已创建").then(() =>
-              setCreating(false),
-            )
-          }
-          onCancel={() => setCreating(false)}
+          rules={rules}
+          onNotice={showNotice}
+          onError={(msg) => setError(msg)}
+          onRulesChange={setRules}
         />
-      ) : null}
+      )}
 
-      {pricing ? (
-        <ConversationPricingSection
+      {tab === "chat" && pricing && (
+        <ChatPricingTab
           pricing={pricing}
-          onSave={(next) =>
-            run(() => patchAdminConversationPricing(next), "对话定价已保存")
-          }
+          onSave={async (next) => {
+            await patchAdminConversationPricing(next);
+            setPricing(next);
+            showNotice("对话定价已保存");
+          }}
         />
-      ) : pricingError ? (
-        <div className="surface-panel mb-6 p-4">
-          <p className="eyebrow">对话计费</p>
-          <p className="mt-2 text-sm text-danger">加载失败：{pricingError}</p>
-          <Button type="button" className="mt-3 h-8 px-3 text-xs text-text-muted" onClick={reload}>
-            重试
-          </Button>
-        </div>
-      ) : null}
-
-      {models.length === 0 ? (
-        <EmptyPanel text="没有已配置的模型" />
-      ) : (
-        models.map((model) => {
-          const modelRules = rulesByModel.get(model.id) ?? [];
-
-          return (
-            <section key={model.id} className="mb-6">
-              <div className="mb-2 flex items-baseline gap-3">
-                <h2 className="text-sm font-semibold">{model.displayName}</h2>
-                <span className="font-mono text-[11px] text-text-faint">
-                  {model.id}
-                </span>
-              </div>
-              {modelRules.length === 0 ? (
-                <p className="surface-panel-soft px-4 py-3 text-xs text-text-muted">
-                  暂无规则，使用系统默认成本
-                </p>
-              ) : (
-                <AdminTable head={["条件", "点数", "优先级", "状态", "操作"]}>
-                  {modelRules.map((rule) => (
-                    <RuleRow
-                      key={rule.id}
-                      model={model}
-                      rule={rule}
-                      onToggle={() =>
-                        run(
-                          () =>
-                            patchAdminPricingRule(rule.id, {
-                              isActive: !rule.isActive,
-                            }),
-                          rule.isActive ? "已停用" : "已启用",
-                        )
-                      }
-                      onSaveCredits={(credits) =>
-                        run(
-                          () => patchAdminPricingRule(rule.id, { credits }),
-                          "点数已更新",
-                        )
-                      }
-                    />
-                  ))}
-                </AdminTable>
-              )}
-            </section>
-          );
-        })
       )}
     </div>
   );
 }
 
-function channelName(model: ModelInfo, providerChannelId?: string | null) {
-  if (!providerChannelId) {
-    return "全部渠道";
-  }
+// ─── Image pricing tab ────────────────────────────────────────────────────────
 
+function ImagePricingTab({
+  models,
+  rules,
+  onNotice,
+  onError,
+  onRulesChange,
+}: {
+  models: ModelInfo[];
+  rules: PricingRule[];
+  onNotice: (msg: string) => void;
+  onError: (msg: string) => void;
+  onRulesChange: (rules: PricingRule[]) => void;
+}) {
   return (
-    model.providerChannels?.find((channel) => channel.id === providerChannelId)
-      ?.displayName ?? providerChannelId
+    <div className="space-y-6">
+      {models.map((model) => {
+        const modelRules = rules.filter((r) => r.modelId === model.id);
+        return (
+          <ModelPricingCard
+            key={model.id}
+            model={model}
+            rules={modelRules}
+            onNotice={onNotice}
+            onError={onError}
+            onRulesChange={(updated) => {
+              onRulesChange(
+                rules
+                  .filter((r) => r.modelId !== model.id)
+                  .concat(updated),
+              );
+            }}
+          />
+        );
+      })}
+    </div>
   );
 }
 
-function ruleCondition(rule: PricingRule, model: ModelInfo): string {
-  const parts: string[] = [];
-  parts.push(`渠道 ${channelName(model, rule.providerChannelId)}`);
-  if (rule.image2Mode) parts.push(`模式 ${rule.image2Mode}`);
-  if (rule.resolution) parts.push(`分辨率 ${rule.resolution}`);
-  if (rule.aspectRatio) parts.push(`比例 ${rule.aspectRatio}`);
-  if (rule.outputFormat) parts.push(`格式 ${rule.outputFormat}`);
-  if (rule.background) parts.push(`背景 ${rule.background}`);
-  if (rule.usesReference !== null && rule.usesReference !== undefined) {
-    parts.push(rule.usesReference ? "带参考图" : "无参考图");
-  }
-  return parts.length > 0 ? parts.join(" · ") : "默认规则";
-}
+// ─── Per-model card ───────────────────────────────────────────────────────────
 
-function RuleRow({
+function ModelPricingCard({
   model,
-  rule,
-  onToggle,
-  onSaveCredits,
+  rules,
+  onNotice,
+  onError,
+  onRulesChange,
 }: {
   model: ModelInfo;
-  rule: PricingRule;
-  onToggle: () => Promise<void>;
-  onSaveCredits: (credits: number) => Promise<void>;
+  rules: PricingRule[];
+  onNotice: (msg: string) => void;
+  onError: (msg: string) => void;
+  onRulesChange: (rules: PricingRule[]) => void;
 }) {
-  const [credits, setCredits] = useState(rule.credits);
-  const [busy, setBusy] = useState(false);
+  const grid = buildGrid(rules, model.id);
+  const resolutions = sortedResolutions(grid);
+  const modes = modesForGrid(grid);
+  const hasModes = modes.some((m) => m !== null);
 
-  // Sync input when rule reloads from server (e.g. after another field saves)
-  useEffect(() => {
-    setCredits(rule.credits);
-  }, [rule.credits]);
+  const modeLabel = (m: string | null) =>
+    m === null ? "默认" : m === "standard" ? "标准" : "高质量";
+
+  const handleSave = async (
+    resolution: string,
+    mode: string | null,
+    credits: number,
+  ) => {
+    const existing = grid.get(resolution)?.get(mode);
+    try {
+      if (existing) {
+        const updated = await patchAdminPricingRule(existing.id, { credits });
+        onRulesChange(
+          rules.map((r) => (r.id === existing.id ? { ...r, ...updated } : r)),
+        );
+      } else {
+        const created = await createAdminPricingRule({
+          modelId: model.id,
+          resolution: resolution === "auto" ? null : resolution,
+          image2Mode: mode as "standard" | "high" | null,
+          credits,
+          priority: 10,
+        });
+        onRulesChange([...rules, created as PricingRule]);
+      }
+      onNotice("已保存");
+    } catch (err) {
+      onError(isAdminApiError(err) ? err.message : "保存失败");
+    }
+  };
 
   return (
-    <tr className="border-b border-border/60 last:border-0">
-      <td className="px-4 py-2.5 text-xs">{ruleCondition(rule, model)}</td>
-      <td className="px-4 py-2.5">
-        <div className="flex items-center gap-1.5">
-          <Input
-            type="number"
-            min={0}
-            className="h-7 w-20 rounded-md border border-border bg-surface px-1.5 font-mono text-xs outline-none"
-            value={credits}
-            onChange={(event) => setCredits(Number(event.target.value))}
-          />
-          <Button
-            type="button"
-            className="h-7 px-2 text-[11px] text-text-muted disabled:opacity-40"
-            disabled={busy || credits === rule.credits}
-            onClick={() => {
-              setBusy(true);
-              void onSaveCredits(credits).finally(() => setBusy(false));
-            }}
-          >
-            存
-          </Button>
+    <section className="rounded-xl border border-border bg-surface">
+      <div className="flex items-center justify-between border-b border-border px-5 py-3">
+        <div>
+          <span className="font-medium">{model.displayName}</span>
+          <span className="ml-2 font-mono text-xs text-text-faint">
+            {model.id}
+          </span>
         </div>
-      </td>
-      <td className="px-4 py-2.5 font-mono text-xs text-text-muted">
-        {rule.priority}
-      </td>
-      <td className="px-4 py-2.5">
-        {rule.isActive ? (
-          <span className="text-xs text-success">启用</span>
-        ) : (
-          <span className="text-xs text-text-faint">停用</span>
-        )}
-      </td>
-      <td className="px-4 py-2.5">
-        <Button
-          type="button"
-          className="h-7 px-2 text-[11px] text-text-muted disabled:opacity-40"
-          disabled={busy}
-          onClick={() => {
-            setBusy(true);
-            void onToggle().finally(() => setBusy(false));
-          }}
-        >
-          {rule.isActive ? "停用" : "启用"}
-        </Button>
-      </td>
-    </tr>
+        <span className="text-xs text-text-muted">单位：积分 / 张</span>
+      </div>
+
+      {resolutions.length === 0 ? (
+        <p className="px-5 py-4 text-sm text-text-muted">
+          暂无活跃规则，使用系统默认成本
+        </p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="px-5 py-2.5 text-left text-xs font-medium text-text-muted">
+                  分辨率
+                </th>
+                {modes.map((m) => (
+                  <th
+                    key={String(m)}
+                    className="px-5 py-2.5 text-left text-xs font-medium text-text-muted"
+                  >
+                    {modeLabel(m)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {resolutions.map((res) => (
+                <tr key={res} className="hover:bg-foreground/[0.02]">
+                  <td className="px-5 py-2 font-mono text-xs font-medium">
+                    {res}
+                  </td>
+                  {modes.map((mode) => {
+                    const rule = grid.get(res)?.get(mode);
+                    return (
+                      <td key={String(mode)} className="px-5 py-2">
+                        <CreditCell
+                          initialValue={rule?.credits ?? null}
+                          onSave={(v) => handleSave(res, mode, v)}
+                        />
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
   );
 }
 
-function ConversationPricingSection({
+// ─── Inline credit cell ───────────────────────────────────────────────────────
+
+function CreditCell({
+  initialValue,
+  onSave,
+}: {
+  initialValue: number | null;
+  onSave: (value: number) => Promise<void>;
+}) {
+  const [value, setValue] = useState(
+    initialValue !== null ? String(initialValue) : "",
+  );
+  const [busy, setBusy] = useState(false);
+  const [dirty, setDirty] = useState(false);
+
+  useEffect(() => {
+    setValue(initialValue !== null ? String(initialValue) : "");
+    setDirty(false);
+  }, [initialValue]);
+
+  const commit = async () => {
+    const n = Number(value);
+    if (!dirty || !Number.isFinite(n) || n < 0) return;
+    setBusy(true);
+    try {
+      await onSave(n);
+      setDirty(false);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <Input
+        type="number"
+        min={0}
+        value={value}
+        placeholder="—"
+        disabled={busy}
+        className="h-7 w-20 rounded border border-border bg-transparent px-2 font-mono text-xs outline-none focus:border-accent disabled:opacity-50"
+        onChange={(e) => {
+          setValue(e.target.value);
+          setDirty(true);
+        }}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.currentTarget.blur();
+          }
+        }}
+      />
+      {busy && <Loader2 className="h-3 w-3 animate-spin text-text-muted" />}
+      {dirty && !busy && (
+        <span className="h-1.5 w-1.5 rounded-full bg-warning" title="未保存" />
+      )}
+    </div>
+  );
+}
+
+// ─── Chat pricing tab ─────────────────────────────────────────────────────────
+
+function ChatPricingTab({
   pricing,
   onSave,
 }: {
@@ -283,203 +387,77 @@ function ConversationPricingSection({
   const [form, setForm] = useState(pricing);
   const [busy, setBusy] = useState(false);
 
-  // Keep local form in sync when parent reloads fresh data from the server
   useEffect(() => {
     setForm(pricing);
   }, [pricing]);
 
-  return (
-    <section className="surface-panel mb-6 p-4">
-      <p className="eyebrow">对话计费</p>
-      <div className="mt-3 flex flex-wrap items-end gap-3">
-        <AdminField label="标准对话（点/次）">
-          <Input
-            type="number"
-            min={0}
-            step={0.5}
-            className="w-32"
-            value={form.standardCredits}
-            onChange={(event) =>
-              setForm({ ...form, standardCredits: Number(event.target.value) })
-            }
-          />
-        </AdminField>
-        <AdminField label="推理对话（点/次）">
-          <Input
-            type="number"
-            min={0}
-            step={0.5}
-            className="w-32"
-            value={form.reasoningCredits}
-            onChange={(event) =>
-              setForm({ ...form, reasoningCredits: Number(event.target.value) })
-            }
-          />
-        </AdminField>
-        <Button
-          type="button"
-          className="h-9 px-4 text-text-muted disabled:opacity-45"
-          disabled={busy}
-          onClick={() => {
-            setBusy(true);
-            void onSave(form).finally(() => setBusy(false));
-          }}
-        >
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          保存对话定价
-        </Button>
-      </div>
-    </section>
-  );
-}
-
-function CreateRuleForm({
-  models,
-  onCreate,
-  onCancel,
-}: {
-  models: ModelInfo[];
-  onCreate: (input: {
-    modelId: string;
-    providerChannelId?: string | null;
-    image2Mode?: "standard" | "high" | null;
-    resolution?: string | null;
-    credits: number;
-    priority?: number;
-    note?: string | null;
-  }) => Promise<void>;
-  onCancel: () => void;
-}) {
-  const [form, setForm] = useState({
-    modelId: models[0]?.id ?? "",
-    providerChannelId: "",
-    image2Mode: "",
-    resolution: "",
-    credits: 10,
-    priority: 0,
-    note: "",
-  });
-  const [busy, setBusy] = useState(false);
-  const selectedModel =
-    models.find((model) => model.id === form.modelId) ?? models[0] ?? null;
-  const providerChannels = selectedModel?.providerChannels ?? [];
+  const isDirty =
+    form.standardCredits !== pricing.standardCredits ||
+    form.reasoningCredits !== pricing.reasoningCredits;
 
   return (
-    <div className="surface-panel mb-6 space-y-3 p-4">
-      <p className="text-sm font-medium">新建定价规则</p>
-      <div className="grid gap-3 sm:grid-cols-3">
-        <AdminField label="模型">
-          <Select
-            aria-label="模型"
-            value={form.modelId}
-            onValueChange={(value) =>
-              setForm({ ...form, modelId: value, providerChannelId: "" })
-            }
-            options={models.map((model) => ({
-              value: model.id,
-              label: model.displayName,
-            }))}
-          />
-        </AdminField>
-        <AdminField label="渠道（可选）">
-          <Select
-            aria-label="渠道"
-            value={form.providerChannelId || "all"}
-            onValueChange={(value) =>
-              setForm({
-                ...form,
-                providerChannelId: value === "all" ? "" : value,
-              })
-            }
-            options={[
-              { value: "all", label: "全部渠道" },
-              ...providerChannels.map((channel) => ({
-                value: channel.id,
-                label: `${channel.displayName} (${channel.availableAccountCount}/${channel.accountCount})`,
-              })),
-            ]}
-          />
-        </AdminField>
-        <AdminField label="image2 模式（可选）">
-          <Select
-            aria-label="image2 模式"
-            value={form.image2Mode || "all"}
-            onValueChange={(value) =>
-              setForm({
-                ...form,
-                image2Mode: value === "all" ? "" : value,
-              })
-            }
-            options={[
-              { value: "all", label: "不限" },
-              { value: "standard", label: "standard" },
-              { value: "high", label: "high" },
-            ]}
-          />
-        </AdminField>
-        <AdminField label="分辨率（可选）">
-          <Input
-            placeholder="如 1K / 2K / 4K"
-            value={form.resolution}
-            onChange={(event) =>
-              setForm({ ...form, resolution: event.target.value })
-            }
-          />
-        </AdminField>
-        <AdminField label="点数">
-          <Input
-            type="number"
-            min={0}
-            value={form.credits}
-            onChange={(event) =>
-              setForm({ ...form, credits: Number(event.target.value) })
-            }
-          />
-        </AdminField>
-        <AdminField label="优先级">
-          <Input
-            type="number"
-            min={0}
-            value={form.priority}
-            onChange={(event) =>
-              setForm({ ...form, priority: Number(event.target.value) })
-            }
-          />
-        </AdminField>
-        <AdminField label="备注（可选）">
-          <Input
-            value={form.note}
-            onChange={(event) => setForm({ ...form, note: event.target.value })}
-          />
-        </AdminField>
+    <div className="max-w-md rounded-xl border border-border bg-surface">
+      <div className="border-b border-border px-5 py-3">
+        <span className="font-medium">对话计费</span>
+        <p className="mt-0.5 text-xs text-text-muted">
+          每次对话消耗的积分数。推理模式使用更多计算资源，单独定价。
+        </p>
       </div>
-      <div className="flex gap-2">
+
+      <div className="space-y-4 px-5 py-4">
+        <div>
+          <label className="mb-1.5 block text-xs font-medium text-text-muted">
+            标准对话（积分 / 次）
+          </label>
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              min={0}
+              step={0.5}
+              className="h-8 w-32 font-mono text-sm"
+              value={form.standardCredits}
+              onChange={(e) =>
+                setForm({ ...form, standardCredits: Number(e.target.value) })
+              }
+            />
+            <span className="text-xs text-text-muted">积分 / 次</span>
+          </div>
+        </div>
+
+        <div>
+          <label className="mb-1.5 block text-xs font-medium text-text-muted">
+            推理对话（积分 / 次）
+          </label>
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              min={0}
+              step={0.5}
+              className="h-8 w-32 font-mono text-sm"
+              value={form.reasoningCredits}
+              onChange={(e) =>
+                setForm({ ...form, reasoningCredits: Number(e.target.value) })
+              }
+            />
+            <span className="text-xs text-text-muted">积分 / 次</span>
+          </div>
+        </div>
+
         <Button
           type="button"
-          className="h-9 px-4 text-text-muted disabled:opacity-45"
-          disabled={busy || !form.modelId}
-          onClick={() => {
+          disabled={busy || !isDirty}
+          className="mt-2 h-8 px-4 text-sm disabled:opacity-40"
+          onClick={async () => {
             setBusy(true);
-            void onCreate({
-              modelId: form.modelId,
-              providerChannelId: form.providerChannelId.trim() || null,
-              image2Mode: (form.image2Mode as "standard" | "high" | "") || null,
-              resolution: form.resolution.trim() || null,
-              credits: form.credits,
-              priority: form.priority,
-              note: form.note.trim() || null,
-            }).finally(() => setBusy(false));
+            try {
+              await onSave(form);
+            } finally {
+              setBusy(false);
+            }
           }}
         >
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          创建规则
-        </Button>
-        <Button
-          type="button"
-          className="h-9 px-4 text-text-muted"
-          onClick={onCancel}
-        >
-          取消
+          {busy ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : null}
+          保存
         </Button>
       </div>
     </div>
