@@ -208,7 +208,7 @@ function ProfileSection({
             <Input
               type="number"
               min={1}
-              max={1000}
+              max={1000000}
               value={form.dailyGenLimit}
               onChange={(event) =>
                 setForm({ ...form, dailyGenLimit: Number(event.target.value) })

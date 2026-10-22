@@ -1,21 +1,70 @@
-import { ok } from "@/lib/api-response";
+import { fail, ok } from "@/lib/api-response";
 import { requireV1Auth, v1AuthErrorResponse } from "@/lib/v1-auth";
 import {
   agentImageErrorResponse,
+  listAgentGenerations,
   submitAgentGeneration,
 } from "@/lib/agent-images";
 import { readJsonBodySafe } from "@/lib/request-body";
 import { userActionRateLimitResponse } from "@/lib/api-rate-limit";
+import { getApiKeyRuntimeConfig } from "@/lib/api-key-pricing";
 export const runtime = "nodejs";
+
+const DEFAULT_LIST_LIMIT = 20;
+const MAX_LIST_LIMIT = 100;
+
+function isAuthError(error: unknown) {
+  return (
+    (error as { code?: string })?.code === "UNAUTHORIZED" ||
+    (error as { status?: number })?.status === 401
+  );
+}
+
+export async function GET(request: Request) {
+  try {
+    const principal = await requireV1Auth(request);
+    const url = new URL(request.url);
+    const rawLimit = Number(url.searchParams.get("limit") ?? DEFAULT_LIST_LIMIT);
+    if (!Number.isInteger(rawLimit) || rawLimit < 1) {
+      return fail("UNSUPPORTED_PARAM", "limit 必须是正整数", { status: 400 });
+    }
+    const result = await listAgentGenerations(
+      {
+        user: principal.user,
+        agentAuthorizationId: principal.agentAuthorizationId ?? undefined,
+        apiKeyId: principal.apiKeyId ?? undefined,
+      },
+      {
+        limit: Math.min(rawLimit, MAX_LIST_LIMIT),
+        cursor: url.searchParams.get("cursor") ?? undefined,
+        status: url.searchParams.get("status") ?? undefined,
+      },
+    );
+    return ok(result, { headers: { "Cache-Control": "no-store" } });
+  } catch (error) {
+    if (isAuthError(error)) return v1AuthErrorResponse(error);
+    return agentImageErrorResponse(error);
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const principal = await requireV1Auth(request);
-    const limited = await userActionRateLimitResponse(
-      principal.user.id,
-      "agent-submit",
-      process.env.RATE_LIMIT_AGENT_SUBMIT_PER_MIN,
-      20,
-    );
+    // API keys use the admin-configured per-minute limit; agent tokens keep
+    // the env-configured limit.
+    const limited = principal.apiKeyId
+      ? await userActionRateLimitResponse(
+          principal.user.id,
+          "apikey-submit",
+          String((await getApiKeyRuntimeConfig()).rateLimitPerMin),
+          20,
+        )
+      : await userActionRateLimitResponse(
+          principal.user.id,
+          "agent-submit",
+          process.env.RATE_LIMIT_AGENT_SUBMIT_PER_MIN,
+          20,
+        );
     if (limited) return limited;
     const body = await readJsonBodySafe(request);
     if (!body.ok) return body.response;
@@ -31,6 +80,8 @@ export async function POST(request: Request) {
     );
     return ok(
       {
+        // `id` is the documented field; `generationId` kept for older clients.
+        id: result.generationId,
         generationId: result.generationId,
         status: result.status,
         estimatedCredits: result.estimatedCredits,
@@ -38,12 +89,7 @@ export async function POST(request: Request) {
       { status: 202, headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
-    if (
-      (error as { code?: string })?.code === "UNAUTHORIZED" ||
-      (error as { status?: number })?.status === 401
-    ) {
-      return v1AuthErrorResponse(error);
-    }
+    if (isAuthError(error)) return v1AuthErrorResponse(error);
     return agentImageErrorResponse(error);
   }
 }

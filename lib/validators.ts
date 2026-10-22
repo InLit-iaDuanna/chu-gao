@@ -113,7 +113,7 @@ export const adminUserPatchSchema = z
     name: z.string().trim().min(1).max(40).nullable().optional(),
     role: z.enum(["USER", "ADMIN"]).optional(),
     status: z.enum(["ACTIVE", "BANNED"]).optional(),
-    dailyGenLimit: z.number().int().min(1).max(1000).optional(),
+    dailyGenLimit: z.number().int().min(1).max(1000000).optional(),
     concurrentLimit: z.number().int().min(1).max(10000).optional(),
     materialInboxBeta: z.boolean().optional(),
     bannedReason: z.string().trim().max(200).nullable().optional(),

@@ -34,17 +34,9 @@ const FIELDS: {
     unit: "×",
   },
   {
-    key: "maxConcurrency",
-    label: "最大并发数",
-    hint: "单个 API Key 同时允许运行的生图任务数。超出后新提交将返回 429",
-    min: 1,
-    max: 1000,
-    unit: "个",
-  },
-  {
     key: "rateLimitPerMin",
     label: "每分钟限速",
-    hint: "单个 API Key 每分钟最多提交的任务数",
+    hint: "每个用户通过 API Key 每分钟最多提交的任务数。并发上限请在「用户」详情页按用户单独设置",
     min: 1,
     max: 10000,
     unit: "次/分",
@@ -107,7 +99,7 @@ export function ApiKeyConfigView() {
       <AdminPageHeader
         eyebrow="API Keys"
         title="API Key 配置"
-        description="调整通过 API Key 调用时的积分倍率、并发上限和限速"
+        description="调整通过 API Key 调用时的积分倍率和提交限速"
         actions={
           <Button
             type="button"

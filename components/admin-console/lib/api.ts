@@ -509,7 +509,6 @@ export const deleteAdminAnnouncement = (id: string) =>
 
 export interface ApiKeyRuntimeConfig {
   creditMultiplier: number;
-  maxConcurrency: number;
   rateLimitPerMin: number;
 }
 

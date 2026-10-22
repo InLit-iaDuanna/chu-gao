@@ -14,7 +14,6 @@ import { readJsonBodySafe } from "@/lib/request-body";
 
 const patchSchema = z.object({
   creditMultiplier: z.number().min(0).max(100).optional(),
-  maxConcurrency: z.number().int().min(1).max(1000).optional(),
   rateLimitPerMin: z.number().int().min(1).max(10000).optional(),
 });
 

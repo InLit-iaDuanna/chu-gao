@@ -3,7 +3,7 @@ import { requireV1Auth, v1AuthErrorResponse } from "@/lib/v1-auth";
 import {
   agentImageErrorResponse,
   ownedAgentGeneration,
-  publicAgentFailure,
+  serializeAgentGeneration,
 } from "@/lib/agent-images";
 export async function GET(
   request: Request,
@@ -19,30 +19,9 @@ export async function GET(
       },
       (await context.params).id,
     );
-    return ok(
-      {
-        id: row.id,
-        modelId: row.modelId,
-        status: row.status,
-        progress: row.progress,
-        costCredits: row.costCredits,
-        errorCode: row.errorCode
-          ? /MODERATION|CONTENT|SAFETY|UNSAFE/.test(row.errorCode)
-            ? "MODERATION_REJECTED"
-            : row.status === "CANCELED"
-              ? "CANCELED"
-              : "GENERATION_FAILED"
-          : null,
-        errorMessage: publicAgentFailure(row.errorCode),
-        images: row.images.map(({ id, width, height, mimeType }) => ({
-          id,
-          width,
-          height,
-          mimeType,
-        })),
-      },
-      { headers: { "Cache-Control": "no-store" } },
-    );
+    return ok(serializeAgentGeneration(row), {
+      headers: { "Cache-Control": "no-store" },
+    });
   } catch (error) {
     if (
       (error as { code?: string })?.code === "UNAUTHORIZED" ||
