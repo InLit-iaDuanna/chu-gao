@@ -8,31 +8,23 @@ import {
 } from "@/lib/providers/failure-policy";
 
 /**
- * Compute how long to cool down an account after an error.
+ * Compute how long to cool down an account after it starts cooling.
  *
  * Priority order:
  * 1. Retry-After header from the upstream response (exact window the API gave us)
- * 2. Exponential back-off scaled to consecutive error count
- *    - rate-limit base: 60 s → 2 min → 4 min → 8 min → cap 15 min
- *    - transient/other base: 30 s → 1 min → 2 min → 4 min → cap 10 min
- * 3. Fatal auth errors: 5 minutes (account will be marked DOWN anyway)
+ * 2. Fixed 5 minutes for all other cases — gives the account meaningful
+ *    recovery time without the exponential blowup of the old backoff scheme.
+ *    (Cooldown only triggers on the 3rd+ consecutive failure, so by the time
+ *    we get here the account genuinely needs a break.)
  */
-function adaptiveCooldownMs(error: unknown, consecutiveErrors: number): number {
+function adaptiveCooldownMs(error: unknown, _consecutiveErrors: number): number {
   if (error instanceof ProviderRequestError && error.diagnostic.retryAfterSeconds) {
     const ms = error.diagnostic.retryAfterSeconds * 1000;
     return Math.min(Math.max(ms, 5_000), 30 * 60_000);
   }
 
-  if (isFatalAccountError(error)) {
-    return 5 * 60_000;
-  }
-
-  const n = Math.max(0, consecutiveErrors - 1);
-  if (isRateLimited(error)) {
-    return Math.min(60_000 * Math.pow(2, n), 15 * 60_000);
-  }
-
-  return Math.min(30_000 * Math.pow(2, n), 10 * 60_000);
+  // Fixed 5-minute cooldown for all other error types.
+  return 5 * 60_000;
 }
 
 export async function markProviderHealthy(providerId: string): Promise<void> {
@@ -154,6 +146,8 @@ export async function markAccountErrored(
   // shrink the active set unnecessarily.
   //
   // Auth errors (fatal) always cool immediately regardless.
+  // When cooling does start, use a fixed 5-minute window so the account gets
+  // meaningful recovery time without endless short retries.
   const shouldCoolRateLimit = isRateLimited(error) && nextErrors >= 3;
   const shouldCoolTransient = !isRateLimited(error) && downgradable && nextErrors >= 3;
   const shouldCoolFatal = isFatalAccountError(error);
