@@ -7,7 +7,6 @@ import { requireAgent, agentErrorResponse } from "@/lib/agent-auth";
 import {
   requireApiKey,
   detectAuthType,
-  apiKeyErrorResponse,
 } from "@/lib/api-key-auth";
 import { fail } from "@/lib/api-response";
 
