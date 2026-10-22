@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  Activity,
+  AlertTriangle,
   ChevronDown,
   ChevronRight,
   Loader2,
@@ -10,8 +10,6 @@ import {
   Plus,
   RefreshCw,
   RotateCcw,
-  Shield,
-  Zap,
 } from "lucide-react";
 
 import { Button, Input, Select } from "@/components/ui";
@@ -60,29 +58,88 @@ function HealthDot({ health, size = "md" }: { health: string; size?: "sm" | "md"
   );
 }
 
+// ─── Status bar ───────────────────────────────────────────────────────────────
+
+function HealthBar({ healthy, degraded, down }: { healthy: number; degraded: number; down: number }) {
+  const total = healthy + degraded + down;
+  if (total === 0) return null;
+  return (
+    <div className="flex h-1.5 w-20 overflow-hidden rounded-full bg-border" title={`健康 ${healthy} / 降级 ${degraded} / DOWN ${down}`}>
+      {healthy > 0 && <div className="bg-success" style={{ width: `${(healthy / total) * 100}%` }} />}
+      {degraded > 0 && <div className="bg-warning" style={{ width: `${(degraded / total) * 100}%` }} />}
+      {down > 0 && <div className="bg-danger" style={{ width: `${(down / total) * 100}%` }} />}
+    </div>
+  );
+}
+
 // ─── Stat chip ────────────────────────────────────────────────────────────────
 
-function StatChip({
-  label,
-  value,
-  accent,
-}: {
-  label: string;
-  value: string | number;
-  accent?: boolean;
-}) {
+function StatChip({ label, value, accent }: { label: string; value: string | number; accent?: boolean }) {
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-mono text-[11px]",
-        accent
-          ? "border-accent/30 bg-accent/[0.06] text-accent"
-          : "border-border bg-surface text-text-muted",
-      )}
-    >
+    <span className={cn(
+      "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-mono text-[11px]",
+      accent ? "border-accent/30 bg-accent/[0.06] text-accent" : "border-border bg-surface text-text-muted",
+    )}>
       <span className="text-text-faint">{label}</span>
       {value}
     </span>
+  );
+}
+
+// ─── Error log panel ──────────────────────────────────────────────────────────
+
+function ErrorLogPanel({
+  providers,
+  onExpand,
+}: {
+  providers: AdminProvider[];
+  onExpand: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const errored = providers.filter((p) => p.lastErrorMsg && p.isActive);
+  if (errored.length === 0) return null;
+
+  return (
+    <div className="mb-4 rounded-xl border border-danger/20 bg-danger/[0.02]">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between px-4 py-2.5 text-sm font-medium text-danger"
+        aria-expanded={open}
+      >
+        <span className="flex items-center gap-2">
+          <AlertTriangle className="h-3.5 w-3.5" />
+          {errored.length} 个渠道有错误
+        </span>
+        {open ? <ChevronDown className="h-3.5 w-3.5 text-danger/60" /> : <ChevronRight className="h-3.5 w-3.5 text-danger/60" />}
+      </button>
+      {open && (
+        <div className="divide-y divide-danger/10 border-t border-danger/10">
+          {errored.map((p) => (
+            <div key={p.id} className="flex items-start gap-3 px-4 py-2.5">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium">{p.name}</span>
+                  {p.lastErrorAt && (
+                    <span className="text-[10px] text-text-faint">
+                      {new Date(p.lastErrorAt).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-0.5 truncate font-mono text-[11px] text-danger/80">{p.lastErrorMsg}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setOpen(false); onExpand(p.id); }}
+                className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] text-text-muted hover:text-foreground"
+              >
+                查看
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -95,12 +152,11 @@ export function ProvidersView() {
   const [notice, setNotice] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [bulkBusy, setBulkBusy] = useState<string | null>(null);
 
   const reload = useCallback(() => {
     setFailed(false);
-    listAdminProviders()
-      .then(setProviders)
-      .catch(() => setFailed(true));
+    listAdminProviders().then(setProviders).catch(() => setFailed(true));
   }, []);
 
   useEffect(reload, [reload]);
@@ -117,9 +173,44 @@ export function ProvidersView() {
     }
   }
 
+  const handleRestoreAll = async () => {
+    if (!providers) return;
+    const down = providers.filter((p) => p.isActive && p.health === "DOWN");
+    if (down.length === 0) return;
+    setBulkBusy("restore");
+    setError(null);
+    try {
+      await Promise.all(down.map((p) => restoreAdminProvider(p.id)));
+      setNotice(`已恢复 ${down.length} 个渠道`);
+      reload();
+    } catch {
+      setError("部分恢复失败，请单独处理");
+    } finally {
+      setBulkBusy(null);
+    }
+  };
+
+  const handleTestAll = async () => {
+    if (!providers) return;
+    const active = providers.filter((p) => p.isActive);
+    if (active.length === 0) return;
+    setBulkBusy("test");
+    setError(null);
+    let passed = 0;
+    let failed_count = 0;
+    for (const p of active) {
+      try { await testAdminProvider(p.id); passed++; }
+      catch { failed_count++; }
+    }
+    setNotice(`全部测试完成：${passed} 通过 / ${failed_count} 失败`);
+    reload();
+    setBulkBusy(null);
+  };
+
   const healthy = providers?.filter((p) => p.isActive && p.health === "HEALTHY").length ?? 0;
   const total = providers?.filter((p) => p.isActive).length ?? 0;
   const inFlight = providers?.reduce((s, p) => s + p.inFlight, 0) ?? 0;
+  const hasDown = providers?.some((p) => p.isActive && p.health === "DOWN") ?? false;
 
   return (
     <div>
@@ -129,19 +220,35 @@ export function ProvidersView() {
         description="出图账号池、健康状态与并发控制"
         actions={
           <div className="flex items-center gap-2">
-            <Button
+            {hasDown && (
+              <button
+                type="button"
+                disabled={bulkBusy !== null}
+                onClick={handleRestoreAll}
+                className="flex h-8 items-center gap-1.5 rounded-md border border-success/30 px-3 text-sm text-success hover:bg-success/[0.06] disabled:opacity-40"
+              >
+                {bulkBusy === "restore" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+                恢复 DOWN 渠道
+              </button>
+            )}
+            <button
               type="button"
-              className="h-8 w-8 p-0 text-text-muted"
+              disabled={bulkBusy !== null}
+              onClick={handleTestAll}
+              className="flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-sm text-text-muted hover:text-foreground disabled:opacity-40"
+            >
+              {bulkBusy === "test" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+              全部测试
+            </button>
+            <button
+              type="button"
               onClick={reload}
+              className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-text-muted hover:text-foreground"
               title="刷新"
             >
               <RefreshCw className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              type="button"
-              className="h-8 px-3 text-sm"
-              onClick={() => setCreating((v) => !v)}
-            >
+            </button>
+            <Button type="button" className="h-8 px-3 text-sm" onClick={() => setCreating((v) => !v)}>
               <Plus className="h-3.5 w-3.5" />
               新建渠道
             </Button>
@@ -151,18 +258,20 @@ export function ProvidersView() {
 
       {/* Summary strip */}
       {providers && providers.length > 0 && (
-        <div className="mb-5 flex flex-wrap gap-2">
-          <StatChip label="渠道健康" value={`${healthy}/${total}`} accent={healthy === total} />
+        <div className="mb-4 flex flex-wrap gap-2">
+          <StatChip label="渠道健康" value={`${healthy}/${total}`} accent={healthy === total && total > 0} />
           <StatChip label="并发中" value={inFlight} accent={inFlight > 0} />
-          <StatChip
-            label="总账号"
-            value={providers.reduce((s, p) => s + p.accountCount, 0)}
-          />
-          <StatChip
-            label="活跃账号"
-            value={providers.reduce((s, p) => s + p.activeAccountCount, 0)}
-          />
+          <StatChip label="总账号" value={providers.reduce((s, p) => s + p.accountCount, 0)} />
+          <StatChip label="活跃账号" value={providers.reduce((s, p) => s + p.activeAccountCount, 0)} />
         </div>
+      )}
+
+      {/* Error log */}
+      {providers && (
+        <ErrorLogPanel
+          providers={providers}
+          onExpand={(id) => setExpandedId((cur) => (cur === id ? null : id))}
+        />
       )}
 
       <ErrorText message={error} />
@@ -171,9 +280,7 @@ export function ProvidersView() {
       {creating && (
         <CreateProviderForm
           onCreate={(input) =>
-            run(() => createAdminProvider(input), "渠道已创建").then(() =>
-              setCreating(false),
-            )
+            run(() => createAdminProvider(input), "渠道已创建").then(() => setCreating(false))
           }
           onCancel={() => setCreating(false)}
         />
@@ -196,11 +303,7 @@ export function ProvidersView() {
               key={provider.id}
               provider={provider}
               expanded={expandedId === provider.id}
-              onToggle={() =>
-                setExpandedId((cur) =>
-                  cur === provider.id ? null : provider.id,
-                )
-              }
+              onToggle={() => setExpandedId((cur) => (cur === provider.id ? null : provider.id))}
               onRun={run}
             />
           ))}
@@ -312,61 +415,60 @@ function CreateProviderForm({
   const valid = form.name.trim() && form.baseUrl.trim() && form.apiKey.trim() && form.modelsSupported.trim();
 
   return (
-    <div className="mb-4 rounded-xl border border-accent/20 bg-accent/[0.03] p-4">
-      <p className="mb-3 text-sm font-semibold">新建渠道</p>
-      <div className="grid gap-3 sm:grid-cols-2">
+    <div className="mb-4 rounded-xl border border-accent/20 bg-accent/[0.03] p-5">
+      <p className="mb-4 text-sm font-semibold">新建渠道</p>
+
+      <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-text-faint">基本信息</p>
+      <div className="mb-4 grid gap-3 sm:grid-cols-2">
         <AdminField label="名称">
           <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
         </AdminField>
         <AdminField label="协议">
-          <Select
-            aria-label="协议"
-            value={form.protocol}
-            onValueChange={(v) => setForm({ ...form, protocol: v as AdminProviderInput["protocol"] })}
-            options={[...PROTOCOL_OPTIONS]}
-          />
+          <Select aria-label="协议" value={form.protocol} onValueChange={(v) => setForm({ ...form, protocol: v as AdminProviderInput["protocol"] })} options={[...PROTOCOL_OPTIONS]} />
         </AdminField>
+        <AdminField label="支持模型（逗号分隔）" className="sm:col-span-2">
+          <Input placeholder="gpt-image-1.5, doubao-seedream-4-5" value={form.modelsSupported} onChange={(e) => setForm({ ...form, modelsSupported: e.target.value })} />
+        </AdminField>
+      </div>
+
+      <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-text-faint">连接</p>
+      <div className="mb-4 grid gap-3 sm:grid-cols-2">
         <AdminField label="Base URL">
           <Input placeholder="https://…" value={form.baseUrl} onChange={(e) => setForm({ ...form, baseUrl: e.target.value })} />
         </AdminField>
         <AdminField label="API Key">
           <Input value={form.apiKey} onChange={(e) => setForm({ ...form, apiKey: e.target.value })} />
         </AdminField>
+      </div>
+
+      <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-text-faint">调度</p>
+      <div className="mb-5 grid gap-3 sm:grid-cols-2">
         <AdminField label="优先级（越大越优先）">
           <Input type="number" min={0} value={form.priority} onChange={(e) => setForm({ ...form, priority: Number(e.target.value) })} />
         </AdminField>
         <AdminField label="成本倍率">
           <Input type="number" min={0} step={0.1} value={form.costMultiplier} onChange={(e) => setForm({ ...form, costMultiplier: Number(e.target.value) })} />
         </AdminField>
-        <AdminField label="支持模型（逗号分隔）" className="sm:col-span-2">
-          <Input placeholder="gpt-image-1.5, doubao-seedream-4-5" value={form.modelsSupported} onChange={(e) => setForm({ ...form, modelsSupported: e.target.value })} />
+        <AdminField label="备注（可选）" className="sm:col-span-2">
+          <Input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
         </AdminField>
       </div>
-      <div className="mt-3 flex gap-2">
-        <Button
-          type="button"
-          disabled={busy || !valid}
-          className="h-9 px-4 text-sm disabled:opacity-45"
+
+      <div className="flex gap-2">
+        <Button type="button" disabled={busy || !valid} className="h-9 px-4 text-sm disabled:opacity-45"
           onClick={() => {
             setBusy(true);
             void onCreate({
-              name: form.name.trim(),
-              protocol: form.protocol,
-              baseUrl: form.baseUrl.trim(),
-              apiKey: form.apiKey.trim(),
-              priority: form.priority,
-              costMultiplier: form.costMultiplier,
+              name: form.name.trim(), protocol: form.protocol, baseUrl: form.baseUrl.trim(), apiKey: form.apiKey.trim(),
+              priority: form.priority, costMultiplier: form.costMultiplier,
               modelsSupported: form.modelsSupported.split(",").map((s) => s.trim()).filter(Boolean),
               note: form.note.trim() || undefined,
             }).finally(() => setBusy(false));
-          }}
-        >
+          }}>
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           创建渠道
         </Button>
-        <Button type="button" className="h-9 px-4 text-sm text-text-muted" onClick={onCancel}>
-          取消
-        </Button>
+        <Button type="button" className="h-9 px-4 text-sm text-text-muted" onClick={onCancel}>取消</Button>
       </div>
     </div>
   );
@@ -395,108 +497,62 @@ function ProviderCard({
 
   const isDown = provider.health === "DOWN";
   const isDegraded = provider.health === "DEGRADED";
+  const healthyAccounts = provider.healthyAccountCount;
+  const downAccounts = provider.activeAccountCount - healthyAccounts;
 
   return (
-    <div
-      className={cn(
-        "overflow-hidden rounded-xl border transition-colors",
-        !provider.isActive
-          ? "border-border/50 opacity-60"
-          : isDown
-            ? "border-danger/30 bg-danger/[0.02]"
-            : isDegraded
-              ? "border-warning/30 bg-warning/[0.02]"
-              : "border-border bg-surface",
-      )}
-    >
+    <div className={cn(
+      "overflow-hidden rounded-xl border transition-colors",
+      !provider.isActive ? "border-border/50 opacity-60" :
+      isDown ? "border-danger/30 bg-danger/[0.02]" :
+      isDegraded ? "border-warning/30 bg-warning/[0.02]" :
+      "border-border bg-surface",
+    )}>
+      {/* Colored top status bar */}
+      <div className={cn("h-0.5", !provider.isActive ? "bg-border" : isDown ? "bg-danger" : isDegraded ? "bg-warning" : "bg-success")} />
+
       {/* Header row */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
-        <button
-          type="button"
-          onClick={onToggle}
-          className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
-          aria-expanded={expanded}
-        >
+        <button type="button" onClick={onToggle} className="flex min-w-0 flex-1 items-center gap-2.5 text-left" aria-expanded={expanded}>
           <HealthDot health={provider.isActive ? provider.health : "DOWN"} />
           <span className="min-w-0 flex-1">
             <span className="flex items-center gap-2">
               <span className="truncate text-sm font-semibold">{provider.name}</span>
-              {!provider.isActive && (
-                <span className="shrink-0 rounded border border-danger/30 px-1 py-px text-[10px] text-danger">
-                  已停用
-                </span>
-              )}
+              {!provider.isActive && <span className="shrink-0 rounded border border-danger/30 px-1 py-px text-[10px] text-danger">已停用</span>}
             </span>
-            <span className="block truncate font-mono text-[11px] text-text-faint">
-              {provider.protocol} · {provider.baseUrl}
-            </span>
+            <span className="block truncate font-mono text-[11px] text-text-faint">{provider.protocol} · {provider.baseUrl}</span>
           </span>
-          {expanded ? (
-            <ChevronDown className="h-3.5 w-3.5 shrink-0 text-text-faint" />
-          ) : (
-            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-text-faint" />
-          )}
+          {expanded ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-text-faint" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-text-faint" />}
         </button>
 
-        {/* Stats */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          <StatChip
-            label="账号"
-            value={`${provider.healthyAccountCount}/${provider.activeAccountCount}`}
-            accent={provider.healthyAccountCount === provider.activeAccountCount && provider.activeAccountCount > 0}
-          />
-          <StatChip
-            label="并发"
-            value={`${provider.inFlight}/${provider.totalMaxConcurrency}`}
-            accent={provider.inFlight > 0}
-          />
-          <StatChip label="优先级" value={provider.priority} />
-          <StatChip label="倍率" value={`×${provider.costMultiplier}`} />
+        {/* Stats with mini health bar */}
+        <div className="flex flex-wrap items-center gap-2">
+          <HealthBar healthy={healthyAccounts} degraded={0} down={downAccounts} />
+          <StatChip label="账号" value={`${provider.healthyAccountCount}/${provider.activeAccountCount}`} accent={provider.healthyAccountCount === provider.activeAccountCount && provider.activeAccountCount > 0} />
+          <StatChip label="并发" value={`${provider.inFlight}/${provider.totalMaxConcurrency}`} accent={provider.inFlight > 0} />
+          <StatChip label="P" value={provider.priority} />
+          <StatChip label="×" value={provider.costMultiplier} />
         </div>
 
         {/* Actions */}
         <div className="flex items-center gap-1">
-          <button
-            type="button"
-            disabled={busy !== null}
-            onClick={() => act("test", () => testAdminProvider(provider.id), "测试通过")}
-            className="flex h-7 items-center gap-1 rounded-md border border-border px-2 text-[11px] text-text-muted hover:border-accent/40 hover:text-accent disabled:opacity-40"
-            title="快速测试"
-          >
-            {busy === "test" ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
-            ) : (
-              <Play className="h-3 w-3" />
-            )}
+          <button type="button" disabled={busy !== null} onClick={() => act("test", () => testAdminProvider(provider.id), "测试通过")}
+            className="flex h-7 items-center gap-1 rounded-md border border-border px-2 text-[11px] text-text-muted hover:border-accent/40 hover:text-accent disabled:opacity-40">
+            {busy === "test" ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
             测试
           </button>
-          <button
-            type="button"
-            onClick={() => setEditing((v) => !v)}
-            className="flex h-7 items-center gap-1 rounded-md border border-border px-2 text-[11px] text-text-muted hover:border-border hover:text-foreground"
-          >
+          <button type="button" onClick={() => setEditing((v) => !v)}
+            className="flex h-7 items-center rounded-md border border-border px-2 text-[11px] text-text-muted hover:text-foreground">
             编辑
           </button>
           {provider.isActive && isDown && (
-            <button
-              type="button"
-              disabled={busy !== null}
-              onClick={() =>
-                act("restore", () => restoreAdminProvider(provider.id), "渠道已恢复")
-              }
-              className="flex h-7 items-center gap-1 rounded-md border border-success/30 px-2 text-[11px] text-success hover:bg-success/[0.06] disabled:opacity-40"
-            >
-              {busy === "restore" ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : (
-                <RotateCcw className="h-3 w-3" />
-              )}
+            <button type="button" disabled={busy !== null} onClick={() => act("restore", () => restoreAdminProvider(provider.id), "渠道已恢复")}
+              className="flex h-7 items-center gap-1 rounded-md border border-success/30 px-2 text-[11px] text-success hover:bg-success/[0.06] disabled:opacity-40">
+              {busy === "restore" ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />}
               恢复
             </button>
           )}
-          <button
-            type="button"
-            disabled={busy !== null}
+          <button type="button" disabled={busy !== null}
             onClick={() => {
               if (provider.isActive) {
                 if (!window.confirm(`停用渠道「${provider.name}」及其全部账号？`)) return;
@@ -505,13 +561,8 @@ function ProviderCard({
                 act("enable", () => restoreAdminProvider(provider.id), "渠道已恢复");
               }
             }}
-            className={cn(
-              "flex h-7 items-center rounded-md border px-2 text-[11px] disabled:opacity-40",
-              provider.isActive
-                ? "border-danger/30 text-danger hover:bg-danger/[0.06]"
-                : "border-success/30 text-success hover:bg-success/[0.06]",
-            )}
-          >
+            className={cn("flex h-7 items-center rounded-md border px-2 text-[11px] disabled:opacity-40",
+              provider.isActive ? "border-danger/30 text-danger hover:bg-danger/[0.06]" : "border-success/30 text-success hover:bg-success/[0.06]")}>
             {provider.isActive ? "停用" : "启用"}
           </button>
         </div>
@@ -521,40 +572,34 @@ function ProviderCard({
       {provider.modelsSupported.length > 0 && (
         <div className="flex flex-wrap gap-1 border-t border-border/50 px-4 py-2">
           {provider.modelsSupported.map((id) => (
-            <span
-              key={id}
-              className="rounded border border-border px-1.5 py-px font-mono text-[10px] text-text-faint"
-            >
-              {id}
-            </span>
+            <span key={id} className="rounded border border-border px-1.5 py-px font-mono text-[10px] text-text-faint">{id}</span>
           ))}
-          {provider.note && (
-            <span className="ml-auto text-[11px] text-text-faint">{provider.note}</span>
-          )}
+          {provider.note && <span className="ml-auto text-[11px] text-text-faint">{provider.note}</span>}
         </div>
       )}
 
-      {/* Last error */}
+      {/* Last error — always visible with timestamp */}
       {provider.lastErrorMsg && (
-        <p className="border-t border-danger/20 bg-danger/[0.03] px-4 py-2 text-[11px] text-danger">
-          {provider.lastErrorMsg}
-        </p>
+        <div className="border-t border-danger/20 bg-danger/[0.03] px-4 py-2">
+          <div className="flex items-start gap-2">
+            {provider.lastErrorAt && (
+              <span className="mt-0.5 shrink-0 text-[10px] text-danger/60">
+                {new Date(provider.lastErrorAt).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}
+              </span>
+            )}
+            <p className="flex-1 text-[11px] text-danger">{provider.lastErrorMsg}</p>
+          </div>
+        </div>
       )}
 
-      {/* Edit form */}
       {editing && (
         <EditProviderForm
           provider={provider}
-          onSave={(patch) =>
-            onRun(() => patchAdminProvider(provider.id, patch), "渠道已更新").then(
-              () => setEditing(false),
-            )
-          }
+          onSave={(patch) => onRun(() => patchAdminProvider(provider.id, patch), "渠道已更新").then(() => setEditing(false))}
           onCancel={() => setEditing(false)}
         />
       )}
 
-      {/* Accounts panel */}
       {expanded && (
         <div className="border-t border-border/50 px-4 py-4">
           <ProviderAccounts providerId={provider.id} />
