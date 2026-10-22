@@ -15,6 +15,8 @@ export interface ProviderFailureDiagnostic {
   endpoint: string;
   requestId: string;
   bodyPreview: string;
+  /** Parsed value of the Retry-After response header, in seconds. */
+  retryAfterSeconds?: number;
 }
 
 export class ProviderRequestError extends Error {
@@ -154,7 +156,10 @@ export function classifyProviderFailure(
     }
 
     if (
-      (status === 400 || status === 403 || status === 422) &&
+      (status === 400 ||
+        status === 403 ||
+        status === 422 ||
+        status === 451) &&
       hasContentRejectionSignal(text)
     ) {
       return { category: "CONTENT_REJECTED", status };
@@ -295,6 +300,22 @@ export async function providerError(
     response.headers.get("cf-ray") ??
     "unknown";
 
+  const retryAfterRaw = response.headers.get("retry-after");
+  let retryAfterSeconds: number | undefined;
+  if (retryAfterRaw) {
+    const numeric = Number(retryAfterRaw);
+    if (Number.isFinite(numeric) && numeric > 0) {
+      retryAfterSeconds = numeric;
+    } else {
+      // RFC 7231 HTTP-date fallback
+      const date = Date.parse(retryAfterRaw);
+      if (!Number.isNaN(date)) {
+        const delta = Math.ceil((date - Date.now()) / 1000);
+        if (delta > 0) retryAfterSeconds = delta;
+      }
+    }
+  }
+
   return new ProviderRequestError({
     provider: providerName,
     protocol,
@@ -303,6 +324,7 @@ export async function providerError(
     endpoint: safeUrlForDiagnostics(endpoint),
     requestId,
     bodyPreview,
+    retryAfterSeconds,
   });
 }
 
