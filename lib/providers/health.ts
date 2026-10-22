@@ -148,15 +148,14 @@ export async function markAccountErrored(
     }
   }
 
-  // For high-concurrency account pools a single rate-limit or transient error
-  // does NOT warrant a cooldown — that just removes a healthy account from the
-  // pool while other requests are still in flight.  We only start cooling after
-  // the second consecutive failure of the same category, so one stray 429 in a
-  // busy pool is absorbed without pulling the account.
+  // For high-concurrency account pools transient failures should be absorbed
+  // before triggering a cooldown.  We wait until the 3rd consecutive failure
+  // before cooling the account so a couple of stray 429s in a busy pool do not
+  // shrink the active set unnecessarily.
   //
   // Auth errors (fatal) always cool immediately regardless.
-  const shouldCoolRateLimit = isRateLimited(error) && nextErrors >= 2;
-  const shouldCoolTransient = !isRateLimited(error) && downgradable && nextErrors >= 2;
+  const shouldCoolRateLimit = isRateLimited(error) && nextErrors >= 3;
+  const shouldCoolTransient = !isRateLimited(error) && downgradable && nextErrors >= 3;
   const shouldCoolFatal = isFatalAccountError(error);
   const shouldCool = shouldCoolRateLimit || shouldCoolTransient || shouldCoolFatal;
 
