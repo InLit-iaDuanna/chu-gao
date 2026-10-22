@@ -1,27 +1,16 @@
-import type { Provider, ProviderAccount, ProviderHealth } from "@prisma/client";
-
 import { decrypt } from "@/lib/crypto";
+import { ProviderSubmissionUnknownError } from "@/lib/providers/single-submit";
 import { db } from "@/lib/db";
+import { logger } from "@/lib/logger";
 import { getModel } from "@/lib/models/registry";
 import type { InternalRequest } from "@/lib/models/types";
 import {
-  channelIdFromBaseUrl,
   displayNameForProviderChannel,
   getImage2ProviderChannel,
-  normalizeProviderChannelBaseUrl,
-  supportsProviderChannels,
 } from "@/lib/provider-channels";
-import {
-  ProviderContentRejectedError,
-  ProviderRejectedRequestError,
-  classifyProviderFailure,
-  serializeProviderError,
-} from "@/lib/providers/diagnostics";
+import { serializeProviderError } from "@/lib/providers/diagnostics";
 import { buildAdapter } from "@/lib/providers/factory";
-import {
-  generationTimeoutMs,
-  providerAccountMaxAttempts,
-} from "@/lib/providers/config";
+import { generationTimeoutMs } from "@/lib/providers/config";
 import {
   modelProtocolToProviderProtocol,
   providerProtocolToModelProtocol,
@@ -30,77 +19,43 @@ import type {
   GenerateProgressCallback,
   GenerateResult,
 } from "@/lib/providers/types";
+import {
+  findEligibleProviderAccounts,
+  leaseProviderAccount,
+  maxAttemptsForAccounts,
+  releaseAccountLease,
+  type ProviderLeaseContext,
+} from "@/lib/providers/account-pool";
+import {
+  providerChannelMatchesBaseUrl,
+  supportedModelIds,
+} from "@/lib/providers/availability";
+import {
+  isDowngradable,
+  isFatalAccountError,
+  isRateLimited,
+  providerRejectedError,
+  shouldRecordProviderPoolError,
+} from "@/lib/providers/failure-policy";
+import {
+  markAccountErrored,
+  markAccountHealthy,
+  markProviderErrored,
+  markProviderHealthy,
+  markProviderPoolErrored,
+} from "@/lib/providers/health";
+import {
+  isChannelCircuitOpen,
+  resetChannelCircuit,
+  tripChannelCircuit,
+} from "@/lib/providers/channel-circuit-breaker";
 
-type ProviderTarget = {
-  provider: Provider;
-  account: ProviderAccount | null;
-};
-
-function supportedModelIds(modelId: string): string[] {
-  if (modelId === "gpt-image-2") {
-    return [modelId, "gpt-image-2-standard", "gpt-image-2-high"];
-  }
-
-  if (modelId === "nano-banana-2-512") {
-    return [modelId];
-  }
-
-  return [modelId];
-}
-
-export { supportedModelIds };
-
-export function providerChannelMatchesBaseUrl(
-  providerChannelId: string | undefined | null,
-  baseUrl?: string | null,
-): boolean {
-  if (!providerChannelId) {
-    return true;
-  }
-
-  const normalizedBaseUrl = normalizeProviderChannelBaseUrl(baseUrl);
-
-  if (!normalizedBaseUrl) {
-    return false;
-  }
-
-  return (
-    channelIdFromBaseUrl(normalizedBaseUrl) === providerChannelId ||
-    getImage2ProviderChannel(providerChannelId)?.baseUrl === normalizedBaseUrl
-  );
-}
+export { providerChannelMatchesBaseUrl, supportedModelIds };
 
 type ProviderFailureDetails = {
   accountAttempts?: number;
   maxAccountAttempts?: number;
 };
-
-function accountReliabilityScore(
-  account: ProviderAccount & { provider: Provider },
-): number {
-  let score = 0;
-
-  if (account.lastHealthyAt) {
-    score += 10_000;
-  }
-
-  if (account.lastErrorMsg?.includes("访问被拒绝")) {
-    score -= 5_000;
-  }
-
-  if (account.lastErrorMsg?.includes("Upstream access forbidden")) {
-    score -= 5_000;
-  }
-
-  if (account.lastErrorMsg?.includes("502 Bad Gateway")) {
-    score -= 1_000;
-  }
-
-  score -= account.consecutiveErrors * 500;
-  score += account.weight * 10;
-
-  return score;
-}
 
 export class ModelNotAvailableError extends Error {
   constructor(modelId: string, channelLabel?: string | null) {
@@ -129,332 +84,22 @@ export class ProviderUnavailableError extends Error {
   }
 }
 
-function isDowngradable(error: unknown): boolean {
-  const { category } = classifyProviderFailure(error);
-
-  return category === "RATE_LIMITED" || category === "TRANSIENT_PROVIDER";
-}
-
-function isAuthenticationError(error: unknown): boolean {
-  return classifyProviderFailure(error).category === "AUTH_ACCOUNT_FATAL";
-}
-
-function isFatalAccountError(error: unknown): boolean {
-  return isAuthenticationError(error);
-}
-
-function isRateLimited(error: unknown): boolean {
-  return classifyProviderFailure(error).category === "RATE_LIMITED";
-}
-
-function shouldRecordProviderPoolError(error: unknown): boolean {
-  const { category } = classifyProviderFailure(error);
-
-  return (
-    category === "RATE_LIMITED" ||
-    category === "TRANSIENT_PROVIDER" ||
-    category === "AUTH_ACCOUNT_FATAL"
-  );
-}
-
-function providerRejectedError(error: unknown): Error | null {
-  const { category } = classifyProviderFailure(error);
-
-  if (category === "CONTENT_REJECTED") {
-    return new ProviderContentRejectedError(error);
+/** A healthy provider exists, but all of its configured slots are busy. */
+export class ProviderCapacityError extends Error {
+  constructor(modelId: string, channelLabel?: string | null) {
+    super(
+      channelLabel
+        ? `${channelLabel} 当前繁忙，任务将稍后重试`
+        : `模型 ${modelId} 当前繁忙，任务将稍后重试`,
+    );
+    this.name = "ProviderCapacityError";
   }
-
-  if (category === "BAD_REQUEST") {
-    return new ProviderRejectedRequestError(error);
-  }
-
-  return null;
-}
-
-async function markHealthy(providerId: string): Promise<void> {
-  await db.provider.update({
-    where: { id: providerId },
-    data: {
-      consecutiveErrors: 0,
-      health: "HEALTHY",
-      lastHealthyAt: new Date(),
-    },
-  });
-}
-
-async function markAccountHealthy(accountId: string): Promise<void> {
-  await db.providerAccount.update({
-    where: { id: accountId },
-    data: {
-      consecutiveErrors: 0,
-      health: "HEALTHY",
-      cooldownUntil: null,
-      lastHealthyAt: new Date(),
-    },
-  });
-}
-
-async function markErrored(
-  providerId: string,
-  error: unknown,
-  downgradable: boolean,
-): Promise<void> {
-  const provider = await db.provider.findUnique({
-    where: { id: providerId },
-    select: {
-      consecutiveErrors: true,
-      health: true,
-    },
-  });
-
-  if (!provider) {
-    return;
-  }
-
-  const nextErrors = provider.consecutiveErrors + 1;
-  let health: ProviderHealth = provider.health;
-
-  if (downgradable) {
-    if (nextErrors >= 5) {
-      health = "DOWN";
-    } else if (nextErrors >= 3) {
-      health = "DEGRADED";
-    }
-  }
-
-  await db.provider.update({
-    where: { id: providerId },
-    data: {
-      consecutiveErrors: nextErrors,
-      health,
-      lastErrorAt: new Date(),
-      lastErrorMsg: serializeProviderError(error).slice(0, 500),
-    },
-  });
-}
-
-async function markProviderPoolErrored(
-  providerId: string,
-  errors: unknown[],
-): Promise<void> {
-  if (errors.length === 0) {
-    return;
-  }
-
-  await markErrored(
-    providerId,
-    new Error(
-      `账号池本轮尝试失败（${errors.length} 个账号）: ${errors
-        .map(serializeProviderError)
-        .join("; ")}`,
-    ),
-    true,
-  );
-}
-
-async function markAccountErrored(
-  accountId: string,
-  error: unknown,
-  downgradable: boolean,
-): Promise<void> {
-  const account = await db.providerAccount.findUnique({
-    where: { id: accountId },
-    select: {
-      consecutiveErrors: true,
-      health: true,
-    },
-  });
-
-  if (!account) {
-    return;
-  }
-
-  const nextErrors = account.consecutiveErrors + 1;
-  let health: ProviderHealth = account.health;
-
-  if (isFatalAccountError(error)) {
-    health = "DOWN";
-  }
-
-  if (downgradable) {
-    if (nextErrors >= 5) {
-      health = "DOWN";
-    } else if (nextErrors >= 3) {
-      health = "DEGRADED";
-    }
-  }
-
-  await db.providerAccount.update({
-    where: { id: accountId },
-    data: {
-      consecutiveErrors: nextErrors,
-      health,
-      cooldownUntil:
-        isRateLimited(error) || isFatalAccountError(error)
-          ? new Date(Date.now() + 5 * 60_000)
-          : downgradable
-            ? new Date(Date.now() + 60_000)
-            : undefined,
-      lastErrorAt: new Date(),
-      lastErrorMsg: serializeProviderError(error).slice(0, 500),
-    },
-  });
-}
-
-async function releaseAccountLease(accountId: string): Promise<void> {
-  await db.providerAccount.updateMany({
-    where: {
-      id: accountId,
-      inFlight: { gt: 0 },
-    },
-    data: {
-      inFlight: {
-        decrement: 1,
-      },
-    },
-  });
-}
-
-async function leaseProviderAccount(
-  account: ProviderAccount & { provider: Provider },
-): Promise<ProviderTarget | null> {
-  const leased = await db.providerAccount.updateMany({
-    where: {
-      id: account.id,
-      isActive: true,
-      health: { not: "DOWN" },
-      inFlight: { lt: account.maxConcurrency },
-      OR: [{ cooldownUntil: null }, { cooldownUntil: { lte: new Date() } }],
-    },
-    data: {
-      inFlight: {
-        increment: 1,
-      },
-      lastLeaseAt: new Date(),
-    },
-  });
-
-  if (leased.count === 0) {
-    return null;
-  }
-
-  return {
-    provider: account.provider,
-    account,
-  };
-}
-
-async function findAvailableProviderAccounts(
-  modelId: string,
-  providerChannelId?: string,
-) {
-  const model = getModel(modelId);
-
-  if (!model || !process.env.DATABASE_URL) {
-    return [];
-  }
-
-  const now = new Date();
-  const modelIds = supportedModelIds(modelId);
-  const channelId = supportsProviderChannels(modelId)
-    ? providerChannelId
-    : undefined;
-
-  const accounts = await db.providerAccount.findMany({
-    where: {
-      isActive: true,
-      health: { not: "DOWN" },
-      inFlight: {
-        lt: db.providerAccount.fields.maxConcurrency,
-      },
-      OR: [{ cooldownUntil: null }, { cooldownUntil: { lte: now } }],
-      provider: {
-        isActive: true,
-        protocol: modelProtocolToProviderProtocol(model.protocol),
-        OR: modelIds.map((id) => ({ modelsSupported: { has: id } })),
-        health: {
-          not: "DOWN",
-        },
-      },
-    },
-    include: {
-      provider: true,
-    },
-    orderBy: [
-      { provider: { priority: "desc" } },
-      { priority: "desc" },
-      { inFlight: "asc" },
-      { lastLeaseAt: "asc" },
-      { createdAt: "asc" },
-    ],
-  });
-
-  return accounts
-    .filter((account) =>
-      providerChannelMatchesBaseUrl(channelId, account.baseUrl),
-    )
-    .sort((left, right) => {
-      const leftProviderPriority = left.provider.priority;
-      const rightProviderPriority = right.provider.priority;
-
-      if (rightProviderPriority !== leftProviderPriority) {
-        return rightProviderPriority - leftProviderPriority;
-      }
-
-      if (right.priority !== left.priority) {
-        return right.priority - left.priority;
-      }
-
-      const leftReliability = accountReliabilityScore(left);
-      const rightReliability = accountReliabilityScore(right);
-
-      if (rightReliability !== leftReliability) {
-        return rightReliability - leftReliability;
-      }
-
-      const leftFreeSlots = left.maxConcurrency - left.inFlight;
-      const rightFreeSlots = right.maxConcurrency - right.inFlight;
-
-      if (rightFreeSlots !== leftFreeSlots) {
-        return rightFreeSlots - leftFreeSlots;
-      }
-
-      if (right.weight !== left.weight) {
-        return right.weight - left.weight;
-      }
-
-      if (left.inFlight !== right.inFlight) {
-        return left.inFlight - right.inFlight;
-      }
-
-      const leftLease = left.lastLeaseAt?.getTime() ?? 0;
-      const rightLease = right.lastLeaseAt?.getTime() ?? 0;
-
-      return leftLease - rightLease;
-    });
-}
-
-function maxAttemptsForAccounts(
-  accounts: Array<ProviderAccount & { provider: Provider }>,
-  providerChannelId?: string | null,
-): number {
-  if (!providerChannelId) {
-    return Math.min(providerAccountMaxAttempts(), accounts.length);
-  }
-
-  const successfulAccountCount = accounts.filter(
-    (account) => account.lastHealthyAt,
-  ).length;
-
-  return Math.min(
-    accounts.length,
-    Math.max(providerAccountMaxAttempts(), successfulAccountCount, 12),
-  );
 }
 
 export async function selectAndGenerate(
   request: InternalRequest,
   options?: {
+    leaseContext?: ProviderLeaseContext;
     onProviderSelected?: (selection: {
       providerId: string;
       providerName: string;
@@ -475,7 +120,10 @@ export async function selectAndGenerate(
     throw new ProviderUnavailableError(request.modelId);
   }
 
-  const accountCandidates = await findAvailableProviderAccounts(
+  // Healthy but saturated accounts must remain candidates: saturation is a
+  // queueing condition, not an outage. The atomic lease below decides which
+  // job can start immediately.
+  const accountCandidates = await findEligibleProviderAccounts(
     request.modelId,
     request.providerChannelId,
   );
@@ -495,6 +143,15 @@ export async function selectAndGenerate(
     );
   }
 
+  // Short-circuit if this channel was recently tripped by a full rate-limit
+  // sweep — avoids redundant DB lease attempts when the upstream is cooling off.
+  if (await isChannelCircuitOpen(request.providerChannelId)) {
+    throw new ProviderCapacityError(
+      request.modelId,
+      providerChannelName ?? null,
+    );
+  }
+
   const errors: unknown[] = [];
   const providerPoolErrors = new Map<string, unknown[]>();
   let accountAttempts = 0;
@@ -503,6 +160,7 @@ export async function selectAndGenerate(
         providerChannelMatchesBaseUrl(
           request.providerChannelId,
           account.baseUrl,
+          account.provider.id,
         ),
       )
     : accountCandidates;
@@ -516,30 +174,28 @@ export async function selectAndGenerate(
       break;
     }
 
-    const target = await leaseProviderAccount(account);
+    const target = options?.leaseContext
+      ? await leaseProviderAccount(account, options.leaseContext)
+      : null;
 
     if (!target) {
       continue;
     }
 
-    if (!target.account) {
-      continue;
-    }
-
     accountAttempts += 1;
-
-    const adapter = buildAdapter({
-      id: target.account?.id ?? target.provider.id,
-      name: target.account?.name ?? target.provider.name,
-      protocol: providerProtocolToModelProtocol(target.provider.protocol),
-      baseUrl: target.account?.baseUrl ?? target.provider.baseUrl,
-      apiKey: decrypt(target.account?.apiKeyEnc ?? target.provider.apiKeyEnc),
-    });
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), generationTimeoutMs());
 
     try {
+      const adapter = buildAdapter({
+        id: target.account.id,
+        name: target.account.name ?? target.provider.name,
+        protocol: providerProtocolToModelProtocol(target.provider.protocol),
+        baseUrl: target.account.baseUrl,
+        apiKey: decrypt(target.account.apiKeyEnc),
+      });
+
       await options?.onProviderSelected?.({
         providerId: target.provider.id,
         providerName: target.provider.name,
@@ -551,24 +207,34 @@ export async function selectAndGenerate(
         controller.signal,
         options?.onProgress,
       );
-      clearTimeout(timer);
-      await Promise.all([
-        markHealthy(target.provider.id),
-        target.account
-          ? markAccountHealthy(target.account.id)
-          : Promise.resolve(),
+      const healthUpdates = await Promise.allSettled([
+        markProviderHealthy(target.provider.id),
+        markAccountHealthy(target.account.id),
+        // A successful generation means the channel is healthy — clear any breaker.
+        resetChannelCircuit(request.providerChannelId),
       ]);
+      for (const update of healthUpdates) {
+        if (update.status === "rejected") {
+          logger.warn(
+            {
+              providerId: target.provider.id,
+              providerAccountId: target.account.id,
+              error: serializeProviderError(update.reason),
+            },
+            "Provider generated an image, but its health status could not be updated.",
+          );
+        }
+      }
 
       return {
         result,
         providerId: target.provider.id,
         providerName: target.provider.name,
-        providerAccountId: target.account?.id ?? null,
-        providerAccountName: target.account?.name ?? null,
+        providerAccountId: target.account.id,
+        providerAccountName: target.account.name ?? null,
         multiplier: target.provider.costMultiplier,
       };
     } catch (error) {
-      clearTimeout(timer);
       const rejectedError = providerRejectedError(error);
 
       if (rejectedError) {
@@ -586,12 +252,22 @@ export async function selectAndGenerate(
 
       await markAccountErrored(target.account.id, error, downgradable);
 
+      if (request.executionPolicy === "single-submit") {
+        throw downgradable ? new ProviderSubmissionUnknownError(error) : error;
+      }
+
       if (!downgradable && !isFatalAccountError(error)) {
         throw error;
       }
     } finally {
-      if (target.account) {
-        await releaseAccountLease(target.account.id);
+      clearTimeout(timer);
+      try {
+        await releaseAccountLease(target.leaseId, "provider_attempt_finished");
+      } catch (error) {
+        logger.warn(
+          { leaseId: target.leaseId, error: serializeProviderError(error) },
+          "Provider account lease release failed; worker reconciliation will retry.",
+        );
       }
     }
   }
@@ -603,6 +279,18 @@ export async function selectAndGenerate(
     ),
   );
 
+  // If every error in this round was a rate-limit or transient failure (no
+  // fatal/content errors), trip the channel circuit so the next N seconds of
+  // jobs skip the DB and get queued instead of hammering the upstream further.
+  if (
+    request.providerChannelId &&
+    errors.length > 0 &&
+    errors.every((e) => isRateLimited(e) || isDowngradable(e))
+  ) {
+    await tripChannelCircuit(request.providerChannelId);
+  }
+
+  let legacyAttempts = 0;
   for (const provider of request.providerChannelId ? [] : legacyCandidates) {
     const hasAccounts = await db.providerAccount.count({
       where: { providerId: provider.id },
@@ -611,6 +299,8 @@ export async function selectAndGenerate(
     if (hasAccounts > 0) {
       continue;
     }
+
+    legacyAttempts += 1;
 
     const adapter = buildAdapter({
       id: provider.id,
@@ -636,7 +326,14 @@ export async function selectAndGenerate(
         options?.onProgress,
       );
       clearTimeout(timer);
-      await markHealthy(provider.id);
+      try {
+        await markProviderHealthy(provider.id);
+      } catch (error) {
+        logger.warn(
+          { providerId: provider.id, error: serializeProviderError(error) },
+          "Provider generated an image, but its health status could not be updated.",
+        );
+      }
 
       return {
         result,
@@ -656,12 +353,27 @@ export async function selectAndGenerate(
 
       const downgradable = isDowngradable(error);
       errors.push(error);
-      await markErrored(provider.id, error, downgradable);
+      await markProviderErrored(provider.id, error, downgradable);
+
+      if (request.executionPolicy === "single-submit") {
+        throw downgradable ? new ProviderSubmissionUnknownError(error) : error;
+      }
 
       if (!downgradable) {
         throw error;
       }
     }
+  }
+
+  if (
+    accountAttempts === 0 &&
+    legacyAttempts === 0 &&
+    filteredAccountCandidates.length > 0
+  ) {
+    throw new ProviderCapacityError(
+      request.modelId,
+      providerChannelName ?? null,
+    );
   }
 
   throw new ProviderUnavailableError(
@@ -706,7 +418,7 @@ export async function assertProviderAvailable(
   providerChannelId?: string,
 ): Promise<void> {
   const [accounts, providers] = await Promise.all([
-    findAvailableProviderAccounts(modelId, providerChannelId),
+    findEligibleProviderAccounts(modelId, providerChannelId),
     findAvailableProviders(modelId),
   ]);
   const providerChannel = getImage2ProviderChannel(providerChannelId);
