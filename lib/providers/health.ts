@@ -148,6 +148,18 @@ export async function markAccountErrored(
     }
   }
 
+  // For high-concurrency account pools a single rate-limit or transient error
+  // does NOT warrant a cooldown — that just removes a healthy account from the
+  // pool while other requests are still in flight.  We only start cooling after
+  // the second consecutive failure of the same category, so one stray 429 in a
+  // busy pool is absorbed without pulling the account.
+  //
+  // Auth errors (fatal) always cool immediately regardless.
+  const shouldCoolRateLimit = isRateLimited(error) && nextErrors >= 2;
+  const shouldCoolTransient = !isRateLimited(error) && downgradable && nextErrors >= 2;
+  const shouldCoolFatal = isFatalAccountError(error);
+  const shouldCool = shouldCoolRateLimit || shouldCoolTransient || shouldCoolFatal;
+
   await db.providerAccount.update({
     where: { id: accountId },
     data: {
@@ -157,10 +169,9 @@ export async function markAccountErrored(
       ...(isRateLimited(error) ? { rateLimitErrors: { increment: 1 } } : {}),
       ...(!isRateLimited(error) && downgradable ? { transientErrors: { increment: 1 } } : {}),
       health,
-      cooldownUntil:
-        isRateLimited(error) || isFatalAccountError(error) || downgradable
-          ? new Date(Date.now() + adaptiveCooldownMs(error, nextErrors))
-          : undefined,
+      cooldownUntil: shouldCool
+        ? new Date(Date.now() + adaptiveCooldownMs(error, nextErrors))
+        : undefined,
       lastErrorAt: new Date(),
       lastErrorMsg: serializeProviderError(error).slice(0, 500),
     },
