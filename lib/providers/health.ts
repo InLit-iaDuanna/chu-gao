@@ -152,6 +152,10 @@ export async function markAccountErrored(
     where: { id: accountId },
     data: {
       consecutiveErrors: nextErrors,
+      // Increment the per-category counter so account scoring and the
+      // circuit breaker can distinguish rate-limits from hard failures.
+      ...(isRateLimited(error) ? { rateLimitErrors: { increment: 1 } } : {}),
+      ...(!isRateLimited(error) && downgradable ? { transientErrors: { increment: 1 } } : {}),
       health,
       cooldownUntil:
         isRateLimited(error) || isFatalAccountError(error) || downgradable

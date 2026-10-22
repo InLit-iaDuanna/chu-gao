@@ -811,6 +811,8 @@ model ProviderAccount {
   health            ProviderHealth @default(HEALTHY)
   isActive          Boolean        @default(true)
   consecutiveErrors Int            @default(0)
+  rateLimitErrors   Int            @default(0)
+  transientErrors   Int            @default(0)
   lastLeaseAt       DateTime?
   lastHealthyAt     DateTime?
   lastErrorAt       DateTime?
