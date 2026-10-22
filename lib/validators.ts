@@ -3,6 +3,8 @@ import { z } from "zod";
 import {
   IMAGE_ASPECT_RATIO_OPTIONS,
   IMAGE_RESOLUTION_OPTIONS,
+  IMAGE_SIZE_OPTIONS,
+  RESPONSE_FORMAT_OPTIONS,
 } from "@/lib/models/options";
 
 export const loginSchema = z.object({
@@ -52,11 +54,18 @@ export const providerAccountPatchSchema = z
     cooldownUntil: z.string().datetime().nullable().optional(),
     consecutiveErrors: z.number().int().min(0).optional(),
   })
-  .partial()
   .refine((value) => Object.keys(value).length > 0, "至少提供一个字段");
 
 export const providerChannelDeleteSchema = z.object({
   baseUrl: z.url(),
+});
+
+// 渠道请求格式：结构化字段（可选 size 列表 / 返回格式）+ 可选原始请求体模板。
+export const channelRequestConfigPatchSchema = z.object({
+  baseUrl: z.url(),
+  sizes: z.array(z.enum(IMAGE_SIZE_OPTIONS)).max(8).optional(),
+  responseFormat: z.enum(RESPONSE_FORMAT_OPTIONS).optional(),
+  bodyTemplate: z.string().max(8000).nullable().optional(),
 });
 
 export const providerChannelPatchSchema = z
@@ -105,7 +114,8 @@ export const adminUserPatchSchema = z
     role: z.enum(["USER", "ADMIN"]).optional(),
     status: z.enum(["ACTIVE", "BANNED"]).optional(),
     dailyGenLimit: z.number().int().min(1).max(1000).optional(),
-    concurrentLimit: z.number().int().min(1).max(20).optional(),
+    concurrentLimit: z.number().int().min(1).max(10000).optional(),
+    materialInboxBeta: z.boolean().optional(),
     bannedReason: z.string().trim().max(200).nullable().optional(),
   })
   .refine((value) => Object.keys(value).length > 0, "至少提供一个字段");
@@ -137,6 +147,7 @@ export const inviteBatchSchema = z.object({
 
 export const modelPricingSchema = z.object({
   modelId: z.string().min(1),
+  providerChannelId: z.string().trim().min(1).max(200).nullable().optional(),
   image2Mode: z.enum(["standard", "high"]).nullable().optional(),
   resolution: z.string().min(1).nullable().optional(),
   aspectRatio: z.string().min(1).nullable().optional(),
@@ -154,9 +165,11 @@ export const modelPricingPatchSchema = modelPricingSchema
   .refine((value) => Object.keys(value).length > 0, "至少提供一个字段");
 
 export const adminCreditAdjustmentSchema = z.object({
+  operationKey: z.string().min(8).max(128),
   amount: z
     .number()
-    .int()
+    .finite()
+    .multipleOf(0.000001)
     .min(-1_000_000)
     .max(1_000_000)
     .refine((value) => value !== 0, {
@@ -177,6 +190,42 @@ export const redemptionCodeBatchSchema = z.object({
 export const redeemCodeSchema = z.object({
   code: z.string().trim().min(4).max(80),
 });
+
+export const integrationsPatchSchema = z
+  .object({
+    deepseek: z
+      .object({
+        enabled: z.boolean().optional(),
+        baseUrl: z.url().optional(),
+        model: z.string().trim().min(1).max(100).optional(),
+        systemPrompt: z.string().max(4000).optional(),
+        // 留空字符串 = 清除已存密钥；省略 = 不修改。
+        apiKey: z.string().max(400).optional(),
+      })
+      .optional(),
+    // 对话模型：独立于 DeepSeek 优化与出图渠道。
+    conversation: z
+      .object({
+        enabled: z.boolean().optional(),
+        baseUrl: z.url().optional(),
+        model: z.string().trim().min(1).max(100).optional(),
+        systemPrompt: z.string().max(4000).optional(),
+        // 出图提示词编译指令（compile 端点用）。
+        compileSystemPrompt: z.string().max(4000).optional(),
+        reasoning: z.boolean().optional(),
+        // 留空字符串 = 清除已存密钥；省略 = 不修改。
+        apiKey: z.string().max(400).optional(),
+      })
+      .optional(),
+    pptSystemPrompt: z.string().trim().max(4000).optional(),
+  })
+  .refine(
+    (value) =>
+      value.deepseek !== undefined ||
+      value.conversation !== undefined ||
+      value.pptSystemPrompt !== undefined,
+    "至少提供一个字段",
+  );
 
 export const systemConfigPatchSchema = z.discriminatedUnion("key", [
   z.object({
@@ -241,24 +290,72 @@ export const systemConfigPatchSchema = z.discriminatedUnion("key", [
     key: z.literal("moderation.blockedKeywords"),
     value: z.array(z.string().trim().min(1).max(80)).max(500),
   }),
-  z.object({
-    key: z.literal("announcement.enabled"),
-    value: z.boolean(),
-  }),
-  z.object({
-    key: z.literal("announcement.title"),
-    value: z.string().trim().max(80),
-  }),
-  z.object({
-    key: z.literal("announcement.body"),
-    value: z.string().trim().max(500),
-  }),
-  z.object({
-    key: z.literal("announcement.tone"),
-    value: z.enum(["info", "warning", "success", "danger"]),
-  }),
-  z.object({
-    key: z.literal("announcement.displayMode"),
-    value: z.enum(["banner", "popup", "both"]),
-  }),
 ]);
+
+// ─── 公告（独立 Announcement 表）────────────────────────────────
+
+const announcementDateField = z
+  .string()
+  .datetime({ offset: true })
+  .nullable()
+  .optional();
+
+const announcementFields = {
+  title: z.string().trim().max(80).default(""),
+  body: z.string().trim().min(1, "公告内容不能为空").max(2000),
+  tone: z.enum(["info", "warning", "success", "danger"]).default("info"),
+  displayMode: z.enum(["banner", "popup", "both"]).default("banner"),
+  linkLabel: z.string().trim().max(24).nullable().optional(),
+  linkUrl: z
+    .string()
+    .trim()
+    .max(500)
+    .refine(
+      (value) =>
+        value === "" || /^https?:\/\//.test(value) || value.startsWith("/"),
+      "链接需为 http(s) 或站内路径",
+    )
+    .nullable()
+    .optional(),
+  enabled: z.boolean().default(true),
+  startsAt: announcementDateField,
+  endsAt: announcementDateField,
+};
+
+const announcementPatchFields = {
+  title: announcementFields.title.optional(),
+  body: announcementFields.body.optional(),
+  tone: announcementFields.tone.optional(),
+  displayMode: announcementFields.displayMode.optional(),
+  linkLabel: announcementFields.linkLabel,
+  linkUrl: announcementFields.linkUrl,
+  enabled: announcementFields.enabled.optional(),
+  startsAt: announcementFields.startsAt,
+  endsAt: announcementFields.endsAt,
+};
+
+function hasValidAnnouncementDates(value: {
+  startsAt?: string | null;
+  endsAt?: string | null;
+}) {
+  return (
+    !value.startsAt ||
+    !value.endsAt ||
+    new Date(value.endsAt) > new Date(value.startsAt)
+  );
+}
+
+export const announcementCreateSchema = z
+  .object(announcementFields)
+  .refine(hasValidAnnouncementDates, {
+    message: "结束时间需晚于开始时间",
+    path: ["endsAt"],
+  });
+
+export const announcementPatchSchema = z
+  .object(announcementPatchFields)
+  .refine((value) => Object.keys(value).length > 0, "至少提供一个字段")
+  .refine(hasValidAnnouncementDates, {
+    message: "结束时间需晚于开始时间",
+    path: ["endsAt"],
+  });
