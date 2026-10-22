@@ -505,15 +505,34 @@ export const patchAdminAnnouncement = (
 export const deleteAdminAnnouncement = (id: string) =>
   del<{ id: string }>(`/api/admin/announcements/${id}`);
 
-// ---------- API Key 运行时配置 ----------
+// ---------- API Key 配置 ----------
 
-export interface ApiKeyRuntimeConfig {
+export type ApiPriceTier = "1K" | "2K" | "4K";
+export type ApiPriceTable = Record<string, Partial<Record<ApiPriceTier, number>>>;
+
+export interface ApiKeyAdminConfig {
   creditMultiplier: number;
   rateLimitPerMin: number;
+  prices: ApiPriceTable;
+  docsMarkdown: string;
+  docsIsDefault: boolean;
+  models: {
+    id: string;
+    displayName: string;
+    resolutions: ApiPriceTier[];
+    webPrices: Partial<Record<ApiPriceTier, number>>;
+  }[];
 }
 
-export const getAdminApiKeyConfig = () =>
-  request<ApiKeyRuntimeConfig>("/api/admin/api-key-config");
+export type ApiKeyAdminPatch = Partial<
+  Pick<
+    ApiKeyAdminConfig,
+    "creditMultiplier" | "rateLimitPerMin" | "prices" | "docsMarkdown"
+  >
+>;
 
-export const patchAdminApiKeyConfig = (input: Partial<ApiKeyRuntimeConfig>) =>
-  patch<ApiKeyRuntimeConfig>("/api/admin/api-key-config", input);
+export const getAdminApiKeyConfig = () =>
+  request<ApiKeyAdminConfig>("/api/admin/api-key-config");
+
+export const patchAdminApiKeyConfig = (input: ApiKeyAdminPatch) =>
+  patch<ApiKeyAdminConfig>("/api/admin/api-key-config", input);

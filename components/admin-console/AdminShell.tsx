@@ -40,7 +40,7 @@ const NAV_GROUPS: {
       { href: "/admin/generations", label: "生成记录" },
       { href: "/admin/providers", label: "渠道" },
       { href: "/admin/pricing", label: "定价" },
-      { href: "/admin/api-key-config", label: "API Key" },
+      { href: "/admin/api-key-config", label: "API 配置" },
       { href: "/admin/integrations", label: "AI 集成" },
       { href: "/admin/research", label: "研究工作台" },
     ],
