@@ -272,6 +272,88 @@ export async function selectAndGenerate(
     }
   }
 
+  // If the specified channel exhausted all its accounts, fall back to accounts
+  // from other channels that support the same model.  This lets the job succeed
+  // instead of surfacing a hard failure to the user when a single channel is
+  // temporarily degraded.
+  if (
+    request.providerChannelId &&
+    accountAttempts === 0 &&
+    filteredAccountCandidates.length > 0
+  ) {
+    // All candidates for this channel were busy/skipped — try the wider pool.
+    const fallbackCandidates = accountCandidates.filter(
+      (account) =>
+        !providerChannelMatchesBaseUrl(
+          request.providerChannelId,
+          account.baseUrl,
+          account.provider.id,
+        ),
+    );
+
+    const fallbackMaxAttempts = maxAttemptsForAccounts(fallbackCandidates, null);
+
+    for (const account of fallbackCandidates) {
+      if (accountAttempts >= fallbackMaxAttempts) break;
+
+      const target = options?.leaseContext
+        ? await leaseProviderAccount(account, options.leaseContext)
+        : null;
+      if (!target) continue;
+
+      accountAttempts += 1;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), generationTimeoutMs());
+
+      try {
+        const adapter = buildAdapter({
+          id: target.account.id,
+          name: target.account.name ?? target.provider.name,
+          protocol: providerProtocolToModelProtocol(target.provider.protocol),
+          baseUrl: target.account.baseUrl,
+          apiKey: decrypt(target.account.apiKeyEnc),
+        });
+        await options?.onProviderSelected?.({
+          providerId: target.provider.id,
+          providerName: target.provider.name,
+          providerAccountId: target.account.id,
+          providerAccountName: target.account.name ?? null,
+        });
+        const result = await adapter.generate(
+          request,
+          controller.signal,
+          options?.onProgress,
+        );
+        await Promise.allSettled([
+          markProviderHealthy(target.provider.id),
+          markAccountHealthy(target.account.id),
+          resetChannelCircuit(request.providerChannelId),
+        ]);
+        return {
+          result,
+          providerId: target.provider.id,
+          providerName: target.provider.name,
+          providerAccountId: target.account.id,
+          providerAccountName: target.account.name ?? null,
+          multiplier: target.provider.costMultiplier,
+        };
+      } catch (error) {
+        const rejectedError = providerRejectedError(error);
+        if (rejectedError) throw rejectedError;
+        errors.push(error);
+        await markAccountErrored(target.account.id, error, isDowngradable(error));
+        if (!isDowngradable(error) && !isFatalAccountError(error)) throw error;
+      } finally {
+        clearTimeout(timer);
+        try {
+          await releaseAccountLease(target.leaseId, "provider_attempt_finished");
+        } catch (err) {
+          logger.warn({ leaseId: target.leaseId, error: serializeProviderError(err) }, "Fallback lease release failed.");
+        }
+      }
+    }
+  }
+
   await Promise.all(
     Array.from(providerPoolErrors.entries()).map(
       ([providerId, providerErrors]) =>
