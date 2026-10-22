@@ -1,11 +1,25 @@
 import type { Prisma } from "@prisma/client";
+import { ChatTurnError } from "@/lib/chat-turns";
 
 import { fail, ok } from "@/lib/api-response";
 import { checkSession } from "@/lib/auth";
+import { creativeAssistantEnabled } from "@/lib/creative-config";
+import { creativePrompt, creativeReferenceRequest } from "@/lib/creative-brief";
+import {
+  findGenerationOperation,
+  generationOperation,
+  GenerationOperationConflictError,
+} from "@/lib/generation-operation";
 import { estimateCost } from "@/lib/credits";
 import { db } from "@/lib/db";
-import { isGenerationStatus, serializeGeneration } from "@/lib/generations";
-import { logger } from "@/lib/logger";
+import {
+  ConversationNotFoundError,
+  GenerationQueueError,
+  InsufficientCreditsError,
+  createAndEnqueueGeneration,
+  isGenerationStatus,
+  serializeGeneration,
+} from "@/lib/generations";
 import { getProviderChannelDisplayNameMap } from "@/lib/provider-channel-config";
 import { isPromptBlocked } from "@/lib/moderation";
 import {
@@ -30,38 +44,19 @@ import {
   normalizeProviderChannelBaseUrl,
   supportsProviderChannels,
 } from "@/lib/provider-channels";
-import { serializeProviderError } from "@/lib/providers/diagnostics";
 import { modelProtocolToProviderProtocol } from "@/lib/providers/protocols";
-import {
-  assertGenerationQueueReady,
-  enqueueGeneration,
-  generationQueueStats,
-} from "@/lib/queue";
+import { assertGenerationQueueReady, generationQueueStats } from "@/lib/queue";
 import {
   ConcurrentLimitError,
   DailyLimitError,
   ModerationRejectionLimitError,
-  assertGenerationAllowed,
   assertModerationRejectionAllowed,
   recordModerationRejectionAttempt,
 } from "@/lib/rate-limit";
 import { RedisUnavailableError } from "@/lib/redis";
 import { readJsonBodySafe } from "@/lib/request-body";
 import { isDatabaseUnavailableError } from "@/lib/service-errors";
-
-class InsufficientCreditsError extends Error {
-  constructor() {
-    super("点数不足");
-    this.name = "InsufficientCreditsError";
-  }
-}
-
-class ConversationNotFoundError extends Error {
-  constructor() {
-    super("对话不存在");
-    this.name = "ConversationNotFoundError";
-  }
-}
+import { normalizeUploadedReferenceKey } from "@/lib/storage";
 
 function generationServiceUnavailable() {
   return fail("SERVICE_UNAVAILABLE", "生成服务暂时不可用", { status: 503 });
@@ -96,6 +91,8 @@ export async function GET(request: Request) {
         where: {
           userId: session.id,
           deletedAt: null,
+          // API-key jobs return their images to the caller and keep none here.
+          apiKeyId: null,
           ...(isGenerationStatus(status) ? { status } : {}),
         },
         include: {
@@ -139,8 +136,49 @@ export async function GET(request: Request) {
   }
 }
 
+export async function DELETE(request: Request) {
+  const sessionResult = await checkSession(request);
+
+  if (sessionResult.status === "unavailable") {
+    return fail("AUTH_UNAVAILABLE", "认证服务暂时不可用", { status: 503 });
+  }
+
+  if (sessionResult.status === "unauthenticated") {
+    return fail("UNAUTHORIZED", "请先登录", { status: 401 });
+  }
+
+  if (!process.env.DATABASE_URL) {
+    return fail("SERVICE_UNAVAILABLE", "生成服务未配置数据库", {
+      status: 503,
+    });
+  }
+
+  try {
+    const cleared = await db.generation.updateMany({
+      where: {
+        userId: sessionResult.user.id,
+        deletedAt: null,
+        status: { in: ["SUCCEEDED", "FAILED", "CANCELED"] },
+      },
+      data: { deletedAt: new Date() },
+    });
+
+    return ok({ cleared: cleared.count });
+  } catch (error) {
+    if (isDatabaseUnavailableError(error)) {
+      return generationServiceUnavailable();
+    }
+
+    throw error;
+  }
+}
+
 export async function POST(request: Request) {
   const sessionResult = await checkSession(request);
+  if (sessionResult.status === "unavailable")
+    return fail("AUTH_UNAVAILABLE", "认证服务暂时不可用", { status: 503 });
+  if (sessionResult.status === "unauthenticated")
+    return fail("UNAUTHORIZED", "请先登录", { status: 401 });
   const body = await readJsonBodySafe(request);
 
   if (!body.ok) {
@@ -158,6 +196,37 @@ export async function POST(request: Request) {
   }
 
   try {
+    const creative = parsed.data.creative;
+    if (creative) {
+      if (!creativeAssistantEnabled())
+        return fail("FEATURE_DISABLED", "辅助创作暂未开放", { status: 503 });
+      if (parsed.data.n !== 1)
+        return fail("VALIDATION_ERROR", "辅助创作每次确认生成一张", {
+          status: 400,
+        });
+      Object.assign(parsed.data, {
+        prompt: creativePrompt(creative.brief, Boolean(creative.baseReference)),
+        negativePrompt: undefined,
+        ...creativeReferenceRequest(creative.baseReference),
+      });
+    }
+    const operation = creative
+      ? generationOperation(creative.operationId, parsed.data)
+      : undefined;
+    if (operation) {
+      const replay = await findGenerationOperation(
+        sessionResult.user.id,
+        operation,
+      );
+      if (replay)
+        return ok({
+          ...replay,
+          providerChannelId: parsed.data.providerChannelId ?? null,
+          queuePosition: 0,
+          workerOnline: false,
+          queueWaiting: 0,
+        });
+    }
     const model = await getModelWithPricing(parsed.data.modelId);
 
     if (!model) {
@@ -168,7 +237,8 @@ export async function POST(request: Request) {
     const normalizedRequestParams = {
       ...parsed.data,
       providerChannelId: internalRequest.providerChannelId,
-      image2Mode: internalRequest.image2Mode,
+      size: internalRequest.size,
+      responseFormat: internalRequest.responseFormat,
     };
 
     if (!process.env.DATABASE_URL) {
@@ -177,23 +247,17 @@ export async function POST(request: Request) {
       });
     }
 
-    if (sessionResult.status === "unavailable") {
-      return fail("AUTH_UNAVAILABLE", "认证服务暂时不可用", { status: 503 });
-    }
-
-    if (sessionResult.status === "unauthenticated") {
-      return fail("UNAUTHORIZED", "请先登录", { status: 401 });
-    }
-
     const session = sessionResult.user;
-    const estimatedCredits = estimateCost(model, internalRequest);
-    const pricingSnapshot = createPricingSnapshot(
-      model,
-      internalRequest,
-      estimatedCredits,
-    );
-    const pricingSnapshotJson =
-      pricingSnapshot as unknown as Prisma.InputJsonObject;
+    if (
+      parsed.data.referenceImageKeys?.some((key) => {
+        const normalized = normalizeUploadedReferenceKey(key);
+        return !normalized || !normalized.startsWith(`uploads/${session.id}/`);
+      })
+    ) {
+      return fail("REFERENCE_IMAGE_NOT_FOUND", "参考图不存在或不可用", {
+        status: 404,
+      });
+    }
     const conversationId = parsed.data.conversationId;
     const providerChannelId = internalRequest.providerChannelId;
     const displayNameMap = await getProviderChannelDisplayNameMap();
@@ -222,13 +286,18 @@ export async function POST(request: Request) {
         include: {
           provider: {
             select: {
+              id: true,
               name: true,
             },
           },
         },
       });
       const selectedAccount = candidateAccounts.find((account) =>
-        providerChannelMatchesBaseUrl(providerChannelId, account.baseUrl),
+        providerChannelMatchesBaseUrl(
+          providerChannelId,
+          account.baseUrl,
+          account.provider.id,
+        ),
       );
 
       if (!selectedAccount) {
@@ -259,7 +328,6 @@ export async function POST(request: Request) {
       internalRequest.providerChannelId,
     );
     await assertGenerationQueueReady();
-    await assertGenerationAllowed(session.id);
     await assertModerationRejectionAllowed(session.id);
 
     const combinedPrompt = [
@@ -268,11 +336,12 @@ export async function POST(request: Request) {
     ]
       .filter(Boolean)
       .join("\n");
-    const sourceReferenceImages = parsed.data.sourceImageIds?.length
+    const sourceImageIds = parsed.data.sourceImageIds ?? [];
+    const sourceImages = sourceImageIds.length
       ? await db.generatedImage.findMany({
           where: {
             id: {
-              in: parsed.data.sourceImageIds,
+              in: sourceImageIds,
             },
             generation: {
               userId: session.id,
@@ -280,20 +349,30 @@ export async function POST(request: Request) {
             },
           },
           select: {
+            id: true,
             storageKey: true,
             mimeType: true,
           },
         })
       : [];
 
+    const sourceImagesById = new Map(
+      sourceImages.map((image) => [image.id, image]),
+    );
     if (
-      (parsed.data.sourceImageIds?.length ?? 0) !== sourceReferenceImages.length
+      sourceImageIds.length !== sourceImages.length ||
+      sourceImageIds.some((id) => !sourceImagesById.has(id))
     ) {
       return fail("REFERENCE_IMAGE_NOT_FOUND", "参考图不存在或不可用", {
         status: 404,
       });
     }
 
+    // SQL IN does not preserve selection order. Keep the same reference order
+    // in the provider request and the persisted recovery/retry data.
+    const sourceReferenceImages = sourceImageIds.map(
+      (id) => sourceImagesById.get(id)!,
+    );
     if (sourceReferenceImages.length) {
       if (!model.capabilities.supportsReferenceImage) {
         return fail("UNSUPPORTED_PARAM", "当前模型不支持参考图", {
@@ -321,6 +400,20 @@ export async function POST(request: Request) {
       );
     }
 
+    const estimatedCredits = estimateCost(model, internalRequest);
+    if (creative && estimatedCredits > creative.maxCredits) {
+      return fail("PRICE_CHANGED", "生成费用已变化，请重新确认费用", {
+        status: 409,
+      });
+    }
+    const pricingSnapshot = createPricingSnapshot(
+      model,
+      internalRequest,
+      estimatedCredits,
+    );
+    const pricingSnapshotJson =
+      pricingSnapshot as unknown as Prisma.InputJsonObject;
+
     if (await isPromptBlocked(combinedPrompt)) {
       await recordModerationRejectionAttempt(
         session.id,
@@ -335,195 +428,58 @@ export async function POST(request: Request) {
       });
     }
 
-    const user = await db.user.findUnique({
-      where: { id: session.id },
-      select: { credits: true },
-    });
-
-    if (!user || user.credits < estimatedCredits) {
-      return fail("INSUFFICIENT_CREDITS", "点数不足", { status: 402 });
+    if (!operation) {
+      const user = await db.user.findUnique({
+        where: { id: session.id },
+        select: { credits: true },
+      });
+      if (!user || user.credits < estimatedCredits) {
+        return fail("INSUFFICIENT_CREDITS", "点数不足", { status: 402 });
+      }
     }
 
-    const generation = await db.$transaction(async (tx) => {
-      if (conversationId) {
-        const conversation = await tx.conversation.findFirst({
-          where: {
-            id: conversationId,
-            userId: session.id,
-            archivedAt: null,
-          },
-          select: {
-            id: true,
-          },
-        });
-
-        if (!conversation) {
-          throw new ConversationNotFoundError();
-        }
-      }
-
-      const created = await tx.generation.create({
-        data: {
-          userId: session.id,
-          conversationId,
-          modelId: internalRequest.modelId,
-          prompt: internalRequest.prompt,
-          negativePrompt: internalRequest.negativePrompt,
-          aspectRatio: internalRequest.aspectRatio,
-          resolution: internalRequest.resolution,
-          n: internalRequest.n,
-          seed:
-            internalRequest.seed === undefined
-              ? undefined
-              : BigInt(internalRequest.seed),
-          outputFormat: internalRequest.outputFormat,
-          paramsRaw: normalizedRequestParams,
-          referenceImageKeys: [
-            ...(parsed.data.referenceImageKeys ?? []),
-            ...sourceReferenceImages.map((image) => image.storageKey),
-          ],
-          status: "PENDING",
-          progress: 0,
-          costCredits: estimatedCredits,
-          pricingSnapshot: pricingSnapshotJson,
-        },
-      });
-
-      if (conversationId) {
-        if (parsed.data.userMessage?.trim()) {
-          await tx.conversationMessage.create({
-            data: {
-              conversationId,
-              role: "USER",
-              content: parsed.data.userMessage.trim(),
-            },
-          });
-        }
-
-        if (parsed.data.assistantMessage?.trim()) {
-          await tx.conversationMessage.create({
-            data: {
-              conversationId,
-              role: "ASSISTANT",
-              content: parsed.data.assistantMessage.trim(),
-              generationId: created.id,
-            },
-          });
-        }
-
-        await tx.conversation.update({
-          where: { id: conversationId },
-          data: {
-            lastMessageAt: new Date(),
-          },
-        });
-      }
-
-      const debited = await tx.user.updateMany({
-        where: {
-          id: session.id,
-          credits: {
-            gte: estimatedCredits,
-          },
-        },
-        data: {
-          credits: {
-            decrement: estimatedCredits,
-          },
-        },
-      });
-
-      if (debited.count === 0) {
-        throw new InsufficientCreditsError();
-      }
-
-      await tx.usageLog.create({
-        data: {
-          userId: session.id,
-          generationId: created.id,
-          modelId: internalRequest.modelId,
-          action: "generate",
-          creditsDelta: -estimatedCredits,
-          metadata: {
-            estimatedCredits,
-            pricingSnapshot: pricingSnapshotJson,
-          },
-        },
-      });
-
-      return created;
+    const {
+      generationId,
+      status,
+      estimatedCredits: acceptedCredits,
+    } = await createAndEnqueueGeneration({
+      userId: session.id,
+      operation,
+      request: internalRequest,
+      normalizedRequestParams,
+      estimatedCredits,
+      pricingSnapshotJson,
+      conversationId,
+      referenceImageKeys: [
+        ...(parsed.data.referenceImageKeys ?? []),
+        ...sourceReferenceImages.map((image) => image.storageKey),
+      ],
+      userMessage: parsed.data.userMessage,
+      assistantMessage: parsed.data.assistantMessage,
     });
-
-    let jobId: string | null = null;
-
-    try {
-      jobId = await enqueueGeneration({
-        generationId: generation.id,
-        userId: session.id,
-        request: internalRequest,
-        estimatedCredits,
-      });
-
-      await db.generation.update({
-        where: { id: generation.id },
-        data: { jobId },
-      });
-    } catch (error) {
-      await db.$transaction([
-        db.generation.update({
-          where: { id: generation.id },
-          data: {
-            status: "FAILED",
-            errorCode: "QUEUE_ERROR",
-            errorMessage: "任务队列暂不可用，请稍后重试。",
-          },
-        }),
-        db.user.update({
-          where: { id: session.id },
-          data: {
-            credits: {
-              increment: estimatedCredits,
-            },
-          },
-        }),
-        db.usageLog.create({
-          data: {
-            userId: session.id,
-            generationId: generation.id,
-            modelId: internalRequest.modelId,
-            action: "refund",
-            creditsDelta: estimatedCredits,
-            metadata: {
-              reason: "queue_failed",
-            },
-          },
-        }),
-      ]);
-
-      logger.error(
-        { generationId: generation.id, error: serializeProviderError(error) },
-        "Generation enqueue failed.",
-      );
-
-      return fail("QUEUE_UNAVAILABLE", "任务入队失败，已退还点数", {
-        status: 503,
-      });
-    }
 
     const queueStats = await generationQueueStats().catch(() => null);
 
     return ok({
-      generationId: generation.id,
-      status: generation.status,
-      estimatedCredits,
-      providerChannelId: internalRequest.providerChannelId ?? null,
+      generationId,
+      status,
+      estimatedCredits: acceptedCredits ?? estimatedCredits,
+      providerChannelId: null,
       queuePosition: queueStats?.waiting ?? 0,
       workerOnline: queueStats?.workerOnline ?? false,
       queueWaiting: queueStats?.waiting ?? 0,
     });
   } catch (error) {
+    if (error instanceof GenerationOperationConflictError)
+      return fail("OPERATION_CONFLICT", error.message, { status: 409 });
+    if (error instanceof ChatTurnError)
+      return fail(error.code, error.message, { status: error.status });
     if (isDatabaseUnavailableError(error)) {
       return generationServiceUnavailable();
+    }
+
+    if (error instanceof GenerationQueueError) {
+      return fail("QUEUE_UNAVAILABLE", error.message, { status: 503 });
     }
 
     if (

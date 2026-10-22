@@ -3,8 +3,8 @@ import { requireV1Auth, v1AuthErrorResponse } from "@/lib/v1-auth";
 import { agentImageErrorResponse, agentModels } from "@/lib/agent-images";
 export async function GET(request: Request) {
   try {
-    await requireV1Auth(request);
-    return ok(await agentModels(), {
+    const principal = await requireV1Auth(request);
+    return ok(await agentModels(Boolean(principal.apiKeyId)), {
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {

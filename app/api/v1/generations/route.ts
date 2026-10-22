@@ -8,7 +8,13 @@ import {
 import { readJsonBodySafe } from "@/lib/request-body";
 import { userActionRateLimitResponse } from "@/lib/api-rate-limit";
 import { getApiKeyRuntimeConfig } from "@/lib/api-key-pricing";
+import {
+  syncGenerationResponse,
+  waitForGeneration,
+} from "@/lib/api-generation-result";
 export const runtime = "nodejs";
+// Synchronous API-key submits hold the request open for up to 180 s.
+export const maxDuration = 200;
 
 const DEFAULT_LIST_LIMIT = 20;
 const MAX_LIST_LIMIT = 100;
@@ -78,6 +84,17 @@ export async function POST(request: Request) {
       request.headers.get("idempotency-key"),
       principal.apiKeyId ?? undefined,
     );
+    // API-key calls wait for the result and get the images inline, unless the
+    // caller opts out with ?wait=false. Agent tokens stay asynchronous.
+    const wantsWait = new URL(request.url).searchParams.get("wait") !== "false";
+    if (principal.apiKeyId && wantsWait) {
+      const row = await waitForGeneration(
+        result.generationId,
+        principal.user.id,
+        request.signal,
+      );
+      if (row) return syncGenerationResponse(row);
+    }
     return ok(
       {
         // `id` is the documented field; `generationId` kept for older clients.

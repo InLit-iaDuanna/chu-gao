@@ -3,8 +3,8 @@ import { requireV1Auth, v1AuthErrorResponse } from "@/lib/v1-auth";
 import {
   agentImageErrorResponse,
   ownedAgentGeneration,
-  serializeAgentGeneration,
 } from "@/lib/agent-images";
+import { serializeWithInlineImages } from "@/lib/api-generation-result";
 export async function GET(
   request: Request,
   context: { params: Promise<{ id: string }> },
@@ -19,7 +19,7 @@ export async function GET(
       },
       (await context.params).id,
     );
-    return ok(serializeAgentGeneration(row), {
+    return ok(await serializeWithInlineImages(row), {
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {

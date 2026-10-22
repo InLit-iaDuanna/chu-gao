@@ -22,8 +22,13 @@ function toSubmissionPrincipal(p: AgentPrincipal): SubmissionPrincipal {
   };
 }
 import { db } from "@/lib/db";
-import { estimateCost } from "@/lib/credits";
 import { getApiKeyRuntimeConfig } from "@/lib/api-key-pricing";
+import {
+  applyApiPricing,
+  getApiPriceTable,
+  resolveApiPriceList,
+  type ApiPriceTable,
+} from "@/lib/api-pricing";
 import {
   createPricingSnapshot,
   getModelWithPricing,
@@ -77,8 +82,16 @@ export const agentGenerationSchema = generationRequestSchema
   .extend({ n: generationRequestSchema.shape.n.default(1) })
   .strict();
 
-export async function agentModels() {
-  const models = await listModelsWithPricing();
+/**
+ * Model catalog for v1 callers. API-key callers see the API price list
+ * (`prices`, per image by resolution); agent tokens keep the web pricing data.
+ */
+export async function agentModels(forApiKey = false) {
+  const [models, apiPrices, runtime] = await Promise.all([
+    listModelsWithPricing(),
+    forApiKey ? getApiPriceTable() : Promise.resolve<ApiPriceTable>({}),
+    forApiKey ? getApiKeyRuntimeConfig() : Promise.resolve(null),
+  ]);
   return Promise.all(
     models.map(async (model) => {
       let available = false;
@@ -93,7 +106,7 @@ export async function agentModels() {
         image2Modes: _modes,
         ...capabilities
       } = model.capabilities;
-      return {
+      const base = {
         id: model.id,
         displayName: model.displayName,
         available,
@@ -104,6 +117,19 @@ export async function agentModels() {
           outputFormat: model.defaults.outputFormat,
           background: model.defaults.background,
         },
+      };
+      if (runtime) {
+        return {
+          ...base,
+          prices: resolveApiPriceList(
+            model,
+            apiPrices[model.id],
+            runtime.creditMultiplier,
+          ),
+        };
+      }
+      return {
+        ...base,
         costAxis: model.costAxis,
         costTable: model.costTable,
         pricingRules: model.pricingRules
@@ -205,12 +231,18 @@ export async function submitAgentGeneration(
       400,
     );
   }
-  // API-key calls are billed with the admin-configured multiplier; the
-  // estimate is what gets held, so the charge and snapshot stay consistent.
-  const multiplier = resolvedApiKeyId
-    ? (await getApiKeyRuntimeConfig()).creditMultiplier
-    : 1;
-  const estimatedCredits = estimateCost(model, request, multiplier);
+  // API-key calls are billed from the API price list. The re-priced snapshot
+  // is what worker settlement reads, so the final charge stays on API prices.
+  const webSnapshot = createPricingSnapshot(model, request);
+  const pricingSnapshot = resolvedApiKeyId
+    ? applyApiPricing(
+        webSnapshot,
+        (await getApiPriceTable())[model.id],
+        (await getApiKeyRuntimeConfig()).creditMultiplier,
+        { resolution: request.resolution, n: request.n },
+      )
+    : webSnapshot;
+  const estimatedCredits = pricingSnapshot.estimatedCredits;
   return createAndEnqueueGeneration({
     userId: sp.user.id,
     agentAuthorizationId: resolvedAgentAuthId,
@@ -224,11 +256,7 @@ export async function submitAgentGeneration(
       responseFormat: request.responseFormat,
     },
     estimatedCredits,
-    pricingSnapshotJson: createPricingSnapshot(
-      model,
-      request,
-      estimatedCredits,
-    ) as unknown as Prisma.InputJsonObject,
+    pricingSnapshotJson: pricingSnapshot as unknown as Prisma.InputJsonObject,
     referenceImageKeys: referenceKeys,
   });
 }

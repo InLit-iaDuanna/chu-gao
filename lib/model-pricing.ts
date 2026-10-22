@@ -12,16 +12,26 @@ import type {
   InternalRequest,
   ModelDefinition,
   PricingRule,
+  Resolution,
 } from "@/lib/models/types";
+import { IMAGE_RESOLUTION_OPTIONS } from "@/lib/models/options";
 
 export interface PricingSnapshot {
   modelId: string;
   ruleId: string | null;
   perImageCredits: number;
+  // Keep the resolved price for each tier at submission time. This makes
+  // auto-size settlement deterministic even if an admin changes pricing while
+  // the job is running.
+  perImageCreditsByResolution?: Partial<Record<Resolution, number>>;
   estimatedCredits: number;
+  /** "api" when re-priced from the API price list; absent for web jobs. */
+  channel?: "web" | "api";
   request: {
+    providerChannelId?: string;
+    size: string;
+    image2Mode?: string;
     resolution: string;
-    image2Mode?: string | null;
     aspectRatio: string;
     outputFormat: string;
     background: string;
@@ -33,6 +43,7 @@ export interface PricingSnapshot {
 function serializeRule(rule: {
   id: string;
   modelId: string;
+  providerChannelId: string | null;
   image2Mode: string | null;
   resolution: string | null;
   aspectRatio: string | null;
@@ -45,6 +56,7 @@ function serializeRule(rule: {
   return {
     id: rule.id,
     modelId: rule.modelId,
+    providerChannelId: rule.providerChannelId,
     image2Mode:
       rule.image2Mode === "standard" || rule.image2Mode === "high"
         ? (rule.image2Mode as Image2Mode)
@@ -110,15 +122,28 @@ export function createPricingSnapshot(
   estimatedCredits = estimateCost(model, request),
 ): PricingSnapshot {
   const perImage = resolvePerImageCredits(model, request);
+  const perImageCreditsByResolution = Object.fromEntries(
+    IMAGE_RESOLUTION_OPTIONS.map((resolution) => [
+      resolution,
+      resolvePerImageCredits(model, {
+        ...request,
+        resolution,
+        n: 1,
+      }).credits,
+    ]),
+  ) as Partial<Record<Resolution, number>>;
 
   return {
     modelId: model.id,
     ruleId: perImage.ruleId,
     perImageCredits: perImage.credits,
+    perImageCreditsByResolution,
     estimatedCredits,
     request: {
+      providerChannelId: request.providerChannelId,
+      size: request.size,
+      image2Mode: request.image2Mode,
       resolution: request.resolution,
-      image2Mode: request.image2Mode ?? null,
       aspectRatio: request.aspectRatio,
       outputFormat: request.outputFormat,
       background: request.background,
@@ -132,9 +157,24 @@ export function estimateCostFromSnapshot(
   snapshot: PricingSnapshot | null | undefined,
   count: number,
   multiplier = 1,
+  actualResolutionTiers?: Resolution[],
 ): number | null {
   if (!snapshot) {
     return null;
+  }
+
+  if (
+    actualResolutionTiers?.length &&
+    snapshot.perImageCreditsByResolution
+  ) {
+    const total = actualResolutionTiers.reduce(
+      (sum, resolution) =>
+        sum +
+        (snapshot.perImageCreditsByResolution?.[resolution] ??
+          snapshot.perImageCredits),
+      0,
+    );
+    return Math.ceil(total * multiplier);
   }
 
   return Math.ceil(snapshot.perImageCredits * count * multiplier);

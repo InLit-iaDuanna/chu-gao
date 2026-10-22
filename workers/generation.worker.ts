@@ -1,35 +1,65 @@
-import { Worker } from "bullmq";
+import { DelayedError, Worker } from "bullmq";
+import { randomUUID } from "node:crypto";
 
-import { estimateCost } from "@/lib/credits";
 import { db } from "@/lib/db";
+import { startChatWorker } from "@/lib/chat-worker";
+import {
+  closeChatRuntimeHealth,
+  withChatRuntimeTimeout,
+} from "@/lib/chat-runtime-health";
+import {
+  delayGenerationForProviderCapacity,
+  positiveInteger,
+} from "@/lib/generation-capacity";
 import { logger } from "@/lib/logger";
 import {
-  estimateCostFromSnapshot,
-  parsePricingSnapshot,
-} from "@/lib/model-pricing";
-import { getConfiguredModel } from "@/lib/models/runtime-config";
+  ProviderCapacityError,
+  ProviderUnavailableError,
+  selectAndGenerate,
+} from "@/lib/providers";
 import {
-  generationRequestSchema,
-  validateAgainstModel,
-} from "@/lib/models/validate";
-import { ProviderUnavailableError, selectAndGenerate } from "@/lib/providers";
+  reconcileProviderAccountCounters,
+  releaseOrphanedProviderLeases,
+} from "@/lib/providers/account-pool";
+import { serializeProviderError } from "@/lib/providers/diagnostics";
 import {
-  classifyProviderFailure,
-  serializeProviderError,
-} from "@/lib/providers/diagnostics";
-import {
-  enqueueGeneration,
   touchGenerationWorkerHeartbeat,
   type GenerationJobPayload,
 } from "@/lib/queue";
+import {
+  discardApiGenerationImages,
+  stashApiGenerationImages,
+} from "@/lib/api-image-cache";
 import { assertRedisReady, getRedis } from "@/lib/redis";
-import { hydrateReferenceImages, saveGeneratedImage } from "@/lib/storage";
+import {
+  hydrateReferenceImages,
+  removePersistedGeneratedImages,
+  materializeGeneratedImage,
+  saveGeneratedImage,
+  type PersistedGeneratedImage,
+} from "@/lib/storage";
+import {
+  generationFailureCode,
+  usageFailureCategory,
+  userFacingGenerationError,
+} from "./generation-worker-errors";
+import { recoverStuckGenerations } from "./generation-worker-recovery";
+import {
+  settleGenerationFailure,
+  settleGenerationSuccess,
+} from "./generation-worker-settlement";
 
 const STUCK_PENDING_MS = Number(process.env.STUCK_PENDING_MS ?? 2 * 60_000);
 const STUCK_RUNNING_MS = Number(process.env.STUCK_RUNNING_MS ?? 10 * 60_000);
 const STUCK_MAX_ATTEMPTS = Number(process.env.STUCK_MAX_ATTEMPTS ?? 3);
+const STUCK_RECOVERY_INTERVAL_MS = Number(
+  process.env.STUCK_RECOVERY_INTERVAL_MS ?? 60_000,
+);
 const WORKER_HEARTBEAT_INTERVAL_MS = Number(
   process.env.WORKER_HEARTBEAT_INTERVAL_MS ?? 15_000,
+);
+const PROVIDER_CAPACITY_RETRY_MS = Number(
+  process.env.PROVIDER_CAPACITY_RETRY_MS ?? 1_500,
 );
 
 function clampProgress(value?: number): number {
@@ -40,265 +70,53 @@ function clampProgress(value?: number): number {
   return Math.max(0, Math.min(100, Math.round(value ?? 0)));
 }
 
-function userFacingGenerationError(error: unknown): string {
-  const { category } = classifyProviderFailure(error);
-
-  if (category === "CONTENT_REJECTED") {
-    return "提示词或参考图包含不允许的内容，请调整后再试。";
-  }
-
-  if (category === "BAD_REQUEST") {
-    return "生成请求被渠道拒绝，请调整提示词、参考图或参数后再试。";
-  }
-
-  const message = serializeProviderError(error);
-
-  if (message.includes("provider returned no images")) {
-    return "渠道没有返回图片，请稍后重试或更换模型。";
-  }
-
-  if (
-    message.includes("invalid reference image key") ||
-    message.includes("ENOENT")
-  ) {
-    return "参考图不可用，请重新上传后再试。";
-  }
-
-  return "渠道生成失败，请稍后重试或联系管理员检查渠道状态。";
-}
-
-function generationFailureCode(error: unknown): string {
-  const { category } = classifyProviderFailure(error);
-
-  if (category === "CONTENT_REJECTED") {
-    return "MODERATION_REJECTED";
-  }
-
-  if (category === "BAD_REQUEST") {
-    return "PROVIDER_REJECTED_REQUEST";
-  }
-
-  return "PROVIDER_ERROR";
-}
-
-function usageFailureCategory(error: unknown): string {
-  const { category } = classifyProviderFailure(error);
-
-  if (category === "CONTENT_REJECTED") {
-    return "moderation";
-  }
-
-  if (category === "BAD_REQUEST") {
-    return "request";
-  }
-
-  return "provider";
-}
-
-async function refundGeneration(
-  generationId: string,
-  userId: string,
-  reason: string,
-): Promise<void> {
-  await db.$transaction(async (tx) => {
-    const refunded = await tx.usageLog.aggregate({
-      where: {
-        generationId,
-        action: "refund",
-      },
-      _sum: {
-        creditsDelta: true,
-      },
-    });
-    const charged = await tx.usageLog.aggregate({
-      where: {
-        generationId,
-        action: "generate",
-      },
-      _sum: {
-        creditsDelta: true,
-      },
-    });
-    const debitedCredits = Math.max(0, -(charged._sum.creditsDelta ?? 0));
-    const refundedCredits = Math.max(0, refunded._sum.creditsDelta ?? 0);
-    const refundableCredits = Math.max(0, debitedCredits - refundedCredits);
-
-    if (refundableCredits === 0) {
-      return;
-    }
-
-    await tx.user.update({
-      where: { id: userId },
-      data: {
-        credits: {
-          increment: refundableCredits,
-        },
-      },
-    });
-
-    await tx.usageLog.create({
-      data: {
-        userId,
-        generationId,
-        action: "refund",
-        creditsDelta: refundableCredits,
-        metadata: {
-          reason,
-        },
-      },
-    });
-  });
-}
-
-async function markGenerationFailedAndRefund(
-  generationId: string,
-  userId: string,
-  errorCode: string,
-  errorMessage: string,
-  reason: string,
-): Promise<void> {
-  const failed = await db.generation.updateMany({
-    where: {
-      id: generationId,
-      userId,
-      status: { in: ["PENDING", "RUNNING"] },
-    },
-    data: {
-      status: "FAILED",
-      finishedAt: new Date(),
-      errorCode,
-      errorMessage,
-    },
-  });
-
-  if (failed.count > 0) {
-    await refundGeneration(generationId, userId, reason);
-  }
-}
-
-async function recoverStuckGenerations(): Promise<void> {
-  const now = Date.now();
-  const stuck = await db.generation.findMany({
-    where: {
-      deletedAt: null,
-      status: { in: ["PENDING", "RUNNING"] },
-      OR: [
-        {
-          status: "PENDING",
-          createdAt: { lt: new Date(now - STUCK_PENDING_MS) },
-        },
-        {
-          status: "RUNNING",
-          startedAt: { lt: new Date(now - STUCK_RUNNING_MS) },
-        },
-      ],
-    },
-    take: 100,
-    select: {
-      id: true,
-      userId: true,
-      status: true,
-      attempts: true,
-      modelId: true,
-      prompt: true,
-      negativePrompt: true,
-      aspectRatio: true,
-      resolution: true,
-      n: true,
-      outputFormat: true,
-      paramsRaw: true,
-      referenceImageKeys: true,
-      costCredits: true,
-      jobId: true,
-    },
-    orderBy: { createdAt: "asc" },
-  });
-
-  for (const generation of stuck) {
-    if (generation.attempts >= STUCK_MAX_ATTEMPTS) {
-      await markGenerationFailedAndRefund(
-        generation.id,
-        generation.userId,
-        "STUCK_JOB",
-        "任务长时间未完成，已自动终止并退还点数。",
-        "stuck_generation",
-      );
-      logger.warn(
-        { generationId: generation.id, attempts: generation.attempts },
-        "Stuck generation failed after max recovery attempts.",
-      );
-      continue;
-    }
-
-    const parsedRequest = generationRequestSchema.safeParse(
-      generation.paramsRaw,
-    );
-
-    if (!parsedRequest.success) {
-      await markGenerationFailedAndRefund(
-        generation.id,
-        generation.userId,
-        "STUCK_JOB_INVALID_REQUEST",
-        "历史任务参数已不可恢复，已自动终止并退还点数。",
-        "stuck_generation_invalid_request",
-      );
-      logger.warn(
-        { generationId: generation.id },
-        "Stuck generation failed because paramsRaw is invalid.",
-      );
-      continue;
-    }
-
-    const request = await validateAgainstModel(parsedRequest.data);
-
-    await db.generation.update({
-      where: { id: generation.id },
-      data: {
-        status: "PENDING",
-        progress: 0,
-        startedAt: null,
-        finishedAt: null,
-        errorCode: null,
-        errorMessage: null,
-      },
-    });
-
-    const jobId = await enqueueGeneration({
-      generationId: generation.id,
-      userId: generation.userId,
-      request,
-      estimatedCredits: generation.costCredits,
-    });
-
-    if (jobId !== generation.jobId) {
-      await db.generation.update({
-        where: { id: generation.id },
-        data: { jobId },
-      });
-    }
-
-    logger.info(
-      { generationId: generation.id, previousStatus: generation.status },
-      "Recovered stuck generation into queue.",
-    );
-  }
-}
-
 async function main() {
   if (!process.env.DATABASE_URL) {
     throw new Error(
-      "DATABASE_URL is missing. Set it in .env, run `docker compose up -d postgres redis`, then `pnpm db:push && pnpm db:seed`.",
+      "DATABASE_URL is missing. Set it in .env, run `docker compose up -d postgres redis`, then `pnpm db:migrate && pnpm db:seed`.",
     );
   }
 
   await db.$queryRaw`SELECT 1`;
   await touchGenerationWorkerHeartbeat();
-  await recoverStuckGenerations();
+  const stopChatWorker = startChatWorker();
+  const runRecoveryPass = async () => {
+    await recoverStuckGenerations({
+      stuckPendingMs: STUCK_PENDING_MS,
+      stuckRunningMs: STUCK_RUNNING_MS,
+      stuckMaxAttempts: STUCK_MAX_ATTEMPTS,
+    });
+    const releasedLeases = await releaseOrphanedProviderLeases();
+    const correctedAccounts = await reconcileProviderAccountCounters();
+    if (releasedLeases > 0) {
+      logger.warn(
+        { releasedLeases },
+        "Released provider leases left behind by completed executions.",
+      );
+    }
+    if (correctedAccounts > 0) {
+      logger.warn(
+        { correctedAccounts },
+        "Reconciled provider account concurrency counters.",
+      );
+    }
+  };
+
+  await runRecoveryPass();
+
+  const recoveryTimer = setInterval(() => {
+    runRecoveryPass().catch((error) => {
+      logger.error(
+        { error: serializeProviderError(error) },
+        "Periodic stuck generation recovery failed.",
+      );
+    });
+  }, STUCK_RECOVERY_INTERVAL_MS);
 
   const redis = getRedis();
   const worker = new Worker<GenerationJobPayload>(
     "generation",
-    async (job) => {
+    async (job, token) => {
       if (!process.env.DATABASE_URL) {
         logger.info(
           { jobId: job.id },
@@ -308,17 +126,23 @@ async function main() {
       }
 
       const { generationId, userId, request, estimatedCredits } = job.data;
+      const executionToken = randomUUID();
+      const leaseContext = { generationId, userId, executionToken };
+      const claimedAt = new Date();
 
       const claimed = await db.generation.updateMany({
         where: {
           id: generationId,
           userId,
           status: "PENDING",
+          deletedAt: null,
         },
         data: {
           status: "RUNNING",
           progress: 0,
-          startedAt: new Date(),
+          startedAt: claimedAt,
+          heartbeatAt: claimedAt,
+          executionToken,
           attempts: {
             increment: 1,
           },
@@ -333,6 +157,40 @@ async function main() {
         return;
       }
 
+      const executionHeartbeat = setInterval(() => {
+        db.generation
+          .updateMany({
+            where: {
+              id: generationId,
+              userId,
+              status: "RUNNING",
+              executionToken,
+            },
+            data: { heartbeatAt: new Date() },
+          })
+          .catch((error) => {
+            logger.warn(
+              { generationId, error: serializeProviderError(error) },
+              "Generation execution heartbeat failed.",
+            );
+          });
+      }, WORKER_HEARTBEAT_INTERVAL_MS);
+      const savedImages: PersistedGeneratedImage[] = [];
+      // API-key jobs return their images to the caller and keep nothing on
+      // the server; their bytes are only parked in Redis until picked up.
+      const isApiKeyJob = Boolean(
+        (
+          await db.generation.findUnique({
+            where: { id: generationId },
+            select: { apiKeyId: true },
+          })
+        )?.apiKeyId,
+      );
+      let stashedImageCount = 0;
+      let imagesCommitted = false;
+      let selectedProviderId: string | null = null;
+      let selectedProviderAccountId: string | null = null;
+
       try {
         const hydratedRequest = {
           ...request,
@@ -340,46 +198,49 @@ async function main() {
             request.referenceImages,
           ),
         };
-        let selectedProviderId: string | null = null;
-        let selectedProviderAccountId: string | null = null;
         const {
           result,
           providerId,
           providerName,
           providerAccountId,
           providerAccountName,
-          multiplier,
         } = await selectAndGenerate(hydratedRequest, {
+          leaseContext,
           onProviderSelected: async (selection) => {
             selectedProviderId = selection.providerId;
             selectedProviderAccountId = selection.providerAccountId;
-            await db.generation.updateMany({
+            const selected = await db.generation.updateMany({
               where: {
                 id: generationId,
                 userId,
-                status: { in: ["PENDING", "RUNNING"] },
+                status: "RUNNING",
+                executionToken,
               },
               data: {
                 providerId: selection.providerId,
                 providerAccountId: selection.providerAccountId,
+                heartbeatAt: new Date(),
               },
             });
+            if (selected.count === 0)
+              throw new Error(
+                "generation execution was superseded before dispatch",
+              );
           },
           onProgress: async (event) => {
             const progress = clampProgress(event.progress);
-            const status = event.status === "queued" ? "PENDING" : "RUNNING";
-
             await db.generation.updateMany({
               where: {
                 id: generationId,
                 userId,
-                status: { in: ["PENDING", "RUNNING"] },
+                status: "RUNNING",
+                executionToken,
               },
               data: {
-                status,
                 progress,
                 providerId: selectedProviderId,
                 providerAccountId: selectedProviderAccountId,
+                heartbeatAt: new Date(),
               },
             });
           },
@@ -389,119 +250,46 @@ async function main() {
           throw new Error("provider returned no images");
         }
 
-        const savedImages = await Promise.all(
-          result.images.map((image, index) =>
-            saveGeneratedImage(image, generationId, index),
-          ),
-        );
-        const model = await getConfiguredModel(request.modelId);
-        const successCount = Math.max(savedImages.length, 1);
-        const generationSnapshot = await db.generation.findUnique({
-          where: { id: generationId },
-          select: { pricingSnapshot: true },
-        });
-        const actualCredits =
-          estimateCostFromSnapshot(
-            parsePricingSnapshot(generationSnapshot?.pricingSnapshot),
-            successCount,
-            multiplier,
-          ) ??
-          (model
-            ? estimateCost(
-                model,
-                { n: successCount, resolution: request.resolution },
-                multiplier,
-              )
-            : estimatedCredits);
-
-        await db.$transaction(async (tx) => {
-          const chargeLog = await tx.usageLog.aggregate({
-            where: {
-              generationId,
-              action: "generate",
-            },
-            _sum: {
-              creditsDelta: true,
-            },
-          });
-          const alreadyDebited = Math.max(
-            0,
-            -(chargeLog._sum.creditsDelta ?? 0),
-          );
-          const boundedActualCredits = Math.min(
-            actualCredits,
-            alreadyDebited || estimatedCredits,
-          );
-          const boundedRefundCredits = Math.max(
-            0,
-            alreadyDebited - boundedActualCredits,
-          );
-
-          const completed = await tx.generation.updateMany({
-            where: {
-              id: generationId,
-              userId,
-              status: { in: ["PENDING", "RUNNING"] },
-            },
-            data: {
-              status: "SUCCEEDED",
-              providerId,
-              providerAccountId,
-              progress: 100,
-              finishedAt: new Date(),
-              costCredits: boundedActualCredits,
-            },
-          });
-
-          if (completed.count === 0) {
-            logger.info(
-              { generationId },
-              "Generation completion skipped because it is no longer running.",
-            );
-            return;
-          }
-
-          await tx.generatedImage.createMany({
-            data: savedImages.map((image) => ({
-              generationId,
-              storageKey: image.storageKey,
-              thumbnailKey: image.thumbnailKey,
-              width: image.width,
-              height: image.height,
-              sizeBytes: image.sizeBytes,
-              mimeType: image.mimeType,
-            })),
-          });
-
-          if (boundedRefundCredits > 0) {
-            await tx.user.update({
-              where: { id: userId },
-              data: {
-                credits: {
-                  increment: boundedRefundCredits,
-                },
-              },
-            });
-
-            await tx.usageLog.create({
-              data: {
-                userId,
+        const outputImages =
+          request.executionPolicy === "single-submit"
+            ? result.images.slice(0, 1)
+            : result.images;
+        const ephemeralImages = isApiKeyJob
+          ? await Promise.all(outputImages.map(materializeGeneratedImage))
+          : [];
+        if (isApiKeyJob) {
+          await stashApiGenerationImages(generationId, ephemeralImages);
+          stashedImageCount = ephemeralImages.length;
+        } else {
+          for (const [index, image] of outputImages.entries()) {
+            savedImages.push(
+              await saveGeneratedImage(
+                image,
                 generationId,
-                providerId,
-                providerAccountId,
-                modelId: request.modelId,
-                action: "refund",
-                creditsDelta: boundedRefundCredits,
-                metadata: {
-                  reason: "provider_multiplier",
-                  estimatedCredits,
-                  actualCredits,
-                  chargedCredits: boundedActualCredits,
-                },
-              },
-            });
+                index,
+                executionToken,
+              ),
+            );
           }
+        }
+        imagesCommitted = await settleGenerationSuccess({
+          generationId,
+          userId,
+          request,
+          estimatedCredits,
+          providerId,
+          providerAccountId,
+          savedImages,
+          ephemeralImages: ephemeralImages.map(({ width, height }) => ({
+            width,
+            height,
+          })),
+          executionToken,
         });
+
+        if (!imagesCommitted) {
+          throw new Error("generation execution was superseded");
+        }
 
         logger.info(
           {
@@ -514,6 +302,58 @@ async function main() {
           "Generation completed.",
         );
       } catch (error) {
+        if (error instanceof ProviderCapacityError) {
+          const capacityRetry = await delayGenerationForProviderCapacity(
+            db,
+            job,
+            leaseContext,
+            {
+              configuredRetryMs: PROVIDER_CAPACITY_RETRY_MS,
+              lockToken: token,
+            },
+          );
+
+          if (!capacityRetry.delayed) {
+            logger.info(
+              { generationId },
+              "Capacity retry skipped because the execution was superseded.",
+            );
+            return;
+          }
+
+          logger.info(
+            { generationId, retryDelay: capacityRetry.retryDelay },
+            "Provider pool is saturated; generation moved back to delayed queue.",
+          );
+          throw new DelayedError();
+        }
+
+        if (!imagesCommitted && stashedImageCount > 0) {
+          await discardApiGenerationImages(
+            generationId,
+            stashedImageCount,
+          ).catch((cleanupError) => {
+            logger.warn(
+              { generationId, error: serializeProviderError(cleanupError) },
+              "API generation image discard failed; it will expire on its own.",
+            );
+          });
+        }
+
+        if (!imagesCommitted && savedImages.length > 0) {
+          try {
+            await removePersistedGeneratedImages(savedImages);
+          } catch (cleanupError) {
+            logger.error(
+              {
+                generationId,
+                error: serializeProviderError(cleanupError),
+              },
+              "Generation file cleanup failed.",
+            );
+          }
+        }
+
         const internalDiagnostic = serializeProviderError(error);
         const failureCode = generationFailureCode(error);
         const failureCategory = usageFailureCategory(error);
@@ -535,106 +375,28 @@ async function main() {
           "Generation provider failed.",
         );
 
-        await db.$transaction(async (tx) => {
-          const failed = await tx.generation.updateMany({
-            where: {
-              id: generationId,
-              userId,
-              status: { in: ["PENDING", "RUNNING"] },
-            },
-            data: {
-              status: "FAILED",
-              finishedAt: new Date(),
-              progress: 0,
-              errorCode: failureCode,
-              errorMessage: failureMessage,
-            },
-          });
-
-          if (failed.count === 0) {
-            logger.info(
-              { generationId },
-              "Generation failure skipped because it is no longer running.",
-            );
-            return;
-          }
-
-          const alreadyRefunded = await tx.usageLog.aggregate({
-            where: {
-              generationId,
-              action: "refund",
-            },
-            _sum: {
-              creditsDelta: true,
-            },
-          });
-          const charged = await tx.usageLog.aggregate({
-            where: {
-              generationId,
-              action: "generate",
-            },
-            _sum: {
-              creditsDelta: true,
-            },
-          });
-          const debitedCredits = Math.max(0, -(charged._sum.creditsDelta ?? 0));
-          const refundedCredits = Math.max(
-            0,
-            alreadyRefunded._sum.creditsDelta ?? 0,
-          );
-          const refundableCredits = Math.max(
-            0,
-            debitedCredits - refundedCredits,
-          );
-
-          if (refundableCredits > 0) {
-            await tx.user.update({
-              where: { id: userId },
-              data: {
-                credits: {
-                  increment: refundableCredits,
-                },
-              },
-            });
-
-            await tx.usageLog.create({
-              data: {
-                userId,
-                generationId,
-                modelId: request.modelId,
-                action: "refund",
-                creditsDelta: refundableCredits,
-                metadata: {
-                  reason: "generation_failed",
-                  estimatedCredits,
-                  failureCategory,
-                },
-              },
-            });
-          }
-
-          if (failureCode === "MODERATION_REJECTED") {
-            await tx.usageLog.create({
-              data: {
-                userId,
-                generationId,
-                modelId: request.modelId,
-                action: "moderation_rejected",
-                creditsDelta: 0,
-                metadata: {
-                  reason: "provider_content_rejected",
-                },
-              },
-            });
-          }
+        await settleGenerationFailure({
+          generationId,
+          userId,
+          modelId: request.modelId,
+          estimatedCredits,
+          failureCode,
+          failureMessage,
+          failureCategory,
+          executionToken,
         });
 
         throw new Error(failureMessage);
+      } finally {
+        clearInterval(executionHeartbeat);
       }
     },
     {
       connection: redis,
-      concurrency: Number(process.env.WORKER_CONCURRENCY ?? 4),
+      concurrency: positiveInteger(
+        Number(process.env.WORKER_CONCURRENCY ?? 4),
+        4,
+      ),
     },
   );
 
@@ -667,6 +429,7 @@ async function main() {
 
   worker.on("closed", () => {
     clearInterval(heartbeat);
+    clearInterval(recoveryTimer);
   });
 
   let shuttingDown = false;
@@ -677,13 +440,26 @@ async function main() {
 
     shuttingDown = true;
     clearInterval(heartbeat);
+    clearInterval(recoveryTimer);
     logger.info({ signal }, "Generation worker shutting down.");
+    const deadline = setTimeout(() => process.exit(1), 25_000);
 
     try {
-      await worker.close();
+      if (!(await stopChatWorker())) process.exitCode = 1;
+      await withChatRuntimeTimeout(() => worker.close(), 10_000);
+    } catch {
+      process.exitCode = 1;
+      logger.warn(
+        "Generation worker shutdown deadline reached; unfinished work will be recovered.",
+      );
     } finally {
       redis.disconnect();
-      await db.$disconnect();
+      closeChatRuntimeHealth();
+      await withChatRuntimeTimeout(() => db.$disconnect(), 3_000).catch(
+        () => undefined,
+      );
+      clearTimeout(deadline);
+      process.exit(process.exitCode ?? 0);
     }
   };
 
