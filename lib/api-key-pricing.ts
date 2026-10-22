@@ -6,22 +6,20 @@
  *
  * - creditMultiplier: estimated credits × this factor (1 = same price,
  *   1.2 = 20% premium, 0.8 = 20% discount)
- * - maxConcurrency: how many generations may run simultaneously per API key
- * - rateLimitPerMin: how many submissions a single API key may send per minute
+ * - rateLimitPerMin: how many API-key submissions a user may send per minute
+ *
+ * Concurrency is governed per user by User.concurrentLimit (admin user page).
  */
 import { db } from "@/lib/db";
 
 const KEY_MULTIPLIER = "apiKey.creditMultiplier";
-const KEY_CONCURRENCY = "apiKey.maxConcurrency";
 const KEY_RATE_LIMIT = "apiKey.rateLimitPerMin";
 
 export const DEFAULT_API_KEY_MULTIPLIER = 1;
-export const DEFAULT_API_KEY_CONCURRENCY = 10;
 export const DEFAULT_API_KEY_RATE_LIMIT = 20;
 
 export interface ApiKeyRuntimeConfig {
   creditMultiplier: number;
-  maxConcurrency: number;
   rateLimitPerMin: number;
 }
 
@@ -39,7 +37,6 @@ export async function getApiKeyRuntimeConfig(): Promise<ApiKeyRuntimeConfig> {
 
   let config: ApiKeyRuntimeConfig = {
     creditMultiplier: DEFAULT_API_KEY_MULTIPLIER,
-    maxConcurrency: DEFAULT_API_KEY_CONCURRENCY,
     rateLimitPerMin: DEFAULT_API_KEY_RATE_LIMIT,
   };
 
@@ -47,7 +44,7 @@ export async function getApiKeyRuntimeConfig(): Promise<ApiKeyRuntimeConfig> {
     try {
       const rows = await db.systemConfig.findMany({
         where: {
-          key: { in: [KEY_MULTIPLIER, KEY_CONCURRENCY, KEY_RATE_LIMIT] },
+          key: { in: [KEY_MULTIPLIER, KEY_RATE_LIMIT] },
         },
       });
       const map = Object.fromEntries(rows.map((r) => [r.key, r.value]));
@@ -55,10 +52,6 @@ export async function getApiKeyRuntimeConfig(): Promise<ApiKeyRuntimeConfig> {
         creditMultiplier: readNumber(
           map[KEY_MULTIPLIER],
           DEFAULT_API_KEY_MULTIPLIER,
-        ),
-        maxConcurrency: readNumber(
-          map[KEY_CONCURRENCY],
-          DEFAULT_API_KEY_CONCURRENCY,
         ),
         rateLimitPerMin: readNumber(
           map[KEY_RATE_LIMIT],
@@ -83,10 +76,6 @@ export async function setApiKeyRuntimeConfig(
       patch.creditMultiplier !== undefined
         ? Math.max(0, Math.round(patch.creditMultiplier * 100) / 100)
         : current.creditMultiplier,
-    maxConcurrency:
-      patch.maxConcurrency !== undefined
-        ? Math.max(1, Math.round(patch.maxConcurrency))
-        : current.maxConcurrency,
     rateLimitPerMin:
       patch.rateLimitPerMin !== undefined
         ? Math.max(1, Math.round(patch.rateLimitPerMin))
@@ -96,7 +85,6 @@ export async function setApiKeyRuntimeConfig(
   if (process.env.DATABASE_URL) {
     const entries: Array<[string, number]> = [
       [KEY_MULTIPLIER, next.creditMultiplier],
-      [KEY_CONCURRENCY, next.maxConcurrency],
       [KEY_RATE_LIMIT, next.rateLimitPerMin],
     ];
     await Promise.all(

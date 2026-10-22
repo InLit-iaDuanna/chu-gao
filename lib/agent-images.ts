@@ -23,6 +23,7 @@ function toSubmissionPrincipal(p: AgentPrincipal): SubmissionPrincipal {
 }
 import { db } from "@/lib/db";
 import { estimateCost } from "@/lib/credits";
+import { getApiKeyRuntimeConfig } from "@/lib/api-key-pricing";
 import {
   createPricingSnapshot,
   getModelWithPricing,
@@ -204,7 +205,12 @@ export async function submitAgentGeneration(
       400,
     );
   }
-  const estimatedCredits = estimateCost(model, request);
+  // API-key calls are billed with the admin-configured multiplier; the
+  // estimate is what gets held, so the charge and snapshot stay consistent.
+  const multiplier = resolvedApiKeyId
+    ? (await getApiKeyRuntimeConfig()).creditMultiplier
+    : 1;
+  const estimatedCredits = estimateCost(model, request, multiplier);
   return createAndEnqueueGeneration({
     userId: sp.user.id,
     agentAuthorizationId: resolvedAgentAuthId,
@@ -251,6 +257,84 @@ export async function ownedAgentGeneration(
     await bindAgentRead(principal, row.id);
   }
   return row;
+}
+
+type AgentGenerationRow = Prisma.GenerationGetPayload<{
+  include: { images: true };
+}>;
+
+/** Public v1 shape for a generation; shared by the detail and list routes. */
+export function serializeAgentGeneration(row: AgentGenerationRow) {
+  return {
+    id: row.id,
+    modelId: row.modelId,
+    status: row.status,
+    progress: row.progress,
+    costCredits: row.costCredits,
+    createdAt: row.createdAt,
+    finishedAt: row.finishedAt,
+    errorCode: row.errorCode
+      ? /MODERATION|CONTENT|SAFETY|UNSAFE/.test(row.errorCode)
+        ? "MODERATION_REJECTED"
+        : row.status === "CANCELED"
+          ? "CANCELED"
+          : "GENERATION_FAILED"
+      : null,
+    errorMessage: publicAgentFailure(row.errorCode),
+    images: row.images.map(({ id, width, height, mimeType }) => ({
+      id,
+      width,
+      height,
+      mimeType,
+    })),
+  };
+}
+
+const LIST_STATUSES = [
+  "PENDING",
+  "RUNNING",
+  "SUCCEEDED",
+  "FAILED",
+  "CANCELED",
+] as const;
+type ListStatus = (typeof LIST_STATUSES)[number];
+
+/**
+ * List the caller's API/agent generations, newest first. When the caller is
+ * an API key, only that key's generations are returned.
+ */
+export async function listAgentGenerations(
+  principal: SubmissionPrincipal,
+  params: { limit: number; cursor?: string; status?: string },
+) {
+  const status = LIST_STATUSES.includes(params.status as ListStatus)
+    ? (params.status as ListStatus)
+    : undefined;
+  const rows = await db.generation.findMany({
+    where: {
+      userId: principal.user.id,
+      deletedAt: null,
+      ...(principal.apiKeyId
+        ? { apiKeyId: principal.apiKeyId }
+        : {
+            OR: [
+              { agentAuthorizationId: { not: null } },
+              { apiKeyId: { not: null } },
+            ],
+          }),
+      ...(status ? { status } : {}),
+    },
+    include: { images: { orderBy: { createdAt: "asc" } } },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: params.limit + 1,
+    ...(params.cursor ? { cursor: { id: params.cursor }, skip: 1 } : {}),
+  });
+  const hasMore = rows.length > params.limit;
+  const page = hasMore ? rows.slice(0, params.limit) : rows;
+  return {
+    items: page.map(serializeAgentGeneration),
+    nextCursor: hasMore ? page[page.length - 1].id : null,
+  };
 }
 
 export function publicAgentFailure(code: string | null) {
