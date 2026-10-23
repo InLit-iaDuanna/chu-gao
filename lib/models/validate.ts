@@ -1,14 +1,22 @@
 import { z } from "zod";
+import { creativeConfirmationSchema } from "@/lib/creative-brief";
 
-import { isResolutionAspectRatioSupported } from "@/lib/models/capabilities";
+import { isSizeSupported } from "@/lib/models/capabilities";
 import type {
-  AspectRatio,
   ImageBackground,
+  ImageQuality,
+  ImageSize,
   InternalRequest,
   ModelDefinition,
   OutputFormat,
-  Resolution,
+  ResponseFormat,
 } from "@/lib/models/types";
+import {
+  aspectRatioForSize,
+  IMAGE_QUALITY_OPTIONS,
+  IMAGE_SIZE_OPTIONS,
+  resolutionTierForSize,
+} from "@/lib/models/options";
 import { getConfiguredModel } from "@/lib/models/runtime-config";
 import { normalizeProviderChannelIdForModel } from "@/lib/provider-channels";
 import { normalizeUploadedReferenceKey } from "@/lib/storage";
@@ -28,15 +36,16 @@ export class UnsupportedParamError extends Error {
 }
 
 export const generationRequestSchema = z.object({
+  creative: creativeConfirmationSchema.optional(),
   conversationId: z.string().min(1).optional(),
   userMessage: z.string().min(1).max(4000).optional(),
   assistantMessage: z.string().min(1).max(400).optional(),
   modelId: z.string().min(1),
+  image2Mode: z.enum(["standard", "high"]).optional(),
   prompt: z.string().min(1).max(4000),
   negativePrompt: z.string().max(4000).optional(),
-  aspectRatio: z.string().min(1),
-  resolution: z.enum(["1K", "2K", "4K"]).optional(),
-  image2Mode: z.enum(["standard", "high"]).optional(),
+  size: z.enum(IMAGE_SIZE_OPTIONS).optional(),
+  quality: z.enum(IMAGE_QUALITY_OPTIONS).optional(),
   n: z.number().int().min(1),
   seed: z.number().int().optional(),
   outputFormat: z.enum(["png", "jpeg", "webp"]).optional(),
@@ -44,6 +53,10 @@ export const generationRequestSchema = z.object({
   outputCompression: z.number().int().min(0).max(100).optional(),
   referenceImageKeys: z.array(z.string().min(1)).max(16).optional(),
   sourceImageIds: z.array(z.string().min(1)).max(4).optional(),
+  // Ordered sequence of "upload:<key>" | "source:<id>" tokens that the client
+  // builds from the UI reference list. The server uses this to reconstruct the
+  // exact user-specified reference image order.
+  referenceOrder: z.array(z.string().min(1)).max(20).optional(),
   providerChannelId: z.string().trim().min(1).max(200).optional(),
 });
 
@@ -68,44 +81,34 @@ export function validateAgainstModelDefinition(
   model: ModelDefinition,
 ): InternalRequest {
   const modelId = input.modelId;
-
   const capabilities = model.capabilities;
-  const aspectRatio = input.aspectRatio as AspectRatio;
-  const resolution = input.resolution as Resolution | undefined;
-  const image2Mode = input.image2Mode ?? model.defaults.image2Mode;
+
+  const size = (input.size ?? model.defaults.size) as ImageSize;
+  const quality = (input.quality ??
+    model.defaults.quality ??
+    "auto") as ImageQuality;
+  const responseFormat = model.defaults.responseFormat as ResponseFormat;
   const outputFormat = (input.outputFormat ??
     model.defaults.outputFormat) as OutputFormat;
   const background = (input.background ?? model.defaults.background) as
     | ImageBackground
     | undefined;
 
-  if (!capabilities.aspectRatios.includes(aspectRatio)) {
-    throw new UnsupportedParamError(
-      `aspectRatio ${aspectRatio} 不被 ${model.id} 支持`,
-    );
+  if (!isSizeSupported(model, size)) {
+    throw new UnsupportedParamError(`尺寸 ${size} 不被 ${model.id} 支持`);
   }
 
-  if (!resolution) {
-    throw new ValidationError("缺少 resolution");
+  const supportedQualities = capabilities.qualities ?? ["auto"];
+  if (!supportedQualities.includes(quality)) {
+    throw new UnsupportedParamError(`质量 ${quality} 不被 ${model.id} 支持`);
   }
 
-  if (!capabilities.resolutions.includes(resolution)) {
-    throw new UnsupportedParamError(`resolution ${resolution} 不被支持`);
+  if (!capabilities.responseFormats.includes(responseFormat)) {
+    throw new UnsupportedParamError(`返回格式 ${responseFormat} 不被支持`);
   }
 
-  if (
-    image2Mode &&
-    capabilities.image2Modes &&
-    !capabilities.image2Modes.includes(image2Mode)
-  ) {
-    throw new UnsupportedParamError(`image2Mode ${image2Mode} 不被支持`);
-  }
-
-  if (
-    !isResolutionAspectRatioSupported(capabilities, resolution, aspectRatio)
-  ) {
-    throw new UnsupportedParamError(`${resolution} 不支持 ${aspectRatio} 比例`);
-  }
+  const resolution = resolutionTierForSize(size);
+  const aspectRatio = aspectRatioForSize(size);
 
   if (input.n > capabilities.maxN) {
     throw new ValidationError(`n 必须在 1 到 ${capabilities.maxN} 之间`);
@@ -167,14 +170,20 @@ export function validateAgainstModelDefinition(
   );
 
   return {
+    executionPolicy: input.creative ? "single-submit" : undefined,
     modelId,
+    // Keep the historical pricing axis stable while the public UI uses the
+    // upstream-native quality parameter instead.
+    image2Mode: modelId === "gpt-image-2" ? "standard" : undefined,
     protocol: model.protocol,
     providerChannelId,
     prompt: input.prompt,
     negativePrompt: input.negativePrompt,
+    size,
+    quality,
+    responseFormat,
     aspectRatio,
     resolution,
-    image2Mode,
     n: input.n,
     seed: input.seed,
     outputFormat,
