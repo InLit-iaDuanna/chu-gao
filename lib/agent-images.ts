@@ -66,8 +66,86 @@ import {
 } from "@/lib/rate-limit";
 import {
   normalizeUploadedReferenceKey,
+  saveUploadedReferenceImage,
   statPrivateStorageKey,
 } from "@/lib/storage";
+
+/**
+ * Download a caller-supplied reference image URL, validate it, and persist it
+ * as a user upload so the rest of the pipeline can use it identically to an
+ * explicitly uploaded file.  The upstream URL is never forwarded to callers.
+ */
+async function downloadAndSaveReferenceImageUrl(
+  url: string,
+  userId: string,
+): Promise<string> {
+  let buf: Buffer;
+  try {
+    const resp = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const ab = await resp.arrayBuffer();
+    buf = Buffer.from(ab);
+  } catch (err) {
+    throw new AgentAuthError(
+      "REFERENCE_IMAGE_FETCH_FAILED",
+      `参考图 URL 无法访问：${err instanceof Error ? err.message : "网络错误"}`,
+      400,
+    );
+  }
+  const ct = (await fetch(url, { method: "HEAD", signal: AbortSignal.timeout(5_000) }).catch(() => null))?.headers.get("content-type") ?? "";
+  const mimeType =
+    ct.includes("jpeg") || ct.includes("jpg")
+      ? "image/jpeg"
+      : ct.includes("webp")
+        ? "image/webp"
+        : "image/png";
+  try {
+    const saved = await saveUploadedReferenceImage({ buffer: buf, mimeType, userId });
+    return saved.storageKey;
+  } catch {
+    throw new AgentAuthError(
+      "REFERENCE_IMAGE_FETCH_FAILED",
+      "参考图 URL 内容无效，请检查图片格式",
+      400,
+    );
+  }
+}
+
+import { z } from "zod";
+import { IMAGE_QUALITY_OPTIONS } from "@/lib/models/options";
+
+// Accepted effort labels that map to quality values.
+const EFFORT_TO_QUALITY: Record<string, string> = {
+  low: "low",
+  medium: "medium",
+  high: "high",
+  xhigh: "xhigh",
+  max: "max",
+};
+
+function normalizeApiInput(raw: unknown): unknown {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw;
+  const obj = { ...(raw as Record<string, unknown>) };
+  // `effort` is an alias for `quality`; if both are present `quality` wins.
+  if (obj.effort !== undefined && obj.quality === undefined) {
+    const mapped = EFFORT_TO_QUALITY[String(obj.effort)];
+    if (mapped) obj.quality = mapped;
+  }
+  delete obj.effort;
+  // `image_url` is an alias for a single referenceImageUrl
+  if (typeof obj.image_url === "string" && !obj.referenceImageUrls) {
+    obj.referenceImageUrls = [obj.image_url];
+  }
+  delete obj.image_url;
+  // `images` as array of URL strings or {image_url: string}
+  if (Array.isArray(obj.images) && !obj.referenceImageUrls) {
+    obj.referenceImageUrls = (obj.images as unknown[]).map((item) =>
+      typeof item === "string" ? item : (item as Record<string, string>).image_url ?? "",
+    ).filter(Boolean);
+  }
+  delete obj.images;
+  return obj;
+}
 
 export const agentGenerationSchema = generationRequestSchema
   .omit({
@@ -79,8 +157,16 @@ export const agentGenerationSchema = generationRequestSchema
     image2Mode: true,
     sourceImageIds: true,
   })
-  .extend({ n: generationRequestSchema.shape.n.default(1) })
+  .extend({
+    n: generationRequestSchema.shape.n.default(1),
+    // Inline reference images via URL (downloaded server-side, never forwarded as-is).
+    referenceImageUrls: z.array(z.url()).max(16).optional(),
+  })
   .strict();
+
+export function preprocessAgentInput(raw: unknown): unknown {
+  return normalizeApiInput(raw);
+}
 
 /**
  * Model catalog for v1 callers. API-key callers see the API price list
@@ -159,7 +245,7 @@ export async function submitAgentGeneration(
       "请提供 8 至 128 位 Idempotency-Key",
       400,
     );
-  const parsed = agentGenerationSchema.safeParse(body);
+  const parsed = agentGenerationSchema.safeParse(preprocessAgentInput(body));
   if (!parsed.success)
     throw new AgentAuthError(
       "VALIDATION_ERROR",
@@ -195,7 +281,14 @@ export async function submitAgentGeneration(
   // Keep the upstream's base64 preference independent of the external API result transport.
   if (model.capabilities.responseFormats.includes("b64_json"))
     request.responseFormat = "b64_json";
-  const referenceKeys = input.referenceImageKeys ?? [];
+  // Download any inline URL references first; they become first-class uploads.
+  const urlKeys: string[] = [];
+  for (const url of input.referenceImageUrls ?? []) {
+    const key = await downloadAndSaveReferenceImageUrl(url, sp.user.id);
+    urlKeys.push(key);
+  }
+
+  const referenceKeys = [...urlKeys, ...(input.referenceImageKeys ?? [])];
   for (const key of referenceKeys) {
     const normalized = normalizeUploadedReferenceKey(key);
     if (!normalized || !normalized.startsWith(`uploads/${sp.user.id}/`))
