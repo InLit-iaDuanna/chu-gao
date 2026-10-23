@@ -450,10 +450,37 @@ export async function POST(request: Request) {
       estimatedCredits,
       pricingSnapshotJson,
       conversationId,
-      referenceImageKeys: [
-        ...(parsed.data.referenceImageKeys ?? []),
-        ...sourceReferenceImages.map((image) => image.storageKey),
-      ],
+      referenceImageKeys: (() => {
+        const order = parsed.data.referenceOrder;
+        const uploadKeys = parsed.data.referenceImageKeys ?? [];
+        const sourceStorageKeys = sourceReferenceImages.map((img) => img.storageKey);
+        if (!order?.length) {
+          // Legacy: uploads first, then source images.
+          return [...uploadKeys, ...sourceStorageKeys];
+        }
+        // Reconstruct the ordered list the client specified.
+        const uploadById = new Map(uploadKeys.map((k) => [k, k]));
+        const sourceById = new Map(
+          sourceReferenceImages.map((img) => [img.id, img.storageKey]),
+        );
+        const ordered: string[] = [];
+        for (const token of order) {
+          const [kind, key] = token.split(":", 2) as [string, string];
+          if (kind === "upload") {
+            const resolved = uploadById.get(key);
+            if (resolved) ordered.push(resolved);
+          } else if (kind === "source") {
+            const resolved = sourceById.get(key);
+            if (resolved) ordered.push(resolved);
+          }
+        }
+        // Append any keys not mentioned in the order (shouldn't happen but safe).
+        const seen = new Set(ordered);
+        for (const k of [...uploadKeys, ...sourceStorageKeys]) {
+          if (!seen.has(k)) ordered.push(k);
+        }
+        return ordered;
+      })(),
       userMessage: parsed.data.userMessage,
       assistantMessage: parsed.data.assistantMessage,
     });
