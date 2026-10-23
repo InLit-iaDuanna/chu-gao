@@ -8,8 +8,10 @@ import {
   withChatRuntimeTimeout,
 } from "@/lib/chat-runtime-health";
 import {
+  activeProviderAccountSlots,
   delayGenerationForProviderCapacity,
   positiveInteger,
+  workerConcurrencyTarget,
 } from "@/lib/generation-capacity";
 import { logger } from "@/lib/logger";
 import {
@@ -58,6 +60,11 @@ const STUCK_RECOVERY_INTERVAL_MS = Number(
 const WORKER_HEARTBEAT_INTERVAL_MS = Number(
   process.env.WORKER_HEARTBEAT_INTERVAL_MS ?? 15_000,
 );
+const CONCURRENCY_SYNC_INTERVAL_MS = 30_000;
+const WORKER_CONCURRENCY_BOUNDS = {
+  min: positiveInteger(Number(process.env.WORKER_CONCURRENCY_MIN ?? 4), 4),
+  max: positiveInteger(Number(process.env.WORKER_CONCURRENCY_MAX ?? 64), 64),
+};
 const PROVIDER_CAPACITY_RETRY_MS = Number(
   process.env.PROVIDER_CAPACITY_RETRY_MS ?? 1_500,
 );
@@ -400,6 +407,30 @@ async function main() {
     },
   );
 
+  const syncConcurrency = async () => {
+    try {
+      const slots = await activeProviderAccountSlots(db);
+      const target = workerConcurrencyTarget(slots, WORKER_CONCURRENCY_BOUNDS);
+      if (worker.concurrency !== target) {
+        logger.info(
+          { from: worker.concurrency, to: target, slots },
+          "Generation worker concurrency synced to channel capacity.",
+        );
+        worker.concurrency = target;
+      }
+    } catch (error) {
+      logger.warn(
+        { error: serializeProviderError(error) },
+        "Generation worker concurrency sync failed.",
+      );
+    }
+  };
+  void syncConcurrency();
+  const concurrencyTimer = setInterval(
+    () => void syncConcurrency(),
+    CONCURRENCY_SYNC_INTERVAL_MS,
+  );
+
   const heartbeat = setInterval(() => {
     touchGenerationWorkerHeartbeat().catch((error) => {
       logger.warn(
@@ -430,6 +461,7 @@ async function main() {
   worker.on("closed", () => {
     clearInterval(heartbeat);
     clearInterval(recoveryTimer);
+    clearInterval(concurrencyTimer);
   });
 
   let shuttingDown = false;
@@ -441,6 +473,7 @@ async function main() {
     shuttingDown = true;
     clearInterval(heartbeat);
     clearInterval(recoveryTimer);
+    clearInterval(concurrencyTimer);
     logger.info({ signal }, "Generation worker shutting down.");
     const deadline = setTimeout(() => process.exit(1), 25_000);
 
