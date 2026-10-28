@@ -1,23 +1,66 @@
 @layer base {
+  /* ============================================================
+     Studio 工具风设计令牌（Linear / Raycast / Vercel 一脉）
+     高对比黑白灰 + 单色（mono）强调色；零渐变、零辉光、零模糊。
+     令牌名保持兼容，仅替换值；serif 字栈已并入 sans。
+     ============================================================ */
   :root,
   html.dark {
-    --bg: 8 8 9;
-    --surface: 14 14 16;
+    --bg: 10 10 11;
+    --surface: 15 15 17;
     --surface-2: 22 22 25;
-    --surface-3: 32 32 36;
+    --surface-3: 30 30 34;
 
-    --border: 32 32 36;
-    --border-strong: 56 56 62;
+    --border: 39 39 43;
+    --border-strong: 63 63 69;
 
-    --text: 237 237 240;
-    --text-muted: 150 150 158;
-    --text-faint: 95 95 102;
+    --text: 244 244 245;
+    --text-muted: 154 154 161;
+    --text-faint: 106 106 113;
 
-    --accent: 237 237 240;
-    --success: 76 175 130;
-    --danger: 232 90 79;
-    --warning: 230 175 84;
-    --info: 130 170 230;
+    /* Interactive controls use stronger boundaries than layout separators. */
+    --control-bg: 22 22 25;
+    --control-bg-hover: 30 30 34;
+    --control-selected-bg: 244 244 245;
+    --control-disabled-bg: 30 30 34;
+    --control-border: 96 96 104;
+    --control-border-hover: 132 132 141;
+    --control-selected-border: 244 244 245;
+    --control-disabled-border: 96 96 104;
+    --control-focus: 244 244 245;
+
+    --icon: 244 244 245;
+    --icon-muted: 154 154 161;
+    --icon-disabled: 132 132 141;
+    --icon-selected: 15 15 17;
+
+    /* Alias so rgb(var(--foreground)) resolves to the text ink. */
+    --foreground: var(--text);
+    /* Readable foreground for brand/danger filled surfaces. */
+    --on-brand: 250 250 252;
+    /* Dark ink for accent-filled controls (light chalk accent carries dark text best). */
+    --on-accent: 15 15 17;
+    --on-danger: 15 15 17;
+
+    --accent: var(--brand-primary);
+    --brand-primary: 244 244 245;
+    --success: 63 185 120;
+    --danger: 235 87 87;
+    --warning: 240 177 80;
+    --info: 110 168 254;
+
+    /* 兼容令牌：渐变退化为纯色（新视觉禁止渐变）。 */
+    --gradient-hero-start: var(--brand-primary);
+    --gradient-hero-end: var(--brand-primary);
+    --gradient-accent-start: var(--brand-primary);
+    --gradient-accent-end: var(--brand-primary);
+    --gradient-danger-start: var(--danger);
+    --gradient-danger-end: var(--danger);
+
+    --deco-1: var(--brand-primary);
+    --deco-2: var(--success);
+    --deco-3: var(--warning);
+    --deco-4: var(--info);
 
     --radius-sm: 4px;
     --radius-md: 6px;
@@ -25,19 +68,27 @@
     --radius-xl: 14px;
     --radius-pill: 999px;
 
-    --duration-fast: 120ms;
+    --duration-micro: 120ms;
+    --duration-fast: 150ms;
+    --duration-transition: 200ms;
     --duration-base: 160ms;
     --duration-modal: 200ms;
     --duration-image: 180ms;
+    --duration-reveal: 300ms;
+    --duration-morph: 400ms;
     --duration-slow: 240ms;
     --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
     --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
     --font-stack-sans:
-      "Geist", "HarmonyOS Sans SC", "PingFang SC", system-ui, -apple-system,
-      BlinkMacSystemFont, sans-serif;
-    --font-stack-serif: "Fraunces", "LXGW WenKai", Georgia, serif;
-    --font-stack-mono: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
+      var(--font-geist-sans), "Geist", "HarmonyOS Sans SC", "PingFang SC",
+      system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    /* Serif 已废弃：全部回落到 sans，彻底切断纸墨风字体。 */
+    --font-stack-serif: var(--font-stack-sans);
+    --font-stack-mono:
+      var(--font-geist-mono), "Geist Mono", "JetBrains Mono", ui-monospace,
+      monospace;
 
     --fs-11: 11px;
     --fs-12: 12px;
@@ -53,10 +104,20 @@
     --fs-48: 48px;
     --fs-60: 60px;
 
+    --lh-display: 1.1;
+    --lh-headline: 1.2;
+    --lh-body: 1.6;
+    --lh-caption: 1.5;
+    --lh-label: 1.4;
     --lh-tight: 1.1;
     --lh-snug: 1.3;
     --lh-normal: 1.5;
     --lh-loose: 1.7;
+    --ls-display: -0.04em;
+    --ls-headline: -0.02em;
+    --ls-body: 0;
+    --ls-caption: 0.01em;
+    --ls-label: 0.1em;
     --ls-tight: -0.02em;
     --ls-snug: -0.01em;
     --ls-normal: 0;
@@ -80,36 +141,130 @@
     --s-96: 96px;
     --s-128: 128px;
 
-    --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.06);
-    --shadow-sm: 0 2px 4px -1px rgb(0 0 0 / 0.08), 0 1px 2px rgb(0 0 0 / 0.04);
-    --shadow-md: 0 8px 24px -8px rgb(0 0 0 / 0.18);
-    --shadow-lg: 0 16px 40px -12px rgb(0 0 0 / 0.24);
+    /* 阴影只做极浅的分层，禁止大投影与辉光。 */
+    --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.3);
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.35), 0 1px 1px rgb(0 0 0 / 0.2);
+    --shadow-md: 0 6px 16px -6px rgb(0 0 0 / 0.5);
+    --shadow-lg: 0 12px 32px -12px rgb(0 0 0 / 0.55);
     --shadow-ring: 0 0 0 1px rgb(var(--border));
     --shadow-ring-strong: 0 0 0 1px rgb(var(--border-strong));
-    --shadow-focus: 0 0 0 2px rgb(var(--bg)), 0 0 0 4px rgb(var(--text) / 0.5);
+    --shadow-focus:
+      0 0 0 2px rgb(var(--bg)), 0 0 0 4px rgb(var(--brand-primary) / 0.6);
+    /* 兼容令牌：brutal 硬投影退化为常规浅阴影。 */
+    --shadow-brutal-sm: var(--shadow-sm);
+    --shadow-brutal-md: var(--shadow-md);
+    --shadow-brutal-lg: var(--shadow-lg);
+    --shadow-brutal-brand: var(--shadow-sm);
+    --shadow-brutal-success: var(--shadow-sm);
+    --shadow-brutal-info: var(--shadow-sm);
+    --shadow-brutal-warning: var(--shadow-sm);
   }
 
   html.light {
-    --bg: 252 252 252;
+    --bg: 250 250 250;
     --surface: 255 255 255;
-    --surface-2: 247 247 248;
-    --surface-3: 240 240 242;
-    --border: 232 232 234;
-    --border-strong: 210 210 214;
-    --text: 17 17 19;
-    --text-muted: 102 102 110;
-    --text-faint: 156 156 163;
-    --accent: 17 17 19;
-    --success: 22 128 86;
-    --danger: 196 56 50;
-    --warning: 178 124 32;
-    --info: 56 110 196;
+    --surface-2: 244 244 245;
+    --surface-3: 235 235 237;
+    --border: 228 228 231;
+    --border-strong: 203 203 208;
+    --text: 15 15 17;
+    --text-muted: 104 104 110;
+    --text-faint: 148 148 152;
 
-    --shadow-xs: 0 1px 2px rgb(17 17 19 / 0.04);
-    --shadow-sm:
-      0 2px 4px -1px rgb(17 17 19 / 0.06), 0 1px 2px rgb(17 17 19 / 0.03);
-    --shadow-md: 0 8px 24px -8px rgb(17 17 19 / 0.1);
-    --shadow-lg: 0 16px 40px -12px rgb(17 17 19 / 0.12);
-    --shadow-focus: 0 0 0 2px rgb(var(--bg)), 0 0 0 4px rgb(var(--text) / 0.4);
+    --control-bg: 255 255 255;
+    --control-bg-hover: 244 244 245;
+    --control-selected-bg: 24 24 27;
+    --control-disabled-bg: 244 244 245;
+    --control-border: 148 148 152;
+    --control-border-hover: 104 104 110;
+    --control-selected-border: 24 24 27;
+    --control-disabled-border: 148 148 152;
+    --control-focus: 15 15 17;
+
+    --icon: 15 15 17;
+    --icon-muted: 104 104 110;
+    --icon-disabled: 124 124 130;
+    --icon-selected: 255 255 255;
+    --accent: var(--brand-primary);
+    --brand-primary: 24 24 27;
+    --on-accent: 255 255 255;
+    --on-danger: 250 250 252;
+    --success: 16 128 72;
+    --danger: 202 52 49;
+    --warning: 176 122 24;
+    --info: 37 99 235;
+
+    --shadow-xs: 0 1px 2px rgb(15 15 17 / 0.05);
+    --shadow-sm: 0 1px 2px rgb(15 15 17 / 0.06), 0 1px 1px rgb(15 15 17 / 0.04);
+    --shadow-md: 0 6px 16px -6px rgb(15 15 17 / 0.12);
+    --shadow-lg: 0 12px 32px -12px rgb(15 15 17 / 0.14);
+    --shadow-focus:
+      0 0 0 2px rgb(var(--bg)), 0 0 0 4px rgb(var(--brand-primary) / 0.45);
+  }
+
+  /* ============================================================
+     Studio 工作区——暖米白主题（v8 设计语言）
+     用 :where() 降低特异性，避免被 html.dark / html.light 覆盖。
+     需要比 html.dark(0,1,0) 更高的特异性，所以直接用 .studio-workspace。
+     ============================================================ */
+  html .studio-workspace,
+  html.dark .studio-workspace,
+  html.light .studio-workspace {
+    /* 背景层 */
+    --bg:        245 243 239;   /* #f5f3ef 暖米白主背景 */
+    --surface:   249 247 244;   /* #f9f7f4 卡片 / 助手侧 */
+    --surface-2: 237 234 228;   /* #ede9e4 轻强调背景 */
+    --surface-3: 229 225 218;   /* #e5e1da 最深层悬浮 */
+
+    /* 边框 */
+    --border:        219 215 207; /* #dbd7cf 主分割线（发丝） */
+    --border-strong: 202 198 188; /* #cac6bc 强调边框 */
+
+    /* 文字 */
+    --text:       26 25 22;      /* #1a1916 深墨 */
+    --text-muted: 154 152 144;   /* #9a9890 辅助灰 */
+    --text-faint: 190 188 182;   /* #bebcb6 极浅提示 */
+    --foreground: var(--text);
+
+    /* 控件 */
+    --control-bg:            249 247 244;
+    --control-bg-hover:      237 234 228;
+    --control-selected-bg:   26 25 22;
+    --control-disabled-bg:   237 234 228;
+    --control-border:        154 152 144;
+    --control-border-hover:  104 103 97;
+    --control-selected-border: 26 25 22;
+    --control-disabled-border: 190 188 182;
+    --control-focus:         26 25 22;
+
+    /* 图标 */
+    --icon:          26 25 22;
+    --icon-muted:    154 152 144;
+    --icon-disabled: 190 188 182;
+    --icon-selected: 249 247 244;
+
+    /* 品牌 / 强调（初稿绿） */
+    --brand-primary: 59 106 79;  /* #3b6a4f 深绿 */
+    --accent:        var(--brand-primary);
+    --on-accent:     249 247 244;
+    --on-brand:      249 247 244;
+
+    /* 语义色 */
+    --success: 16 128 72;
+    --danger:  202 52 49;
+    --warning: 176 122 24;
+    --info:    37 99 235;
+
+    /* 阴影 */
+    --shadow-xs: 0 1px 2px rgb(26 25 22 / 0.04);
+    --shadow-sm: 0 1px 2px rgb(26 25 22 / 0.06), 0 1px 1px rgb(26 25 22 / 0.04);
+    --shadow-md: 0 6px 16px -6px rgb(26 25 22 / 0.10);
+    --shadow-lg: 0 12px 32px -12px rgb(26 25 22 / 0.12);
+    --shadow-focus:
+      0 0 0 2px rgb(var(--bg)), 0 0 0 4px rgb(var(--brand-primary) / 0.35);
+
+    /* 字体栈（继承全局） */
+    background: rgb(var(--bg));
+    color:      rgb(var(--text));
   }
 }

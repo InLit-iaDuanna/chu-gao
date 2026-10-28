@@ -1,0 +1,172 @@
+/*
+ * ConversationTimelineV8 — 横排轮次 + scroll-snap proximity
+ *
+ * 使用项目设计令牌（styles/tokens.css）。
+ * .studio-workspace 已覆盖为暖米白调色板，此文件无需硬编码颜色。
+ */
+
+/* ── 滚动容器 ── */
+.timeline {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-snap-type: y proximity;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--border)) transparent;
+  overscroll-behavior-y: none;
+  -webkit-overflow-scrolling: touch;
+}
+.timeline::-webkit-scrollbar {
+  width: 3px;
+}
+.timeline::-webkit-scrollbar-thumb {
+  background: rgb(var(--border-strong));
+  border-radius: 2px;
+}
+
+/* ── 每一轮 ── */
+.turn {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid rgb(var(--border));
+  /* 填满视口让长内容独占屏幕，proximity snap 生效 */
+  min-height: calc(100dvh - 52px - 96px);
+  scroll-snap-align: start;
+  scroll-snap-stop: normal;
+  animation: rowIn 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.turn:first-child {
+  border-top: 1px solid rgb(var(--border));
+}
+
+/* 短内容不强制拉高 */
+.turnShort {
+  min-height: 0;
+}
+
+@keyframes rowIn {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── 序号 ── */
+.num {
+  flex-shrink: 0;
+  width: 44px;
+  display: flex;
+  align-items: flex-start;
+  padding: 24px 0 24px 14px;
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  color: rgb(var(--text-faint));
+  user-select: none;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 用户侧 ── */
+.userCol {
+  flex: 0 0 256px;
+  padding: 24px 18px;
+  border-right: 1px solid rgb(var(--border));
+  background: rgb(var(--bg));
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  max-height: calc(100dvh - 52px - 96px);
+  overflow: hidden;
+}
+.userLabel {
+  font-size: 8.5px;
+  letter-spacing: 0.22em;
+  color: rgb(var(--text-muted));
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+.userText {
+  font-size: 13px;
+  line-height: 1.75;
+  color: rgb(var(--foreground));
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+/* ── 助手侧 ── */
+.asstCol {
+  flex: 1;
+  min-width: 0;
+  padding: 24px 26px 22px;
+  background: rgb(var(--surface));
+}
+.asstId {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 8.5px;
+  letter-spacing: 0.2em;
+  color: rgb(var(--text-muted));
+  margin-bottom: 14px;
+}
+.asstDot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgb(var(--brand-primary));
+  flex-shrink: 0;
+}
+.asstTag {
+  font-size: 8.5px;
+  color: rgb(var(--brand-primary));
+  border: 1px solid rgb(var(--brand-primary) / 0.25);
+  padding: 1px 6px;
+  border-radius: 3px;
+  letter-spacing: 0.06em;
+}
+.statusRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  font-size: 11.5px;
+  color: rgb(var(--text-muted));
+  margin-bottom: 10px;
+}
+
+/* ── 操作行 ── */
+.acts {
+  display: flex;
+  gap: 0;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+/* ── 双栏文字容器 ── */
+.twoColWrap {
+  columns: 2;
+  column-gap: 24px;
+  column-rule: 1px solid rgb(var(--border));
+}
+.twoColWrap > :global(*) {
+  break-inside: avoid;
+}
+/* 代码块、表格跨两栏 */
+.twoColWrap :global(.codeBlock),
+.twoColWrap :global(.artifact),
+.twoColWrap :global(.tableScroll) {
+  column-span: all;
+}
+
+/* ── 回到底部按钮定位 ── */
+.scrollBtn {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+}

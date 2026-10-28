@@ -5,6 +5,11 @@ interface LogoProps {
   className?: string;
 }
 
+/**
+ * 初稿 Logo — 喜茶式极简字标
+ * md: 汉字「初稿」+ 小号拼音「Chūgǎo」竖向叠排
+ * sm: 仅显示汉字「初」字方块
+ */
 export function Logo({
   size = "md",
   className,
@@ -12,27 +17,36 @@ export function Logo({
   const compact = size === "sm";
 
   return (
-    <div className={cn("flex min-w-0 items-center gap-2.5", className)}>
-      <div className="relative flex h-6 w-6 shrink-0 items-center justify-center text-foreground">
-        <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 16 16">
-          <rect
-            x="2.5"
-            y="2.5"
-            width="8"
-            height="8"
-            rx="1.5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1"
-          />
-          <rect x="6" y="6" width="7" height="7" rx="1.2" fill="currentColor" />
-        </svg>
-      </div>
-      {!compact ? (
-        <span className="truncate text-[14px] font-semibold leading-none tracking-[-0.01em] text-foreground">
-          Chūgǎo
+    <div className={cn("flex min-w-0 shrink-0 items-center", className)}>
+      {compact ? (
+        /* 紧凑版：单字方块 */
+        <span
+          aria-label="初稿"
+          className="inline-flex h-7 w-7 items-center justify-center rounded-[5px] bg-foreground text-[13px] font-bold leading-none text-background"
+          style={{ fontFamily: "var(--font-stack-sans)", letterSpacing: 0 }}
+        >
+          初
         </span>
-      ) : null}
+      ) : (
+        /* 标准版：字标 */
+        <span
+          aria-label="初稿 Chūgǎo"
+          className="logo-wordmark inline-flex flex-col items-start leading-none"
+        >
+          <span
+            className="logo-hanzi block text-[17px] font-semibold tracking-[0.05em] text-foreground"
+            style={{ fontFamily: "var(--font-stack-sans)" }}
+          >
+            初稿
+          </span>
+          <span
+            className="logo-pinyin block text-[8.5px] font-normal tracking-[0.22em] text-text-muted"
+            style={{ fontFamily: "var(--font-stack-sans)", marginTop: "1px" }}
+          >
+            CHŪGǍO
+          </span>
+        </span>
+      )}
     </div>
   );
 }
