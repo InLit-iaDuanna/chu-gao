@@ -1918,7 +1918,23 @@ export function StudioApp({
               </div>
             </>
           ) : (
-            <ConversationTimelineV8
+            me?.role === "ADMIN" ? <ConversationTimelineV8
+              conversation={conversation}
+              generations={generations}
+              models={models}
+              pending={pending}
+              streaming={streaming}
+              status={status}
+              managedTurnId={managedTurnId}
+              connection={chatConnection}
+              disabled={locked}
+              onEdit={handleUsePrompt}
+              onReference={handleUseAsReference}
+              onOpen={(generation, index) => setLightbox({ generation, index })}
+              onRetry={(generation) => void retry(generation)}
+              onCancel={(id) => void cancel(id)}
+              onRetryChat={(id, attemptId) => void retryChatTurn(id, attemptId)}
+            /> : <ConversationTimeline
               conversation={conversation}
               generations={generations}
               models={models}
