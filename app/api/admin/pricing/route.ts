@@ -9,9 +9,17 @@ import {
 import { db } from "@/lib/db";
 import { listModelsWithPricing } from "@/lib/model-pricing";
 import { getConfiguredModel } from "@/lib/models/runtime-config";
+import { getProviderChannelDisplayNameMap } from "@/lib/provider-channel-config";
+import {
+  buildProviderChannelsFromAccounts,
+  supportsProviderChannels,
+  toPublicProviderChannels,
+} from "@/lib/provider-channels";
+import { providerProtocolToModelProtocol } from "@/lib/providers/protocols";
 import { modelPricingPatchSchema, modelPricingSchema } from "@/lib/validators";
 
 function isSimpleMatrixRule(data: {
+  image2Mode?: string | null;
   aspectRatio?: string | null;
   outputFormat?: string | null;
   background?: string | null;
@@ -37,16 +45,71 @@ export async function GET(request: Request) {
     return fail("SERVICE_UNAVAILABLE", "定价服务未配置数据库", { status: 503 });
   }
 
-  const [models, rules] = await Promise.all([
+  const [baseModels, rules, providers, displayNameMap] = await Promise.all([
     listModelsWithPricing(),
     db.modelPricing.findMany({
       orderBy: [
         { modelId: "asc" },
+        { providerChannelId: "asc" },
         { priority: "desc" },
         { updatedAt: "desc" },
       ],
     }),
+    db.provider.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        name: true,
+        protocol: true,
+        modelsSupported: true,
+        accounts: {
+          where: { isActive: true },
+          select: {
+            id: true,
+            baseUrl: true,
+            isActive: true,
+            health: true,
+            cooldownUntil: true,
+          },
+        },
+      },
+    }),
+    getProviderChannelDisplayNameMap(),
   ]);
+  const models = baseModels.map((model) => {
+    if (!supportsProviderChannels(model.id)) {
+      return model;
+    }
+
+    const accounts = providers
+      .filter((provider) => {
+        const expectedProtocol = providerProtocolToModelProtocol(
+          provider.protocol,
+        );
+        const aliases =
+          model.id === "gpt-image-2"
+            ? [model.id, "gpt-image-2-standard", "gpt-image-2-high"]
+            : [model.id];
+
+        return (
+          model.protocol === expectedProtocol &&
+          aliases.some((id) => provider.modelsSupported.includes(id))
+        );
+      })
+      .flatMap((provider) =>
+        provider.accounts.map((account) => ({
+          ...account,
+          provider: { id: provider.id, name: provider.name },
+        })),
+      );
+
+    return {
+      ...model,
+      providerChannels: toPublicProviderChannels(
+        buildProviderChannelsFromAccounts(accounts, { displayNameMap }),
+      ),
+    };
+  });
 
   return ok({ models, rules });
 }
@@ -89,6 +152,7 @@ export async function POST(request: Request) {
       ? await db.modelPricing.findFirst({
           where: {
             modelId: parsed.data.modelId,
+            providerChannelId: parsed.data.providerChannelId ?? null,
             image2Mode: parsed.data.image2Mode ?? null,
             resolution: parsed.data.resolution,
             aspectRatio: null,
@@ -104,7 +168,6 @@ export async function POST(request: Request) {
         where: { id: existingRule.id },
         data: {
           ...parsed.data,
-          image2Mode: parsed.data.image2Mode ?? null,
           aspectRatio: null,
           outputFormat: null,
           background: null,
@@ -116,7 +179,6 @@ export async function POST(request: Request) {
     : await db.modelPricing.create({
         data: {
           ...parsed.data,
-          image2Mode: parsed.data.image2Mode ?? null,
           updatedBy: admin.id,
         },
       });

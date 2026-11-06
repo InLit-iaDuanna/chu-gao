@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>方案 A — 宽流 · 方案 B — 翻页</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:rgb(13 13 15);
+  --surface:rgb(19 19 22);
+  --surface-2:rgb(26 26 30);
+  --surface-3:rgb(34 34 40);
+  --border:rgb(42 42 50);
+  --border-s:rgb(62 62 74);
+  --text:rgb(242 242 244);
+  --muted:rgb(148 148 162);
+  --faint:rgb(92 92 106);
+  --hi:rgb(158 211 192);
+  --hi-ink:rgb(18 44 36);
+  --r-sm:6px;--r-md:10px;--r-lg:14px;--r-xl:18px;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);
+  font-family:-apple-system,"Geist","PingFang SC",sans-serif;font-size:15px;}
+
+/* ═══════════════════════════════════════
+   SHARED CHROME
+═══════════════════════════════════════ */
+.chrome{display:grid;grid-template-rows:auto 1fr auto;height:100dvh;overflow:hidden}
+
+.topbar{
+  display:flex;align-items:center;gap:10px;
+  height:52px;padding:0 18px;
+  border-bottom:1px solid var(--border);
+  background:var(--bg);flex-shrink:0;
+}
+.logo-mark{display:flex;flex-direction:column;gap:1px;line-height:1}
+.logo-han{font-size:16px;font-weight:600;letter-spacing:.06em}
+.logo-pin{font-size:8px;letter-spacing:.24em;color:var(--muted)}
+.divider{width:1px;height:16px;background:var(--border);margin:0 4px}
+.conv-title{font-size:13px;color:var(--muted)}
+
+.dock{
+  flex-shrink:0;padding:12px 20px 16px;
+  border-top:1px solid var(--border);background:var(--bg);
+}
+.dock-box{
+  border:1px solid rgba(62,62,74,.6);
+  border-radius:var(--r-xl);
+  background:var(--surface);
+  transition:border-color .18s,box-shadow .18s;
+}
+.dock-box:focus-within{
+  border-color:rgba(158,211,192,.55);
+  box-shadow:0 0 0 2px rgba(158,211,192,.07);
+}
+.dock-ta{
+  width:100%;padding:13px 16px 8px;
+  background:transparent;border:0;outline:0;resize:none;
+  font:inherit;font-size:14.5px;line-height:1.65;color:var(--text);
+}
+.dock-ta::placeholder{color:var(--faint)}
+.dock-bar{display:flex;align-items:center;gap:6px;padding:7px 12px}
+.dock-model{
+  display:inline-flex;align-items:center;gap:6px;
+  height:30px;padding:0 10px;border-radius:var(--r-sm);
+  border:1px solid var(--border);background:var(--surface-2);
+  font-size:12px;color:var(--muted);cursor:pointer;
+}
+.sp{flex:1}
+.btn-send{
+  width:34px;height:34px;border-radius:50%;
+  border:1px solid var(--border-s);background:var(--surface-2);
+  color:var(--text);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+}
+.btn-send:hover{background:var(--surface-3)}
+.btn-gen{
+  display:inline-flex;align-items:center;gap:6px;
+  height:34px;padding:0 15px;border-radius:999px;
+  border:0;background:var(--hi);color:var(--hi-ink);
+  font-size:13px;font-weight:500;cursor:pointer;
+  transition:opacity .14s,transform .08s;
+}
+.btn-gen:hover{opacity:.88}
+.btn-gen:active{transform:scale(.96)}
+.dock-hint{font-size:11px;color:var(--faint);margin-top:6px;padding:0 4px}
+
+/* ═══════════════════════════════════════
+   SCHEME SELECTOR TABS
+═══════════════════════════════════════ */
+.scheme-tabs{
+  display:flex;gap:0;
+  background:var(--bg);border-bottom:1px solid var(--border);
+  padding:0 20px;
+}
+.scheme-tab{
+  padding:0 18px;height:42px;
+  border:0;background:transparent;
+  font:inherit;font-size:13px;color:var(--muted);
+  cursor:pointer;border-bottom:2px solid transparent;
+  margin-bottom:-1px;transition:color .15s,border-color .15s;
+}
+.scheme-tab.active{color:var(--hi);border-bottom-color:var(--hi)}
+.scheme-tab .badge{
+  display:inline-block;margin-left:7px;
+  font-size:10px;letter-spacing:.08em;color:var(--hi-ink);
+  background:var(--hi);border-radius:999px;padding:1px 7px;
+}
+
+/* ═══════════════════════════════════════
+   SCHEME A — WIDE FLOW
+   宽流：卡片宽度 560-640px，轻微错落，左右滚动，
+   切换带 slide+fade 过渡
+═══════════════════════════════════════ */
+.scheme-a{display:none;flex:1;min-height:0;flex-direction:column;overflow:hidden}
+.scheme-a.visible{display:flex}
+
+.rail-a{
+  flex:1;min-height:0;
+  display:flex;align-items:flex-start;gap:16px;
+  overflow-x:auto;overflow-y:hidden;
+  padding:24px 28px;
+  scroll-behavior:smooth;scrollbar-width:none;
+}
+.rail-a::-webkit-scrollbar{display:none}
+
+.card-a{
+  flex-shrink:0;width:560px;
+  display:flex;flex-direction:column;gap:0;
+  border-radius:var(--r-xl);
+  border:1px solid var(--border);
+  background:var(--surface);
+  overflow:hidden;
+  /* stagger animation */
+  animation:cardIn .3s ease both;
+}
+.card-a:nth-child(2n){margin-top:16px}
+.card-a:nth-child(3n){margin-top:8px}
+@keyframes cardIn{
+  from{opacity:0;transform:translateY(12px) scale(.97)}
+  to{opacity:1;transform:none}
+}
+.card-a:nth-child(1){animation-delay:.0s}
+.card-a:nth-child(2){animation-delay:.06s}
+.card-a:nth-child(3){animation-delay:.12s}
+.card-a:nth-child(4){animation-delay:.18s}
+.card-a:nth-child(5){animation-delay:.24s}
+
+/* 用户消息区 */
+.ca-user{
+  padding:16px 20px 14px;
+  border-bottom:1px solid var(--border);
+  background:var(--surface-2);
+}
+.ca-user-label{font-size:11px;color:var(--faint);margin-bottom:6px;letter-spacing:.06em}
+.ca-user-text{font-size:14.5px;line-height:1.65;color:var(--text)}
+
+/* 助手区 */
+.ca-asst{padding:16px 20px 12px;display:flex;flex-direction:column;gap:10px}
+.ca-asst-header{
+  display:flex;align-items:center;gap:7px;
+  font-size:11px;font-weight:600;color:var(--muted);
+}
+.hi-dot{width:5px;height:5px;border-radius:50%;background:var(--hi)}
+.img-num{color:var(--faint);font-weight:400}
+.ca-asst-text{font-size:14px;line-height:1.72;color:var(--text)}
+
+/* 图片区 */
+.ca-img{
+  border-radius:var(--r-md);overflow:hidden;
+  border:1px solid var(--border);
+  aspect-ratio:1;width:100%;
+  display:flex;align-items:center;justify-content:center;
+  flex-direction:column;gap:8px;
+  font-size:12px;color:var(--muted);
+}
+.prog{width:60%;height:3px;border-radius:999px;background:var(--border)}
+.prog-fill{height:100%;width:72%;background:var(--hi);border-radius:999px;
+  animation:progPulse 1.4s ease-in-out infinite}
+@keyframes progPulse{0%,100%{opacity:1}50%{opacity:.55}}
+
+/* 图片完成 */
+.ca-img-done{
+  border-radius:var(--r-md);overflow:hidden;
+  aspect-ratio:1;width:100%;
+  display:flex;align-items:center;justify-content:center;
+}
+
+/* 底部操作 */
+.ca-actions{
+  display:flex;align-items:center;gap:2px;
+  padding:10px 16px 12px;
+  border-top:1px solid var(--border);
+}
+.act-btn{
+  display:inline-flex;align-items:center;gap:5px;
+  height:28px;padding:0 8px;border-radius:var(--r-sm);
+  border:0;background:transparent;
+  font-size:12px;color:var(--muted);cursor:pointer;
+}
+.act-btn:hover{background:var(--surface-2);color:var(--text)}
+
+/* 右侧偷窥提示 */
+.peek-hint{
+  position:absolute;right:0;top:0;bottom:0;width:60px;
+  background:linear-gradient(to right,transparent,var(--bg) 90%);
+  pointer-events:none;
+  display:flex;align-items:center;justify-content:flex-end;padding-right:8px;
+}
+
+
+/* ═══════════════════════════════════════
+   SCHEME B — IMMERSIVE SNAP
+   沉浸式：每次全屏展示一轮，左右 snap 翻页，
+   边缘窥视提示上下轮
+═══════════════════════════════════════ */
+.scheme-b{display:none;flex:1;min-height:0;position:relative;overflow:hidden}
+.scheme-b.visible{display:flex;flex-direction:column}
+
+.snap-rail{
+  flex:1;min-height:0;
+  display:flex;
+  overflow-x:auto;overflow-y:hidden;
+  scroll-snap-type:x mandatory;
+  scrollbar-width:none;
+  padding:20px 0;
+}
+.snap-rail::-webkit-scrollbar{display:none}
+
+.snap-card{
+  flex-shrink:0;
+  width:calc(100% - 80px); /* 两侧各露 40px */
+  margin:0 12px;
+  border-radius:var(--r-xl);
+  border:1px solid var(--border);
+  background:var(--surface);
+  scroll-snap-align:center;
+  display:flex;flex-direction:column;gap:0;
+  overflow:hidden;
+  transition:transform .3s ease,opacity .3s ease;
+}
+/* 首尾加额外 margin 让第一/最后一张也能居中 */
+.snap-card:first-child{margin-left:40px}
+.snap-card:last-child{margin-right:40px}
+
+/* 非中心卡片缩小 */
+.snap-card:not(.snap-active){
+  transform:scale(.96);opacity:.55;
+}
+.snap-card.snap-active{transform:scale(1);opacity:1}
+
+/* 导航指示点 */
+.snap-dots{
+  display:flex;justify-content:center;align-items:center;gap:6px;
+  padding:8px 0 4px;flex-shrink:0;
+}
+.snap-dot{
+  width:6px;height:6px;border-radius:50%;
+  background:var(--border-s);transition:all .2s;
+}
+.snap-dot.active{background:var(--hi);width:20px;border-radius:3px}
+
+/* 内容布局：左侧消息，右侧图/文 */
+.sb-layout{display:grid;grid-template-columns:1fr 1fr;min-height:280px;height:100%}
+.sb-left{
+  padding:22px 20px;
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;gap:12px;
+}
+.sb-right{
+  padding:22px 20px;
+  display:flex;flex-direction:column;gap:10px;
+}
+.sb-label{font-size:11px;letter-spacing:.08em;color:var(--faint)}
+.sb-user-text{font-size:15px;line-height:1.7;color:var(--text)}
+.sb-asst-header{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:600;color:var(--muted)}
+.sb-asst-text{font-size:14px;line-height:1.72;color:var(--text)}
+
+/* 翻页箭头 */
+.snap-arrow{
+  position:absolute;top:50%;transform:translateY(-50%);
+  width:36px;height:36px;border-radius:50%;
+  border:1px solid var(--border-s);background:var(--surface);
+  display:flex;align-items:center;justify-content:center;
+  color:var(--muted);cursor:pointer;z-index:10;
+  box-shadow:0 2px 10px rgba(0,0,0,.3);
+  transition:color .15s,background .15s;
+}
+.snap-arrow:hover{background:var(--surface-2);color:var(--text)}
+.snap-arrow.left{left:6px}
+.snap-arrow.right{right:6px}
+
+/* 轮次数字 */
+.turn-num{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:18px;height:18px;border-radius:50%;
+  background:var(--surface-3);border:1px solid var(--border-s);
+  font-size:10px;color:var(--muted);flex-shrink:0;
+}
+
+/* 通用 */
+svg{display:inline-block;vertical-align:middle}
+</style>
+</head>
+<body>
+<div class="chrome">
+
+<!-- 顶栏 -->
+<header class="topbar">
+  <span class="logo-mark">
+    <span class="logo-han">初稿</span>
+    <span class="logo-pin">CHŪGǍO</span>
+  </span>
+  <span class="divider"></span>
+  <span class="conv-title">毕业设计 · 包装系列</span>
+</header>
+
+<!-- 方案切换 Tabs -->
+<div class="scheme-tabs">
+  <button class="scheme-tab active" onclick="switchScheme('a',this)">
+    方案 A — 宽流布局<span class="badge">较宽松</span>
+  </button>
+  <button class="scheme-tab" onclick="switchScheme('b',this)">
+    方案 B — 沉浸翻页<span class="badge">全屏感</span>
+  </button>
+</div>
+
+<!-- ═══ 方案 A ═══ -->
+<div class="scheme-a visible" id="scheme-a">
+  <div class="rail-a" id="rail-a">
+
+    <!-- 轮 1 -->
+    <article class="card-a">
+      <div class="ca-user">
+        <div class="ca-user-label">你</div>
+        <p class="ca-user-text">帮我设计一款茶饮品牌的包装，风格参考无印良品，简约但有质感。</p>
+      </div>
+      <div class="ca-asst">
+        <div class="ca-asst-header"><span class="hi-dot"></span>初稿</div>
+        <p class="ca-asst-text">好的，我们可以从这几个方向入手：米白色底 + 单色压印质感，克制的中文字体配留白构图。你希望突出哪一类茶？（绿茶、白茶、乌龙还是花茶？）另外，是否需要系列化（多 SKU 变体）？</p>
+      </div>
+      <div class="ca-actions">
+        <button class="act-btn">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><rect x="5" y="5" width="9" height="9" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M11 5V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h1" stroke="currentColor" stroke-width="1.4"/></svg>
+          复制
+        </button>
+        <button class="act-btn">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M2 14l4-1 8-8a1.4 1.4 0 0 0-2-2L4 11 2 14z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+          使用
+        </button>
+      </div>
+    </article>
+
+    <!-- 轮 2 -->
+    <article class="card-a">
+      <div class="ca-user">
+        <div class="ca-user-label">你</div>
+        <p class="ca-user-text">绿茶系列，三个 SKU，颜色分别是淡绿、青灰、浅黄，要体现东方茶道的静谧感。</p>
+      </div>
+      <div class="ca-asst">
+        <div class="ca-asst-header"><span class="hi-dot"></span>初稿</div>
+        <p class="ca-asst-text">明白了，方案整理：<br><br>
+        <b>底色</b> 淡绿 #E8EFE4 · 青灰 #B8C6C8 · 浅黄 #F5EDDB<br>
+        <b>字体</b> 细宋或现代黑，配拼音副标题<br>
+        <b>图形</b> 毛笔轮廓线描茶叶，低饱和度<br><br>
+        你可以点「生图」生成第一版包装概念图。</p>
+      </div>
+      <div class="ca-actions">
+        <button class="act-btn">复制</button>
+        <button class="act-btn">使用</button>
+      </div>
+    </article>
+
+    <!-- 轮 3：生图进行中 -->
+    <article class="card-a" style="width:420px">
+      <div class="ca-user">
+        <div class="ca-user-label">你</div>
+        <p class="ca-user-text">先生一张淡绿款的包装正面图。</p>
+      </div>
+      <div class="ca-asst">
+        <div class="ca-asst-header">
+          <span class="hi-dot"></span>初稿
+          <span class="img-num">图1 · 生成中</span>
+        </div>
+        <p style="font-size:11px;color:var(--muted)">Flux 1.1 Pro</p>
+        <div class="ca-img">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" stroke-width="1.5"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><path d="M3 16l5-5 4 4 3-3 5 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+          <span>72%</span>
+          <div class="prog"><div class="prog-fill"></div></div>
+        </div>
+      </div>
+    </article>
+
+    <!-- 轮 4：图已完成 -->
+    <article class="card-a" style="width:420px">
+      <div class="ca-user">
+        <div class="ca-user-label">你</div>
+        <p class="ca-user-text">根据图1，改成青灰款，字体稍微粗一点。</p>
+      </div>
+      <div class="ca-asst">
+        <div class="ca-asst-header">
+          <span class="hi-dot"></span>初稿
+          <span class="img-num">图2</span>
+        </div>
+        <div class="ca-img-done" style="background:linear-gradient(135deg,#b8c6c8,#7a9ea2)">
+          <div style="text-align:center">
+            <div style="font-size:28px;font-weight:700;color:#2a3f42;letter-spacing:.12em">青</div>
+            <div style="font-size:10px;color:rgba(42,63,66,.6);letter-spacing:.28em;margin-top:4px">QĪNG · PURE</div>
+          </div>
+        </div>
+      </div>
+      <div class="ca-actions">
+        <button class="act-btn">放大</button>
+        <button class="act-btn">下载</button>
+        <button class="act-btn">继续修改</button>
+      </div>
+    </article>
+
+    <!-- 轮 5 -->
+    <article class="card-a">
+      <div class="ca-user">
+        <div class="ca-user-label">你</div>
+        <p class="ca-user-text">很好！帮我写一段这个系列的品牌文案，不超过 50 字。</p>
+      </div>
+      <div class="ca-asst">
+        <div class="ca-asst-header"><span class="hi-dot"></span>初稿</div>
+        <p class="ca-asst-text" style="font-style:italic;line-height:1.9">「以山泉入杯，以留白入心。<br>三款绿意，三种清醒。<br>—— 初绿 · 青灰 · 浅黄，东方茶道静谧系列。」</p>
+      </div>
+      <div class="ca-actions">
+        <button class="act-btn">复制</button>
+        <button class="act-btn">使用</button>
+      </div>
+    </article>
+
+    <div style="width:28px;flex-shrink:0"></div>
+  </div>
+</div>
+
+<!-- ═══ 方案 B ═══ -->
+<div class="scheme-b" id="scheme-b">
+  <div class="snap-rail" id="snap-rail">
+
+    <!-- 卡 1 -->
+    <article class="snap-card snap-active">
+      <div class="sb-layout">
+        <div class="sb-left">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="turn-num">1</span>
+            <span class="sb-label">你</span>
+          </div>
+          <p class="sb-user-text">帮我设计一款茶饮品牌的包装，风格参考无印良品，简约但有质感。</p>
+        </div>
+        <div class="sb-right">
+          <div class="sb-asst-header"><span class="hi-dot"></span>初稿</div>
+          <p class="sb-asst-text">好的，可以从米白色底 + 单色压印质感入手，克制中文字体配留白构图。你希望突出哪一类茶，以及是否需要系列化？</p>
+          <div style="margin-top:auto;display:flex;gap:4px">
+            <button class="act-btn" style="font-size:11px">复制</button>
+            <button class="act-btn" style="font-size:11px">使用</button>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- 卡 2 -->
+    <article class="snap-card">
+      <div class="sb-layout">
+        <div class="sb-left">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="turn-num">2</span>
+            <span class="sb-label">你</span>
+          </div>
+          <p class="sb-user-text">绿茶系列，三个 SKU，淡绿、青灰、浅黄，体现东方静谧感。</p>
+        </div>
+        <div class="sb-right">
+          <div class="sb-asst-header"><span class="hi-dot"></span>初稿</div>
+          <p class="sb-asst-text"><b>底色</b> 淡绿 / 青灰 / 浅黄<br><b>字体</b> 细宋 + 拼音副标<br><b>图形</b> 毛笔线描茶叶<br><br>点「生图」可生成第一版。</p>
+        </div>
+      </div>
+    </article>
+
+    <!-- 卡 3：图 -->
+    <article class="snap-card">
+      <div class="sb-layout">
+        <div class="sb-left">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="turn-num">3</span>
+            <span class="sb-label">你</span>
+          </div>
+          <p class="sb-user-text">先生一张淡绿款包装正面图。</p>
+        </div>
+        <div class="sb-right">
+          <div class="sb-asst-header"><span class="hi-dot"></span>初稿 <span class="img-num" style="font-size:11px">图1</span></div>
+          <div class="ca-img" style="flex:1">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" stroke-width="1.5"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><path d="M3 16l5-5 4 4 3-3 5 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+            <span style="font-size:12px">生成中 72%</span>
+            <div class="prog"><div class="prog-fill"></div></div>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- 卡 4：图已完成 -->
+    <article class="snap-card">
+      <div class="sb-layout">
+        <div class="sb-left">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="turn-num">4</span>
+            <span class="sb-label">你</span>
+          </div>
+          <p class="sb-user-text">根据图1，改成青灰款，字体稍粗。</p>
+        </div>
+        <div class="sb-right">
+          <div class="sb-asst-header"><span class="hi-dot"></span>初稿 <span class="img-num" style="font-size:11px">图2</span></div>
+          <div class="ca-img-done" style="background:linear-gradient(135deg,#b8c6c8,#7a9ea2);flex:1;border-radius:var(--r-md)">
+            <div style="text-align:center">
+              <div style="font-size:32px;font-weight:700;color:#2a3f42;letter-spacing:.12em">青</div>
+              <div style="font-size:10px;color:rgba(42,63,66,.6);letter-spacing:.28em;margin-top:4px">QĪNG · PURE</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:4px;margin-top:8px">
+            <button class="act-btn" style="font-size:11px">放大</button>
+            <button class="act-btn" style="font-size:11px">下载</button>
+            <button class="act-btn" style="font-size:11px">继续修改</button>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- 卡 5 -->
+    <article class="snap-card">
+      <div class="sb-layout">
+        <div class="sb-left">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="turn-num">5</span>
+            <span class="sb-label">你</span>
+          </div>
+          <p class="sb-user-text">帮我写一段品牌文案，不超过 50 字。</p>
+        </div>
+        <div class="sb-right">
+          <div class="sb-asst-header"><span class="hi-dot"></span>初稿</div>
+          <p class="sb-asst-text" style="font-style:italic;line-height:2">「以山泉入杯，以留白入心。三款绿意，三种清醒。—— 初绿 · 青灰 · 浅黄，东方茶道静谧系列。」</p>
+          <div style="margin-top:auto;display:flex;gap:4px">
+            <button class="act-btn" style="font-size:11px">复制</button>
+          </div>
+        </div>
+      </div>
+    </article>
+
+  </div>
+
+  <!-- 导航点 -->
+  <div class="snap-dots" id="snap-dots">
+    <span class="snap-dot active"></span>
+    <span class="snap-dot"></span>
+    <span class="snap-dot"></span>
+    <span class="snap-dot"></span>
+    <span class="snap-dot"></span>
+  </div>
+
+  <!-- 翻页箭头 -->
+  <button class="snap-arrow left" id="snap-left" onclick="snapNav(-1)">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9 3L5 7l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+  <button class="snap-arrow right" id="snap-right" onclick="snapNav(1)">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M5 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+</div>
+
+<!-- 输入栏（两个方案共用） -->
+<div class="dock">
+  <div class="dock-box">
+    <textarea class="dock-ta" rows="2" placeholder="继续描述，或点「生图」生成新版本…"></textarea>
+    <div class="dock-bar">
+      <button class="dock-model">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.4"/></svg>
+        Flux 1.1 Pro
+        <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+      </button>
+      <div class="sp"></div>
+      <button class="btn-send" title="发送对话">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 12V4M4 8l4-4 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button class="btn-gen">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2l1.4 3.4L13 7l-3.6 1.6L8 12l-1.4-3.4L3 7l3.6-1.6L8 2z" fill="currentColor"/></svg>
+        生图
+      </button>
+    </div>
+  </div>
+  <p class="dock-hint">↑ 发送 = 纯对话 · ✦ 生图 = 生成图片 · 引用图1/图2 时模型会记住顺序</p>
+</div>
+
+</div><!-- end chrome -->
+
+<script>
+/* 方案切换 */
+function switchScheme(id, tab) {
+  document.querySelectorAll('.scheme-a,.scheme-b').forEach(el => el.classList.remove('visible'));
+  document.querySelectorAll('.scheme-tab').forEach(el => el.classList.remove('active'));
+  document.getElementById('scheme-' + id).classList.add('visible');
+  tab.classList.add('active');
+}
+
+/* 方案 B snap 导航 */
+let currentSnap = 0;
+const snapCards = () => document.querySelectorAll('.snap-card');
+const snapDots = () => document.querySelectorAll('.snap-dot');
+
+function snapNav(dir) {
+  const cards = snapCards();
+  currentSnap = Math.max(0, Math.min(cards.length - 1, currentSnap + dir));
+  updateSnap();
+}
+
+function updateSnap() {
+  const cards = snapCards();
+  const rail = document.getElementById('snap-rail');
+  cards.forEach((c, i) => {
+    c.classList.toggle('snap-active', i === currentSnap);
+  });
+  snapDots().forEach((d, i) => d.classList.toggle('active', i === currentSnap));
+  // scroll into view
+  const target = cards[currentSnap];
+  if (target) {
+    const railRect = rail.getBoundingClientRect();
+    const cardRect = target.getBoundingClientRect();
+    const offset = cardRect.left - railRect.left + rail.scrollLeft - (railRect.width - cardRect.width) / 2;
+    rail.scrollTo({ left: offset, behavior: 'smooth' });
+  }
+  document.getElementById('snap-left').style.opacity = currentSnap === 0 ? '0.3' : '1';
+  document.getElementById('snap-right').style.opacity = currentSnap === cards.length - 1 ? '0.3' : '1';
+}
+
+// init B
+updateSnap();
+
+// keyboard nav for B
+document.addEventListener('keydown', e => {
+  if (!document.getElementById('scheme-b').classList.contains('visible')) return;
+  if (e.key === 'ArrowRight') snapNav(1);
+  if (e.key === 'ArrowLeft') snapNav(-1);
+});
+
+// touch swipe for B
+let tx = 0;
+document.getElementById('snap-rail').addEventListener('touchstart', e => { tx = e.touches[0].clientX; }, { passive: true });
+document.getElementById('snap-rail').addEventListener('touchend', e => {
+  const dx = e.changedTouches[0].clientX - tx;
+  if (Math.abs(dx) > 40) snapNav(dx < 0 ? 1 : -1);
+});
+</script>
+</body>
+</html>

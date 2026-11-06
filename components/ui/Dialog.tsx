@@ -1,42 +1,30 @@
 "use client";
 
-import { createContext, useContext, useEffect, useRef } from "react";
+import * as RadixDialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-import { IconButton } from "./IconButton";
-
-interface DialogContextValue {
+interface DialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-}
-
-interface DialogProps extends DialogContextValue {
   children: React.ReactNode;
 }
 
-type DialogContentProps = React.HTMLAttributes<HTMLDivElement>;
-
-const DialogContext = createContext<DialogContextValue | null>(null);
-
-function useDialogContext(): DialogContextValue {
-  const context = useContext(DialogContext);
-  if (!context) {
-    throw new Error("Dialog components must be used inside Dialog.");
-  }
-  return context;
-}
-
+/**
+ * Accessible modal built on Radix Dialog — focus trap, scroll lock, Esc-to-close,
+ * focus restore, and aria-labelledby/describedby (wired automatically from
+ * DialogTitle/DialogDescription) all come for free.
+ */
 export function Dialog({
   open,
   onOpenChange,
   children,
 }: DialogProps): React.ReactElement {
   return (
-    <DialogContext.Provider value={{ open, onOpenChange }}>
+    <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
       {children}
-    </DialogContext.Provider>
+    </RadixDialog.Root>
   );
 }
 
@@ -45,76 +33,45 @@ export function DialogTrigger({
 }: {
   children: React.ReactElement;
 }): React.ReactElement {
-  const context = useDialogContext();
-
-  return <span onClick={() => context.onOpenChange(true)}>{children}</span>;
+  return <RadixDialog.Trigger asChild>{children}</RadixDialog.Trigger>;
 }
+
+type DialogContentProps = Omit<
+  React.ComponentPropsWithoutRef<typeof RadixDialog.Content>,
+  "children"
+> & {
+  children: React.ReactNode;
+  /** Hide the built-in close button (e.g. when the content renders its own). */
+  hideClose?: boolean;
+};
 
 export function DialogContent({
   className,
   children,
+  hideClose = false,
   ...props
-}: DialogContentProps): React.ReactElement | null {
-  const context = useDialogContext();
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!context.open) {
-      return;
-    }
-
-    const previous = document.activeElement as HTMLElement | null;
-    ref.current?.focus();
-
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        context.onOpenChange(false);
-      }
-    }
-
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      previous?.focus();
-    };
-  }, [context]);
-
-  if (!context.open) {
-    return null;
-  }
-
+}: DialogContentProps): React.ReactElement {
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-4 backdrop-blur-[2px]"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) {
-          context.onOpenChange(false);
-        }
-      }}
-    >
-      <div
-        ref={ref}
-        aria-modal="true"
+    <RadixDialog.Portal>
+      <RadixDialog.Overlay className="fixed inset-0 z-50 bg-black/40" />
+      <RadixDialog.Content
         className={cn(
-          "relative w-[calc(100%-32px)] max-w-[480px] rounded-lg border border-border bg-surface shadow-[var(--shadow-lg)] outline-none",
+          "fixed left-1/2 top-1/2 z-50 w-[calc(100%-32px)] max-w-[480px] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-surface shadow-[var(--shadow-lg)] outline-none",
           className,
         )}
-        tabIndex={-1}
         {...props}
-        role={props.role ?? "dialog"}
       >
-        <div className="absolute right-3 top-3">
-          <IconButton
-            aria-label="关闭"
-            size="sm"
-            onClick={() => context.onOpenChange(false)}
-          >
-            <X />
-          </IconButton>
-        </div>
         {children}
-      </div>
-    </div>
+        {hideClose ? null : (
+          <RadixDialog.Close
+            aria-label="关闭"
+            className="absolute right-3 top-3 inline-flex h-7 w-7 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-surface-2 hover:text-foreground"
+          >
+            <X size={14} aria-hidden="true" />
+          </RadixDialog.Close>
+        )}
+      </RadixDialog.Content>
+    </RadixDialog.Portal>
   );
 }
 
@@ -128,9 +85,11 @@ export function DialogHeader({
 export function DialogTitle({
   className,
   ...props
-}: React.HTMLAttributes<HTMLHeadingElement>): React.ReactElement {
+}: React.ComponentPropsWithoutRef<
+  typeof RadixDialog.Title
+>): React.ReactElement {
   return (
-    <h2
+    <RadixDialog.Title
       className={cn("text-base font-semibold tracking-[-0.01em]", className)}
       {...props}
     />
@@ -140,9 +99,14 @@ export function DialogTitle({
 export function DialogDescription({
   className,
   ...props
-}: React.HTMLAttributes<HTMLParagraphElement>): React.ReactElement {
+}: React.ComponentPropsWithoutRef<
+  typeof RadixDialog.Description
+>): React.ReactElement {
   return (
-    <p className={cn("mt-1 text-sm text-text-muted", className)} {...props} />
+    <RadixDialog.Description
+      className={cn("mt-1 text-sm text-text-muted", className)}
+      {...props}
+    />
   );
 }
 

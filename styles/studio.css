@@ -1,0 +1,63 @@
+/* Studio 工作区 — 暖米白主题（v8 设计语言）
+   必须在单独文件中声明，确保 Tailwind v4 不会优化掉 */
+
+html .studio-workspace,
+html.dark .studio-workspace,
+html.light .studio-workspace {
+  /* 背景层 */
+  --bg:        245 243 239;   /* #f5f3ef 暖米白主背景 */
+  --surface:   249 247 244;   /* #f9f7f4 卡片 / 助手侧 */
+  --surface-2: 237 234 228;   /* #ede9e4 轻强调背景 */
+  --surface-3: 229 225 218;   /* #e5e1da 最深层悬浮 */
+
+  /* 边框 */
+  --border:        219 215 207; /* #dbd7cf 主分割线（发丝） */
+  --border-strong: 202 198 188; /* #cac6bc 强调边框 */
+
+  /* 文字 */
+  --text:       26 25 22;      /* #1a1916 深墨 */
+  --text-muted: 100 98 91;     /* #64625b 辅助灰 */
+  --text-faint: 112 110 103;   /* #706e67 弱提示 */
+  --foreground: var(--text);
+
+  /* 控件 */
+  --control-bg:            249 247 244;
+  --control-bg-hover:      237 234 228;
+  --control-selected-bg:   26 25 22;
+  --control-disabled-bg:   237 234 228;
+  --control-border:        154 152 144;
+  --control-border-hover:  104 103 97;
+  --control-selected-border: 26 25 22;
+  --control-disabled-border: 190 188 182;
+  --control-focus:         26 25 22;
+
+  /* 图标 */
+  --icon:          26 25 22;
+  --icon-muted:    100 98 91;
+  --icon-disabled: 160 158 151;
+  --icon-selected: 249 247 244;
+
+  /* 品牌 / 强调（初稿绿） */
+  --brand-primary: 59 106 79;  /* #3b6a4f 深绿 */
+  --accent:        var(--brand-primary);
+  --on-accent:     249 247 244;
+  --on-brand:      249 247 244;
+
+  /* 语义色 */
+  --success: 16 128 72;
+  --danger:  202 52 49;
+  --warning: 176 122 24;
+  --info:    37 99 235;
+
+  /* 阴影 */
+  --shadow-xs: 0 1px 2px rgb(26 25 22 / 0.04);
+  --shadow-sm: 0 1px 2px rgb(26 25 22 / 0.06), 0 1px 1px rgb(26 25 22 / 0.04);
+  --shadow-md: 0 6px 16px -6px rgb(26 25 22 / 0.10);
+  --shadow-lg: 0 12px 32px -12px rgb(26 25 22 / 0.12);
+  --shadow-focus:
+    0 0 0 2px rgb(var(--bg)), 0 0 0 4px rgb(var(--brand-primary) / 0.35);
+
+  /* 应用到元素 */
+  background: rgb(var(--bg));
+  color:      rgb(var(--text));
+}

@@ -86,7 +86,11 @@ import {
 } from "./lib/api";
 import { subscribeGeneration } from "./lib/sse";
 import { writeActiveConversationId } from "./lib/active-conversation";
-import { referenceRequest, useReferenceInput } from "./lib/reference-input";
+import {
+  chatReferenceRequest,
+  referenceRequest,
+  useReferenceInput,
+} from "./lib/reference-input";
 import {
   agentTurnsSchema,
   reasoningEffortSchema,
@@ -548,7 +552,7 @@ export function StudioApp({
     }
     let current = true;
     setChatContextLoading(true);
-    getChatContext(activeId, chatModel?.id)
+    getChatContext(activeId)
       .then((data) => {
         if (current) setChatContext(data);
       })
@@ -1042,6 +1046,7 @@ export function StudioApp({
       disabled: locked,
       onSelect: selectThread,
       onNew: newConversation,
+      onUpdate: setConversation,
     });
     return () => setStudioNavigation(null);
   }, [activeId, locked, selectThread, newConversation, setStudioNavigation]);
@@ -1375,7 +1380,7 @@ export function StudioApp({
           webSearch: Boolean(chatModel?.supportsWebSearch),
           modelId: chatModel!.id,
           reasoningEffort,
-          ...referenceRequest(submittedReferences),
+          ...chatReferenceRequest(submittedReferences),
           references: submittedReferences.map((reference, index) =>
             reference.kind === "upload"
               ? {
@@ -1954,7 +1959,7 @@ export function StudioApp({
           )}
           <div
             className={cn(
-              "shrink-0 px-3 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-6 lg:px-8",
+              "relative z-10 shrink-0 border-t border-border/70 bg-background px-3 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_-18px_rgb(0_0_0_/_0.55)] md:px-6 lg:px-8",
               !empty && mode !== "agent" && "max-h-[60%] overflow-y-auto pt-2",
               mode === "agent" && "max-h-[55%] overflow-y-auto pt-2",
             )}
@@ -2086,7 +2091,6 @@ export function StudioApp({
                   mode === "chat" ? (
                     <>
                       <ChatContextControl
-                        modelId={chatModel?.id}
                         status={chatContext}
                         loading={chatContextLoading}
                         compacting={chatCompacting}

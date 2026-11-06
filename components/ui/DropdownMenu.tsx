@@ -1,74 +1,53 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import * as RadixMenu from "@radix-ui/react-dropdown-menu";
 
 import { cn } from "@/lib/utils";
 
 import { Kbd } from "./Kbd";
 
 interface DropdownMenuProps {
-  trigger: React.ReactNode;
+  trigger: React.ReactElement;
   children: React.ReactNode;
   className?: string;
 }
 
-interface DropdownMenuItemProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+interface DropdownMenuItemProps {
+  children: React.ReactNode;
+  className?: string;
   shortcut?: string;
+  disabled?: boolean;
+  /** Fired on both pointer click and keyboard (Enter/Space) selection. */
+  onClick?: () => void;
+  onSelect?: (event: Event) => void;
 }
 
+/**
+ * Accessible menu built on Radix DropdownMenu — focusable trigger with
+ * aria-haspopup/expanded, roving arrow-key navigation, typeahead, Esc + focus
+ * restore. The public API (trigger / children / className) is unchanged.
+ */
 export function DropdownMenu({
   trigger,
   children,
   className,
 }: DropdownMenuProps): React.ReactElement {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  function onMenuClick(event: React.MouseEvent<HTMLDivElement>) {
-    const target = event.target;
-    if (target instanceof Element && target.closest('[role="menuitem"]')) {
-      setOpen(false);
-    }
-  }
-
-  useEffect(() => {
-    function onPointerDown(event: PointerEvent) {
-      if (!ref.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setOpen(false);
-      }
-    }
-
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, []);
-
   return (
-    <div ref={ref} className="relative inline-flex">
-      <span onClick={() => setOpen((value) => !value)}>{trigger}</span>
-      {open ? (
-        <div
+    <RadixMenu.Root>
+      <RadixMenu.Trigger asChild>{trigger}</RadixMenu.Trigger>
+      <RadixMenu.Portal>
+        <RadixMenu.Content
+          align="end"
+          sideOffset={6}
           className={cn(
-            "absolute right-0 top-[calc(100%+6px)] z-50 min-w-48 rounded-md border border-border bg-surface p-1 shadow-[var(--shadow-md)]",
-            "animate-in fade-in duration-[var(--duration-base)]",
+            "z-50 min-w-48 rounded-md border border-border bg-surface p-1 shadow-[var(--shadow-md)] outline-none",
             className,
           )}
-          onClick={onMenuClick}
-          role="menu"
         >
           {children}
-        </div>
-      ) : null}
-    </div>
+        </RadixMenu.Content>
+      </RadixMenu.Portal>
+    </RadixMenu.Root>
   );
 }
 
@@ -76,27 +55,30 @@ export function DropdownMenuItem({
   className,
   children,
   shortcut,
-  type = "button",
-  ...props
+  disabled,
+  onClick,
+  onSelect,
 }: DropdownMenuItemProps): React.ReactElement {
   return (
-    <button
+    <RadixMenu.Item
+      disabled={disabled}
       className={cn(
-        "flex h-8 w-full items-center justify-between gap-6 rounded-[4px] px-2.5 text-left text-sm text-foreground transition-colors hover:bg-surface-2 disabled:opacity-45",
+        "flex h-8 w-full cursor-pointer items-center justify-between gap-6 rounded-[4px] px-2.5 text-left text-sm text-foreground outline-none transition-colors data-[highlighted]:bg-surface-2 data-[disabled]:cursor-not-allowed data-[disabled]:opacity-45",
         className,
       )}
-      role="menuitem"
-      type={type}
-      {...props}
+      onSelect={(event) => {
+        onSelect?.(event);
+        onClick?.();
+      }}
     >
       <span className="flex min-w-0 items-center gap-2 truncate">
         {children}
       </span>
       {shortcut ? <Kbd>{shortcut}</Kbd> : null}
-    </button>
+    </RadixMenu.Item>
   );
 }
 
 export function DropdownMenuSeparator(): React.ReactElement {
-  return <div className="my-1 h-px bg-border" role="separator" />;
+  return <RadixMenu.Separator className="my-1 h-px bg-border" />;
 }

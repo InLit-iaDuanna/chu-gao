@@ -1,9 +1,8 @@
 import { headers } from "next/headers";
 import Link from "next/link";
 
-import { ActionableStatus } from "@/components/shared/ActionableStatus";
-import { RedeemCodeForm } from "@/components/shared/RedeemCodeForm";
-import { WorkbenchPreferencesForm } from "@/components/workbench/WorkbenchPreferencesForm";
+import { SettingsView } from "@/components/studio/SettingsView";
+import { StudioPageShell } from "@/components/studio/StudioPageShell";
 import { checkSessionFromHeaders } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { listConfiguredModels } from "@/lib/models/runtime-config";
@@ -16,19 +15,16 @@ async function getUserProfile() {
     return null;
   }
 
-  const session = sessionResult.user;
-
   if (!process.env.DATABASE_URL) {
     return null;
   }
 
   try {
     const user = await db.user.findUnique({
-      where: { id: session.id },
+      where: { id: sessionResult.user.id },
       select: {
         id: true,
         email: true,
-        name: true,
         credits: true,
         dailyGenLimit: true,
       },
@@ -49,7 +45,8 @@ async function getUserProfile() {
     });
 
     return {
-      ...user,
+      email: user.email,
+      credits: user.credits,
       dailyUsed,
       dailyLimit: user.dailyGenLimit,
     };
@@ -62,58 +59,27 @@ async function getUserProfile() {
   }
 }
 
-function usageLabel(used: number, limit: number | null) {
-  return limit ? `${used} / ${limit}` : `${used} / 不限`;
-}
-
 export default async function SettingsPage() {
   const [user, models] = await Promise.all([
     getUserProfile(),
     listConfiguredModels(),
   ]);
 
-  if (!user) {
-    return (
-      <ActionableStatus
-        tone="warning"
-        eyebrow="账户"
-        title="账户资料暂时无法读取"
-        description="请稍后刷新页面，或返回创作页继续查看当前工作台状态。"
-        action={
-          <Link href="/app" className="tool-button h-10 text-text-muted">
-            返回创作
-          </Link>
-        }
-      />
-    );
-  }
-
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      <section className="surface-panel p-6">
-        <p className="eyebrow">账户</p>
-        <h1 className="mt-2 text-2xl">个人资料</h1>
-        <div className="mt-6 space-y-4">
-          <div>
-            <p className="text-sm text-text-muted">邮箱</p>
-            <p className="mt-1">{user.email}</p>
-          </div>
-          <div>
-            <p className="text-sm text-text-muted">余额</p>
-            <p className="mt-1">{user.credits} 点</p>
-          </div>
-          <div>
-            <p className="text-sm text-text-muted">今日用量</p>
-            <p className="mt-1">
-              {usageLabel(user.dailyUsed, user.dailyLimit)}
-            </p>
-          </div>
+    <StudioPageShell eyebrow="Settings" title="设置">
+      {!user ? (
+        <div className="surface-panel flex min-h-72 flex-col items-center justify-center gap-3 px-6 py-10 text-center">
+          <h2 className="text-xl font-medium">账户资料暂时无法读取</h2>
+          <p className="max-w-md text-sm leading-6 text-text-muted">
+            请稍后刷新页面，或返回工作台继续查看当前状态。
+          </p>
+          <Link href="/app" className="tool-button mt-2 h-9 text-text-muted">
+            返回工作台
+          </Link>
         </div>
-        <RedeemCodeForm />
-      </section>
-      <WorkbenchPreferencesForm
-        models={models.map((model) => ({ ...model, available: true }))}
-      />
-    </div>
+      ) : (
+        <SettingsView user={user} models={models} />
+      )}
+    </StudioPageShell>
   );
 }

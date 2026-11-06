@@ -198,7 +198,6 @@ export async function DELETE(
       isActive: false,
       health: "DOWN",
       cooldownUntil: null,
-      inFlight: 0,
     },
   });
 

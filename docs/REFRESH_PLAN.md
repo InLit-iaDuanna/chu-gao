@@ -197,7 +197,7 @@ Admin 区域不再单独令牌，与主站统一。删除文件并去除 `app/gl
 
 ## 2. UI 原子层 `components/ui/`（Phase 2）
 
-新建目录与文件清单：
+当前保留的基础组件清单：
 
 ```
 components/ui/
@@ -205,28 +205,22 @@ components/ui/
   IconButton.tsx
   Input.tsx
   Textarea.tsx
-  Select.tsx
   Switch.tsx
   Checkbox.tsx
-  Radio.tsx
   Label.tsx
   FormField.tsx          // Label + control + Description + ErrorMessage 容器
   Badge.tsx
   Card.tsx               // 命名导出 Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter
-  Separator.tsx
-  Tooltip.tsx
   Dialog.tsx             // Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter
-  Popover.tsx
   DropdownMenu.tsx
-  Tabs.tsx               // Tabs, TabsList, TabsTrigger, TabsContent
   Kbd.tsx
-  Skeleton.tsx
   Spinner.tsx
   Toast.tsx + ToastProvider + useToast
   Segmented.tsx          // 单选 chip 组
-  EmptyState.tsx
   index.ts               // re-export 全部
 ```
+
+`Select`、`Radio`、`Tabs`、`Tooltip`、`Popover`、`Separator`、`Skeleton`、`EmptyState` 没有产品路径引用时不常驻仓库；等具体页面需要时再按本设计语言补回，避免维护未接入组件。
 
 ### 2.1 Button.tsx 规范
 
@@ -308,11 +302,11 @@ interface FormFieldProps {
 - 关闭键：ESC + 点击 backdrop + ✕ 按钮。
 - 必须 trap focus、`role=dialog`、`aria-modal=true`。
 
-### 2.8 Tooltip.tsx
+### 2.8 Tooltip
 
-- 纯 CSS hover 实现（`group-hover` 配合）即可，无需 portal。
-- 内容：`bg-foreground text-background text-[11px] px-2 py-1 rounded shadow-sm`。
-- 延迟 200ms 显现。
+- 当前产品路径使用局部说明浮层；需要跨页面复用时再提取为 `components/ui/Tooltip.tsx`。
+- 建议纯 CSS hover/focus 实现（`group-hover` 配合）即可，无需 portal。
+- 内容：`bg-foreground text-background text-[11px] px-2 py-1 rounded shadow-sm`，延迟 200ms 显现。
 
 ### 2.9 DropdownMenu.tsx
 
@@ -321,8 +315,9 @@ interface FormFieldProps {
 - 分隔线：1px border-border。
 - 支持快捷键尾部对齐显示（用 Kbd）。
 
-### 2.10 Tabs.tsx
+### 2.10 Tabs
 
+- 当前没有运行时复用点；需要多处设置页/详情页复用时再提取为 `components/ui/Tabs.tsx`。
 - TabsList：底部 1px hairline 容器。
 - TabsTrigger：h-9 px-3 text-sm，active 时下方 2px `bg-foreground` 条。
 
@@ -337,9 +332,10 @@ interface FormFieldProps {
 - 自动消失 4s，可手动 ✕。
 - 暴露 `useToast()` 返回 `{ toast: (opts: { title; description?; variant?: "default"|"success"|"danger" }) => void }`。
 
-### 2.13 Skeleton.tsx
+### 2.13 Loading skeletons
 
-- `bg-surface-2 rounded` + `animate-pulse`（自定义关键帧，opacity 0.5→1，1.2s linear infinite）。
+- 当前加载骨架在页面内组合；出现稳定复用点时再提取 `components/ui/Skeleton.tsx`。
+- 推荐样式：`bg-surface-2 rounded` + `animate-pulse`（自定义关键帧，opacity 0.5→1，1.2s linear infinite）。
 - 不要 shimmer 滑光。
 
 ### 2.14 Spinner.tsx
@@ -376,20 +372,21 @@ interface FormFieldProps {
 - 高度 36px，垂直居中，右侧 ✕ 关闭按钮（IconButton ghost sm）。
 - 关闭状态用 localStorage 记忆（key 用 announcement hash）。
 
-### 3.5 `components/shared/ProgressIndicator.tsx`
+### 3.5 Progress indicators
 
-- 线性进度：`h-0.5 bg-surface-2 overflow-hidden rounded-full`，内条 `bg-foreground`。
-- 支持 indeterminate：用 `@keyframes indeterminate` 平移。
+- 需要进度反馈时优先在目标区域内用 `components/ui/Spinner.tsx`。
+- 只有多个页面复用同一进度条形态时，再提取 shared 组件。
 
-### 3.6 `components/shared/EmptyState.tsx`
+### 3.6 Empty states
 
-- props：`icon?: React.ReactNode; title: string; description?: string; action?: React.ReactNode`。
+- 当前空态在对应页面内联；出现 2 个以上稳定复用点时再提取 `components/ui/EmptyState.tsx`。
+- 推荐 props：`icon?: React.ReactNode; title: string; description?: string; action?: React.ReactNode`。
 - icon 默认：48×48 圆角方框 + 内部线条几何（虚线圆 / 斜线等纯 CSS）。
 - 文本居中，title `text-sm font-semibold`，description `text-xs text-text-muted max-w-[320px]`。
 
-### 3.7 `components/shared/LoadingSkeleton.tsx`
+### 3.7 Loading skeletons
 
-- 整文件用 `Skeleton` 重新实现：导出 `SkeletonText`、`SkeletonCard`、`SkeletonRow`。
+- 页面级骨架在具体页面内组合；出现稳定复用点时再提取唯一基础骨架组件，不保留未接入的二次包装。
 
 ### 3.8 `components/shared/ActionableStatus.tsx`
 
@@ -472,15 +469,15 @@ interface FormFieldProps {
 
 ## 5. (app) 用户工作台重构（Phase 5 — 最重）
 
-### 5.1 拆分 WorkbenchShell.tsx（先重构，不改样式）
+### 5.1 拆分 WorkbenchShellV2.tsx（先重构，不改样式）
 
-**当前**：`components/workbench/WorkbenchShell.tsx` 1641 行。
+**当前**：主入口统一到 `components/workbench/WorkbenchShellV2.tsx`。已拆出生成舞台、历史栏、命令栏、Shell 控件/浮层、对话模式消息组件/工具/SSE 解析/API 请求边界、无限画布模型/节点组件，以及 `components/workbench/lib/workbench-api.ts` / `workbench-action-utils.ts` 等工作台动作辅助模块。下一步继续拆分 V2 的布局、状态和面板；拆分时从当前 V2 重新提取，避免维护两套实现。
 
 **拆分后结构**：
 
 ```
 components/workbench/
-  WorkbenchShell.tsx              // < 300 行；仅做布局编排 + provider 包裹
+  WorkbenchShellV2.tsx            // < 300 行；仅做布局编排 + provider 包裹
   hooks/
     useWorkbenchState.ts          // 当前 Shell 内 useState 全部移入；导出 reducer + actions
     useGenerationStream.ts        // SSE 流式逻辑（fetch /api/generations/[id]/stream）
@@ -491,8 +488,8 @@ components/workbench/
     WorkbenchTopBar.tsx           // 顶部 48px：左侧对话切换/新建、中间空、右侧模型 + 主题 + 账户
     WorkbenchLeftRail.tsx         // 左侧对话历史 240px
     WorkbenchCenter.tsx           // 中间画布 + 对话流
-    WorkbenchInspector.tsx        // 右侧 320px：动态参数、宽高比、分辨率、CostPreview
-    WorkbenchComposer.tsx         // 底部贴边输入栏（PromptInput 重写）
+    WorkbenchInspector.tsx        // 右侧 320px：动态参数、宽高比、分辨率、积分预估
+    WorkbenchComposer.tsx         // 底部贴边输入栏
   context/
     WorkbenchContext.tsx          // React Context，暴露 state + dispatch
 ```
@@ -524,9 +521,9 @@ components/workbench/
 ### 5.3 WorkbenchTopBar.tsx
 
 - 高 48px，`border-b border-border bg-surface px-3`。
-- 左：折叠左栏 IconButton + 当前对话标题（可点编辑） + ModelSelector（chip 风格）。
+- 左：折叠左栏 IconButton + 当前对话标题（可点编辑） + 模型选择 chip。
 - 中：留白。
-- 右：折叠右栏 IconButton + CostPreview（紧凑） + ThemeToggle + AccountMenu。
+- 右：折叠右栏 IconButton + 积分预估（紧凑） + ThemeToggle + AccountMenu。
 
 ### 5.4 WorkbenchLeftRail.tsx
 
@@ -537,10 +534,10 @@ components/workbench/
 
 ### 5.5 WorkbenchCenter.tsx
 
-- 内部纵向：`ConversationThread`（滚动） + 贴底 `WorkbenchComposer`（fixed-like 内部相对定位）。
-- 画布有图时：图像走 `Canvas.tsx`。
+- 内部纵向：对话流（滚动） + 贴底 `WorkbenchComposer`（fixed-like 内部相对定位）。
+- 画布有图时：使用从 V2 重新提取的画布组件。
 
-#### 5.5.1 `ConversationThread.tsx` 重写
+#### 5.5.1 对话流组件
 
 - 消息列表 max-width 720，居中。
 - user 消息：`border-l-2 border-foreground pl-3 py-2`，无背景。
@@ -548,32 +545,32 @@ components/workbench/
 - 角色 label：`text-[11px] font-mono uppercase tracking-wider text-text-faint mb-1`（如 `USER` / `ASSISTANT`）。
 - 时间戳：尾部 `text-[11px] text-text-faint`。
 - 图片消息：image grid（最多 4 列），每张图 `aspect-square rounded-md ring-1 ring-border hover:ring-border-strong`，点击放大用 Dialog。
-- 流式生成中：底部显示 `<Spinner size=14 /> 正在生成...`，附 `ProgressIndicator`。
+- 流式生成中：底部显示 `<Spinner size=14 /> 正在生成...`，必要时补局部进度条。
 - 进场：每条 `motion.div` y 4→0, opacity 0→1, duration 160ms。
 
-#### 5.5.2 `Canvas.tsx` 重写
+#### 5.5.2 画布组件
 
 - 单图模式 vs 网格模式切换（Segmented）。
 - 单图：居中显示，最大 80vh，aspect 自适应；下方一行 metadata（模型、尺寸、用时、积分），text-xs muted。
 - 操作浮层：右上角 IconButton 组（下载 / 复制 prompt / 重新生成 / 删除），仅 hover 显示，背景 `bg-surface/80 backdrop-blur-sm`。
 
-#### 5.5.3 `WorkbenchComposer.tsx`（替代 `PromptInput.tsx` 编排）
+#### 5.5.3 `WorkbenchComposer.tsx`
 
 - 容器：`absolute bottom-4 left-1/2 -translate-x-1/2 w-[calc(100%-32px)] max-w-[760px]`。
 - 卡片：`bg-surface border border-border rounded-xl shadow-md hover:shadow-lg focus-within:border-foreground focus-within:shadow-lg transition`。
 - Textarea：自适应高度 1→6 行，无 border 无 outline，`bg-transparent px-4 pt-3`。
 - 底部行：`flex items-center gap-2 px-3 pb-2.5`：
-  - 左：AspectRatioPicker（Segmented sm）、ResolutionPicker（Segmented sm）、ProviderChannelSelector（DropdownMenu sm ghost）、附件按钮（IconButton）。
-  - 右：CostPreview 紧凑（"约 -3 积分"） + 发送 Button primary sm + Kbd `⌘↵` 提示。
+  - 左：比例选择（Segmented sm）、分辨率选择（Segmented sm）、ProviderChannelSelector（DropdownMenu sm ghost）、附件按钮（IconButton）。
+  - 右：积分预估（"约 -3 积分"） + 发送 Button primary sm + Kbd `⌘↵` 提示。
 - ⌘+Enter 发送，Enter 换行（改原逻辑）。
 - 附件预览：textarea 上方一行 chip 列表，每个 chip 显示文件名 + ✕ 移除。
 
-#### 5.5.4 `AspectRatioPicker.tsx` / `ResolutionPicker.tsx`
+#### 5.5.4 比例 / 分辨率选择
 
 - 重写为 `Segmented`，紧凑模式（每项仅显示比例如 `1:1` / `16:9` / `9:16`）。
 - 选项随模型 `capabilities` 动态改变。
 
-#### 5.5.5 `ModelSelector.tsx`
+#### 5.5.5 模型选择
 
 - 改为 `DropdownMenu` 触发按钮：`<Button variant="secondary" size="sm" rightIcon={<ChevronDown />}>{model.name}`。
 - 下拉每项：模型图标（小方块色） + 名称 + 描述（text-xs muted） + 右侧定价 chip。
@@ -629,7 +626,7 @@ components/workbench/
 - 各 nav item：active 时 `bg-surface-2 text-foreground shadow-ring`，inactive `text-text-faint hover:text-foreground hover:bg-surface-2`。
 - 顶部 header 高度 48 → 与 TopBar 一致。
 
-**Phase 5 验收**：`WorkbenchShell.tsx < 300 行`；所有现有功能正常（生成、流式、历史切换、参数变更、对话切换）；移动端 ≥ 768px 仅显示中间区，左右栏自动折叠。
+**Phase 5 验收**：`WorkbenchShellV2.tsx < 300 行`；所有现有功能正常（生成、流式、历史切换、参数变更、对话切换）；移动端 ≥ 768px 仅显示中间区，左右栏自动折叠。
 
 ---
 
@@ -685,9 +682,9 @@ components/workbench/
 - 表头：``h-9 px-3`text-[11px] font-mono uppercase tracking-wider text-text-faint`，底部 1px hairline。
 - 行：h-11 hover `bg-surface-2/50`，cell `px-3 text-sm`。
 - 列对齐由 column def 控制（数字/状态默认右对齐）。
-- 加载态：用 `Skeleton` 占位行（5 行）。
-- 空态：`EmptyState`。
-- 分页底部右侧：`Button ghost sm` 前/后 + 页码 + 每页数量 `Select`。
+- 加载态：用页面内骨架占位行（5 行）。
+- 空态：页面内联，或在复用点出现后提取 `EmptyState`。
+- 分页底部右侧：`Button ghost sm` 前/后 + 页码 + 每页数量原生 select / dropdown。
 
 ### 6.5 `components/admin/StatCard.tsx` 重写
 
@@ -718,15 +715,21 @@ interface StatCardProps {
 
 - form 内全部换 ui/，分组用 Card。
 
-### 6.9 `components/admin/AdminForms.tsx`
+### 6.9 Admin form modules
 
-- 通用 form 字段全部换 ui/，导出的 helper 调整签名（保留外部 API）。
+- `components/admin/AdminForms.tsx` 已移除，不再保留大桶文件。
+- 用户详情页表单：`components/admin/UserAdminForms.tsx`。
+- Provider 号池级表单：`components/admin/ProviderAdminForms.tsx`。
+- Provider 账号级表单：`components/admin/ProviderAccountAdminForms.tsx`。
+- 定价表单：`components/admin/PricingAdminForms.tsx`。
+- 邀请码 / 兑换码表单：`components/admin/CodeAdminForms.tsx`。
+- Dashboard 最近记录控制：`components/admin/DashboardAdminControls.tsx`。
+- 共享请求、日期和局部 Toast 工具集中在 `components/admin/admin-form-utils.tsx`；新增后台表单不要再复制 fetch helper。
 
-### 6.10 `components/admin/ProviderEditDialog.tsx`
+### 6.10 Provider editing
 
-- 用新 `Dialog` 重写。
-- 字段表单同上。
-- 底部 DialogFooter：取消 ghost + 保存 primary。
+- Provider 编辑入口已收敛到当前管理页表单/控制台组件。
+- 需要弹窗编辑时，从当前表单逻辑提取 Dialog，不保留未接入的预览组件。
 
 ### 6.11 各管理页统一改造
 
@@ -828,7 +831,7 @@ pnpm tsc --noEmit
 - [ ] `pnpm tsc --noEmit` 0 error
 - [ ] 全站搜不到 `#[0-9a-fA-F]{3,8}` 硬编码颜色（除 SVG currentColor）
 - [ ] 全站搜不到 `style={{ color`、`style={{ background`、`style={{ border`
-- [ ] `components/workbench/WorkbenchShell.tsx` < 300 行
+- [ ] `components/workbench/WorkbenchShellV2.tsx` < 300 行
 - [ ] `components/ui/` 全部组件均被实际使用（无死代码）
 - [ ] dark / light 双主题视觉一致、对比度 ≥ WCAG AA
 - [ ] 所有交互元素 `:focus-visible` 显示双层环

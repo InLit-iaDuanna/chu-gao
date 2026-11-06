@@ -1,16 +1,8 @@
-import { PROVIDER_FETCH_RETRY, fetchWithTimeout } from "@/lib/http";
-import type {
-  AspectRatio,
-  InternalRequest,
-  OutputFormat,
-  Resolution,
-} from "@/lib/models/types";
+import { fetchWithTimeout } from "@/lib/http";
+import { generationFetchRetry } from "@/lib/providers/single-submit";
+import type { InternalRequest, OutputFormat } from "@/lib/models/types";
 import { providerError } from "@/lib/providers/diagnostics";
 import { providerRequestTimeoutMs } from "@/lib/providers/config";
-import {
-  RESOLUTION_TO_QUALITY,
-  imagePixelSizeForRequest,
-} from "@/lib/providers/image-params";
 import type {
   GenerateResult,
   ProviderAdapter,
@@ -72,6 +64,12 @@ function upstreamModelForRequest(): string {
 }
 
 function imageToolModelForRequest(req: InternalRequest): string | undefined {
+  if (
+    req.modelId === "gpt-image-2.5-flare" ||
+    req.modelId === "gpt-image-2.5-sunburst"
+  ) {
+    return req.modelId;
+  }
   if (req.modelId === "gpt-image-2") {
     return req.image2Mode === "high"
       ? "gpt-image-2-high"
@@ -84,25 +82,11 @@ function imageToolModelForRequest(req: InternalRequest): string | undefined {
   );
 }
 
-function imageToolSizeForRequest(
-  aspectRatio: AspectRatio,
-  resolution: Resolution,
-): string {
-  const mode =
-    process.env.SUB2API_RESPONSES_SIZE_MODE ??
-    process.env.OPENAI_RESPONSES_IMAGE_SIZE_MODE ??
-    "resolution";
-
-  if (mode === "resolution") {
-    return resolution;
-  }
-
-  return imagePixelSizeForRequest(aspectRatio, resolution, "OpenAI Responses");
+function imageToolSizeForRequest(req: InternalRequest): string {
+  return req.size;
 }
 
-function imageToolQualityForRequest(
-  resolution: Resolution,
-): string | undefined {
+function imageToolQualityForRequest(req: InternalRequest): string | undefined {
   const configured =
     process.env.SUB2API_RESPONSES_QUALITY ??
     process.env.OPENAI_RESPONSES_IMAGE_QUALITY;
@@ -111,7 +95,7 @@ function imageToolQualityForRequest(
     return undefined;
   }
 
-  return configured ?? RESOLUTION_TO_QUALITY[resolution] ?? "medium";
+  return configured ?? req.quality;
 }
 
 function shouldSendOutputCompression(
@@ -210,7 +194,7 @@ export class OpenAIResponsesImageAdapter implements ProviderAdapter {
         method: "POST",
         signal,
         timeoutMs: providerRequestTimeoutMs(),
-        retry: PROVIDER_FETCH_RETRY,
+        retry: generationFetchRetry(req),
         headers: {
           Authorization: `Bearer ${this.config.apiKey}`,
           "Content-Type": "application/json",
@@ -253,8 +237,8 @@ export class OpenAIResponsesImageAdapter implements ProviderAdapter {
 
     const tool: ImageGenerationTool = {
       type: "image_generation",
-      size: imageToolSizeForRequest(req.aspectRatio, req.resolution),
-      quality: imageToolQualityForRequest(req.resolution),
+      size: imageToolSizeForRequest(req),
+      quality: imageToolQualityForRequest(req),
       output_format: req.outputFormat,
       background: req.background,
     };

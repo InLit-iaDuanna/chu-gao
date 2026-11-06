@@ -1,9 +1,10 @@
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { DEVICE_ID_COOKIE_NAME } from "@/lib/session-device";
 import {
   parseSessionToken,
-  readCookie,
-  SESSION_COOKIE_NAME,
+  readCookieValues,
+  readSessionToken,
 } from "@/lib/session-cookie";
 import { fail } from "@/lib/api-response";
 
@@ -26,9 +27,37 @@ export type AuthenticatedSessionCheckResult = Extract<
 >;
 
 async function cookieSession(headers: Headers): Promise<SessionCheckResult> {
-  const payload = parseSessionToken(readCookie(headers, SESSION_COOKIE_NAME));
+  const payload = parseSessionToken(readSessionToken(headers));
 
   if (!payload) {
+    return { status: "unauthenticated" };
+  }
+
+  // Bind the signed session to the persistent device cookie. Copying only the
+  // session cookie into another browser must not bypass the device slot.
+  if (!readCookieValues(headers, DEVICE_ID_COOKIE_NAME).includes(payload.did)) {
+    return { status: "unauthenticated" };
+  }
+
+  // The explicit local-only bypass has no database-backed slots. Still verify
+  // that the signed token exactly represents one of the two supported dev
+  // identities so the development login endpoint remains usable.
+  if (isDevAuthDbBypassEnabled()) {
+    const user = devBypassSession(
+      payload.role === "ADMIN" ? "admin" : "student",
+    );
+
+    if (
+      user &&
+      payload.sub === user.id &&
+      payload.email === user.email &&
+      payload.role === user.role &&
+      payload.status === user.status &&
+      payload.ver === user.sessionVersion
+    ) {
+      return { status: "authenticated", user };
+    }
+
     return { status: "unauthenticated" };
   }
 
@@ -40,21 +69,38 @@ async function cookieSession(headers: Headers): Promise<SessionCheckResult> {
   }
 
   try {
-    const user = await db.user.findUnique({
-      where: { id: payload.sub },
+    const deviceSession = await db.deviceSession.findUnique({
+      where: {
+        userId_deviceType: {
+          userId: payload.sub,
+          deviceType: payload.dvc,
+        },
+      },
       select: {
-        id: true,
-        email: true,
-        role: true,
-        status: true,
-        sessionVersion: true,
+        deviceId: true,
+        version: true,
+        expiresAt: true,
+        user: {
+          select: {
+            id: true,
+            email: true,
+            role: true,
+            status: true,
+            sessionVersion: true,
+          },
+        },
       },
     });
+    const user = deviceSession?.user;
 
     if (
+      !deviceSession ||
       !user ||
       user.status !== "ACTIVE" ||
-      user.sessionVersion !== payload.ver
+      user.sessionVersion !== payload.ver ||
+      deviceSession.deviceId !== payload.did ||
+      deviceSession.version !== payload.dsv ||
+      deviceSession.expiresAt.getTime() <= Date.now()
     ) {
       return { status: "unauthenticated" };
     }

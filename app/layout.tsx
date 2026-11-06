@@ -1,13 +1,16 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
 
+import { AccentColorProvider } from "@/components/shared/AccentColorProvider";
 import { AppThemeProvider } from "@/components/shared/AppThemeProvider";
 import { AnnouncementBanner } from "@/components/shared/AnnouncementBanner";
-import { ToastProvider } from "@/components/ui";
+import { ToastProvider, TooltipProvider } from "@/components/ui";
 import {
-  getPublicRuntimeConfig,
-  SystemConfigUnavailableError,
-} from "@/lib/system-config";
+  listActiveAnnouncements,
+  type PublicAnnouncement,
+} from "@/lib/announcements";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -15,18 +18,20 @@ export const metadata: Metadata = {
   description: "为设计学生提供统一的海外图像生成工作台。",
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
+
 export const dynamic = "force-dynamic";
 
-async function getAnnouncement() {
+async function getAnnouncements(): Promise<PublicAnnouncement[]> {
+  if (!process.env.DATABASE_URL) return [];
   try {
-    const config = await getPublicRuntimeConfig();
-    return config.announcement;
-  } catch (error) {
-    if (error instanceof SystemConfigUnavailableError) {
-      return null;
-    }
-
-    throw error;
+    return await listActiveAnnouncements();
+  } catch {
+    return [];
   }
 }
 
@@ -35,18 +40,26 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const announcement = await getAnnouncement();
+  const announcements = await getAnnouncements();
 
   return (
-    <html lang="zh-CN" className="h-full" suppressHydrationWarning>
+    <html
+      lang="zh-CN"
+      className={`${GeistSans.variable} ${GeistMono.variable} h-full`}
+      suppressHydrationWarning
+    >
       <body className="min-h-full bg-background text-foreground">
         <AppThemeProvider>
-          <ToastProvider>
-            <Suspense fallback={null}>
-              <AnnouncementBanner announcement={announcement} />
-            </Suspense>
-            {children}
-          </ToastProvider>
+          <AccentColorProvider>
+            <TooltipProvider delayDuration={350}>
+              <ToastProvider>
+                <Suspense fallback={null}>
+                  <AnnouncementBanner announcements={announcements} />
+                </Suspense>
+                {children}
+              </ToastProvider>
+            </TooltipProvider>
+          </AccentColorProvider>
         </AppThemeProvider>
       </body>
     </html>

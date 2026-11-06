@@ -1,0 +1,12 @@
+FROM python:3.12-slim-bookworm@sha256:34386ef0cb081344d7ec1c103ba398e6e9f64e9ab3a1509accc92a4e24a07258
+ENV PYTHONUNBUFFERED=1 HTTP_PROXY= HTTPS_PROXY= ALL_PROXY= NO_PROXY=* OMP_NUM_THREADS=2 TOKENIZERS_PARALLELISM=false
+ARG TARGETARCH
+RUN --mount=type=cache,target=/root/.cache/pip if [ "$TARGETARCH" = arm64 ]; then pip install --timeout 30 --retries 2 torch==2.8.0; else pip install --timeout 30 --retries 2 torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu; fi
+RUN --mount=type=cache,target=/root/.cache/pip pip install sentence-transformers==5.1.2 fastapi==0.128.0 uvicorn==0.40.0
+RUN --mount=type=cache,target=/root/.cache/huggingface HF_HUB_DISABLE_XET=1 python -c "from huggingface_hub import snapshot_download; snapshot_download('intfloat/multilingual-e5-small', revision='614241f622f53c4eeff9890bdc4f31cfecc418b3', local_dir='/models/e5', ignore_patterns=['onnx/*','openvino/*','pytorch_model.bin','tf_model.h5'])"
+ENV HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1
+COPY services/research-runtime/requirements.embedding.lock /bridge/requirements.lock
+RUN --mount=type=cache,target=/root/.cache/pip pip install --no-deps -r /bridge/requirements.lock || pip install --no-deps --index-url https://pypi.org/simple/ -r /bridge/requirements.lock
+WORKDIR /bridge
+COPY services/research-runtime/embedding.py .
+CMD ["uvicorn", "embedding:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]

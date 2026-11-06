@@ -3,9 +3,16 @@ import bcrypt from "bcryptjs";
 import { fail, ok } from "@/lib/api-response";
 import type { SessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
+import {
+  requestDeviceContext,
+  rotateDeviceSession,
+} from "@/lib/device-session";
 import { LoginRateLimitError, assertLoginAllowed } from "@/lib/rate-limit";
 import { readJsonBodySafe } from "@/lib/request-body";
-import { attachSessionCookie } from "@/lib/session-cookie";
+import {
+  attachDeviceIdCookie,
+  attachSessionCookie,
+} from "@/lib/session-cookie";
 import { loginSchema } from "@/lib/validators";
 
 export async function POST(request: Request) {
@@ -91,13 +98,25 @@ export async function POST(request: Request) {
     status: user.status,
     sessionVersion: user.sessionVersion,
   };
-  const response = ok({
-    id: user.id,
-    email: user.email,
-    name: user.name,
-    role: user.role,
-    credits: user.credits,
-  });
+  const device = requestDeviceContext(request.headers);
 
-  return attachSessionCookie(response, sessionUser);
+  try {
+    const deviceSession = await rotateDeviceSession(user.id, device);
+    const response = ok({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      credits: user.credits,
+      deviceType: device.deviceType,
+    });
+
+    return attachSessionCookie(
+      attachDeviceIdCookie(response, device.deviceId),
+      sessionUser,
+      deviceSession,
+    );
+  } catch {
+    return fail("AUTH_UNAVAILABLE", "认证服务暂时不可用", { status: 503 });
+  }
 }

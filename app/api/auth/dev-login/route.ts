@@ -1,6 +1,10 @@
 import { fail, ok } from "@/lib/api-response";
 import { devBypassSession, isDevAuthDbBypassEnabled } from "@/lib/auth";
-import { attachSessionCookie } from "@/lib/session-cookie";
+import { requestDeviceContext } from "@/lib/device-session";
+import {
+  attachDeviceIdCookie,
+  attachSessionCookie,
+} from "@/lib/session-cookie";
 import { z } from "zod";
 
 const devLoginSchema = z.object({
@@ -36,13 +40,23 @@ export async function POST(request: Request) {
     return fail("DEV_AUTH_DISABLED", "本地开发登录未启用", { status: 404 });
   }
 
+  const device = requestDeviceContext(request.headers);
+
   return attachSessionCookie(
-    ok({
-      id: session.id,
-      email: session.email,
-      role: session.role,
-      devAuth: true,
-    }),
+    attachDeviceIdCookie(
+      ok({
+        id: session.id,
+        email: session.email,
+        role: session.role,
+        devAuth: true,
+      }),
+      device.deviceId,
+    ),
     session,
+    {
+      deviceType: device.deviceType,
+      deviceId: device.deviceId,
+      version: 1,
+    },
   );
 }

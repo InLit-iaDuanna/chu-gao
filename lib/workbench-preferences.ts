@@ -1,8 +1,6 @@
 export interface WorkbenchPreferences {
   modelId?: string;
-  aspectRatio?: string;
-  resolution?: string;
-  image2Mode?: string;
+  size?: string;
   providerChannelId?: string;
 }
 
@@ -18,12 +16,7 @@ function normalizePreferences(value: unknown): WorkbenchPreferences {
 
   return {
     modelId: typeof parsed.modelId === "string" ? parsed.modelId : undefined,
-    aspectRatio:
-      typeof parsed.aspectRatio === "string" ? parsed.aspectRatio : undefined,
-    resolution:
-      typeof parsed.resolution === "string" ? parsed.resolution : undefined,
-    image2Mode:
-      typeof parsed.image2Mode === "string" ? parsed.image2Mode : undefined,
+    size: typeof parsed.size === "string" ? parsed.size : undefined,
     providerChannelId:
       typeof parsed.providerChannelId === "string"
         ? parsed.providerChannelId

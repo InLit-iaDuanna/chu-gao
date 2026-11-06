@@ -1,11 +1,71 @@
+import { Readable } from "node:stream";
+
 import { fail, ok } from "@/lib/api-response";
 import { authenticatedUser, checkSession } from "@/lib/auth";
-import { saveUploadedReferenceImage } from "@/lib/storage";
+import { userActionRateLimitResponse } from "@/lib/api-rate-limit";
+import {
+  createPrivateStorageReadStream,
+  normalizeUploadedReferenceKey,
+  saveUploadedReferenceImage,
+  statPrivateStorageKey,
+} from "@/lib/storage";
 
 const ALLOWED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
+const MULTIPART_OVERHEAD_BYTES = 512 * 1024;
+
+export const runtime = "nodejs";
+
+function mimeTypeForKey(key: string): string {
+  if (key.endsWith(".jpg") || key.endsWith(".jpeg")) return "image/jpeg";
+  if (key.endsWith(".webp")) return "image/webp";
+  return "image/png";
+}
+
+export async function GET(request: Request) {
+  const sessionResult = await checkSession(request);
+  if (sessionResult.status === "unavailable") {
+    return fail("AUTH_UNAVAILABLE", "认证服务暂时不可用", { status: 503 });
+  }
+  if (sessionResult.status === "unauthenticated") {
+    return fail("UNAUTHORIZED", "请先登录", { status: 401 });
+  }
+
+  const user = authenticatedUser(sessionResult);
+  const key = normalizeUploadedReferenceKey(
+    new URL(request.url).searchParams.get("key") ?? "",
+  );
+  if (!key || !key.startsWith("uploads/" + user.id + "/")) {
+    return fail("NOT_FOUND", "图片不存在", { status: 404 });
+  }
+
+  try {
+    const stats = await statPrivateStorageKey(key);
+    const stream = createPrivateStorageReadStream(key);
+    return new Response(Readable.toWeb(stream) as ReadableStream<Uint8Array>, {
+      headers: {
+        "Content-Type": mimeTypeForKey(key),
+        "Content-Length": String(stats.size),
+        "Content-Disposition": "inline",
+        "Cache-Control": "private, max-age=3600",
+      },
+    });
+  } catch {
+    return fail("NOT_FOUND", "图片不存在", { status: 404 });
+  }
+}
 
 function maxUploadBytes(): number {
   return Number(process.env.MAX_UPLOAD_SIZE_MB ?? 10) * 1024 * 1024;
+}
+
+function maxUploadBodyBytes(): number {
+  const configured = Number(process.env.MAX_UPLOAD_BODY_MB);
+
+  if (Number.isFinite(configured) && configured > 0) {
+    return configured * 1024 * 1024;
+  }
+
+  return maxUploadBytes() + MULTIPART_OVERHEAD_BYTES;
 }
 
 export async function POST(request: Request) {
@@ -17,6 +77,20 @@ export async function POST(request: Request) {
 
   if (sessionResult.status === "unauthenticated") {
     return fail("UNAUTHORIZED", "请先登录", { status: 401 });
+  }
+
+  const user = authenticatedUser(sessionResult);
+  const rateLimitFailure = await userActionRateLimitResponse(
+    user.id,
+    "upload",
+    process.env.RATE_LIMIT_UPLOAD_PER_MIN,
+    20,
+  );
+  if (rateLimitFailure) return rateLimitFailure;
+
+  const contentLength = Number(request.headers.get("content-length") ?? 0);
+  if (Number.isFinite(contentLength) && contentLength > maxUploadBodyBytes()) {
+    return fail("PAYLOAD_TOO_LARGE", "上传请求过大", { status: 413 });
   }
 
   const formData = await request.formData();
@@ -48,7 +122,7 @@ export async function POST(request: Request) {
     saved = await saveUploadedReferenceImage({
       buffer,
       mimeType: file.type,
-      userId: authenticatedUser(sessionResult).id,
+      userId: user.id,
     });
   } catch (error) {
     if (error instanceof Error && error.message === "invalid uploaded image") {

@@ -1,17 +1,12 @@
 import type { ConversationMessageRole, Prisma } from "@prisma/client";
+import { storedChatReferences } from "@/lib/chat-references-types";
 
 import type {
   ConversationMessage,
   ConversationSummaryView,
   ConversationView,
 } from "@/lib/conversation";
-import { publicChannelAlias } from "@/lib/channel-alias";
-import {
-  displayNameForProviderChannelWithMap,
-  getImage2ProviderChannelName,
-  resolveImage2ProviderChannelId,
-  type Image2ChannelDisplayNameMap,
-} from "@/lib/provider-channels";
+import type { Image2ChannelDisplayNameMap } from "@/lib/provider-channels";
 import { privateImageThumbnailUrl, privateImageUrl } from "@/lib/storage";
 
 const conversationInclude = {
@@ -120,7 +115,7 @@ function generationMessageMeta(
     | ConversationWithMessages["messages"][number]["generation"]
     | ConversationSummaryRow["generations"][number]
     | null,
-  options: { displayNameMap?: Image2ChannelDisplayNameMap } = {},
+  _options: { displayNameMap?: Image2ChannelDisplayNameMap } = {},
 ) {
   if (!generation) {
     return null;
@@ -141,22 +136,9 @@ function generationMessageMeta(
       mimeType: image.mimeType,
     }));
   const image = images[0];
-  const providerChannelId = resolveImage2ProviderChannelId(
-    generation.modelId,
-    generation.paramsRaw,
-    generation.providerAccount?.baseUrl,
-  );
   const paramsRaw =
     generation.paramsRaw && typeof generation.paramsRaw === "object"
       ? (generation.paramsRaw as Record<string, unknown>)
-      : null;
-  const paramsProviderChannelBaseUrl =
-    typeof paramsRaw?.providerChannelBaseUrl === "string"
-      ? paramsRaw.providerChannelBaseUrl
-      : null;
-  const paramsProviderChannelName =
-    typeof paramsRaw?.providerChannelName === "string"
-      ? paramsRaw.providerChannelName
       : null;
 
   return {
@@ -169,26 +151,28 @@ function generationMessageMeta(
         }
       : {}),
     generationPrompt: generation.prompt,
+    generationModelId: generation.modelId,
+    generationSize: typeof paramsRaw?.size === "string" ? paramsRaw.size : null,
+    generationCount: generation.n,
+    generationErrorCode: generation.errorCode,
+    generationErrorMessage: generation.errorMessage,
     generationStatus: generation.status,
-    generationProvider: generation.provider?.name ?? null,
-    generationProviderChannelId: providerChannelId,
-    generationProviderChannelName:
-      paramsProviderChannelName ??
-      displayNameForProviderChannelWithMap(
-        generation.providerAccount?.baseUrl ?? paramsProviderChannelBaseUrl,
-        generation.provider?.name,
-        options.displayNameMap,
-      ) ??
-      getImage2ProviderChannelName(providerChannelId),
-    generationProviderAccountName: publicChannelAlias(
-      generation.providerAccount?.name,
-      generation.provider?.name,
-      generation.providerAccount?.baseUrl,
-    ),
+    generationProvider: null,
+    generationProviderChannelId: null,
+    generationProviderChannelName: null,
+    generationProviderAccountName: null,
     generationStartedAt: generation.startedAt?.toISOString() ?? null,
     generationFinishedAt: generation.finishedAt?.toISOString() ?? null,
     generationProgress: generation.progress,
   };
+}
+
+function serializeChatReferences(value: unknown) {
+  try {
+    return storedChatReferences(value);
+  } catch {
+    return [];
+  }
 }
 
 export function serializeConversation(
@@ -205,6 +189,28 @@ export function serializeConversation(
       role: roleToView(message.role),
       content: message.content,
       generationId: message.generationId ?? undefined,
+      chatTurnId: message.chatTurnId ?? undefined,
+      chatAttemptId: message.chatAttemptId ?? undefined,
+      chatStatus: message.chatStatus ?? undefined,
+      chatReferences: serializeChatReferences(message.chatReferences),
+      chatSources: Array.isArray(message.chatSources)
+        ? (message.chatSources as unknown as import("@/lib/chat-search").ChatSearchSource[])
+        : [],
+      chatUsage:
+        message.chatUsage &&
+        typeof message.chatUsage === "object" &&
+        !Array.isArray(message.chatUsage)
+          ? (message.chatUsage as Record<string, unknown>)
+          : null,
+      chatError:
+        message.chatError &&
+        typeof message.chatError === "object" &&
+        !Array.isArray(message.chatError)
+          ? String(
+              (message.chatError as Record<string, unknown>).publicMessage ??
+                "本次回复未完成，内容已保存",
+            )
+          : null,
       createdAt: message.createdAt.toISOString(),
       ...(generationMessageMeta(message.generation, options) ?? {}),
     })),

@@ -5,7 +5,19 @@ export interface ConversationMessage {
   role: ConversationRole;
   content: string;
   generationId?: string;
+  chatTurnId?: string;
+  chatAttemptId?: string;
+  chatStatus?: string;
+  chatError?: string | null;
+  chatSources?: import("@/lib/chat-search").ChatSearchSource[];
+  chatUsage?: Record<string, unknown> | null;
+  chatReferences?: import("@/lib/chat-references-types").ChatReference[];
   generationPrompt?: string;
+  generationModelId?: string;
+  generationSize?: string | null;
+  generationCount?: number;
+  generationErrorCode?: string | null;
+  generationErrorMessage?: string | null;
   imageId?: string;
   imageUrl?: string;
   images?: Array<{

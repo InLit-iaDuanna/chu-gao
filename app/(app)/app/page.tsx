@@ -1,22 +1,51 @@
-import { WorkbenchShell } from "@/components/workbench/WorkbenchShell";
-import { WorkbenchShellV2 } from "@/components/workbench/WorkbenchShellV2";
+import { StudioApp } from "@/components/studio/StudioApp";
+import { creativeAssistantEnabled } from "@/lib/creative-config";
 
 export default async function AppPage({
   searchParams,
 }: {
-  searchParams: Promise<{ conversation?: string; v?: string }>;
+  searchParams: Promise<{
+    thread?: string;
+    mode?: string;
+    prompt?: string;
+    negativePrompt?: string;
+    modelName?: string;
+    aspectRatio?: string;
+    resolution?: string;
+    seed?: string;
+    reference?: string | string[];
+  }>;
 }) {
-  const params = await searchParams;
-  const useLegacy =
-    params.v === "1" || process.env.NEXT_PUBLIC_WORKBENCH_LEGACY === "1";
-
-  if (useLegacy) {
-    return (
-      <WorkbenchShell initialConversationId={params.conversation ?? null} />
-    );
-  }
+  const {
+    thread,
+    mode,
+    prompt,
+    negativePrompt,
+    modelName,
+    aspectRatio,
+    resolution,
+    seed,
+    reference,
+  } = await searchParams;
+  const initialReferenceKeys = (
+    Array.isArray(reference) ? reference : reference ? [reference] : []
+  ).slice(0, 16);
+  const parsedSeed = seed && /^-?\d+$/.test(seed) ? Number(seed) : undefined;
 
   return (
-    <WorkbenchShellV2 initialConversationId={params.conversation ?? null} />
+    <StudioApp
+      creativeEnabled={creativeAssistantEnabled()}
+      initialMode={mode === "agent" ? "agent" : undefined}
+      initialThreadId={thread ?? null}
+      initialPrompt={prompt ?? null}
+      initialReferenceKeys={initialReferenceKeys}
+      initialRecipe={{
+        ...(negativePrompt ? { negativePrompt } : {}),
+        ...(modelName ? { modelName } : {}),
+        ...(aspectRatio ? { aspectRatio } : {}),
+        ...(resolution ? { resolution } : {}),
+        ...(Number.isSafeInteger(parsedSeed) ? { seed: parsedSeed } : {}),
+      }}
+    />
   );
 }

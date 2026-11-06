@@ -1,9 +1,10 @@
 "use client";
 
-import { Megaphone, X } from "lucide-react";
+import { Button } from "@/components/ui";
+
+import { ArrowUpRight, Megaphone, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import { Button, IconButton } from "@/components/ui";
 import {
   Dialog,
   DialogContent,
@@ -12,198 +13,256 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/Dialog";
-import type {
-  AnnouncementDisplayMode,
-  PublicAnnouncement,
-} from "@/lib/system-config";
+import type { AnnouncementTone, PublicAnnouncement } from "@/lib/announcements";
 import { cn } from "@/lib/utils";
 
-const TONE_CLASSES = {
-  info: "bg-foreground",
+const TONE_DOT: Record<AnnouncementTone, string> = {
+  info: "bg-info",
   warning: "bg-warning",
   success: "bg-success",
   danger: "bg-danger",
-} satisfies Record<PublicAnnouncement["tone"], string>;
+};
 
-function bannerDismissKey(announcement: PublicAnnouncement): string {
-  return `announcement.banner.dismissed.${announcement.id}`;
+const TONE_TEXT: Record<AnnouncementTone, string> = {
+  info: "text-info",
+  warning: "text-warning",
+  success: "text-success",
+  danger: "text-danger",
+};
+
+function showsBanner(announcement: PublicAnnouncement): boolean {
+  return announcement.displayMode !== "popup";
 }
 
-function popupDismissKey(announcement: PublicAnnouncement): string {
-  return `announcement.popup.dismissed.${announcement.id}`;
+function showsPopup(announcement: PublicAnnouncement): boolean {
+  return announcement.displayMode !== "banner";
 }
 
-function legacyDismissKey(announcement: PublicAnnouncement): string {
-  return `announcement.dismissed.${announcement.id}`;
+function dismissKey(id: string): string {
+  return `chugao.announcement.dismissed.${id}`;
 }
 
-function shouldShowPopup(displayMode: AnnouncementDisplayMode): boolean {
-  return displayMode === "popup" || displayMode === "both";
+function isDismissed(id: string): boolean {
+  try {
+    return window.localStorage.getItem(dismissKey(id)) === "true";
+  } catch {
+    return false;
+  }
 }
 
-function shouldShowBanner(displayMode: AnnouncementDisplayMode): boolean {
-  return displayMode === "banner" || displayMode === "both";
+function persistDismiss(id: string): void {
+  try {
+    window.localStorage.setItem(dismissKey(id), "true");
+  } catch {
+    // 忽略存储失败，仅本次会话有效。
+  }
 }
 
+/**
+ * 全局公告：横幅 + 弹窗两种形态，支持多条同时投放。
+ * 横幅展示第一条未关闭的 banner 公告，关闭后露出下一条；
+ * 弹窗逐条弹出未读 popup 公告，全部读完后保留右下角重开入口。
+ */
 export function AnnouncementBanner({
-  announcement,
+  announcements,
 }: {
-  announcement: PublicAnnouncement | null;
-}): React.ReactElement | null {
-  const [isBannerDismissed, setIsBannerDismissed] = useState(false);
-  const [isPopupDismissed, setIsPopupDismissed] = useState(false);
-  const [isPopupOpen, setIsPopupOpen] = useState(false);
-
-  const showBanner = useMemo(
-    () => Boolean(announcement && shouldShowBanner(announcement.displayMode)),
-    [announcement],
+  announcements: PublicAnnouncement[];
+}) {
+  const [dismissedIds, setDismissedIds] = useState<ReadonlySet<string>>(
+    new Set(),
   );
-  const showPopup = useMemo(
-    () => Boolean(announcement && shouldShowPopup(announcement.displayMode)),
-    [announcement],
-  );
+  const [hydrated, setHydrated] = useState(false);
+  const [popupSuppressed, setPopupSuppressed] = useState(false);
 
   useEffect(() => {
-    if (!announcement) {
-      setIsBannerDismissed(false);
-      setIsPopupDismissed(false);
-      setIsPopupOpen(false);
-      return;
+    const stored = new Set<string>();
+    for (const item of announcements) {
+      if (isDismissed(item.id)) stored.add(item.id);
     }
+    setDismissedIds(stored);
+    setPopupSuppressed(false);
+    setHydrated(true);
+  }, [announcements]);
 
-    const bannerDismissed =
-      window.localStorage.getItem(bannerDismissKey(announcement)) === "true" ||
-      window.localStorage.getItem(legacyDismissKey(announcement)) === "true";
-    const popupDismissed =
-      window.localStorage.getItem(popupDismissKey(announcement)) === "true";
+  const dismiss = (id: string) => {
+    persistDismiss(id);
+    setDismissedIds((current) => new Set(current).add(id));
+  };
 
-    setIsBannerDismissed(bannerDismissed);
-    setIsPopupDismissed(popupDismissed);
-    setIsPopupOpen(Boolean(showPopup && !popupDismissed));
-  }, [announcement, showPopup]);
+  const bannerItem = useMemo(
+    () =>
+      hydrated
+        ? announcements.find(
+            (item) => showsBanner(item) && !dismissedIds.has(item.id),
+          )
+        : undefined,
+    [announcements, dismissedIds, hydrated],
+  );
 
-  if (!announcement) {
+  const popupQueue = useMemo(
+    () =>
+      hydrated
+        ? announcements.filter(
+            (item) => showsPopup(item) && !dismissedIds.has(item.id),
+          )
+        : [],
+    [announcements, dismissedIds, hydrated],
+  );
+
+  const popupItem = popupSuppressed ? undefined : popupQueue[0];
+  const reopenable = hydrated && popupQueue.length > 0 && popupSuppressed;
+
+  if (!hydrated || announcements.length === 0) {
     return null;
   }
 
-  const currentAnnouncement = announcement;
-
-  function dismissBanner() {
-    window.localStorage.setItem(bannerDismissKey(currentAnnouncement), "true");
-    setIsBannerDismissed(true);
-  }
-
-  function dismissPopup() {
-    window.localStorage.setItem(popupDismissKey(currentAnnouncement), "true");
-    setIsPopupDismissed(true);
-    setIsPopupOpen(false);
-  }
-
-  function reopenPopup() {
-    setIsPopupOpen(true);
-  }
-
-  const banner =
-    showBanner && !isBannerDismissed ? (
-      <div
-        className="border-b border-border px-3 sm:px-5 lg:px-6"
-        role={announcement.tone === "danger" ? "alert" : "status"}
-      >
-        <div className="mx-auto flex min-h-9 w-full max-w-[1520px] items-center justify-between gap-3 py-1">
-          <button
-            className="flex min-w-0 items-center gap-3 text-left"
-            type="button"
-            onClick={showPopup ? reopenPopup : undefined}
-          >
-            <span
-              className={cn(
-                "h-5 w-0.5 shrink-0 rounded-full",
-                TONE_CLASSES[announcement.tone],
-              )}
-              aria-hidden="true"
-            />
-            {announcement.title ? (
-              <p className="shrink-0 text-xs font-medium">
-                {announcement.title}
-              </p>
-            ) : null}
-            <p className="truncate text-xs text-text-muted">
-              {announcement.body}
-            </p>
-          </button>
-          <IconButton
-            aria-label="关闭公告"
-            className="shrink-0"
-            size="sm"
-            onClick={dismissBanner}
-          >
-            <X />
-          </IconButton>
-        </div>
-      </div>
-    ) : null;
-
-  const popup = showPopup ? (
-    <Dialog
-      open={isPopupOpen}
-      onOpenChange={(open) => {
-        if (open) {
-          setIsPopupOpen(true);
-        } else {
-          dismissPopup();
-        }
-      }}
-    >
-      <DialogContent
-        className="max-w-[560px] overflow-hidden p-0"
-        aria-modal="true"
-        role={announcement.tone === "danger" ? "alertdialog" : "dialog"}
-      >
-        <div className={cn("h-1 w-full", TONE_CLASSES[announcement.tone])} />
-        <DialogHeader className="px-5 pb-4 pt-5 pr-12">
-          <DialogTitle className="text-base">
-            {announcement.title || "公告"}
-          </DialogTitle>
-          <DialogDescription className="mt-2 text-sm leading-6">
-            {announcement.body}
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter className="justify-between px-5 py-4">
-          <div className="flex items-center gap-2 text-xs text-text-muted">
-            <span
-              className={cn(
-                "h-2.5 w-2.5 rounded-full",
-                TONE_CLASSES[announcement.tone],
-              )}
-              aria-hidden="true"
-            />
-            <span>全局公告</span>
-          </div>
-          <Button variant="primary" onClick={dismissPopup}>
-            我知道了
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  ) : null;
-
-  const popupEntry =
-    showPopup && isPopupDismissed && !isPopupOpen ? (
-      <button
-        className="fixed bottom-4 right-4 z-50 inline-flex h-10 items-center gap-2 rounded-full border border-border bg-surface px-3 text-sm shadow-[var(--shadow-md)] transition-colors hover:bg-surface-2"
-        type="button"
-        onClick={reopenPopup}
-      >
-        <Megaphone className="h-4 w-4" />
-        <span className="max-w-40 truncate">公告</span>
-      </button>
-    ) : null;
-
   return (
     <>
-      {banner}
-      {popup}
-      {popupEntry}
+      {bannerItem ? (
+        <div
+          className="border-b border-border bg-surface"
+          role={bannerItem.tone === "danger" ? "alert" : "status"}
+        >
+          <div className="mx-auto flex h-9 w-full max-w-[1520px] items-center gap-2.5 px-3 sm:px-5 lg:px-6">
+            <span
+              className={cn(
+                "h-1.5 w-1.5 shrink-0 rounded-full",
+                TONE_DOT[bannerItem.tone],
+              )}
+              aria-hidden
+            />
+            {bannerItem.title ? (
+              <span className="shrink-0 text-xs font-semibold tracking-tight">
+                {bannerItem.title}
+              </span>
+            ) : null}
+            <p className="min-w-0 flex-1 truncate text-xs text-text-muted">
+              {bannerItem.body}
+            </p>
+            {bannerItem.linkUrl ? (
+              <a
+                href={bannerItem.linkUrl}
+                target={
+                  bannerItem.linkUrl.startsWith("/") ? undefined : "_blank"
+                }
+                rel="noreferrer"
+                className={cn(
+                  "flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors hover:bg-surface-2",
+                  TONE_TEXT[bannerItem.tone],
+                )}
+              >
+                {bannerItem.linkLabel || "查看详情"}
+                <ArrowUpRight size={12} aria-hidden />
+              </a>
+            ) : null}
+            <Button
+              variant="ghost"
+              type="button"
+              aria-label="关闭公告"
+              onClick={() => dismiss(bannerItem.id)}
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md p-0 text-text-faint transition-colors hover:bg-surface-2 hover:text-foreground"
+            >
+              <X size={13} />
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      {popupItem ? (
+        <Dialog
+          open
+          onOpenChange={(open) => {
+            if (!open) dismiss(popupItem.id);
+          }}
+        >
+          <DialogContent hideClose className="max-w-[520px] p-0">
+            <DialogHeader className="pb-2 pr-12">
+              <div className="mb-2 flex items-center gap-2">
+                <span
+                  className={cn(
+                    "h-1.5 w-1.5 rounded-full",
+                    TONE_DOT[popupItem.tone],
+                  )}
+                  aria-hidden
+                />
+                <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-text-faint">
+                  公告
+                  {popupQueue.length > 1 ? ` · 1/${popupQueue.length}` : ""}
+                </span>
+              </div>
+              <DialogTitle>{popupItem.title || "公告"}</DialogTitle>
+              <DialogDescription className="mt-2 whitespace-pre-wrap leading-relaxed">
+                {popupItem.body}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="justify-between">
+              <div className="flex items-center gap-1.5 text-xs text-text-faint">
+                <Megaphone size={12} aria-hidden />
+                Chūgǎo Studio
+              </div>
+              <div className="flex items-center gap-2">
+                {popupItem.linkUrl ? (
+                  <Button asChild variant="ghost" size="sm">
+                    <a
+                      href={popupItem.linkUrl}
+                      target={
+                        popupItem.linkUrl.startsWith("/") ? undefined : "_blank"
+                      }
+                      rel="noreferrer"
+                    >
+                      {popupItem.linkLabel || "查看详情"}
+                      <ArrowUpRight size={12} aria-hidden />
+                    </a>
+                  </Button>
+                ) : null}
+                <Button
+                  variant="ghost"
+                  type="button"
+                  onClick={() => dismiss(popupItem.id)}
+                  className="h-8 px-3.5 text-xs"
+                >
+                  我知道了
+                </Button>
+              </div>
+            </DialogFooter>
+            <Button
+              variant="ghost"
+              type="button"
+              aria-label="关闭"
+              onClick={() => dismiss(popupItem.id)}
+              className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-md p-0 text-text-muted transition-colors hover:bg-surface-2 hover:text-foreground"
+            >
+              <X size={14} />
+            </Button>
+          </DialogContent>
+        </Dialog>
+      ) : null}
+
+      {popupQueue.length > 1 && popupItem ? (
+        <Button
+          variant="ghost"
+          type="button"
+          onClick={() => setPopupSuppressed(true)}
+          className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] right-3 z-40 text-[11px] text-text-faint underline-offset-2 hover:text-text-muted hover:underline md:bottom-4 md:right-4"
+        >
+          稍后阅读剩余 {popupQueue.length - 1} 条
+        </Button>
+      ) : null}
+
+      {reopenable ? (
+        <Button
+          variant="ghost"
+          type="button"
+          onClick={() => setPopupSuppressed(false)}
+          className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] right-3 z-40 flex h-9 items-center gap-2 rounded-md border border-border bg-surface px-3 text-xs font-medium text-foreground shadow-[var(--shadow-md)] transition-colors hover:bg-surface-2 md:bottom-4 md:right-4"
+        >
+          <Megaphone size={13} className="text-text-muted" aria-hidden />
+          公告
+          <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 text-[10px] font-semibold text-on-accent">
+            {popupQueue.length}
+          </span>
+        </Button>
+      ) : null}
     </>
   );
 }

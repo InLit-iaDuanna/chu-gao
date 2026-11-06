@@ -1,16 +1,26 @@
-chugao.art, www.chugao.art {
+chugao.art, www.chugao.art, iwish.chugao.art {
     encode gzip zstd
 
+    # Force the client IP seen by the app to the actual peer. Without this,
+    # requesters can spoof X-Real-IP / CF-Connecting-IP and bypass
+    # ADMIN_IP_ALLOWLIST and the login rate limit.
+    # If you later front this with Cloudflare, drop the CF-Connecting-IP
+    # deletion and trust that header instead of X-Real-IP.
     @sse path /api/generations/*/stream
     reverse_proxy @sse web:3000 {
         flush_interval -1
+        header_up X-Real-IP {remote_host}
+        header_up -CF-Connecting-IP
         transport http {
             read_timeout 5m
             response_header_timeout 5m
         }
     }
 
-    reverse_proxy web:3000
+    reverse_proxy web:3000 {
+        header_up X-Real-IP {remote_host}
+        header_up -CF-Connecting-IP
+    }
     request_body {
         max_size 12MB
     }

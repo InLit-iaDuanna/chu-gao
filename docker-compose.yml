@@ -9,6 +9,11 @@ services:
       - "${POSTGRES_BIND_HOST:-127.0.0.1}:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d app"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
   redis:
@@ -18,35 +23,104 @@ services:
       - "${REDIS_BIND_HOST:-127.0.0.1}:${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
+
+  storage-init:
+    image: alpine:3.22
+    user: "0:0"
+    command:
+      [
+        "sh",
+        "-c",
+        "mkdir -p /storage && chown -R 100:101 /storage && chmod -R u+rwX,g+rwX /storage",
+      ]
+    volumes:
+      - private_storage:/storage
+    restart: "no"
 
   web:
     build:
       context: .
       dockerfile: Dockerfile
     env_file: .env
+    environment:
+      DATABASE_URL: postgresql://app:${POSTGRES_PASSWORD}@postgres:5432/app?schema=public
+      REDIS_URL: redis://redis:6379
     depends_on:
-      - postgres
-      - redis
+      storage-init:
+        condition: service_completed_successfully
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - private_storage:/app/.data/storage
     ports:
       - "${WEB_BIND_HOST:-127.0.0.1}:${WEB_PORT:-3002}:3000"
     expose:
       - "3000"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q -O /dev/null http://127.0.0.1:3000/api/health || exit 1",
+        ]
+      interval: 30s
+      timeout: 8s
+      start_period: 20s
+      retries: 3
     restart: unless-stopped
 
   worker:
+    stop_grace_period: 30s
     build:
       context: .
       dockerfile: Dockerfile.worker
     env_file: .env
+    environment:
+      DATABASE_URL: postgresql://app:${POSTGRES_PASSWORD}@postgres:5432/app?schema=public
+      REDIS_URL: redis://redis:6379
     depends_on:
-      - postgres
-      - redis
+      storage-init:
+        condition: service_completed_successfully
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - private_storage:/app/.data/storage
+    healthcheck:
+      # The application health endpoint verifies DB, Redis, queue, and worker heartbeats.
+      # Keep the container probe cheap so it cannot compile tsx every 30 seconds.
+      test: ["CMD-SHELL", "test -r /proc/1/cmdline"]
+      interval: 30s
+      timeout: 3s
+      start_period: 20s
+      retries: 3
     restart: unless-stopped
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://app:${POSTGRES_PASSWORD}@postgres:5432/app?schema=public
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["./node_modules/.bin/prisma", "migrate", "deploy"]
+    restart: "no"
 
 volumes:
   pg_data: {}

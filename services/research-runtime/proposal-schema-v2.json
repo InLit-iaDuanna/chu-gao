@@ -1,0 +1,407 @@
+{
+  "$defs": {
+    "ProposalClaim": {
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "observed",
+            "verified",
+            "user_requirement",
+            "hypothesis",
+            "recommendation",
+            "unknown"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "evidence_ids": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "type": "string"
+          },
+          "maxItems": 6,
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "assumption_basis": {
+          "default": "",
+          "description": "For a hypothesis claim, copy the retained hypothesis basis exactly. Do not summarize or paraphrase it.",
+          "maxLength": 160,
+          "title": "Assumption Basis",
+          "type": "string"
+        },
+        "hypothesis_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hypothesis Id"
+        }
+      },
+      "required": [
+        "text",
+        "status"
+      ],
+      "title": "ProposalClaim",
+      "type": "object"
+    },
+    "ProposalRow": {
+      "additionalProperties": false,
+      "properties": {
+        "cells": {
+          "items": {
+            "maxLength": 52,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 5,
+          "minItems": 2,
+          "title": "Cells",
+          "type": "array"
+        },
+        "status": {
+          "enum": [
+            "observed",
+            "verified",
+            "user_requirement",
+            "hypothesis",
+            "recommendation",
+            "unknown"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "evidence_ids": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "type": "string"
+          },
+          "maxItems": 4,
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "assumption_basis": {
+          "default": "",
+          "maxLength": 100,
+          "title": "Assumption Basis",
+          "type": "string"
+        },
+        "hypothesis_ids": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "type": "string"
+          },
+          "maxItems": 4,
+          "title": "Hypothesis Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "cells",
+        "status"
+      ],
+      "title": "ProposalRow",
+      "type": "object"
+    },
+    "ProposalSection": {
+      "additionalProperties": false,
+      "description": "Legacy v1 input; v2 derives all formats from slides to prevent divergence.",
+      "properties": {
+        "title": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "body": {
+          "maxLength": 3000,
+          "minLength": 1,
+          "title": "Body",
+          "type": "string"
+        },
+        "evidence_ids": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "type": "string"
+          },
+          "maxItems": 8,
+          "title": "Evidence Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "title",
+        "body"
+      ],
+      "title": "ProposalSection",
+      "type": "object"
+    },
+    "ProposalSlide": {
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "maxLength": 72,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "layout": {
+          "default": "overview",
+          "description": "A semantic section, not a fixed physical slide. The exporter paginates without changing claims, status, citations or hypothesis basis.",
+          "enum": [
+            "overview",
+            "comparison",
+            "process",
+            "tradeoffs",
+            "evidence"
+          ],
+          "title": "Layout",
+          "type": "string"
+        },
+        "claims": {
+          "items": {
+            "$ref": "#/$defs/ProposalClaim"
+          },
+          "maxItems": 5,
+          "title": "Claims",
+          "type": "array"
+        },
+        "table": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProposalTable"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "steps": {
+          "items": {
+            "$ref": "#/$defs/ProposalStep"
+          },
+          "maxItems": 5,
+          "title": "Steps",
+          "type": "array"
+        },
+        "points": {
+          "items": {
+            "maxLength": 90,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 6,
+          "title": "Points",
+          "type": "array"
+        },
+        "evidence_ids": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "type": "string"
+          },
+          "maxItems": 6,
+          "title": "Evidence Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "title"
+      ],
+      "title": "ProposalSlide",
+      "type": "object"
+    },
+    "ProposalStep": {
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "maxLength": 26,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "detail": {
+          "maxLength": 82,
+          "minLength": 1,
+          "title": "Detail",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "observed",
+            "verified",
+            "user_requirement",
+            "hypothesis",
+            "recommendation",
+            "unknown"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "evidence_ids": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "type": "string"
+          },
+          "maxItems": 4,
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "assumption_basis": {
+          "default": "",
+          "maxLength": 100,
+          "title": "Assumption Basis",
+          "type": "string"
+        },
+        "hypothesis_ids": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "type": "string"
+          },
+          "maxItems": 4,
+          "title": "Hypothesis Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "title",
+        "detail",
+        "status"
+      ],
+      "title": "ProposalStep",
+      "type": "object"
+    },
+    "ProposalTable": {
+      "additionalProperties": false,
+      "properties": {
+        "columns": {
+          "items": {
+            "maxLength": 20,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 5,
+          "minItems": 2,
+          "title": "Columns",
+          "type": "array"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/ProposalRow"
+          },
+          "maxItems": 5,
+          "minItems": 2,
+          "title": "Rows",
+          "type": "array"
+        }
+      },
+      "required": [
+        "columns",
+        "rows"
+      ],
+      "title": "ProposalTable",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "contract_version": {
+      "default": 1,
+      "enum": [
+        1,
+        2
+      ],
+      "title": "Contract Version",
+      "type": "integer"
+    },
+    "package_version": {
+      "default": "",
+      "maxLength": 128,
+      "title": "Package Version",
+      "type": "string"
+    },
+    "status": {
+      "default": "draft",
+      "enum": [
+        "draft",
+        "review_ready"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "title": {
+      "maxLength": 80,
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    },
+    "subtitle": {
+      "default": "",
+      "maxLength": 240,
+      "title": "Subtitle",
+      "type": "string"
+    },
+    "slides": {
+      "items": {
+        "$ref": "#/$defs/ProposalSlide"
+      },
+      "maxItems": 16,
+      "minItems": 1,
+      "title": "Slides",
+      "type": "array"
+    },
+    "sections": {
+      "items": {
+        "$ref": "#/$defs/ProposalSection"
+      },
+      "maxItems": 24,
+      "title": "Sections",
+      "type": "array"
+    },
+    "caveats": {
+      "items": {
+        "maxLength": 600,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 16,
+      "title": "Caveats",
+      "type": "array"
+    }
+  },
+  "required": [
+    "title",
+    "slides"
+  ],
+  "title": "ProposalDocument",
+  "type": "object"
+}

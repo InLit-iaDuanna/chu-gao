@@ -101,7 +101,7 @@ function dbHint(error: unknown): string {
     message.includes("does not exist") ||
     message.includes("has been changed")
   ) {
-    return "apply schema with `pnpm db:push`";
+    return "apply migrations with `pnpm db:migrate`";
   }
 
   return "check DATABASE_URL";
@@ -221,7 +221,7 @@ async function checkProviderSeed(): Promise<void> {
     add(
       providerCheckName,
       "fail",
-      "skipped because database is unreachable; start Postgres, then run `pnpm db:push && pnpm db:seed`",
+      "skipped because database is unreachable; start Postgres, then run `pnpm db:migrate && pnpm db:seed`",
     );
     return;
   }
@@ -288,7 +288,7 @@ async function main(): Promise<void> {
     console.log(
       "1. Start local dependencies: docker compose up -d postgres redis",
     );
-    console.log("2. Apply schema: pnpm db:push");
+    console.log("2. Apply migrations: pnpm db:migrate");
     console.log("3. Seed image2 provider: pnpm db:seed");
     console.log("4. Start the worker: pnpm worker");
     process.exitCode = 1;

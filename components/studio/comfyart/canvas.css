@@ -1,0 +1,73 @@
+.chugao-comfyart {
+  background: rgb(var(--surface));
+}
+.chugao-comfyart .tl-container {
+  --font-sans: var(--font-geist-sans), Arial, sans-serif;
+  letter-spacing: 0;
+}
+.chugao-comfyart .tl-frame__body {
+  rx: var(--ca-frame-r, 0);
+  ry: var(--ca-frame-r, 0);
+}
+.chugao-comfyart .ca-comment {
+  overflow: visible;
+  pointer-events: none;
+}
+.chugao-comfyart .ca-comment__pin {
+  position: absolute;
+  display: flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid white;
+  border-radius: 50%;
+  background: #c34e21;
+  color: white;
+  transform-origin: center;
+  box-shadow: 0 1px 4px #0004;
+}
+.chugao-comfyart .ca-comment[data-done] .ca-comment__pin {
+  background: #227752;
+}
+.chugao-comfyart .ca-comment__outline {
+  position: absolute;
+  overflow: visible;
+  fill: #c34e2114;
+  stroke: #c34e21;
+}
+.chugao-comfyart .ca-comment__dot {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #c34e21;
+}
+.chugao-comfyart .ca-icon {
+  display: inline-flex;
+}
+.chugao-comfyart .ca-comment__mark {
+  position: absolute;
+  background: #c34e2140;
+  mask-size: 100% 100%;
+}
+.chugao-comfyart .ca-reframe__hint {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #777;
+  pointer-events: none;
+}
+.chugao-comfyart [aria-pressed="true"] {
+  background-color: rgb(var(--surface-3));
+  color: rgb(var(--text));
+}
+.chugao-comfyart .canvas-side-panel {
+  box-shadow: -4px 0 16px #0001;
+}
+@media (min-width: 768px) {
+  .chugao-comfyart .canvas-side-panel {
+    box-shadow: none;
+  }
+}

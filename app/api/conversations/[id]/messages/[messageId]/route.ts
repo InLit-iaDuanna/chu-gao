@@ -14,6 +14,7 @@ import {
 import { db } from "@/lib/db";
 import { getImage2ChannelDisplayNameMap } from "@/lib/provider-channel-config";
 import { isDatabaseUnavailableError } from "@/lib/service-errors";
+import { assertChatConversationIdle, ChatTurnError } from "@/lib/chat-turns";
 
 const updateMessageSchema = z.object({
   content: z.string().trim().min(1).max(4000),
@@ -80,13 +81,21 @@ export async function PATCH(
       return fail("NOT_FOUND", "消息不存在", { status: 404 });
     }
 
-    await db.conversationMessage.update({
-      where: {
-        id: messageId,
-      },
-      data: {
-        content: parsed.data.content,
-      },
+    await db.$transaction(async (tx) => {
+      await assertChatConversationIdle(tx, id, session.id);
+      await tx.conversationMessage.update({
+        where: {
+          id: messageId,
+        },
+        data: {
+          content: parsed.data.content,
+        },
+      });
+      await tx.conversation.update({
+        where: { id },
+        data: { contextRevision: { increment: 1 } },
+      });
+      await tx.contextSnapshot.deleteMany({ where: { conversationId: id } });
     });
 
     const conversation = await db.conversation.findFirstOrThrow({
@@ -101,6 +110,8 @@ export async function PATCH(
 
     return ok(serializeConversation(conversation, { displayNameMap }));
   } catch (error) {
+    if (error instanceof ChatTurnError)
+      return fail(error.code, error.message, { status: error.status });
     if (isDatabaseUnavailableError(error)) {
       return conversationsUnavailable();
     }

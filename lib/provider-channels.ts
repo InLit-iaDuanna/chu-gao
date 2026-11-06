@@ -65,11 +65,15 @@ export function isImage2ProviderChannelId(
 }
 
 export function isImage2ModelId(modelId?: string | null): boolean {
-  return modelId === "gpt-image-2";
+  return (
+    modelId === "gpt-image-2" ||
+    modelId === "gpt-image-2.5-flare" ||
+    modelId === "gpt-image-2.5-sunburst"
+  );
 }
 
 export function supportsProviderChannels(modelId?: string | null): boolean {
-  return modelId === "gpt-image-2" || modelId === "nano-banana-2-512";
+  return isImage2ModelId(modelId) || modelId === "nano-banana-2-512";
 }
 
 export function normalizeProviderChannelBaseUrl(
@@ -107,6 +111,16 @@ export function channelIdFromBaseUrl(baseUrl: string): ProviderChannelId {
   const normalized = normalizeProviderChannelBaseUrl(baseUrl) ?? baseUrl.trim();
 
   return `url_${hashString(normalized)}`;
+}
+
+// Different Provider pools may share a Base URL but use different upstream
+// groups and credentials. Keep those pools independently selectable.
+export function channelIdFromProvider(
+  providerId: string,
+  baseUrl: string,
+): ProviderChannelId {
+  const normalized = normalizeProviderChannelBaseUrl(baseUrl) ?? baseUrl.trim();
+  return `provider_${hashString(`${providerId}\n${normalized}`)}`;
 }
 
 export function resolveImage2ProviderChannelBaseUrl(
@@ -262,7 +276,7 @@ export function buildProviderChannelsFromAccounts<
     ProviderAccount,
     "baseUrl" | "isActive" | "health" | "cooldownUntil"
   > & {
-    provider?: { name?: string | null } | null;
+    provider?: { id?: string | null; name?: string | null } | null;
   },
 >(
   accounts: T[],
@@ -274,6 +288,7 @@ export function buildProviderChannelsFromAccounts<
     string,
     {
       baseUrl: string;
+      providerId: string | null;
       providerName: string | null;
       accountCount: number;
       availableAccountCount: number;
@@ -287,8 +302,11 @@ export function buildProviderChannelsFromAccounts<
       continue;
     }
 
-    const current = groups.get(normalized) ?? {
+    const providerId = account.provider?.id ?? null;
+    const groupKey = providerId ? `${providerId}:${normalized}` : normalized;
+    const current = groups.get(groupKey) ?? {
       baseUrl: normalized,
+      providerId,
       providerName: account.provider?.name ?? null,
       accountCount: 0,
       availableAccountCount: 0,
@@ -304,21 +322,36 @@ export function buildProviderChannelsFromAccounts<
       current.providerName = account.provider.name;
     }
 
-    groups.set(normalized, current);
+    groups.set(groupKey, current);
   }
 
   const channels = Array.from(groups.values())
-    .map((group) => ({
-      id: channelIdFromBaseUrl(group.baseUrl),
-      displayName: displayNameForProviderChannelWithMap(
-        group.baseUrl,
-        group.providerName,
-        options.displayNameMap,
-      ) as string,
-      baseUrl: group.baseUrl,
-      accountCount: group.accountCount,
-      availableAccountCount: group.availableAccountCount,
-    }))
+    .map((group) => {
+      const explicitProviderName = group.providerName?.trim();
+      const isGenericProviderName = explicitProviderName
+        ? GENERIC_PROVIDER_NAMES.has(explicitProviderName.toLowerCase())
+        : false;
+      const displayNameForGenericProvider =
+        explicitProviderName?.toLowerCase() === "image2" ? "OpenAI渠道" : null;
+
+      return {
+        id: group.providerId
+          ? channelIdFromProvider(group.providerId, group.baseUrl)
+          : channelIdFromBaseUrl(group.baseUrl),
+        displayName:
+          displayNameForGenericProvider ??
+          (explicitProviderName && !isGenericProviderName
+            ? explicitProviderName
+            : (displayNameForProviderChannelWithMap(
+                group.baseUrl,
+                group.providerName,
+                options.displayNameMap,
+              ) as string)),
+        baseUrl: group.baseUrl,
+        accountCount: group.accountCount,
+        availableAccountCount: group.availableAccountCount,
+      };
+    })
     .sort((left, right) => {
       if (right.availableAccountCount !== left.availableAccountCount) {
         return right.availableAccountCount - left.availableAccountCount;

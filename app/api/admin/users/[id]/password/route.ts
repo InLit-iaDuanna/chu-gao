@@ -44,17 +44,22 @@ export async function POST(
   }
 
   const admin = authenticatedUser(sessionResult);
-  const user = await db.user.update({
-    where: { id },
-    data: {
-      passwordHash: await bcrypt.hash(parsed.data.password, 12),
-      sessionVersion: { increment: 1 },
-    },
-    select: {
-      id: true,
-      email: true,
-      sessionVersion: true,
-    },
+  const user = await db.$transaction(async (tx) => {
+    const updated = await tx.user.update({
+      where: { id },
+      data: {
+        passwordHash: await bcrypt.hash(parsed.data.password, 12),
+        sessionVersion: { increment: 1 },
+      },
+      select: {
+        id: true,
+        email: true,
+        sessionVersion: true,
+      },
+    });
+
+    await tx.deviceSession.deleteMany({ where: { userId: id } });
+    return updated;
   });
 
   await audit({

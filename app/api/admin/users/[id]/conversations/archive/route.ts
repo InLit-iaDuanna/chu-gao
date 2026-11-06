@@ -8,6 +8,7 @@ import {
 } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { adminArchiveConversationsSchema } from "@/lib/validators";
+import { assertChatConversationIdle, ChatTurnError } from "@/lib/chat-turns";
 
 export async function POST(
   request: Request,
@@ -42,25 +43,47 @@ export async function POST(
   }
 
   const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-  const archived = await db.conversation.updateMany({
-    where: {
-      userId: id,
-      archivedAt: null,
-      ...(parsed.data.mode === "inactive"
-        ? { lastMessageAt: { lt: cutoff } }
-        : {}),
-    },
-    data: { archivedAt: new Date() },
+  const where = {
+    userId: id,
+    archivedAt: null,
+    ...(parsed.data.mode === "inactive"
+      ? { lastMessageAt: { lt: cutoff } }
+      : {}),
+  };
+  const candidates = await db.conversation.findMany({
+    where,
+    select: { id: true },
+    orderBy: { id: "asc" },
   });
+  let count = 0;
+  for (const candidate of candidates)
+    count += await db.$transaction(async (tx) => {
+      try {
+        await assertChatConversationIdle(tx, candidate.id, id);
+      } catch (error) {
+        if (
+          error instanceof ChatTurnError &&
+          (error.code === "CHAT_TURN_BUSY" || error.code === "NOT_FOUND")
+        )
+          return 0;
+        throw error;
+      }
+      return (
+        await tx.conversation.updateMany({
+          where: { ...where, id: candidate.id },
+          data: { archivedAt: new Date() },
+        })
+      ).count;
+    });
   const admin = authenticatedUser(sessionResult);
 
   await audit({
     actorId: admin.id,
     action: "admin.user.conversations_archive",
     target: id,
-    diff: { mode: parsed.data.mode, count: archived.count },
+    diff: { mode: parsed.data.mode, count },
     request,
   });
 
-  return ok({ archived: archived.count });
+  return ok({ archived: count });
 }

@@ -1,102 +1,53 @@
 "use client";
 
-import { createContext, useContext } from "react";
+import * as RadixTabs from "@radix-ui/react-tabs";
 
 import { cn } from "@/lib/utils";
 
-interface TabsContextValue {
-  value: string;
-  onChange: (value: string) => void;
-}
-
-interface TabsProps {
-  value: string;
-  onChange: (value: string) => void;
-  children: React.ReactNode;
-  className?: string;
-}
-
-interface TabsTriggerProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  value: string;
-}
-
-const TabsContext = createContext<TabsContextValue | null>(null);
-
-function useTabsContext(): TabsContextValue {
-  const context = useContext(TabsContext);
-  if (!context) {
-    throw new Error("Tabs components must be used inside Tabs.");
-  }
-  return context;
-}
-
-export function Tabs({
-  value,
-  onChange,
-  children,
-  className,
-}: TabsProps): React.ReactElement {
-  return (
-    <TabsContext.Provider value={{ value, onChange }}>
-      <div className={className}>{children}</div>
-    </TabsContext.Provider>
-  );
-}
+export const Tabs = RadixTabs.Root;
 
 export function TabsList({
   className,
   ...props
-}: React.HTMLAttributes<HTMLDivElement>): React.ReactElement {
+}: React.ComponentPropsWithoutRef<typeof RadixTabs.List>): React.ReactElement {
   return (
-    <div
-      className={cn("flex border-b border-border", className)}
-      role="tablist"
+    <RadixTabs.List
+      className={cn("inline-flex rounded-md bg-surface-2 p-0.5", className)}
       {...props}
     />
   );
 }
 
 export function TabsTrigger({
-  value,
   className,
-  children,
-  type = "button",
   ...props
-}: TabsTriggerProps): React.ReactElement {
-  const context = useTabsContext();
-  const active = context.value === value;
-
+}: React.ComponentPropsWithoutRef<
+  typeof RadixTabs.Trigger
+>): React.ReactElement {
   return (
-    <button
-      aria-selected={active}
+    <RadixTabs.Trigger
       className={cn(
-        "relative h-9 px-3 text-sm text-text-muted transition-colors hover:text-foreground",
-        active &&
-          "text-foreground after:absolute after:bottom-[-1px] after:left-0 after:h-0.5 after:w-full after:bg-foreground",
+        "h-7 rounded-[4px] px-2.5 text-xs text-text-muted outline-none transition-colors hover:text-foreground focus:shadow-[var(--shadow-focus)] data-[state=active]:bg-surface data-[state=active]:text-foreground data-[state=active]:shadow-[var(--shadow-xs)] disabled:opacity-45",
         className,
       )}
-      role="tab"
-      type={type}
-      onClick={() => context.onChange(value)}
       {...props}
-    >
-      {children}
-    </button>
+    />
   );
 }
 
 export function TabsContent({
-  value,
   className,
   ...props
-}: React.HTMLAttributes<HTMLDivElement> & {
-  value: string;
-}): React.ReactElement | null {
-  const context = useTabsContext();
-
-  if (context.value !== value) {
-    return null;
-  }
-
-  return <div className={cn("pt-4", className)} role="tabpanel" {...props} />;
+}: React.ComponentPropsWithoutRef<
+  typeof RadixTabs.Content
+>): React.ReactElement {
+  return (
+    <RadixTabs.Content
+      className={cn(
+        "outline-none focus-visible:shadow-[var(--shadow-focus)]",
+        className,
+      )}
+      {...props}
+    />
+  );
 }

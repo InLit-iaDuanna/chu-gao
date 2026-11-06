@@ -1,0 +1,162 @@
+{
+  "contract_version": 2,
+  "package_version": "fixture-office-lunch-20261019-v2",
+  "status": "draft",
+  "title": "办公室轻食设备：离线导出验收样例",
+  "subtitle": "用于检查提案结构、来源链接与格式一致性。内容为测试夹具，不构成新完成的市场调研。",
+  "slides": [
+    {
+      "title": "用户要求与系统假设分别标记",
+      "layout": "overview",
+      "claims": [
+        {
+          "text": "办公室快速午餐",
+          "status": "user_requirement"
+        },
+        {
+          "text": "低油、营养可控、分量明确",
+          "status": "user_requirement"
+        },
+        {
+          "text": "优先研究可重复清洁的分量容器，再决定是否增加专用加热设备。",
+          "status": "hypothesis",
+          "assumption_basis": "由分量管理需求提出的概念路线，尚无用户实测支持。",
+          "hypothesis_id": "hyp-container-first"
+        }
+      ]
+    },
+    {
+      "title": "先比较替代路线，再选择产品形态",
+      "layout": "comparison",
+      "table": {
+        "columns": [
+          "候选路线",
+          "可能价值",
+          "关键疑问"
+        ],
+        "rows": [
+          {
+            "cells": [
+              "分量容器与现有微波炉",
+              "复用办公室设备",
+              "共享设备是否可用"
+            ],
+            "status": "hypothesis",
+            "assumption_basis": "场景推演",
+            "hypothesis_ids": [
+              "hyp-microwave"
+            ]
+          },
+          {
+            "cells": [
+              "便携加热饭盒",
+              "减少排队等待",
+              "加热与清洁是否方便"
+            ],
+            "status": "hypothesis",
+            "assumption_basis": "场景推演",
+            "hypothesis_ids": [
+              "hyp-lunchbox"
+            ]
+          },
+          {
+            "cells": [
+              "台式蒸煮设备",
+              "集中控制烹饪流程",
+              "水汽、气味与占地"
+            ],
+            "status": "hypothesis",
+            "assumption_basis": "场景推演",
+            "hypothesis_ids": [
+              "hyp-steamer"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "title": "四个研究环节各有验收目标",
+      "layout": "process",
+      "steps": [
+        {
+          "title": "核对场景",
+          "detail": "确认人数、共享设备与备餐方式。",
+          "status": "recommendation"
+        },
+        {
+          "title": "收集真实产品",
+          "detail": "记录型号、规格、日期和原始链接。",
+          "status": "recommendation"
+        },
+        {
+          "title": "检验使用流程",
+          "detail": "观察装餐、加热、食用和清洗。",
+          "status": "recommendation"
+        },
+        {
+          "title": "回到设计取舍",
+          "detail": "根据证据比较路线，再提出概念方案。",
+          "status": "recommendation"
+        }
+      ]
+    },
+    {
+      "title": "性能目标需要测量条件",
+      "layout": "tradeoffs",
+      "table": {
+        "columns": [
+          "决策项",
+          "当前边界",
+          "下一步动作"
+        ],
+        "rows": [
+          {
+            "cells": [
+              "加热时长",
+              "尚无同条件实测",
+              "固定餐量和起始温度"
+            ],
+            "status": "unknown"
+          },
+          {
+            "cells": [
+              "清洗便利",
+              "尚无用户验证",
+              "记录步骤、耗时和残留"
+            ],
+            "status": "unknown"
+          },
+          {
+            "cells": [
+              "价格区间",
+              "尚无地区与渠道口径",
+              "补齐同日同渠道价格"
+            ],
+            "status": "unknown"
+          }
+        ]
+      }
+    },
+    {
+      "title": "每条事实都指向具体来源记录",
+      "layout": "evidence",
+      "claims": [
+        {
+          "text": "这条内容只验证来源编号、超链接与证据版本能否正确导出。",
+          "status": "observed",
+          "evidence_ids": [
+            "fixture-01"
+          ]
+        },
+        {
+          "text": "该来源是离线测试夹具，不能证明任何真实产品性能或市场需求。",
+          "status": "unknown"
+        }
+      ]
+    }
+  ],
+  "caveats": [
+    "本样例没有新增真实联网检索或用户访谈。",
+    "候选路线与测试方法用于结构验收，尚未形成可交付的市场结论。"
+  ]
+}

@@ -14,6 +14,7 @@ import {
   IconButton,
 } from "@/components/ui";
 import { clearWorkbenchPreferences } from "@/lib/workbench-preferences";
+import { withBrowserAuthLock } from "@/lib/session-device";
 
 type ApiResponse<T> =
   | { ok: true; data: T }
@@ -82,7 +83,14 @@ export function AccountMenu({
   }, []);
 
   async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
+    const response = await withBrowserAuthLock(() =>
+      fetch("/api/auth/logout", { method: "POST" }),
+    );
+    if (!response.ok) {
+      setStatus("error");
+      return;
+    }
+
     clearWorkbenchPreferences();
     setMe(null);
     setStatus("unauthenticated");
@@ -126,7 +134,8 @@ export function AccountMenu({
       ) : null}
       <DropdownMenu
         trigger={
-          <button
+          <Button
+            variant="ghost"
             className="flex h-8 max-w-full items-center gap-2 rounded-md bg-surface-2 pl-1 pr-2 text-sm text-foreground shadow-[inset_0_0_0_1px_rgb(var(--border))] transition-colors hover:bg-surface-3"
             type="button"
           >
@@ -142,7 +151,7 @@ export function AccountMenu({
               className="h-3.5 w-3.5 text-text-faint"
               strokeWidth={1.6}
             />
-          </button>
+          </Button>
         }
       >
         <div className="px-2 py-2">

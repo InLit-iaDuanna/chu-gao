@@ -1,0 +1,22 @@
+FROM node:24.5.0-slim@sha256:ac365b72b69807f4b0f73bcddccffbed7307cc6e296fddf778f3c6ffd6be2381 AS builder
+ENV HTTP_PROXY= HTTPS_PROXY= ALL_PROXY= NO_PROXY=* NEXT_TELEMETRY_DISABLED=1 NODE_OPTIONS=--max-old-space-size=2048
+COPY --from=python:3.12-slim-bookworm@sha256:34386ef0cb081344d7ec1c103ba398e6e9f64e9ab3a1509accc92a4e24a07258 /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+RUN sed -i 's|http://deb.debian.org/debian-security|https://mirrors.ustc.edu.cn/debian-security|g;s|http://deb.debian.org/debian|https://mirrors.ustc.edu.cn/debian|g' /etc/apt/sources.list.d/debian.sources
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked apt-get update -o Acquire::Retries=2 && apt-get install -y --no-install-recommends curl python3 make g++ && rm -rf /var/lib/apt/lists/*
+ARG VANE_REV=348feca3e378fb4157b217724ed508dc707f853f
+WORKDIR /home/vane
+RUN curl --noproxy '*' -fsSL --retry 2 https://codeload.github.com/ItzCrazyKns/Vane/tar.gz/${VANE_REV} | tar -xz --strip-components=1
+RUN sed -i 's|https://registry.yarnpkg.com/|https://registry.npmmirror.com/|g;s|https://registry.npmjs.org/|https://registry.npmmirror.com/|g' yarn.lock && yarn config set registry https://registry.npmmirror.com
+RUN --mount=type=cache,target=/usr/local/share/.cache/yarn yarn install --frozen-lockfile --network-timeout 600000
+COPY services/research-runtime/patch-vane.mjs /bridge/patch-vane.mjs
+RUN node /bridge/patch-vane.mjs
+RUN mkdir -p data && yarn build
+FROM node:24.5.0-slim@sha256:ac365b72b69807f4b0f73bcddccffbed7307cc6e296fddf778f3c6ffd6be2381
+ENV NODE_ENV=production HOSTNAME=0.0.0.0 PORT=3000 NEXT_TELEMETRY_DISABLED=1 HTTP_PROXY= HTTPS_PROXY= ALL_PROXY= NO_PROXY=*
+WORKDIR /home/vane
+COPY --from=builder /home/vane/.next/standalone ./
+COPY --from=builder /home/vane/.next/static ./.next/static
+COPY --from=builder /home/vane/public ./public
+COPY --from=builder /home/vane/drizzle ./drizzle
+RUN mkdir -p data uploads
+CMD ["node", "server.js"]

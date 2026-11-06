@@ -1,5 +1,3 @@
-import { Prisma } from "@prisma/client";
-
 import { fail, ok } from "@/lib/api-response";
 import { readJsonBodySafe } from "@/lib/request-body";
 import { audit } from "@/lib/audit";
@@ -10,6 +8,7 @@ import {
 } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { adminCreditAdjustmentSchema } from "@/lib/validators";
+import { adjustCreditsIdempotently } from "@/lib/chat-credit-ledger";
 
 export async function POST(
   request: Request,
@@ -45,57 +44,25 @@ export async function POST(
 
   const admin = authenticatedUser(sessionResult);
   let user;
+  let replayed = false;
 
   try {
-    user = await db.$transaction(
-      async (tx) => {
-        const existing = await tx.user.findUnique({
-          where: { id },
-          select: { id: true, credits: true },
-        });
-
-        if (!existing) {
-          throw new Error("NOT_FOUND");
-        }
-
-        if (existing.credits + parsed.data.amount < 0) {
-          throw new Error("NEGATIVE_BALANCE");
-        }
-
-        const updated = await tx.user.update({
-          where: { id },
-          data: {
-            credits: {
-              increment: parsed.data.amount,
-            },
-          },
-          select: {
-            id: true,
-            email: true,
-            credits: true,
-          },
-        });
-
-        await tx.usageLog.create({
-          data: {
-            userId: id,
-            action:
-              parsed.data.amount > 0
-                ? "admin_credit_recharge"
-                : "admin_credit_adjust",
-            creditsDelta: parsed.data.amount,
-            metadata: {
-              adminId: admin.id,
-              note: parsed.data.note,
-            },
-          },
-        });
-
-        return updated;
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    const result = await db.$transaction((tx) =>
+      adjustCreditsIdempotently(tx, {
+        userId: id,
+        actorId: admin.id,
+        operationKey: parsed.data.operationKey,
+        amount: parsed.data.amount,
+        note: parsed.data.note,
+      }),
     );
+    user = result.user;
+    replayed = result.replayed;
   } catch (error) {
+    if (error instanceof Error && error.message === "IDEMPOTENCY_CONFLICT")
+      return fail("IDEMPOTENCY_CONFLICT", "同一调额标识不能用于不同操作", {
+        status: 409,
+      });
     if (error instanceof Error && error.message === "NOT_FOUND") {
       return fail("NOT_FOUND", "用户不存在", { status: 404 });
     }
@@ -113,16 +80,17 @@ export async function POST(
     return fail("NOT_FOUND", "用户不存在", { status: 404 });
   }
 
-  await audit({
-    actorId: admin.id,
-    action:
-      parsed.data.amount > 0
-        ? "admin.user.recharge"
-        : "admin.user.credit_adjust",
-    target: id,
-    diff: parsed.data,
-    request,
-  });
+  if (!replayed)
+    await audit({
+      actorId: admin.id,
+      action:
+        parsed.data.amount > 0
+          ? "admin.user.recharge"
+          : "admin.user.credit_adjust",
+      target: id,
+      diff: parsed.data,
+      request,
+    });
 
   return ok(user);
 }

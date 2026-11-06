@@ -37,8 +37,11 @@ export function friendlyErrorMessage(
     return message || "当前提交太频繁，请稍后再试。";
   }
 
+  if (code === "MODERATION_REJECTED") {
+    return message || "提示词或参考图包含不允许的内容，请调整后再试。";
+  }
+
   if (
-    code === "MODERATION_REJECTED" ||
     code === "VALIDATION_ERROR" ||
     code === "UNSUPPORTED_PARAM" ||
     code === "PROVIDER_REJECTED_REQUEST"

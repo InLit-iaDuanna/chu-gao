@@ -1,8 +1,7 @@
 import type { ModelDefinition, ProtocolName } from "@/lib/models/types";
 import {
-  IMAGE2_MODE_OPTIONS,
-  IMAGE2_DEFAULT_RESOLUTION_ASPECT_RATIOS,
-  IMAGE_ASPECT_RATIO_OPTIONS,
+  IMAGE_SIZE_OPTIONS,
+  RESPONSE_FORMAT_OPTIONS,
 } from "@/lib/models/options";
 
 export const MODELS: Record<string, ModelDefinition> = {
@@ -12,9 +11,10 @@ export const MODELS: Record<string, ModelDefinition> = {
     vendor: "动物通道",
     protocol: "openai-images",
     capabilities: {
-      aspectRatios: [...IMAGE_ASPECT_RATIO_OPTIONS],
+      sizes: [...IMAGE_SIZE_OPTIONS],
+      responseFormats: [...RESPONSE_FORMAT_OPTIONS],
       resolutions: ["1K", "2K", "4K"],
-      image2Modes: [...IMAGE2_MODE_OPTIONS],
+      qualities: ["low", "medium", "high"],
       supportsReferenceImage: true,
       maxReferenceImages: 16,
       supportsNegativePrompt: false,
@@ -23,16 +23,11 @@ export const MODELS: Record<string, ModelDefinition> = {
       outputFormats: ["png", "jpeg", "webp"],
       backgrounds: ["auto", "opaque"],
       supportsOutputCompression: true,
-      resolutionAspectRatios: {
-        "1K": [...IMAGE2_DEFAULT_RESOLUTION_ASPECT_RATIOS["1K"]],
-        "2K": [...IMAGE2_DEFAULT_RESOLUTION_ASPECT_RATIOS["2K"]],
-        "4K": [...IMAGE2_DEFAULT_RESOLUTION_ASPECT_RATIOS["4K"]],
-      },
     },
     defaults: {
-      aspectRatio: "1:1",
-      resolution: "2K",
-      image2Mode: "standard",
+      size: "auto",
+      quality: "high",
+      responseFormat: "b64_json",
       outputFormat: "png",
       background: "auto",
     },
@@ -51,8 +46,10 @@ export const MODELS: Record<string, ModelDefinition> = {
     vendor: "Google",
     protocol: "gemini-image",
     capabilities: {
-      aspectRatios: ["1:1", "2:3", "3:2", "3:4", "4:3", "9:16", "16:9"],
+      sizes: ["auto", "1024x1024", "1536x1024", "1024x1536"],
+      responseFormats: [...RESPONSE_FORMAT_OPTIONS],
       resolutions: ["1K"],
+      qualities: ["auto"],
       supportsReferenceImage: true,
       maxReferenceImages: 4,
       supportsNegativePrompt: false,
@@ -63,8 +60,9 @@ export const MODELS: Record<string, ModelDefinition> = {
       supportsOutputCompression: false,
     },
     defaults: {
-      aspectRatio: "1:1",
-      resolution: "1K",
+      size: "1024x1024",
+      quality: "auto",
+      responseFormat: "b64_json",
       outputFormat: "png",
       background: "auto",
     },
@@ -75,6 +73,30 @@ export const MODELS: Record<string, ModelDefinition> = {
     tagline: "风格自然，长于氛围、人物与材质。",
   },
 };
+
+for (const [id, displayName] of [
+  ["gpt-image-2.5-flare", "Image 2.5 Flare"],
+  ["gpt-image-2.5-sunburst", "Image 2.5 Sunburst"],
+] as const) {
+  const base = MODELS["gpt-image-2"];
+  const { image2Modes: _modes, ...capabilities } = base.capabilities;
+  const { image2Mode: _mode, ...defaults } = base.defaults;
+  MODELS[id] = {
+    ...base,
+    id,
+    displayName,
+    capabilities: {
+      ...capabilities,
+      qualities: ["low", "medium", "high", "xhigh", "max"],
+      maxN: 1,
+      outputFormats: ["png"],
+      backgrounds: ["auto"],
+      supportsOutputCompression: false,
+    },
+    defaults: { ...defaults, quality: "high" },
+    costTable: { ...base.costTable },
+  };
+}
 
 export function getModel(id: string): ModelDefinition | null {
   return MODELS[id] ?? null;

@@ -1,0 +1,14 @@
+FROM python:3.12-slim-bookworm@sha256:34386ef0cb081344d7ec1c103ba398e6e9f64e9ab3a1509accc92a4e24a07258
+ENV PYTHONUNBUFFERED=1 PLAYWRIGHT_BROWSERS_PATH=/opt/browsers HTTP_PROXY= HTTPS_PROXY= ALL_PROXY= NO_PROXY=*
+ENV PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+RUN sed -i 's|http://deb.debian.org/debian-security|https://mirrors.ustc.edu.cn/debian-security|g;s|http://deb.debian.org/debian|https://mirrors.ustc.edu.cn/debian|g' /etc/apt/sources.list.d/debian.sources
+RUN --mount=type=cache,target=/root/.cache/pip pip install --timeout 30 --retries 2 crawl4ai==0.9.5 fastapi==0.128.0 uvicorn==0.40.0 httpx==0.28.1 pypdf==5.9.0 python-docx==1.2.0 trafilatura==2.3.1
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked playwright install-deps chromium
+RUN playwright install chromium
+COPY services/research-runtime/requirements.crawl.lock /bridge/requirements.lock
+RUN --mount=type=cache,target=/root/.cache/pip pip install --no-deps -r /bridge/requirements.lock || pip install --no-deps --index-url https://pypi.org/simple/ -r /bridge/requirements.lock
+RUN playwright install chromium
+WORKDIR /bridge
+COPY services/research-runtime/app.py services/research-runtime/capture_pipeline.py ./
+ENV RESEARCH_ENGINE=crawl4ai
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]

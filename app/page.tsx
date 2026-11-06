@@ -1,535 +1,312 @@
-"use client";
-
-import { motion, useReducedMotion } from "framer-motion";
 import Link from "next/link";
-import {
-  ArrowRight,
-  Layers,
-  Sparkles,
-  Wand2,
-  Zap,
-  MessageSquare,
-  ImageIcon,
-  Download,
-} from "lucide-react";
+import { ArrowRight, ArrowUpRight } from "lucide-react";
 
-const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
+import { Logo } from "@/components/shared/Logo";
+import { WishPoolPage } from "@/components/wish-pool/WishPoolPage";
+import { headers } from "next/headers";
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 24 },
-  visible: (i: number) => ({
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.6, ease: EASE, delay: i * 0.07 },
-  }),
-};
-
-const slideInFromRight = {
-  hidden: { opacity: 0, x: 40 },
-  visible: (i: number) => ({
-    opacity: 1,
-    x: 0,
-    transition: { duration: 0.7, ease: EASE, delay: 0.3 + i * 0.1 },
-  }),
-};
-
-interface Feature {
-  icon: typeof Wand2;
-  title: string;
-  desc: string;
+// 纯静态内容 → 服务端组件。入场动画走 CSS（.anim-rise，见 globals.css）。
+function stagger(i: number): React.CSSProperties {
+  return { "--stagger": i } as React.CSSProperties;
 }
 
-const FEATURES: Feature[] = [
+const CAPABILITIES = [
   {
-    icon: Wand2,
-    title: "智能生成",
-    desc: "从一句话到完整草稿，AI 理解你的创作意图。",
+    id: "01",
+    title: "多模型接入",
+    desc: "统一接入海外主流图像模型，通道自动回退，稳定出图。",
   },
   {
-    icon: Layers,
-    title: "多轮迭代",
-    desc: "保留每个版本，随时回溯，精炼到满意为止。",
+    id: "02",
+    title: "对话式迭代",
+    desc: "用自然语言描述修改方向，在同一条线程里持续精修。",
   },
   {
-    icon: Zap,
-    title: "即时预览",
-    desc: "所见即所得，编辑与预览同步，减少切换成本。",
+    id: "03",
+    title: "实时生成墙",
+    desc: "所有产出实时上墙，进度可见，版本一目了然。",
   },
-];
+  {
+    id: "04",
+    title: "PPT 一键成稿",
+    desc: "从提纲到逐页配图自动生成，可直接导出成品。",
+  },
+] as const;
 
-interface Step {
-  icon: typeof MessageSquare;
-  label: string;
-  title: string;
-  desc: string;
-}
-
-const STEPS: Step[] = [
+const STEPS = [
   {
-    icon: MessageSquare,
-    label: "01",
+    id: "01",
     title: "描述想法",
-    desc: "用自然语言告诉模型你想要的画面，或上传参考图。",
+    desc: "一句话、一张参考图，或一段草图说明。",
   },
   {
-    icon: ImageIcon,
-    label: "02",
+    id: "02",
     title: "实时生成",
-    desc: "内置多通道与回退策略，等待感更短、稳定性更高。",
+    desc: "多通道并行调度，等待更短，进度实时可见。",
   },
   {
-    icon: Download,
-    label: "03",
-    title: "导出与迭代",
-    desc: "满意即可下载；不满意继续对话，保留全部历史版本。",
+    id: "03",
+    title: "迭代导出",
+    desc: "满意即下载，不满意继续对话，历史全保留。",
   },
-];
+] as const;
 
-export default function HomePage(): React.ReactElement {
-  const reduceMotion = useReducedMotion();
+/** 生成墙预览砖块：纯 CSS 静态 mock，预演新工作台的「墙」形态。 */
+const WALL_TILES = [
+  { ratio: "aspect-[4/5]", label: "山间驿站 · v3", tone: "warm" },
+  { ratio: "aspect-square", label: "字体海报 · v1", tone: "cool" },
+  { ratio: "aspect-[4/3]", label: "产品场景 · v2", tone: "warm" },
+  { ratio: "aspect-[3/4]", label: "角色设定 · v4", tone: "cool" },
+  { ratio: "aspect-square", label: "包装主视觉", tone: "accent" },
+  { ratio: "aspect-[4/5]", label: "空间氛围 · v2", tone: "warm" },
+  { ratio: "aspect-[4/3]", label: "信息图底图", tone: "cool" },
+  { ratio: "aspect-[3/4]", label: "插画草稿 · v5", tone: "warm" },
+] as const;
 
+/* 墙面占位画：纯 CSS 渐变构图，四种光影结构轮转，
+   全部走 surface/border token，深浅主题自动适配。 */
+const TILE_COMPOSITIONS = [
+  // 左上天光
+  "radial-gradient(130% 100% at 28% 0%, rgb(var(--surface-3)) 0%, rgb(var(--surface-2)) 72%)",
+  // 地平线
+  "linear-gradient(180deg, rgb(var(--surface-3) / 0.9) 0%, rgb(var(--surface-2)) 44%, rgb(var(--surface-2)) 56%, rgb(var(--surface-3) / 0.65) 100%)",
+  // 对角明暗
+  "linear-gradient(135deg, rgb(var(--surface-3)) 0%, rgb(var(--surface-2)) 55%, rgb(var(--border) / 0.55) 135%)",
+  // 偏心光晕
+  "radial-gradient(closest-side at 62% 58%, rgb(var(--surface-3)) 0%, rgb(var(--surface-2)) 100%)",
+] as const;
+
+const ACCENT_COMPOSITION =
+  "linear-gradient(140deg, rgb(var(--brand-primary) / 0.28) 0%, rgb(var(--brand-primary) / 0.08) 58%), radial-gradient(90% 70% at 70% 20%, rgb(var(--brand-primary) / 0.18) 0%, transparent 100%)";
+
+function WallTile({
+  ratio,
+  label,
+  tone,
+  index,
+}: {
+  ratio: string;
+  label: string;
+  tone: "warm" | "cool" | "accent";
+  index: number;
+}): React.ReactElement {
   return (
-    <main className="relative flex min-h-screen flex-col items-center overflow-hidden bg-background">
-      {/* Stronger atmospheric background */}
+    <figure
+      className="anim-rise group relative overflow-hidden rounded-md border border-border bg-surface"
+      style={stagger(index + 2)}
+    >
       <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 overflow-hidden"
+        className={`${ratio} w-full transition-transform duration-500 ease-out group-hover:scale-[1.03]`}
+        style={{
+          backgroundColor: "rgb(var(--surface-2))",
+          backgroundImage:
+            tone === "accent"
+              ? ACCENT_COMPOSITION
+              : TILE_COMPOSITIONS[index % TILE_COMPOSITIONS.length],
+        }}
       >
-        {/* Primary glow - much stronger */}
+        {/* 模拟画面纹理：细网格，零性能开销 */}
         <div
-          className={`absolute left-1/2 top-[-180px] h-[920px] w-[920px] -translate-x-1/2 rounded-full bg-info/[0.15] blur-[200px] ${reduceMotion ? "" : "ambient-drift"}`}
-        />
-        {/* Secondary glows with more presence */}
-        <div className="absolute left-[8%] top-[35%] h-[520px] w-[520px] rounded-full bg-success/[0.08] blur-[160px]" />
-        <div className="absolute right-[5%] top-[25%] h-[460px] w-[460px] rounded-full bg-warning/[0.1] blur-[140px]" />
-        {/* Stronger noise overlay */}
-        <div className="absolute inset-0 noise-overlay opacity-[0.35]" />
-        {/* Grid with better visibility */}
-        <div
-          className="absolute inset-0 opacity-[0.08] [mask-image:radial-gradient(ellipse_at_center,black_20%,transparent_70%)]"
+          aria-hidden
+          className="h-full w-full opacity-[0.5]"
           style={{
             backgroundImage:
-              "linear-gradient(rgb(var(--text)) 1.5px, transparent 1.5px), linear-gradient(90deg, rgb(var(--text)) 1.5px, transparent 1.5px)",
-            backgroundSize: "64px 64px",
+              "linear-gradient(rgb(var(--border) / 0.5) 1px, transparent 1px), linear-gradient(90deg, rgb(var(--border) / 0.5) 1px, transparent 1px)",
+            backgroundSize: "22px 22px",
           }}
         />
       </div>
+      <figcaption className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 border-t border-border bg-surface px-2.5 py-1.5">
+        <span className="truncate font-mono text-[10px] tracking-wide text-text-muted">
+          {label}
+        </span>
+        {tone === "accent" ? (
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand" />
+        ) : null}
+      </figcaption>
+    </figure>
+  );
+}
 
-      {/* Header - cleaner, stronger hierarchy */}
-      <header className="relative z-10 flex w-full max-w-7xl items-center justify-between px-6 py-6">
-        <div className="flex items-center gap-3">
-          <div className="relative flex h-8 w-8 items-center justify-center">
-            <div className="absolute h-6 w-6 rounded-[4px] border-2 border-foreground bg-surface" />
-            <div className="absolute h-3.5 w-3.5 translate-x-[4px] translate-y-[4px] rounded-[2.5px] bg-foreground" />
-          </div>
-          <span className="text-[17px] font-bold tracking-[-0.02em] text-foreground">
-            初稿
-          </span>
-        </div>
-        <div className="flex items-center gap-2.5">
-          <Link
-            href="/register"
-            className="flex h-9 items-center rounded-md px-4 text-[14px] font-medium text-foreground transition-all hover:bg-surface-2 active:scale-[0.96]"
-          >
-            注册
-          </Link>
-          <Link
-            href="/login"
-            className="group flex h-9 items-center gap-1.5 rounded-md border-2 border-border-strong bg-foreground px-4 text-[14px] font-semibold text-background transition-all hover:border-foreground hover:bg-foreground/90 active:scale-[0.96]"
-          >
-            登录
-            <ArrowRight
-              size={14}
-              strokeWidth={2.5}
-              className="transition-transform duration-200 group-hover:translate-x-0.5"
-            />
-          </Link>
+export default async function HomePage(): Promise<React.ReactElement> {
+  const host = (await headers()).get("host")?.split(":")[0].toLowerCase();
+  if (host === "iwish.chugao.art") {
+    return <WishPoolPage />;
+  }
+
+  return (
+    <main className="min-h-screen bg-background text-foreground">
+      {/* ─── 顶部导航 ─────────────────────────────────────── */}
+      <header className="sticky top-0 z-40 border-b border-border bg-background">
+        <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between px-5">
+          <Logo />
+          <nav className="flex items-center gap-1">
+            <Link
+              href="/inspiration"
+              className="hidden h-8 items-center rounded-md px-3 text-sm text-text-muted transition-colors hover:bg-surface-2 hover:text-foreground sm:flex"
+            >
+              灵感圈
+            </Link>
+            <Link
+              href="/login"
+              className="flex h-8 items-center rounded-md px-3 text-sm text-text-muted transition-colors hover:bg-surface-2 hover:text-foreground"
+            >
+              登录
+            </Link>
+            <Link
+              href="/register"
+              className="flex h-8 items-center gap-1.5 rounded-md bg-brand px-3.5 text-sm font-medium text-on-accent transition-colors hover:bg-brand/88"
+            >
+              免费开始
+              <ArrowRight size={14} aria-hidden />
+            </Link>
+          </nav>
         </div>
       </header>
 
-      {/* Hero - Editorial layout with asymmetry */}
-      <section className="relative z-10 mt-12 flex w-full max-w-7xl flex-col px-6">
-        <div className="grid grid-cols-1 gap-12 lg:grid-cols-12">
-          {/* Left column - Hero text */}
-          <div className="flex flex-col lg:col-span-7">
-            <motion.div
-              custom={0}
-              variants={fadeUp}
-              initial="hidden"
-              animate="visible"
-              className="mb-6 inline-flex w-fit items-center gap-2.5 rounded-full border-2 border-success/30 bg-success/10 px-4 py-1.5 backdrop-blur-sm"
-            >
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inset-0 animate-ping rounded-full bg-success motion-reduce:animate-none" />
-                <span className="relative h-2 w-2 rounded-full bg-success" />
-              </span>
-              <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-success">
-                v3 · 公测中
-              </span>
-            </motion.div>
-
-            <motion.h1
-              custom={1}
-              variants={fadeUp}
-              initial="hidden"
-              animate="visible"
-              className="mb-8 text-[clamp(3rem,7vw,5.5rem)] font-bold leading-[0.95] tracking-[-0.04em] text-foreground"
-            >
-              稳稳地接住
-              <br />
-              <span className="relative inline-flex items-baseline gap-3">
-                <span className="font-serif italic text-info">你的</span>
-                <span className="relative">
-                  设计灵感
-                  <svg
-                    className="absolute -bottom-2 left-0 w-full text-info/40"
-                    height="8"
-                    viewBox="0 0 200 8"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M2 6C40 2 80 1 120 3C160 5 180 6 198 5"
-                      stroke="currentColor"
-                      strokeWidth="3"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                </span>
-              </span>
-            </motion.h1>
-
-            <motion.p
-              custom={2}
-              variants={fadeUp}
-              initial="hidden"
-              animate="visible"
-              className="mb-10 max-w-xl text-[18px] leading-[1.7] text-text-muted"
-            >
-              初稿是一个为设计学生打造的图像生成工作台。从模糊的想法到可用的画面，
-              一次对话，多轮迭代，一站完成。
-            </motion.p>
-
-            <motion.div
-              custom={3}
-              variants={fadeUp}
-              initial="hidden"
-              animate="visible"
-              className="flex flex-wrap items-center gap-4"
-            >
-              <Link
-                href="/register"
-                className="group relative flex h-[52px] items-center gap-2.5 overflow-hidden rounded-lg border-2 border-success bg-success px-6 text-[15px] font-bold text-background shadow-[0_20px_40px_-20px_rgb(var(--success)/0.9)] transition-all hover:scale-[1.02] hover:border-success hover:shadow-[0_24px_48px_-20px_rgb(var(--success)/1)] active:scale-[0.98]"
-              >
-                <span className="relative z-10">免费开始</span>
-                <ArrowRight
-                  size={16}
-                  strokeWidth={2.5}
-                  className="relative z-10 transition-transform duration-200 group-hover:translate-x-1"
-                />
-                <div className="absolute inset-0 bg-gradient-to-r from-success/0 via-white/20 to-success/0 opacity-0 transition-opacity group-hover:opacity-100" />
-              </Link>
-              <Link
-                href="/login"
-                className="flex h-[52px] items-center gap-2.5 rounded-lg border-2 border-border-strong bg-surface/80 px-6 text-[15px] font-semibold text-foreground backdrop-blur-sm transition-all hover:border-foreground hover:bg-surface active:scale-[0.98]"
-              >
-                已有账号
-              </Link>
-            </motion.div>
-
-            <motion.p
-              custom={4}
-              variants={fadeUp}
-              initial="hidden"
-              animate="visible"
-              className="mt-8 font-mono text-[12px] font-medium text-text-faint"
-            >
-              注册即可获得初始额度 · 无需信用卡
-            </motion.p>
-          </div>
-
-          {/* Right column - Visual preview with depth */}
-          <motion.div
-            custom={5}
-            variants={slideInFromRight}
-            initial="hidden"
-            animate="visible"
-            className="relative lg:col-span-5"
-          >
-            <div className="relative">
-              {/* Background glow */}
-              <div
-                aria-hidden
-                className="absolute -inset-4 rounded-2xl bg-info/20 blur-3xl"
-              />
-
-              {/* Preview container with stronger borders */}
-              <div className="relative overflow-hidden rounded-2xl border-2 border-border-strong bg-surface shadow-[0_24px_64px_-12px_rgba(0,0,0,0.4)]">
-                {/* Window chrome with stronger presence */}
-                <div className="flex items-center gap-2.5 border-b-2 border-border bg-surface-2 px-5 py-3.5">
-                  <div className="flex gap-2">
-                    <span className="h-3 w-3 rounded-full bg-danger" />
-                    <span className="h-3 w-3 rounded-full bg-warning" />
-                    <span className="h-3 w-3 rounded-full bg-success" />
-                  </div>
-                  <div className="mx-auto flex items-center gap-2 rounded-md border border-border bg-background/80 px-3.5 py-1.5 font-mono text-[11px] font-medium text-text-faint">
-                    <span className="h-1.5 w-1.5 rounded-full bg-success" />
-                    chugao.studio / workbench
-                  </div>
-                </div>
-
-                {/* Bento-style content grid */}
-                <div className="grid grid-cols-[220px_1fr] divide-x-2 divide-border">
-                  {/* Sidebar */}
-                  <div className="flex flex-col gap-3 bg-surface-2/40 p-4">
-                    <div className="flex items-center gap-2.5 rounded-lg border border-info/30 bg-info/10 p-2.5">
-                      <Sparkles
-                        size={14}
-                        className="text-info"
-                        strokeWidth={2}
-                      />
-                      <span className="text-[12px] font-semibold text-foreground">
-                        新建对话
-                      </span>
-                    </div>
-                    {[1, 2, 3].map((i) => (
-                      <div
-                        key={i}
-                        className="flex flex-col gap-2 rounded-lg border border-transparent p-2.5 transition-colors hover:border-border hover:bg-surface-2"
-                      >
-                        <div
-                          className="h-2 rounded-full bg-text-faint/40"
-                          style={{ width: `${75 - i * 12}%` }}
-                        />
-                        <div
-                          className="h-1.5 rounded-full bg-text-faint/25"
-                          style={{ width: `${55 - i * 8}%` }}
-                        />
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Canvas area with overlapping cards */}
-                  <div className="relative aspect-[14/9] overflow-hidden bg-gradient-to-br from-info/8 via-surface to-warning/[0.06]">
-                    <div className="absolute inset-0 p-5">
-                      {/* Staggered card layout for depth */}
-                      <div className="relative h-full">
-                        {/* Back cards */}
-                        <div
-                          className="absolute left-[8%] top-[8%] h-[38%] w-[38%] origin-top-left rotate-[-2deg] rounded-xl border-2 border-border bg-surface-2 shadow-lg"
-                          style={{
-                            background: `linear-gradient(145deg, rgb(var(--info) / 0.12), rgb(var(--surface-2)))`,
-                          }}
-                        >
-                          <div className="absolute bottom-2 left-2 rounded-md bg-background/70 px-2 py-1 font-mono text-[10px] font-semibold text-foreground backdrop-blur-sm">
-                            v1
-                          </div>
-                        </div>
-
-                        <div
-                          className="absolute right-[10%] top-[6%] h-[36%] w-[36%] origin-top-right rotate-[3deg] rounded-xl border-2 border-border bg-surface shadow-lg"
-                          style={{
-                            background: `linear-gradient(165deg, rgb(var(--warning) / 0.1), rgb(var(--surface)))`,
-                          }}
-                        >
-                          <div className="absolute bottom-2 left-2 rounded-md bg-background/70 px-2 py-1 font-mono text-[10px] font-semibold text-foreground backdrop-blur-sm">
-                            v2
-                          </div>
-                        </div>
-
-                        {/* Front cards with more prominence */}
-                        <div
-                          className="absolute bottom-[12%] left-[12%] h-[42%] w-[42%] origin-bottom-left rotate-[-1deg] rounded-xl border-2 border-info/40 bg-surface shadow-2xl"
-                          style={{
-                            background: `linear-gradient(135deg, rgb(var(--info) / 0.18), rgb(var(--success) / 0.08), rgb(var(--surface)))`,
-                          }}
-                        >
-                          <div className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-md border border-info/30 bg-info/20 px-2 py-1 font-mono text-[10px] font-bold text-info backdrop-blur-sm">
-                            <Sparkles size={10} strokeWidth={2.5} />
-                            v3
-                          </div>
-                        </div>
-
-                        <div
-                          className="absolute bottom-[8%] right-[8%] h-[40%] w-[40%] origin-bottom-right rotate-[2deg] rounded-xl border-2 border-success/40 bg-surface-2 shadow-2xl"
-                          style={{
-                            background: `linear-gradient(155deg, rgb(var(--success) / 0.15), rgb(var(--surface-2)))`,
-                          }}
-                        >
-                          <div className="absolute bottom-2 left-2 rounded-md bg-background/70 px-2 py-1 font-mono text-[10px] font-semibold text-foreground backdrop-blur-sm">
-                            v4
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* Features - Bento grid layout */}
-      <section
-        id="features"
-        className="relative z-10 mt-32 w-full max-w-7xl px-6"
-      >
-        <motion.div
-          custom={0}
-          variants={fadeUp}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-100px" }}
-          className="mb-4 font-mono text-[12px] font-bold uppercase tracking-[0.2em] text-text-faint"
+      {/* ─── Hero ─────────────────────────────────────────── */}
+      <section className="mx-auto w-full max-w-6xl px-5 pb-16 pt-20 sm:pt-28">
+        <p
+          className="anim-rise font-mono text-xs uppercase tracking-[0.2em] text-text-faint"
+          style={stagger(0)}
         >
-          核心能力
-        </motion.div>
-        <motion.h2
-          custom={1}
-          variants={fadeUp}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-100px" }}
-          className="mb-16 text-[clamp(2rem,4.5vw,3.2rem)] font-bold leading-[1.1] tracking-[-0.03em] text-foreground"
+          Chūgǎo Studio — 图像生成工作台
+        </p>
+        <h1
+          className="anim-rise mt-5 max-w-3xl text-[clamp(2.6rem,6vw,4.5rem)] font-semibold leading-[1.04] tracking-[-0.035em]"
+          style={stagger(1)}
         >
-          为<span className="font-serif italic text-info">表达</span>而生
-        </motion.h2>
-
-        {/* Asymmetric bento grid */}
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {FEATURES.map(({ icon: Icon, title, desc }, i) => (
-            <motion.div
-              key={title}
-              custom={i}
-              variants={fadeUp}
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true, margin: "-80px" }}
-              className={`group relative overflow-hidden rounded-2xl border-2 border-border bg-surface p-8 transition-all duration-300 hover:-translate-y-1 hover:border-foreground/30 hover:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.3)] ${
-                i === 0 ? "sm:col-span-2 lg:col-span-1" : ""
-              }`}
-            >
-              {/* Decorative corner accent */}
-              <div className="absolute right-0 top-0 h-20 w-20 bg-gradient-to-br from-info/10 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
-
-              <div className="relative">
-                <div className="mb-5 inline-flex h-12 w-12 items-center justify-center rounded-xl border-2 border-border-strong bg-background transition-all group-hover:border-foreground group-hover:bg-foreground group-hover:text-background">
-                  <Icon size={20} strokeWidth={2} />
-                </div>
-                <h3 className="mb-3 text-[17px] font-bold tracking-[-0.01em] text-foreground">
-                  {title}
-                </h3>
-                <p className="text-[14px] leading-relaxed text-text-muted">
-                  {desc}
-                </p>
-              </div>
-
-              {/* Bottom accent line */}
-              <div className="absolute inset-x-0 bottom-0 h-1 scale-x-0 bg-gradient-to-r from-info via-success to-warning transition-transform duration-500 group-hover:scale-x-100" />
-            </motion.div>
-          ))}
-        </div>
-      </section>
-
-      {/* Steps - Linear flow with connection lines */}
-      <section className="relative z-10 mt-32 w-full max-w-7xl px-6">
-        <motion.div
-          variants={fadeUp}
-          custom={0}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-100px" }}
-          className="mb-4 font-mono text-[12px] font-bold uppercase tracking-[0.2em] text-text-faint"
+          稳稳地接住🫴
+          <br />
+          <span className="text-text-muted">你的设计</span>
+        </h1>
+        <p
+          className="anim-rise mt-6 max-w-xl text-base leading-relaxed text-text-muted"
+          style={stagger(2)}
         >
-          如何工作
-        </motion.div>
-        <motion.h2
-          variants={fadeUp}
-          custom={1}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-100px" }}
-          className="mb-20 text-[clamp(2rem,4.5vw,3.2rem)] font-bold leading-[1.1] tracking-[-0.03em] text-foreground"
-        >
-          三步，到达你想要的画面
-        </motion.h2>
-
-        <div className="relative grid gap-8 sm:grid-cols-3">
-          {/* Connection line */}
-          <div
-            aria-hidden
-            className="absolute left-[10%] right-[10%] top-6 hidden h-0.5 bg-gradient-to-r from-border-strong via-foreground/20 to-border-strong sm:block"
-          />
-
-          {STEPS.map(({ icon: Icon, label, title, desc }, i) => (
-            <motion.div
-              key={label}
-              variants={fadeUp}
-              custom={i + 2}
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true, margin: "-80px" }}
-              className="relative flex flex-col items-center text-center"
-            >
-              <div className="relative z-10 mb-6 flex h-12 w-12 items-center justify-center rounded-full border-2 border-foreground bg-background shadow-[0_8px_24px_-8px_rgba(0,0,0,0.3)]">
-                <Icon size={20} strokeWidth={2} className="text-foreground" />
-              </div>
-              <div className="mb-3 font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-text-faint">
-                {label}
-              </div>
-              <h3 className="mb-3 text-[17px] font-bold tracking-[-0.01em] text-foreground">
-                {title}
-              </h3>
-              <p className="max-w-[240px] text-[14px] leading-relaxed text-text-muted">
-                {desc}
-              </p>
-            </motion.div>
-          ))}
-        </div>
-      </section>
-
-      {/* CTA - Bold, elevated treatment */}
-      <section className="relative z-10 mb-24 mt-32 w-full max-w-5xl px-6">
-        <motion.div
-          variants={fadeUp}
-          custom={0}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-100px" }}
-          className="relative overflow-hidden rounded-3xl border-2 border-border-strong bg-surface px-10 py-16 text-center shadow-[0_32px_64px_-16px_rgba(0,0,0,0.4)]"
-        >
-          {/* Stronger atmosphere */}
-          <div
-            aria-hidden
-            className="absolute -left-24 -top-24 h-72 w-72 rounded-full bg-info/15 blur-3xl"
-          />
-          <div
-            aria-hidden
-            className="absolute -bottom-32 -right-20 h-72 w-72 rounded-full bg-success/12 blur-3xl"
-          />
-
-          <h2 className="relative mb-5 text-[clamp(2rem,5vw,3.2rem)] font-bold leading-[1.05] tracking-[-0.04em] text-foreground">
-            准备好把
-            <span className="font-serif italic text-info">想法</span>
-            变成画面了吗
-          </h2>
-          <p className="relative mb-8 text-[16px] leading-relaxed text-text-muted">
-            注册即送初始额度，立刻打开工作台。
-          </p>
+          Chūgǎo 是为设计学生打造的图像生成工作台：一次对话、多轮迭代，
+          所有产出实时呈现在生成墙上，从模糊想法到可用画面一站完成。
+        </p>
+        <div className="anim-rise mt-9 flex flex-wrap items-center gap-3" style={stagger(3)}>
           <Link
             href="/register"
-            className="relative inline-flex h-[56px] items-center gap-2.5 rounded-xl border-2 border-success bg-success px-8 text-[16px] font-bold text-background shadow-[0_24px_48px_-20px_rgb(var(--success)/0.9)] transition-all hover:scale-[1.03] hover:shadow-[0_28px_56px_-20px_rgb(var(--success)/1)] active:scale-[0.98]"
+            className="flex h-11 items-center gap-2 rounded-md bg-brand px-6 text-sm font-medium text-on-accent transition-colors hover:bg-brand/88"
           >
             免费开始
-            <ArrowRight size={18} strokeWidth={2.5} />
+            <ArrowRight size={16} aria-hidden />
           </Link>
-        </motion.div>
+          <Link
+            href="/login"
+            className="flex h-11 items-center gap-2 rounded-md border border-border px-6 text-sm text-foreground transition-colors hover:border-border-strong hover:bg-surface-2"
+          >
+            已有账号登录
+          </Link>
+        </div>
+        <p
+          className="anim-rise mt-5 font-mono text-xs text-text-faint"
+          style={stagger(4)}
+        >
+          注册即送初始额度 · 无需信用卡
+        </p>
+      </section>
 
-        <footer className="mt-16 flex flex-col items-center gap-3 text-center">
-          <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-text-faint">
-            © Chūgǎo Studio
+      {/* ─── 生成墙预览 ───────────────────────────────────── */}
+      <section className="border-y border-border bg-surface/40">
+        <div className="mx-auto w-full max-w-6xl px-5 py-14">
+          <div className="mb-8 flex items-end justify-between gap-4">
+            <div>
+              <p className="font-mono text-xs uppercase tracking-[0.2em] text-text-faint">
+                The Wall
+              </p>
+              <h2 className="mt-2 text-2xl font-semibold tracking-[-0.02em]">
+                你的每一次生成，都在墙上
+              </h2>
+            </div>
+            <div className="hidden items-center gap-2 font-mono text-xs text-text-muted sm:flex">
+              <span className="relative h-1.5 w-1.5">
+                <span className="absolute inset-0 animate-ping rounded-full bg-brand motion-reduce:animate-none" />
+                <span className="relative block h-1.5 w-1.5 rounded-full bg-brand" />
+              </span>
+              实时生成中
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {WALL_TILES.map((tile, i) => (
+              <WallTile key={tile.label} {...tile} index={i} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ─── 核心能力 ─────────────────────────────────────── */}
+      <section className="mx-auto w-full max-w-6xl px-5 py-20">
+        <p className="font-mono text-xs uppercase tracking-[0.2em] text-text-faint">
+          Capabilities
+        </p>
+        <h2 className="mt-2 text-2xl font-semibold tracking-[-0.02em] sm:text-3xl">
+          为创作流程而生
+        </h2>
+        <div className="mt-10 grid gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-2 lg:grid-cols-4">
+          {CAPABILITIES.map((cap) => (
+            <div key={cap.id} className="bg-surface p-6">
+              <p className="font-mono text-xs text-brand">{cap.id}</p>
+              <h3 className="mt-3 text-[15px] font-semibold tracking-[-0.01em]">
+                {cap.title}
+              </h3>
+              <p className="mt-2 text-sm leading-relaxed text-text-muted">
+                {cap.desc}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ─── 工作流 ───────────────────────────────────────── */}
+      <section className="border-t border-border">
+        <div className="mx-auto w-full max-w-6xl px-5 py-20">
+          <p className="font-mono text-xs uppercase tracking-[0.2em] text-text-faint">
+            Workflow
           </p>
+          <h2 className="mt-2 text-2xl font-semibold tracking-[-0.02em] sm:text-3xl">
+            三步，到达你想要的画面
+          </h2>
+          <div className="mt-10 grid gap-10 sm:grid-cols-3">
+            {STEPS.map((step) => (
+              <div key={step.id} className="border-t border-border pt-5">
+                <p className="font-mono text-xs text-text-faint">{step.id}</p>
+                <h3 className="mt-2 text-[15px] font-semibold">{step.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-text-muted">
+                  {step.desc}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ─── 收尾 CTA ─────────────────────────────────────── */}
+      <section className="border-t border-border bg-surface/40">
+        <div className="mx-auto flex w-full max-w-6xl flex-col items-start gap-6 px-5 py-20">
+          <h2 className="max-w-2xl text-[clamp(1.8rem,4vw,2.8rem)] font-semibold leading-[1.1] tracking-[-0.03em]">
+            准备好把想法
+            <br />
+            挂上墙了吗
+          </h2>
+          <Link
+            href="/register"
+            className="flex h-11 items-center gap-2 rounded-md bg-brand px-6 text-sm font-medium text-on-accent transition-colors hover:bg-brand/88"
+          >
+            免费开始
+            <ArrowUpRight size={16} aria-hidden />
+          </Link>
+        </div>
+        <footer className="border-t border-border">
+          <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between px-5">
+            <Logo size="sm" />
+            <p className="font-mono text-[11px] text-text-faint">
+              © 2026 Chūgǎo Studio
+            </p>
+          </div>
         </footer>
       </section>
     </main>
