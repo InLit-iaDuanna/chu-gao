@@ -28,7 +28,68 @@ function isAdminPath(pathname: string): boolean {
   return pathname.startsWith("/admin") || pathname.startsWith("/api/admin/");
 }
 
+function requiresCanonicalAuthOrigin(pathname: string): boolean {
+  return (
+    pathname === "/login" ||
+    pathname === "/register" ||
+    pathname === "/app" ||
+    pathname.startsWith("/app/") ||
+    pathname === "/admin" ||
+    pathname.startsWith("/admin/") ||
+    pathname.startsWith("/api/auth/")
+  );
+}
+
+function requestHostname(request: NextRequest): string {
+  const forwardedHost = request.headers
+    .get("x-forwarded-host")
+    ?.split(",")[0]
+    ?.trim();
+  const host = forwardedHost || request.headers.get("host")?.trim();
+
+  if (host) {
+    try {
+      return new URL(`http://${host}`).hostname.toLowerCase();
+    } catch {
+      // Fall back to Next.js' parsed URL for malformed proxy headers.
+    }
+  }
+
+  return request.nextUrl.hostname.toLowerCase();
+}
+
+function canonicalAuthRedirect(request: NextRequest): NextResponse | null {
+  if (
+    process.env.NODE_ENV !== "production" ||
+    !requiresCanonicalAuthOrigin(request.nextUrl.pathname)
+  ) {
+    return null;
+  }
+
+  const canonicalHost = (
+    process.env.AUTH_CANONICAL_HOST || "chugao.art"
+  ).toLowerCase();
+  const requestHost = requestHostname(request);
+
+  if (!requestHost || requestHost === canonicalHost) {
+    return null;
+  }
+
+  const destination = request.nextUrl.clone();
+  destination.protocol = "https:";
+  destination.hostname = canonicalHost;
+  destination.port = "";
+
+  return NextResponse.redirect(destination, 307);
+}
+
 export function middleware(request: NextRequest) {
+  const canonicalRedirect = canonicalAuthRedirect(request);
+
+  if (canonicalRedirect) {
+    return withSecurityHeaders(canonicalRedirect);
+  }
+
   if (
     isAdminPath(request.nextUrl.pathname) &&
     parseAdminIpAllowlist().length > 0 &&

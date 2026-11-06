@@ -2,6 +2,30 @@ import IORedis from "ioredis";
 
 declare global {
   var __redis__: IORedis | undefined;
+  var __rateLimitRedis__: IORedis | undefined;
+}
+
+export function getRateLimitRedis(): IORedis {
+  if (globalThis.__rateLimitRedis__) {
+    return globalThis.__rateLimitRedis__;
+  }
+
+  const connection = new IORedis(
+    process.env.REDIS_URL ?? "redis://localhost:6379",
+    {
+      connectTimeout: Number(process.env.REDIS_CONNECT_TIMEOUT_MS ?? 3000),
+      enableOfflineQueue: false,
+      lazyConnect: true,
+      maxRetriesPerRequest: 1,
+      retryStrategy: () => null,
+    },
+  );
+  connection.on("error", () => {
+    // Rate limiting falls back to the bounded local store.
+  });
+
+  globalThis.__rateLimitRedis__ = connection;
+  return connection;
 }
 
 export class RedisUnavailableError extends Error {

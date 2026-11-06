@@ -33,12 +33,13 @@ export async function assertGenerationQueueReady(): Promise<void> {
 
 export async function enqueueGeneration(
   payload: GenerationJobPayload,
+  options?: { jobId?: string },
 ): Promise<string> {
   await assertGenerationQueueReady();
 
   const job = await getGenerationQueue().add("generate", payload, {
     attempts: 1,
-    jobId: payload.generationId,
+    jobId: options?.jobId ?? payload.generationId,
     removeOnComplete: 1000,
     removeOnFail: false,
   });
@@ -92,4 +93,21 @@ export async function removeGenerationJob(jobId: string): Promise<boolean> {
 
   await job.remove();
   return true;
+}
+
+export async function generationJobIsQueued(jobId: string): Promise<boolean> {
+  const job = await getGenerationQueue().getJob(jobId);
+
+  if (!job) {
+    return false;
+  }
+
+  const state = await job.getState();
+  return [
+    "waiting",
+    "active",
+    "delayed",
+    "prioritized",
+    "waiting-children",
+  ].includes(state);
 }

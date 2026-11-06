@@ -1,4 +1,5 @@
 import { fail, ok } from "@/lib/api-response";
+import { userActionRateLimitResponse } from "@/lib/api-rate-limit";
 import { audit } from "@/lib/audit";
 import {
   adminFailureResponse,
@@ -21,20 +22,6 @@ function modelIdForRequest(modelId: string): string {
   return modelId;
 }
 
-function image2ModeForRequest(
-  modelId: string,
-): "standard" | "high" | undefined {
-  if (modelId === "gpt-image-2-high") {
-    return "high";
-  }
-
-  if (modelId === "gpt-image-2-standard") {
-    return "standard";
-  }
-
-  return undefined;
-}
-
 function smokeRequestForModel(modelId: string): InternalRequest | null {
   const model = getModel(modelIdForRequest(modelId));
 
@@ -46,11 +33,13 @@ function smokeRequestForModel(modelId: string): InternalRequest | null {
     modelId: model.id,
     protocol: model.protocol,
     prompt: "A small black square on a plain white background.",
-    aspectRatio: model.defaults.aspectRatio,
-    resolution: model.capabilities.resolutions.includes("1K")
-      ? "1K"
-      : model.defaults.resolution,
-    image2Mode: image2ModeForRequest(modelId) ?? model.defaults.image2Mode,
+    size: model.capabilities.sizes.includes("1024x1024")
+      ? "1024x1024"
+      : model.defaults.size,
+    quality: "auto",
+    responseFormat: model.defaults.responseFormat,
+    aspectRatio: "1:1",
+    resolution: "1K",
     n: 1,
     outputFormat: model.defaults.outputFormat,
     background: model.defaults.background,
@@ -79,6 +68,13 @@ export async function POST(
   }
 
   const admin = authenticatedUser(sessionResult);
+  const rateLimitFailure = await userActionRateLimitResponse(
+    admin.id,
+    "admin-provider-test",
+    process.env.RATE_LIMIT_ADMIN_TEST_PER_MIN,
+    5,
+  );
+  if (rateLimitFailure) return rateLimitFailure;
 
   const provider = await db.provider.findUnique({
     where: { id },

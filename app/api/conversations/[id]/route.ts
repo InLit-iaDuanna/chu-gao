@@ -14,6 +14,7 @@ import {
 import { db } from "@/lib/db";
 import { getImage2ChannelDisplayNameMap } from "@/lib/provider-channel-config";
 import { isDatabaseUnavailableError } from "@/lib/service-errors";
+import { assertChatConversationIdle, ChatTurnError } from "@/lib/chat-turns";
 
 const updateConversationSchema = z.object({
   title: z.string().trim().min(1).max(80).optional(),
@@ -109,17 +110,21 @@ export async function PATCH(
 
   try {
     const session = authenticatedUser(sessionResult);
-    const updated = await db.conversation.updateMany({
-      where: {
-        id,
-        userId: session.id,
-      },
-      data: {
-        ...(parsed.data.title ? { title: parsed.data.title } : {}),
-        ...(parsed.data.archived === undefined
-          ? {}
-          : { archivedAt: parsed.data.archived ? new Date() : null }),
-      },
+    const updated = await db.$transaction(async (tx) => {
+      if (parsed.data.archived)
+        await assertChatConversationIdle(tx, id, session.id);
+      return tx.conversation.updateMany({
+        where: {
+          id,
+          userId: session.id,
+        },
+        data: {
+          ...(parsed.data.title ? { title: parsed.data.title } : {}),
+          ...(parsed.data.archived === undefined
+            ? {}
+            : { archivedAt: parsed.data.archived ? new Date() : null }),
+        },
+      });
     });
 
     if (updated.count === 0) {
@@ -138,6 +143,8 @@ export async function PATCH(
 
     return ok(serializeConversation(conversation, { displayNameMap }));
   } catch (error) {
+    if (error instanceof ChatTurnError)
+      return fail(error.code, error.message, { status: error.status });
     if (isDatabaseUnavailableError(error)) {
       return conversationsUnavailable();
     }

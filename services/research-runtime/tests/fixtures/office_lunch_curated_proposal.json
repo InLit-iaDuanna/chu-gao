@@ -1,0 +1,215 @@
+{
+  "contract_version": 2,
+  "package_version": "8e4caa0ea5a21f4f18c589aee96d00380ae7ac15d3f29744632f35bd7d9d7f92",
+  "status": "draft",
+  "title": "办公室轻食方案评审者重组示例",
+  "subtitle": "评审者重组示例 · 使用附件的冻结材料与明确标注的研究建议；没有新增模型调用、用户实测或市场结论。",
+  "caveats": [
+    "本文件由评审者重组，展示证据如何连接到设计决定与验证动作；不代表系统新完成了市场调研。"
+  ],
+  "slides": [
+    {
+      "title": "先验证午餐路径，再决定设备形态",
+      "layout": "overview",
+      "claims": [
+        {
+          "text": "将现场制作、预制复热和购买现成午餐放在同一用餐任务中比较。",
+          "status": "recommendation"
+        },
+        {
+          "text": "首轮研究优先回答：哪一步真的需要新增设备，哪一步可由容器、信息或现有设施解决。",
+          "status": "recommendation"
+        },
+        {
+          "text": "冻结材料还不能选出胜出路线；“快速”、低油、营养可控与分量明确仍需转成可观察的任务标准。",
+          "status": "unknown"
+        }
+      ]
+    },
+    {
+      "title": "网页样本提供规格，尚不能证明体验优势",
+      "layout": "evidence",
+      "claims": [
+        {
+          "text": "摩飞 MR9086 官方页面标价 ¥529；零售页面标价 ¥339.00。",
+          "status": "observed",
+          "evidence_ids": [
+            "cmve7lk8x00wf3yyzt7apwo35",
+            "cmve7lka700wl3yyz7savsb8c"
+          ]
+        },
+        {
+          "text": "同一零售页面列出重量 2.5kg、尺寸 248×221×133mm。",
+          "status": "observed",
+          "evidence_ids": [
+            "cmve7lka700wl3yyz7savsb8c"
+          ]
+        },
+        {
+          "text": "九阳三明治机片段分别记录了备料预热和制作馅料，不能据“三分钟”认定完整午餐耗时。",
+          "status": "observed",
+          "evidence_ids": [
+            "cmve7t3j6003p3yo8zoxvte8w"
+          ]
+        },
+        {
+          "text": "把这些材料用于准备样品核对：检查型号、适用场景、拿取收纳及清洁流程；不据页面标价推断支付意愿。",
+          "status": "recommendation"
+        }
+      ]
+    },
+    {
+      "title": "候选路线对应不同的放弃条件",
+      "layout": "comparison",
+      "table": {
+        "columns": [
+          "候选路线",
+          "重点观察什么",
+          "哪些结果会改变设计"
+        ],
+        "rows": [
+          {
+            "cells": [
+              "办公室现场制作",
+              "备料、台面、用电、排汽和清洁",
+              "现场条件不允许完成任务时，转向复热或现成餐路径"
+            ],
+            "status": "recommendation"
+          },
+          {
+            "cells": [
+              "家中预制、办公室复热",
+              "准备、携带、暂存、等待和容器清洗",
+              "如负担主要在携带与清洗，先验证容器方案"
+            ],
+            "status": "recommendation"
+          },
+          {
+            "cells": [
+              "购买现成午餐",
+              "等待、选择、份量及营养信息理解",
+              "若无需设备也能满足任务，重审增加烹饪硬件的价值"
+            ],
+            "status": "recommendation"
+          }
+        ]
+      }
+    },
+    {
+      "title": "份量表达要通过真实选择任务比较",
+      "layout": "comparison",
+      "claims": [
+        {
+          "text": "份量提示能帮助健身或控卡用户作出午餐选择。",
+          "status": "hypothesis",
+          "hypothesis_id": "H2",
+          "assumption_basis": "分量明确属于已确认需求，但终稿未提供用户测试或证据确定提示形式及其对决策的影响。"
+        }
+      ],
+      "table": {
+        "columns": [
+          "原型方案",
+          "给参与者的任务",
+          "需要记录的差异"
+        ],
+        "rows": [
+          {
+            "cells": [
+              "克数或称重结果",
+              "按提供的信息选择午餐份量",
+              "是否理解数字、是否增加称量动作"
+            ],
+            "status": "recommendation"
+          },
+          {
+            "cells": [
+              "一份 / 半份",
+              "在同样餐食中选择适合份量",
+              "对一份的理解是否一致"
+            ],
+            "status": "recommendation"
+          },
+          {
+            "cells": [
+              "容器刻度",
+              "用容器装出自己想吃的份量",
+              "刻度辨认、装填与清洗的负担"
+            ],
+            "status": "recommendation"
+          },
+          {
+            "cells": [
+              "食材组合",
+              "从常用组合中选择一餐",
+              "选择是否更容易，是否限制替换"
+            ],
+            "status": "recommendation"
+          }
+        ]
+      }
+    },
+    {
+      "title": "功能投入必须对应一个可检验的决定",
+      "layout": "tradeoffs",
+      "table": {
+        "columns": [
+          "设计决定",
+          "验证动作",
+          "决定如何随结果改变"
+        ],
+        "rows": [
+          {
+            "cells": [
+              "是否增加现场烹饪硬件",
+              "对照完整的准备到清洗任务",
+              "新增步骤无补偿价值时，先保留复热路径"
+            ],
+            "status": "recommendation"
+          },
+          {
+            "cells": [
+              "是否加入称重与营养界面",
+              "比较有信息与无信息的选择过程",
+              "信息未改善理解时，先简化呈现"
+            ],
+            "status": "recommendation"
+          },
+          {
+            "cells": [
+              "如何表达低油",
+              "核对用户含义、配方与烹饪记录",
+              "没有支持材料时，只说明操作方式，不承诺效果"
+            ],
+            "status": "recommendation"
+          }
+        ]
+      }
+    },
+    {
+      "title": "下一轮应留下能改变路线的研究记录",
+      "layout": "process",
+      "steps": [
+        {
+          "title": "观察现有午餐",
+          "detail": "记录现有备餐、携带、等待、食用与清洗流程，追问放弃某条路径的具体原因。",
+          "status": "recommendation"
+        },
+        {
+          "title": "核对办公室条件",
+          "detail": "确认允许的操作、共享设备、暂存、清洁与收纳条件，保留现场记录。",
+          "status": "recommendation"
+        },
+        {
+          "title": "比较可操作原型",
+          "detail": "保持用餐任务与餐食条件可比，逐一观察失败环节和额外负担。",
+          "status": "recommendation"
+        },
+        {
+          "title": "记录保留与否定",
+          "detail": "每个设计决定附上观察记录、推断、反例和下一步；尚未观察的条件继续标注未知。",
+          "status": "recommendation"
+        }
+      ]
+    }
+  ]
+}

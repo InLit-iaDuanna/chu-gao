@@ -4,8 +4,16 @@ import { Prisma } from "@prisma/client";
 import { fail, ok } from "@/lib/api-response";
 import type { SessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { requestDeviceContext } from "@/lib/device-session";
+import {
+  assertRegisterAllowed,
+  RegisterRateLimitError,
+} from "@/lib/rate-limit";
 import { readJsonBodySafe } from "@/lib/request-body";
-import { attachSessionCookie } from "@/lib/session-cookie";
+import {
+  attachDeviceIdCookie,
+  attachSessionCookie,
+} from "@/lib/session-cookie";
 import {
   getRequiredSystemConfigValue,
   SystemConfigUnavailableError,
@@ -44,6 +52,21 @@ export async function POST(request: Request) {
   }
 
   try {
+    await assertRegisterAllowed(request.headers);
+  } catch (error) {
+    if (error instanceof RegisterRateLimitError) {
+      return fail("TOO_MANY_REQUESTS", error.message, {
+        status: 429,
+        headers: {
+          "Retry-After": String(error.retryAfterSeconds),
+        },
+      });
+    }
+
+    throw error;
+  }
+
+  try {
     const { email, password, name, inviteCode } = parsed.data;
     const inviteOnly = await getRequiredSystemConfigValue(
       "registration.inviteOnly",
@@ -69,7 +92,8 @@ export async function POST(request: Request) {
     let inviteRecordId: string | undefined;
 
     const passwordHash = await bcrypt.hash(password, 12);
-    const user = await db.$transaction(
+    const device = requestDeviceContext(request.headers);
+    const registration = await db.$transaction(
       async (tx) => {
         if (inviteCode) {
           const inviteRecord = await tx.inviteCode.findUnique({
@@ -120,7 +144,7 @@ export async function POST(request: Request) {
           inviteRecordId = inviteRecord.id;
         }
 
-        return tx.user.create({
+        const user = await tx.user.create({
           data: {
             email,
             name,
@@ -138,9 +162,24 @@ export async function POST(request: Request) {
             sessionVersion: true,
           },
         });
+
+        const deviceSession = await tx.deviceSession.create({
+          data: {
+            userId: user.id,
+            deviceType: device.deviceType,
+            deviceId: device.deviceId,
+            version: 1,
+            expiresAt: device.expiresAt,
+            userAgent: device.userAgent,
+          },
+          select: { version: true },
+        });
+
+        return { user, deviceSession };
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
+    const { user, deviceSession } = registration;
 
     const response = ok(user, { status: 201 });
     const sessionUser: SessionUser = {
@@ -151,7 +190,15 @@ export async function POST(request: Request) {
       sessionVersion: user.sessionVersion,
     };
 
-    return attachSessionCookie(response, sessionUser);
+    return attachSessionCookie(
+      attachDeviceIdCookie(response, device.deviceId),
+      sessionUser,
+      {
+        deviceType: device.deviceType,
+        deviceId: device.deviceId,
+        version: deviceSession.version,
+      },
+    );
   } catch (error) {
     if (error instanceof InviteValidationError) {
       return fail(error.code, error.message, { status: 400 });

@@ -1,0 +1,2 @@
+ALTER INDEX "ContextSnapshot_conversationId_sourceHash_summarizerProfileVe_k"
+  RENAME TO "ContextSnapshot_conversationId_sourceHash_summarizerProfile_key";

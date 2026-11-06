@@ -1,88 +1,112 @@
-import { cloneElement, isValidElement } from "react";
+"use client";
+
+import { cloneElement, forwardRef, isValidElement } from "react";
 
 import { cn } from "@/lib/utils";
 
 import { Spinner } from "./Spinner";
 
-type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "link";
-type ButtonSize = "sm" | "md" | "lg";
+export type ButtonVariant =
+  | "primary"
+  | "secondary"
+  | "ghost"
+  | "danger"
+  | "link";
+export type ButtonSize = "sm" | "md" | "lg";
 
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
   size?: ButtonSize;
   loading?: boolean;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
   asChild?: boolean;
-  children: React.ReactNode;
+  children?: React.ReactNode;
 }
 
 const variantClass: Record<ButtonVariant, string> = {
   primary:
-    "bg-foreground text-background hover:bg-foreground/90 active:bg-foreground/80",
+    "border border-transparent bg-[rgb(var(--brand-primary))] text-on-accent hover:bg-[rgb(var(--brand-primary))]/88 disabled:border-[rgb(var(--control-disabled-border))] disabled:bg-[rgb(var(--control-disabled-bg))] disabled:text-[rgb(var(--icon-disabled))]",
   secondary:
-    "bg-surface-2 text-foreground shadow-[inset_0_0_0_1px_rgb(var(--border))] hover:bg-surface-3",
-  ghost: "text-text-muted hover:bg-surface-2 hover:text-foreground",
-  danger: "bg-danger text-white hover:opacity-90 active:opacity-80",
-  link: "h-auto px-0 text-foreground hover:underline underline-offset-4",
+    "border border-[rgb(var(--control-border))] bg-[rgb(var(--control-bg))] text-foreground hover:border-[rgb(var(--control-border-hover))] hover:bg-[rgb(var(--control-bg-hover))] disabled:border-[rgb(var(--control-disabled-border))] disabled:bg-[rgb(var(--control-disabled-bg))] disabled:text-[rgb(var(--icon-disabled))]",
+  ghost:
+    "border border-transparent text-[rgb(var(--icon-muted))] hover:bg-[rgb(var(--control-bg-hover))] hover:text-[rgb(var(--icon))] disabled:bg-transparent disabled:text-[rgb(var(--icon-disabled))]",
+  danger:
+    "border border-transparent bg-[rgb(var(--danger))] text-[rgb(var(--on-danger))] hover:bg-[rgb(var(--danger))]/90 disabled:border-[rgb(var(--control-disabled-border))] disabled:bg-[rgb(var(--control-disabled-bg))] disabled:text-[rgb(var(--icon-disabled))]",
+  link: "h-auto border-none px-0 text-foreground underline-offset-4 hover:underline disabled:text-[rgb(var(--icon-disabled))] disabled:no-underline",
 };
 
 const sizeClass: Record<ButtonSize, string> = {
-  sm: "h-7 px-2.5 text-xs",
-  md: "h-8 px-3 text-sm",
-  lg: "h-10 px-4 text-sm",
+  sm: "h-8 px-3 text-xs",
+  md: "h-9 px-4 text-sm",
+  lg: "h-11 px-6 text-base",
 };
 
-export function Button({
-  variant = "secondary",
-  size = "md",
-  loading = false,
-  leftIcon,
-  rightIcon,
-  asChild = false,
-  className,
-  disabled,
-  children,
-  type = "button",
-  ...props
-}: ButtonProps): React.ReactElement {
-  const classes = cn(
-    "inline-flex shrink-0 items-center justify-center gap-2 rounded-md font-medium",
-    "transition-[background-color,color,border-color,box-shadow,transform,opacity] duration-[var(--duration-fast)] ease-[var(--ease-out)]",
-    "active:scale-[0.97] motion-reduce:active:scale-100",
-    "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-45",
-    variant !== "link" && sizeClass[size],
-    variantClass[variant],
-    className,
-  );
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
+  function Button(
+    {
+      variant = "secondary",
+      size = "md",
+      loading = false,
+      leftIcon,
+      rightIcon,
+      asChild = false,
+      className,
+      disabled,
+      children,
+      type = "button",
+      ...props
+    },
+    ref,
+  ): React.ReactElement {
+    const classes = cn(
+      "relative inline-flex shrink-0 items-center justify-center gap-2 rounded-md font-medium [&_svg]:shrink-0",
+      "transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] ease-[var(--ease-out)]",
+      "active:translate-y-px motion-reduce:active:translate-y-0",
+      "disabled:cursor-not-allowed disabled:opacity-100 disabled:active:translate-y-0",
+      variant !== "link" && sizeClass[size],
+      variantClass[variant],
+      className,
+    );
 
-  const content = (
-    <>
-      {leftIcon}
-      <span className="min-w-0 truncate">{children}</span>
-      {loading ? <Spinner size="sm" /> : rightIcon}
-    </>
-  );
+    const content = (
+      <>
+        {leftIcon}
+        {children}
+        {loading ? (
+          <>
+            <Spinner className="shrink-0" size="sm" />
+            <span className="sr-only">处理中…</span>
+          </>
+        ) : (
+          rightIcon
+        )}
+      </>
+    );
 
-  if (asChild && isValidElement(children)) {
-    return cloneElement(children, {
-      className: cn(
-        (children.props as { className?: string }).className,
-        classes,
-      ),
-      "aria-disabled": disabled || loading ? true : undefined,
-      ...props,
-    } as React.HTMLAttributes<HTMLElement>);
-  }
+    if (asChild && isValidElement(children)) {
+      return cloneElement(children, {
+        className: cn(
+          (children.props as { className?: string }).className,
+          classes,
+        ),
+        "aria-disabled": disabled || loading ? true : undefined,
+        "aria-busy": loading || undefined,
+        ...props,
+      } as React.HTMLAttributes<HTMLElement>);
+    }
 
-  return (
-    <button
-      className={classes}
-      disabled={disabled || loading}
-      type={type}
-      {...props}
-    >
-      {content}
-    </button>
-  );
-}
+    return (
+      <button
+        className={classes}
+        disabled={disabled || loading}
+        aria-busy={loading || undefined}
+        ref={ref}
+        type={type}
+        {...props}
+      >
+        {content}
+      </button>
+    );
+  },
+);

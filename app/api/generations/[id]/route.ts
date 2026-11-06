@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { serializeGeneration } from "@/lib/generations";
 import { getProviderChannelDisplayNameMap } from "@/lib/provider-channel-config";
 import { isDatabaseUnavailableError } from "@/lib/service-errors";
+import { privateImageUrl, statPrivateStorageKey } from "@/lib/storage";
 
 export async function GET(
   request: Request,
@@ -55,6 +56,59 @@ export async function GET(
     }
 
     const displayNameMap = await getProviderChannelDisplayNameMap();
+
+    if (new URL(request.url).searchParams.get("retry") === "1") {
+      const sourceImages = await db.generatedImage.findMany({
+        where: {
+          storageKey: { in: generation.referenceImageKeys },
+          generation: { userId: session.id, deletedAt: null },
+        },
+        select: { id: true, generationId: true, storageKey: true },
+      });
+      const sources = new Map(
+        sourceImages.map((image) => [image.storageKey, image]),
+      );
+      const retryReferences = [];
+      for (const key of generation.referenceImageKeys) {
+        const source = sources.get(key);
+        if (!source && !key.startsWith(`uploads/${session.id}/`)) {
+          return fail(
+            "REFERENCE_IMAGE_NOT_FOUND",
+            "原参考图已不可用，请重新选择参考图",
+            { status: 404 },
+          );
+        }
+        try {
+          await statPrivateStorageKey(key);
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+            return fail(
+              "REFERENCE_IMAGE_NOT_FOUND",
+              "原参考图已过期或被删除，请重新选择参考图",
+              { status: 404 },
+            );
+          }
+          throw error;
+        }
+        retryReferences.push(
+          source
+            ? {
+                kind: "source" as const,
+                key: source.id,
+                previewUrl: privateImageUrl(source.generationId, source.id),
+              }
+            : {
+                kind: "upload" as const,
+                key,
+                previewUrl: `/api/upload?key=${encodeURIComponent(key)}`,
+              },
+        );
+      }
+      return ok({
+        ...serializeGeneration(generation, { displayNameMap }),
+        retryReferences,
+      });
+    }
 
     return ok(serializeGeneration(generation, { displayNameMap }));
   } catch (error) {

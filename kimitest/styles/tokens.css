@@ -1,0 +1,202 @@
+@layer base {
+  :root,
+  html.light {
+    /* ── First Draft Press 初稿印务所 · 纸墨（默认浅色） ────────── */
+    --bg: 243 240 233; /* #F3F0E9 暖纸 */
+    --surface: 250 248 242; /* #FAF8F2 纸面 */
+    --surface-2: 237 233 222; /* #EDE9DE 纸纹 */
+    --surface-3: 228 222 208; /* #E4DED0 */
+
+    --ink: 24 20 14; /* #181410 墨色（text / hairline 同源） */
+    --border: 24 20 14; /* 发丝线 = 墨色，使用时带 alpha */
+    --border-strong: 24 20 14;
+
+    --text: 24 20 14;
+    --text-muted: 101 92 75; /* #655C4B */
+    --text-faint: 156 146 125; /* #9C927D */
+
+    /* Alias so rgb(var(--foreground)) resolves to the text ink. */
+    --foreground: var(--text);
+    /* Readable foreground for brand/danger filled surfaces. */
+    --on-brand: 250 250 252;
+
+    --accent: var(--brand-primary);
+    --brand-primary: 255 77 0; /* #FF4D00 信号橘（专色） */
+    --brand-primary-soft: 216 58 0; /* #D83A00 纸面文字用深橘 */
+    --cyan: 37 68 242; /* #2544F2 钴蓝（第二专色，克制使用） */
+    --success: 21 138 74; /* #158A4A */
+    --danger: 214 48 32; /* #D63020 */
+    --warning: 176 106 0; /* #B06A00 */
+    --info: 37 68 242;
+
+    --gradient-hero-start: 255 77 0;
+    --gradient-hero-end: 216 58 0;
+    --gradient-accent-start: 255 77 0;
+    --gradient-accent-end: 37 68 242;
+    --gradient-danger-start: 214 48 32;
+    --gradient-danger-end: 176 106 0;
+
+    --deco-1: 255 77 0;
+    --deco-2: 37 68 242;
+    --deco-3: 216 58 0;
+    --deco-4: 21 138 74;
+
+    --radius-sm: 2px;
+    --radius-md: 4px;
+    --radius-lg: 6px;
+    --radius-xl: 10px;
+    --radius-pill: 999px;
+
+    --duration-micro: 100ms;
+    --duration-fast: 140ms;
+    --duration-transition: 180ms;
+    --duration-base: 180ms;
+    --duration-modal: 200ms;
+    --duration-image: 220ms;
+    --duration-reveal: 360ms;
+    --duration-morph: 420ms;
+    --duration-slow: 280ms;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+    --font-stack-sans:
+      var(--font-geist-sans), "Geist", "HarmonyOS Sans SC", "PingFang SC",
+      system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-stack-serif:
+      var(--font-fraunces), "Fraunces", "LXGW WenKai", Georgia, serif;
+    --font-stack-mono:
+      var(--font-geist-mono), "Geist Mono", "JetBrains Mono", ui-monospace,
+      monospace;
+
+    --fs-11: 11px;
+    --fs-12: 12px;
+    --fs-13: 13px;
+    --fs-14: 14px;
+    --fs-15: 15px;
+    --fs-16: 16px;
+    --fs-18: 18px;
+    --fs-20: 20px;
+    --fs-24: 24px;
+    --fs-30: 30px;
+    --fs-36: 36px;
+    --fs-48: 48px;
+    --fs-60: 60px;
+    --fs-96: 96px;
+
+    --lh-display: 1.02;
+    --lh-headline: 1.2;
+    --lh-body: 1.6;
+    --lh-caption: 1.5;
+    --lh-label: 1.4;
+    --lh-tight: 1.1;
+    --lh-snug: 1.3;
+    --lh-normal: 1.5;
+    --lh-loose: 1.7;
+    --ls-display: -0.02em;
+    --ls-headline: -0.02em;
+    --ls-body: 0;
+    --ls-caption: 0.01em;
+    --ls-label: 0.1em;
+    --ls-tight: -0.02em;
+    --ls-snug: -0.01em;
+    --ls-normal: 0;
+    --ls-wide: 0.04em;
+    --ls-eyebrow: 0.14em;
+
+    --s-2: 2px;
+    --s-4: 4px;
+    --s-6: 6px;
+    --s-8: 8px;
+    --s-10: 10px;
+    --s-12: 12px;
+    --s-16: 16px;
+    --s-20: 20px;
+    --s-24: 24px;
+    --s-32: 32px;
+    --s-40: 40px;
+    --s-48: 48px;
+    --s-64: 64px;
+    --s-80: 80px;
+    --s-96: 96px;
+    --s-128: 128px;
+
+    /* ── 近乎无影：印刷的厚度来自纸张叠放，不是投影 ────────────── */
+    --shadow-xs: none;
+    --shadow-sm: 0 1px 2px rgb(24 20 14 / 0.05);
+    --shadow-md: 0 8px 24px -12px rgb(24 20 14 / 0.16);
+    --shadow-lg: 0 20px 56px -20px rgb(24 20 14 / 0.24);
+    --shadow-ring: 0 0 0 1px rgb(24 20 14 / 0.12);
+    --shadow-ring-strong: 0 0 0 1px rgb(24 20 14 / 0.22);
+    --shadow-focus:
+      0 0 0 2px rgb(var(--bg)), 0 0 0 4px rgb(var(--brand-primary) / 0.55);
+
+    /* 契约保留：glow 退化为「微弱暖影」，零模糊零性能开销 */
+    --shadow-glow-brand: 0 8px 24px -12px rgb(var(--brand-primary) / 0.3);
+    --shadow-glow-brand-soft: 0 4px 16px -8px rgb(var(--brand-primary) / 0.22);
+    --shadow-glow-cyan: 0 4px 16px -8px rgb(var(--cyan) / 0.25);
+    --shadow-glow-success: 0 4px 16px -8px rgb(var(--success) / 0.25);
+    --shadow-glow-danger: 0 4px 16px -8px rgb(var(--danger) / 0.25);
+
+    /* 实心纸面（原玻璃参数 → 不透明） */
+    --glass-bg: 250 248 242;
+    --glass-bg-opacity: 1;
+    --glass-border-opacity: 0.12;
+    --glass-highlight-opacity: 0;
+  }
+
+  html.dark {
+    /* ── 墨夜变体：同一套语言，纸墨反转 ────────────────────────── */
+    --bg: 20 17 12; /* #14110C 墨黑 */
+    --surface: 27 23 17; /* #1B1711 */
+    --surface-2: 35 30 22; /* #231E16 */
+    --surface-3: 46 40 29; /* #2E281D */
+
+    --ink: 240 235 224; /* 暗色下「墨」反转为纸色 */
+    --border: 240 235 224;
+    --border-strong: 240 235 224;
+
+    --text: 240 235 224; /* #F0EBE0 */
+    --text-muted: 168 158 138; /* #A89E8A */
+    --text-faint: 120 112 94; /* #78705E */
+
+    --brand-primary: 255 77 0;
+    --brand-primary-soft: 255 122 61; /* #FF7A3D */
+    --cyan: 124 148 255; /* #7C94FF */
+    --success: 74 192 128;
+    --danger: 240 96 78;
+    --warning: 228 160 48;
+    --info: 124 148 255;
+
+    --gradient-hero-start: 255 77 0;
+    --gradient-hero-end: 255 122 61;
+    --gradient-accent-start: 255 77 0;
+    --gradient-accent-end: 124 148 255;
+    --gradient-danger-start: 240 96 78;
+    --gradient-danger-end: 228 160 48;
+
+    --deco-1: 255 77 0;
+    --deco-2: 124 148 255;
+    --deco-3: 255 122 61;
+    --deco-4: 74 192 128;
+
+    --shadow-xs: none;
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+    --shadow-md: 0 8px 24px -12px rgb(0 0 0 / 0.5);
+    --shadow-lg: 0 20px 56px -20px rgb(0 0 0 / 0.6);
+    --shadow-ring: 0 0 0 1px rgb(240 235 224 / 0.14);
+    --shadow-ring-strong: 0 0 0 1px rgb(240 235 224 / 0.24);
+    --shadow-focus:
+      0 0 0 2px rgb(var(--bg)), 0 0 0 4px rgb(var(--brand-primary) / 0.6);
+    --shadow-glow-brand: 0 8px 24px -12px rgb(var(--brand-primary) / 0.35);
+    --shadow-glow-brand-soft: 0 4px 16px -8px rgb(var(--brand-primary) / 0.25);
+    --shadow-glow-cyan: 0 4px 16px -8px rgb(var(--cyan) / 0.3);
+    --shadow-glow-success: 0 4px 16px -8px rgb(var(--success) / 0.3);
+    --shadow-glow-danger: 0 4px 16px -8px rgb(var(--danger) / 0.3);
+
+    --glass-bg: 27 23 17;
+    --glass-bg-opacity: 1;
+    --glass-border-opacity: 0.14;
+    --glass-highlight-opacity: 0;
+  }
+}

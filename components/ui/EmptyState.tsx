@@ -1,39 +1,44 @@
+import type { LucideIcon } from "lucide-react";
+
 import { cn } from "@/lib/utils";
 
-interface EmptyStateProps {
-  icon?: React.ReactNode;
+export interface EmptyStateProps extends React.HTMLAttributes<HTMLDivElement> {
   title: string;
   description?: string;
+  icon?: LucideIcon;
   action?: React.ReactNode;
-  className?: string;
 }
 
 export function EmptyState({
-  icon,
   title,
   description,
+  icon: Icon,
   action,
   className,
+  ...props
 }: EmptyStateProps): React.ReactElement {
   return (
     <div
       className={cn(
-        "flex min-h-56 flex-col items-center justify-center px-6 py-10 text-center",
+        "flex min-h-40 flex-col items-center justify-center px-6 py-10 text-center",
         className,
       )}
+      {...props}
     >
-      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg border border-dashed border-border text-text-faint">
-        {icon ?? (
-          <span className="h-4 w-4 rounded-full border border-current" />
-        )}
-      </div>
-      <p className="text-sm font-semibold text-foreground">{title}</p>
+      {Icon ? (
+        <Icon
+          className="mb-3 h-5 w-5 text-text-faint"
+          strokeWidth={1.5}
+          aria-hidden="true"
+        />
+      ) : null}
+      <p className="text-sm font-medium text-foreground">{title}</p>
       {description ? (
-        <p className="mt-2 max-w-80 text-xs leading-5 text-text-muted">
+        <p className="mt-1 max-w-md text-xs leading-5 text-text-muted">
           {description}
         </p>
       ) : null}
-      {action ? <div className="mt-5">{action}</div> : null}
+      {action ? <div className="mt-4">{action}</div> : null}
     </div>
   );
 }

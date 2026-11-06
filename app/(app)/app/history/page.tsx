@@ -1,29 +1,44 @@
 import Link from "next/link";
 import { headers } from "next/headers";
-import { Download } from "lucide-react";
+import { Download, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Button, Input } from "@/components/ui";
+import type { GenerationStatus } from "@/components/studio/lib/types";
 
-import { ActionableStatus } from "@/components/shared/ActionableStatus";
-import { ClearHistoryButton } from "@/components/workbench/ClearHistoryButton";
 import {
   downloadImageUrl,
   previewImageUrl,
-} from "@/components/workbench/gallery-images";
+} from "@/components/canvas/gallery-images";
+import { friendlyErrorMessage } from "@/components/shared/error-copy";
+import { ClearHistoryButton } from "@/components/studio/ClearHistoryButton";
 import {
   generationStatusLabel,
   generationStatusTone,
-} from "@/components/workbench/status";
+} from "@/components/studio/lib/status";
+import { StudioPageShell } from "@/components/studio/StudioPageShell";
+import { CopyTextButton } from "@/components/studio/CopyTextButton";
 import { checkSessionFromHeaders } from "@/lib/auth";
 import {
   conversationSummaryRowInclude,
   serializeConversationSummary,
 } from "@/lib/conversations";
 import { db } from "@/lib/db";
-import { serializeGeneration } from "@/lib/generations";
+import {
+  serializeGeneration,
+  isGenerationStatus,
+  GENERATION_STATUSES,
+} from "@/lib/generations";
 import { getImage2ChannelDisplayNameMap } from "@/lib/provider-channel-config";
 import { isDatabaseUnavailableError } from "@/lib/service-errors";
 import { formatDate } from "@/lib/utils";
 
-async function getGenerations() {
+const PAGE_SIZE = 24;
+type HistoryFilters = {
+  query: string;
+  status?: GenerationStatus;
+  page: number;
+};
+
+async function getGenerations({ query, status, page }: HistoryFilters) {
   const sessionResult = await checkSessionFromHeaders(await headers());
 
   if (sessionResult.status !== "authenticated" || !process.env.DATABASE_URL) {
@@ -36,27 +51,23 @@ async function getGenerations() {
         where: {
           userId: sessionResult.user.id,
           deletedAt: null,
+          ...(query
+            ? { prompt: { contains: query, mode: "insensitive" as const } }
+            : {}),
+          ...(status ? { status } : {}),
         },
         include: {
           images: true,
           provider: {
-            select: {
-              id: true,
-              name: true,
-            },
+            select: { id: true, name: true },
           },
           providerAccount: {
-            select: {
-              id: true,
-              name: true,
-              baseUrl: true,
-            },
+            select: { id: true, name: true, baseUrl: true },
           },
         },
-        orderBy: {
-          createdAt: "desc",
-        },
-        take: 60,
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        skip: (page - 1) * PAGE_SIZE,
+        take: PAGE_SIZE + 1,
       }),
       getImage2ChannelDisplayNameMap(),
     ]);
@@ -71,7 +82,7 @@ async function getGenerations() {
   }
 }
 
-async function getConversations() {
+async function getConversations({ query, status, page }: HistoryFilters) {
   const sessionResult = await checkSessionFromHeaders(await headers());
 
   if (sessionResult.status !== "authenticated" || !process.env.DATABASE_URL) {
@@ -84,12 +95,17 @@ async function getConversations() {
         where: {
           userId: sessionResult.user.id,
           archivedAt: null,
+          ...(query
+            ? { title: { contains: query, mode: "insensitive" as const } }
+            : {}),
+          ...(status
+            ? { generations: { some: { status, deletedAt: null } } }
+            : {}),
         },
         include: conversationSummaryRowInclude(),
-        orderBy: {
-          lastMessageAt: "desc",
-        },
-        take: 60,
+        orderBy: [{ lastMessageAt: "desc" }, { id: "desc" }],
+        skip: (page - 1) * PAGE_SIZE,
+        take: PAGE_SIZE + 1,
       }),
       getImage2ChannelDisplayNameMap(),
     ]);
@@ -106,11 +122,42 @@ async function getConversations() {
   }
 }
 
-export default async function HistoryPage() {
-  const [conversations, generations] = await Promise.all([
-    getConversations(),
-    getGenerations(),
+export default async function HistoryPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const search = await searchParams;
+  const query = typeof search.q === "string" ? search.q.trim() : "";
+  const status =
+    typeof search.status === "string" && isGenerationStatus(search.status)
+      ? search.status
+      : undefined;
+  const requestedPage =
+    typeof search.page === "string" ? Number(search.page) : 1;
+  const page =
+    Number.isSafeInteger(requestedPage) &&
+    requestedPage > 0 &&
+    requestedPage <= Math.floor(2147483647 / PAGE_SIZE)
+      ? requestedPage
+      : 1;
+  const filters = { query, status, page };
+  const [conversationRows, generationRows] = await Promise.all([
+    getConversations(filters),
+    getGenerations(filters),
   ]);
+  const hasNext = Boolean(
+    (conversationRows && conversationRows.length > PAGE_SIZE) ||
+    (generationRows && generationRows.length > PAGE_SIZE),
+  );
+  const conversations = conversationRows?.slice(0, PAGE_SIZE) ?? null;
+  const generations = generationRows?.slice(0, PAGE_SIZE) ?? null;
+  const pageHref = (nextPage: number) => {
+    const params = new URLSearchParams({ page: String(nextPage) });
+    if (query) params.set("q", query);
+    if (status) params.set("status", status);
+    return `/app/history?${params}`;
+  };
   const hasHistory = Boolean(
     conversations &&
     generations &&
@@ -118,56 +165,96 @@ export default async function HistoryPage() {
   );
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-end justify-between gap-4 max-sm:flex-col max-sm:items-start">
-        <div>
-          <p className="eyebrow">画廊</p>
-          <h1 className="mt-2 text-4xl max-sm:text-3xl">对话与生成记录</h1>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 max-sm:w-full">
-          {hasHistory ? <ClearHistoryButton /> : null}
-          <Link href="/app" className="tool-button h-9 text-text-muted">
-            新建对话
+    <StudioPageShell
+      eyebrow="History"
+      title="历史"
+      wide
+      actions={
+        <>
+          {hasHistory && !query && !status && page === 1 ? (
+            <ClearHistoryButton />
+          ) : null}
+          <Link
+            href="/app"
+            className="tool-button h-9 px-3 text-xs text-text-muted"
+          >
+            回到工作台
+          </Link>
+        </>
+      }
+    >
+      <form
+        action="/app/history"
+        className="mb-6 flex flex-wrap items-center gap-2"
+      >
+        <Input
+          key={query}
+          name="q"
+          defaultValue={query}
+          aria-label="搜索历史提示词或对话标题"
+          placeholder="搜索提示词或对话标题"
+          className="min-w-0 flex-1 basis-56"
+        />
+        <select
+          key={status ?? "all"}
+          name="status"
+          defaultValue={status ?? ""}
+          aria-label="任务状态"
+          className="h-9 rounded-md border border-border bg-surface px-3 text-sm text-foreground"
+        >
+          <option value="">全部状态</option>
+          {GENERATION_STATUSES.map((value) => (
+            <option key={value} value={value}>
+              {generationStatusLabel(value)}
+            </option>
+          ))}
+        </select>
+        <Button type="submit">
+          <Search size={16} /> 搜索
+        </Button>
+        {query || status ? (
+          <Link href="/app/history" className="tool-button h-9 px-3 text-sm">
+            清空筛选
+          </Link>
+        ) : null}
+      </form>
+      {!conversations || !generations ? (
+        <div className="surface-panel flex min-h-72 flex-col items-center justify-center gap-3 px-6 py-10 text-center">
+          <h2 className="text-xl font-medium">历史暂时无法读取</h2>
+          <p className="max-w-md text-sm leading-6 text-text-muted">
+            请稍后刷新页面。你仍然可以返回工作台，服务恢复后新的任务会继续保存。
+          </p>
+          <Link href="/app" className="tool-button mt-2 h-9 text-text-muted">
+            返回工作台
           </Link>
         </div>
-      </div>
-
-      {!conversations || !generations ? (
-        <ActionableStatus
-          tone="warning"
-          eyebrow="历史"
-          title="历史暂时无法读取"
-          description="请稍后刷新页面。你仍然可以返回创作页，服务恢复后新的任务会继续保存。"
-          action={
-            <Link href="/app" className="tool-button h-9 text-text-muted">
-              返回创作
-            </Link>
-          }
-        />
       ) : conversations.length === 0 && generations.length === 0 ? (
         <div className="surface-panel flex min-h-72 flex-col items-center justify-center gap-3 px-6 py-10 text-center">
-          <h2 className="text-xl font-medium">当前账户还没有创作历史</h2>
+          <h2 className="text-xl font-medium">
+            {query || status || page > 1
+              ? "没有找到匹配的历史记录"
+              : "当前账户还没有创作历史"}
+          </h2>
           <p className="max-w-md text-sm leading-6 text-text-muted">
-            回到创作页，描述第一张图。完成后的结果会出现在这里。
+            {query || status || page > 1
+              ? "调整关键词、状态或返回前一页。"
+              : "回到工作台，描述第一张图。完成后的结果会出现在这里。"}
           </p>
           <Link href="/app" className="tool-button mt-2 h-9 text-text-muted">
             开始创作
           </Link>
         </div>
       ) : (
-        <div className="space-y-8">
+        <div className="space-y-10">
           {conversations.length ? (
             <section>
-              <div className="mb-3">
-                <p className="eyebrow">对话</p>
-                <h2 className="mt-1 text-2xl">继续创作</h2>
-              </div>
+              <p className="eyebrow mb-3">对话 · 继续创作</p>
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {conversations.map((conversation) => (
                   <Link
                     key={conversation.id}
-                    href={`/app?conversation=${conversation.id}`}
-                    className="surface-panel img-enter block overflow-hidden p-3 transition-all hover:-translate-y-0.5 hover:bg-surface-2"
+                    href={`/app?thread=${conversation.id}`}
+                    className="surface-panel img-enter block overflow-hidden p-3 transition-colors hover:border-border-strong"
                   >
                     <div className="relative mb-3 h-40 overflow-hidden rounded-[8px] bg-surface-2">
                       {conversation.thumbnailUrl ? (
@@ -203,10 +290,7 @@ export default async function HistoryPage() {
           ) : null}
 
           <section>
-            <div className="mb-3">
-              <p className="eyebrow">任务</p>
-              <h2 className="mt-1 text-2xl">单次生成记录</h2>
-            </div>
+            <p className="eyebrow mb-3">任务 · 单次生成记录</p>
             <div className="columns-1 gap-4 md:columns-2 xl:columns-3">
               {generations.map((generation) => {
                 const previewImages = generation.images.filter(
@@ -215,13 +299,13 @@ export default async function HistoryPage() {
                 const latestImage = previewImages.at(-1);
                 const imageUrl = previewImageUrl(latestImage);
                 const detailHref = generation.conversationId
-                  ? `/app?conversation=${generation.conversationId}`
+                  ? `/app?thread=${generation.conversationId}`
                   : `/app/g/${generation.id}`;
 
                 return (
                   <article
                     key={generation.id}
-                    className="surface-panel img-enter mb-4 block break-inside-avoid p-3 transition-all hover:-translate-y-0.5 hover:bg-surface-2"
+                    className="surface-panel img-enter mb-4 block break-inside-avoid p-3 transition-colors hover:border-border-strong"
                   >
                     <Link href={detailHref} className="block">
                       <div className="relative mb-3 h-64 overflow-hidden rounded-[8px] bg-surface-2 sm:h-80">
@@ -243,14 +327,20 @@ export default async function HistoryPage() {
                         ) : (
                           <div className="flex h-full items-center justify-center px-6 text-center text-sm text-text-muted">
                             {generation.status === "FAILED"
-                              ? (generation.errorMessage ??
-                                "任务失败，可以打开详情查看原因")
+                              ? friendlyErrorMessage(
+                                  {
+                                    code: generation.errorCode ?? undefined,
+                                    message:
+                                      generation.errorMessage ?? undefined,
+                                  },
+                                  "任务失败，可以打开详情查看原因",
+                                )
                               : generationStatusLabel(generation.status)}
                           </div>
                         )}
                       </div>
                       <div className="flex items-center justify-between font-mono text-xs text-text-muted">
-                        <span>{formatDate(generation.createdAt)}</span>
+                        <span>{formatDate(generation.createdAt)}{generation.source === "agent" ? " · Agent" : ""}</span>
                         <span
                           className={generationStatusTone(generation.status)}
                         >
@@ -261,6 +351,9 @@ export default async function HistoryPage() {
                         {generation.prompt}
                       </p>
                     </Link>
+                    <div className="mt-2 flex items-center justify-end">
+                      <CopyTextButton text={generation.prompt} />
+                    </div>
                     {previewImages.length ? (
                       <div className="mt-3 grid gap-2">
                         {previewImages.map((image, index) => {
@@ -287,6 +380,30 @@ export default async function HistoryPage() {
           </section>
         </div>
       )}
-    </div>
+      {conversations && generations && (page > 1 || hasNext) ? (
+        <nav
+          aria-label="历史分页"
+          className="mt-6 flex items-center justify-center gap-4"
+        >
+          {page > 1 ? (
+            <Link
+              href={pageHref(page - 1)}
+              className="tool-button h-10 px-3 text-sm"
+            >
+              <ChevronLeft size={16} /> 上一页
+            </Link>
+          ) : null}
+          <span className="text-sm text-text-muted">第 {page} 页</span>
+          {hasNext ? (
+            <Link
+              href={pageHref(page + 1)}
+              className="tool-button h-10 px-3 text-sm"
+            >
+              下一页 <ChevronRight size={16} />
+            </Link>
+          ) : null}
+        </nav>
+      ) : null}
+    </StudioPageShell>
   );
 }

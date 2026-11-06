@@ -7,11 +7,13 @@
 
 /* ── 滚动容器 ── */
 .timeline {
-  flex: 1;
+  height: 100%;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  padding-bottom: 1rem;
   scroll-snap-type: y proximity;
+  scroll-padding-bottom: 1rem;
   scrollbar-width: thin;
   scrollbar-color: rgb(var(--border)) transparent;
   overscroll-behavior-y: none;
@@ -30,8 +32,12 @@
   display: flex;
   align-items: stretch;
   border-bottom: 1px solid rgb(var(--border));
-  /* 填满视口让长内容独占屏幕，proximity snap 生效 */
-  min-height: calc(100dvh - 52px - 96px);
+  /* 每个长轮次只占一个聊天视口，回复内容在页内横向分页。 */
+  flex: 0 0 100%;
+  height: 100%;
+  min-height: 0;
+  max-height: 100%;
+  overflow: hidden;
   scroll-snap-align: start;
   scroll-snap-stop: normal;
   animation: rowIn 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -42,7 +48,10 @@
 
 /* 短内容不强制拉高 */
 .turnShort {
+  flex: 0 0 auto;
+  height: auto;
   min-height: 0;
+  max-height: none;
 }
 
 @keyframes rowIn {
@@ -73,13 +82,15 @@
 /* ── 用户侧 ── */
 .userCol {
   flex: 0 0 256px;
+  height: 100%;
   padding: 24px 18px;
   border-right: 1px solid rgb(var(--border));
   background: rgb(var(--bg));
   position: sticky;
   top: 0;
-  align-self: flex-start;
-  max-height: calc(100dvh - 52px - 96px);
+  align-self: stretch;
+  min-height: 0;
+  max-height: 100%;
   overflow: hidden;
 }
 .userLabel {
@@ -102,8 +113,12 @@
 .asstCol {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   padding: 24px 26px 22px;
   background: rgb(var(--surface));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 .asstId {
   display: flex;
@@ -147,20 +162,85 @@
   flex-wrap: wrap;
 }
 
-/* ── 双栏文字容器 ── */
-.twoColWrap {
-  columns: 2;
-  column-gap: 24px;
-  column-rule: 1px solid rgb(var(--border));
+/* ── 长回答：固定页高，后续内容流入横向新页 ── */
+.pagerRoot {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
-.twoColWrap > :global(*) {
+.measureContent {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 100%;
+  overflow: hidden;
+}
+.pagedContent {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 100%;
+  column-count: 1;
+  column-gap: 24px;
+  column-fill: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--border-strong)) transparent;
+  -webkit-overflow-scrolling: touch;
+}
+.pagedContent > :global(*) {
+  break-inside: auto;
+}
+.pagedContent :global(h1, h2, h3, h4, h5, h6, blockquote) {
   break-inside: avoid;
 }
-/* 代码块、表格跨两栏 */
-.twoColWrap :global(.codeBlock),
-.twoColWrap :global(.artifact),
-.twoColWrap :global(.tableScroll) {
-  column-span: all;
+.pagedContent :global(.codeBlock),
+.pagedContent :global(.artifact) {
+  break-inside: avoid;
+}
+.pagedContent :global(.tableScroll) {
+  overflow: visible;
+  break-inside: auto;
+  border-right: 0;
+  border-left: 0;
+  border-radius: 0;
+}
+.pagedContent :global(.tableScroll table) {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+}
+.pagedContent :global(.tableScroll tr) {
+  break-inside: avoid;
+}
+.pagedContent :global(.tableScroll th),
+.pagedContent :global(.tableScroll td) {
+  min-width: 0;
+  max-width: none;
+}
+.pagerControls {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-top: 8px;
+}
+.pagerHint {
+  margin-right: auto;
+  color: rgb(var(--text-faint));
+  font-size: 11px;
+}
+.pageIndicator {
+  margin-right: 4px;
+  color: rgb(var(--text-muted));
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 /* ── 回到底部按钮定位 ── */

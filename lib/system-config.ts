@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-
 import type { Prisma } from "@prisma/client";
 
 import { db } from "@/lib/db";
@@ -9,6 +7,13 @@ import {
   IMAGE_ASPECT_RATIO_OPTIONS,
   IMAGE_RESOLUTION_OPTIONS,
 } from "@/lib/models/options";
+
+// 公告功能已迁移至独立 Announcement 表（见 lib/announcements.ts），
+// 以下两个类型仅为兼容旧版 ConfigEditor 保留。
+export type {
+  AnnouncementDisplayMode,
+  AnnouncementTone,
+} from "@/lib/announcements";
 
 export const DEFAULT_BLOCKED_KEYWORDS = [
   "blood and gore",
@@ -53,37 +58,17 @@ export const SYSTEM_CONFIG_DEFAULTS = {
     enabled: true,
     blockedKeywords: [...DEFAULT_BLOCKED_KEYWORDS] as string[],
   },
-  announcement: {
-    enabled: false,
-    title: "",
-    body: "",
-    tone: "info",
-    displayMode: "banner",
-  },
 } as const;
 
 export type SystemConfig = typeof SYSTEM_CONFIG_DEFAULTS;
 
-export type AnnouncementTone = "info" | "warning" | "success" | "danger";
-export type AnnouncementDisplayMode = "banner" | "popup" | "both";
-
-export type PublicAnnouncement = {
-  id: string;
-  title: string;
-  body: string;
-  tone: AnnouncementTone;
-  displayMode: AnnouncementDisplayMode;
-};
-
 export function getPublicConfig(): {
   inviteOnly: boolean;
   version: string;
-  announcement: PublicAnnouncement | null;
 } {
   return {
     inviteOnly: SYSTEM_CONFIG_DEFAULTS.registration.inviteOnly,
     version: "v3.1-mvp",
-    announcement: null,
   };
 }
 
@@ -102,11 +87,6 @@ export const SYSTEM_CONFIG_DEFAULT_ROWS = {
   "generation.image2MaxN": 4,
   "moderation.enabled": true,
   "moderation.blockedKeywords": [...DEFAULT_BLOCKED_KEYWORDS] as string[],
-  "announcement.enabled": false,
-  "announcement.title": "",
-  "announcement.body": "",
-  "announcement.tone": "info" as AnnouncementTone,
-  "announcement.displayMode": "banner" as AnnouncementDisplayMode,
 } as const;
 
 export type SystemConfigKey = keyof typeof SYSTEM_CONFIG_DEFAULT_ROWS;
@@ -237,68 +217,14 @@ export async function setSystemConfigValue(
   configCache = null;
 }
 
-function toBoolean(value: unknown): boolean {
-  return value === true;
-}
-
-function toStringValue(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function toAnnouncementTone(value: unknown): AnnouncementTone {
-  return value === "warning" ||
-    value === "success" ||
-    value === "danger" ||
-    value === "info"
-    ? value
-    : "info";
-}
-
-function toAnnouncementDisplayMode(value: unknown): AnnouncementDisplayMode {
-  return value === "popup" || value === "both" || value === "banner"
-    ? value
-    : "banner";
-}
-
-function publicAnnouncementFromValues(
-  values: Record<SystemConfigKey, unknown>,
-): PublicAnnouncement | null {
-  const enabled = toBoolean(values["announcement.enabled"]);
-  const title = toStringValue(values["announcement.title"]);
-  const body = toStringValue(values["announcement.body"]);
-  const tone = toAnnouncementTone(values["announcement.tone"]);
-  const displayMode = toAnnouncementDisplayMode(
-    values["announcement.displayMode"],
-  );
-
-  if (!enabled || !body) {
-    return null;
-  }
-
-  const hash = createHash("sha256")
-    .update(JSON.stringify({ title, body, tone, displayMode }))
-    .digest("hex")
-    .slice(0, 16);
-
-  return {
-    id: hash,
-    title,
-    body,
-    tone,
-    displayMode,
-  };
-}
-
 export async function getPublicRuntimeConfig(): Promise<{
   inviteOnly: boolean;
   version: string;
-  announcement: PublicAnnouncement | null;
 }> {
   const values = await loadConfigRows({ strict: true });
 
   return {
     inviteOnly: values["registration.inviteOnly"] as boolean,
     version: "v3.1-mvp",
-    announcement: publicAnnouncementFromValues(values),
   };
 }

@@ -14,13 +14,18 @@ import {
 import { db } from "@/lib/db";
 import { getImage2ChannelDisplayNameMap } from "@/lib/provider-channel-config";
 import { isDatabaseUnavailableError } from "@/lib/service-errors";
+import {
+  assertChatConversationIdle,
+  clearChatConversationContent,
+  ChatTurnError,
+} from "@/lib/chat-turns";
 
 const appendMessagesSchema = z.object({
   messages: z
     .array(
       z.object({
         role: z.enum(["user", "assistant"]),
-        content: z.string().trim().min(1).max(4000),
+        content: z.string().trim().min(1).max(128_000),
         generationId: z.string().optional(),
       }),
     )
@@ -67,6 +72,17 @@ export async function POST(
       details: parsed.error.flatten(),
     });
   }
+
+  if (
+    parsed.data.messages.some(
+      (message) => message.role === "assistant" && !message.generationId,
+    )
+  )
+    return fail(
+      "CLIENT_UPGRADE_REQUIRED",
+      "对话回复现由服务器保存，请刷新页面后继续",
+      { status: 426 },
+    );
 
   try {
     const session = authenticatedUser(sessionResult);
@@ -116,6 +132,7 @@ export async function POST(
     }
 
     await db.$transaction(async (tx) => {
+      await assertChatConversationIdle(tx, id, session.id);
       for (const message of parsed.data.messages) {
         await tx.conversationMessage.create({
           data: {
@@ -131,6 +148,7 @@ export async function POST(
         where: { id },
         data: {
           lastMessageAt: new Date(),
+          contextRevision: { increment: 1 },
         },
       });
     });
@@ -147,6 +165,8 @@ export async function POST(
 
     return ok(serializeConversation(updated, { displayNameMap }));
   } catch (error) {
+    if (error instanceof ChatTurnError)
+      return fail(error.code, error.message, { status: error.status });
     if (isDatabaseUnavailableError(error)) {
       return conversationsUnavailable();
     }
@@ -192,23 +212,16 @@ export async function DELETE(
       return fail("NOT_FOUND", "对话不存在", { status: 404 });
     }
 
-    const deleted = await db.conversationMessage.deleteMany({
-      where: {
-        conversationId: id,
-      },
-    });
-
-    await db.conversation.update({
-      where: { id },
-      data: {
-        lastMessageAt: new Date(),
-      },
+    const deleted = await db.$transaction(async (tx) => {
+      return clearChatConversationContent(tx, id, session.id);
     });
 
     return ok({
       deleted: deleted.count,
     });
   } catch (error) {
+    if (error instanceof ChatTurnError)
+      return fail(error.code, error.message, { status: error.status });
     if (isDatabaseUnavailableError(error)) {
       return conversationsUnavailable();
     }

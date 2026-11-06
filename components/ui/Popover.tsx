@@ -1,47 +1,32 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import * as RadixPopover from "@radix-ui/react-popover";
 
 import { cn } from "@/lib/utils";
 
-interface PopoverProps {
-  trigger: React.ReactNode;
-  children: React.ReactNode;
-  className?: string;
-}
+export const Popover = RadixPopover.Root;
+export const PopoverTrigger = RadixPopover.Trigger;
+export const PopoverClose = RadixPopover.Close;
 
-export function Popover({
-  trigger,
-  children,
+export function PopoverContent({
   className,
-}: PopoverProps): React.ReactElement {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function onPointerDown(event: PointerEvent) {
-      if (!ref.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-
-    document.addEventListener("pointerdown", onPointerDown);
-    return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, []);
-
+  align = "center",
+  sideOffset = 6,
+  ...props
+}: React.ComponentPropsWithoutRef<
+  typeof RadixPopover.Content
+>): React.ReactElement {
   return (
-    <div ref={ref} className="relative inline-flex">
-      <span onClick={() => setOpen((value) => !value)}>{trigger}</span>
-      {open ? (
-        <div
-          className={cn(
-            "absolute right-0 top-[calc(100%+6px)] z-50 min-w-48 rounded-md border border-border bg-surface p-2 shadow-[var(--shadow-md)]",
-            className,
-          )}
-        >
-          {children}
-        </div>
-      ) : null}
-    </div>
+    <RadixPopover.Portal>
+      <RadixPopover.Content
+        align={align}
+        sideOffset={sideOffset}
+        className={cn(
+          "z-[70] w-72 rounded-md border border-border bg-surface p-3 text-foreground shadow-[var(--shadow-md)] outline-none",
+          className,
+        )}
+        {...props}
+      />
+    </RadixPopover.Portal>
   );
 }

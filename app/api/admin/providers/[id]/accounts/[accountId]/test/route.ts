@@ -1,4 +1,5 @@
 import { fail, ok } from "@/lib/api-response";
+import { userActionRateLimitResponse } from "@/lib/api-rate-limit";
 import { audit } from "@/lib/audit";
 import {
   adminFailureResponse,
@@ -11,20 +12,6 @@ import { modelsByProtocol } from "@/lib/models/registry";
 import { buildAdapter } from "@/lib/providers/factory";
 import { providerProtocolToModelProtocol } from "@/lib/providers/protocols";
 import { serializeProviderError } from "@/lib/providers/diagnostics";
-
-function image2ModeForSupportedModel(
-  modelId: string,
-): "standard" | "high" | undefined {
-  if (modelId === "gpt-image-2-high") {
-    return "high";
-  }
-
-  if (modelId === "gpt-image-2-standard") {
-    return "standard";
-  }
-
-  return undefined;
-}
 
 export async function POST(
   request: Request,
@@ -41,6 +28,15 @@ export async function POST(
   if (!process.env.DATABASE_URL) {
     return fail("SERVICE_UNAVAILABLE", "号池服务未配置数据库", { status: 503 });
   }
+
+  const admin = authenticatedUser(sessionResult);
+  const rateLimitFailure = await userActionRateLimitResponse(
+    admin.id,
+    "admin-provider-account-test",
+    process.env.RATE_LIMIT_ADMIN_TEST_PER_MIN,
+    5,
+  );
+  if (rateLimitFailure) return rateLimitFailure;
 
   const account = await db.providerAccount.findFirst({
     where: { id: accountId, providerId: id },
@@ -77,20 +73,17 @@ export async function POST(
   });
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 60_000);
-  const admin = authenticatedUser(sessionResult);
-
   try {
     await adapter.generate(
       {
         modelId: model.id,
         protocol: model.protocol,
         prompt: "health check",
-        aspectRatio: model.defaults.aspectRatio,
-        resolution: model.defaults.resolution,
-        image2Mode:
-          account.provider.modelsSupported
-            .map(image2ModeForSupportedModel)
-            .find(Boolean) ?? model.defaults.image2Mode,
+        size: model.defaults.size,
+        quality: "auto",
+        responseFormat: model.defaults.responseFormat,
+        aspectRatio: "1:1",
+        resolution: "1K",
         n: 1,
         outputFormat: model.defaults.outputFormat,
         background: model.defaults.background,

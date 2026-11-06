@@ -61,6 +61,7 @@ export async function GET(request: Request) {
         credits: true,
         dailyGenLimit: true,
         concurrentLimit: true,
+        materialInboxBeta: true,
       },
     });
 
@@ -134,6 +135,7 @@ export async function PATCH(request: Request) {
         credits: true,
         dailyGenLimit: true,
         concurrentLimit: true,
+        materialInboxBeta: true,
       },
     });
     const dailyUsed = await dailyUsedForUser(user.id);

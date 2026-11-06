@@ -1,16 +1,14 @@
-import { WorkbenchShellV2 } from "@/components/workbench/WorkbenchShellV2";
+import { NodesApp } from "@/components/studio/nodes/NodesApp";
+import { CanvasEntry } from "@/components/studio/comfyart/CanvasEntry";
+import "tldraw/tldraw.css";
+import "@/components/studio/comfyart/canvas.css";
 
-export default async function CanvasPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ conversation?: string }>;
-}) {
-  const params = await searchParams;
+export const dynamic = "force-dynamic";
 
-  return (
-    <WorkbenchShellV2
-      initialConversationId={params.conversation ?? null}
-      initialMode="canvas"
-    />
-  );
+export default function CanvasPage() {
+  const licenseKey =
+    process.env.TLDRAW_LICENSE_KEY ||
+    process.env.NEXT_PUBLIC_TLDRAW_LICENSE_KEY;
+  if (process.env.NODE_ENV === "production" && !licenseKey) return <NodesApp />;
+  return <CanvasEntry licenseKey={licenseKey} />;
 }

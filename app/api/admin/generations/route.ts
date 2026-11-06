@@ -11,6 +11,14 @@ function msBetween(start: Date | null, end: Date | null) {
   return (end ?? new Date()).getTime() - start.getTime();
 }
 
+function dateBoundary(value: string | null, nextDay = false) {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
+  const date = new Date(`${value}T00:00:00+08:00`);
+  if (Number.isNaN(date.getTime())) return undefined;
+  if (nextDay) date.setUTCDate(date.getUTCDate() + 1);
+  return date;
+}
+
 export async function GET(request: Request) {
   const sessionResult = await checkSession(request);
   const failure = adminFailureResponse(sessionResult);
@@ -36,6 +44,8 @@ export async function GET(request: Request) {
     const providerAccountId = searchParams.get("providerAccountId")?.trim();
     const errorCode = searchParams.get("errorCode")?.trim();
     const activeOnly = searchParams.get("active") === "true";
+    const from = dateBoundary(searchParams.get("from"));
+    const to = dateBoundary(searchParams.get("to"), true);
     const limit = Math.min(
       Math.max(Number(searchParams.get("limit") ?? 100), 1),
       200,
@@ -52,6 +62,14 @@ export async function GET(request: Request) {
         ...(providerId ? { providerId } : {}),
         ...(providerAccountId ? { providerAccountId } : {}),
         ...(errorCode ? { errorCode } : {}),
+        ...(from || to
+          ? {
+              createdAt: {
+                ...(from ? { gte: from } : {}),
+                ...(to ? { lt: to } : {}),
+              },
+            }
+          : {}),
         ...(q
           ? {
               OR: [
@@ -105,6 +123,7 @@ export async function GET(request: Request) {
         modelId: generation.modelId,
         prompt: generation.prompt,
         status: generation.status,
+        progress: generation.progress,
         provider: generation.provider,
         providerId: generation.providerId,
         providerAccount: generation.providerAccount,
@@ -125,6 +144,16 @@ export async function GET(request: Request) {
         n: generation.n,
         outputFormat: generation.outputFormat,
         imageCount: generation.images.length,
+        images: generation.images.map((image) => ({
+          id: image.id,
+          width: image.width,
+          height: image.height,
+          sizeBytes: image.sizeBytes,
+          mimeType: image.mimeType,
+          createdAt: image.createdAt,
+          thumbnailUrl: `/api/generations/${generation.id}/images/${image.id}?variant=thumb`,
+          originalUrl: `/api/generations/${generation.id}/images/${image.id}`,
+        })),
         isStuck:
           (generation.status === "PENDING" &&
             Date.now() - generation.createdAt.getTime() > 10 * 60_000) ||

@@ -1,0 +1,227 @@
+.markdown {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  font-size: 15px;
+  line-height: 1.8;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.markdown :where(p, ul, ol, dl, blockquote) {
+  margin: 0.8em 0;
+  font-size: inherit;
+  line-height: inherit;
+  letter-spacing: 0;
+}
+
+.markdown :where(h1, h2, h3, h4, h5, h6) {
+  margin: 1.25em 0 0.5em;
+  font-family: inherit;
+  font-weight: 600;
+  line-height: 1.45;
+  letter-spacing: 0;
+}
+
+.markdown h1 {
+  font-size: 1.4em;
+}
+.markdown h2 {
+  font-size: 1.25em;
+}
+.markdown h3 {
+  font-size: 1.1em;
+}
+.markdown :where(h4, h5, h6) {
+  font-size: 1em;
+}
+.markdown > :first-child {
+  margin-top: 0;
+}
+.markdown > :last-child {
+  margin-bottom: 0;
+}
+.markdown ul {
+  list-style: disc;
+  padding-left: 1.5em;
+}
+.markdown ol {
+  list-style: decimal;
+  padding-left: 1.5em;
+}
+.markdown li {
+  padding-left: 0.15em;
+}
+.markdown li > :where(ul, ol, p) {
+  margin: 0.25em 0;
+}
+.markdown li + li {
+  margin-top: 0.25em;
+}
+.markdown :global(.task-list-item) {
+  list-style: none;
+}
+.markdown input[type="checkbox"] {
+  margin: 0 0.45em 0 -1.15em;
+  accent-color: rgb(var(--brand-primary));
+}
+.markdown blockquote {
+  border-left: 3px solid rgb(var(--border-strong));
+  padding: 0 0 0 1em;
+  font-family: inherit;
+  font-style: normal;
+  color: rgb(var(--text-muted));
+}
+.markdown blockquote > :first-child {
+  margin-top: 0;
+}
+.markdown blockquote > :last-child {
+  margin-bottom: 0;
+}
+.markdown a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.markdown hr {
+  margin: 1.4em 0;
+  border-top: 1px solid rgb(var(--border));
+}
+.markdown img {
+  display: block;
+  max-width: 100%;
+  max-height: 28rem;
+  height: auto;
+  object-fit: contain;
+  border-radius: 6px;
+}
+.markdown :where(p, li, td, th) > code {
+  padding: 0.12em 0.35em;
+  border: 1px solid rgb(var(--border));
+  border-radius: 4px;
+  background: rgb(var(--surface-2));
+  font-size: 0.88em;
+  letter-spacing: 0;
+  white-space: break-spaces;
+}
+
+.tableScroll {
+  max-width: 100%;
+  margin: 1em 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  border: 1px solid rgb(var(--border));
+  border-radius: 6px;
+}
+.tableScroll table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  line-height: 1.65;
+}
+.tableScroll :where(th, td) {
+  min-width: 6rem;
+  max-width: 24rem;
+  padding: 0.6em 0.9em;
+  border-bottom: 1px solid rgb(var(--border));
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+.tableScroll th {
+  background: rgb(var(--surface-2));
+  font-weight: 600;
+}
+.tableScroll tbody tr:last-child td {
+  border-bottom: 0;
+}
+.imageLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  max-width: 100%;
+}
+.imageLink svg {
+  flex-shrink: 0;
+}
+
+.codeBlock,
+.artifact {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  margin: 1em 0;
+  overflow: hidden;
+  border: 1px solid rgb(var(--border));
+  border-radius: 6px;
+  background: rgb(var(--surface));
+}
+.toolbar {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+  min-height: 48px;
+  padding: 2px 6px;
+  border-bottom: 1px solid rgb(var(--border));
+  background: rgb(var(--surface-2));
+}
+.language {
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgb(var(--text-muted));
+}
+.source {
+  max-width: 100%;
+  max-height: 20rem;
+  margin: 0;
+  padding: 14px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: 13px;
+  line-height: 1.7;
+  letter-spacing: 0;
+  white-space: pre;
+  overflow-wrap: normal;
+  word-break: normal;
+  tab-size: 2;
+}
+.source code {
+  display: block;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: inherit;
+  line-height: inherit;
+  letter-spacing: 0;
+}
+.preview {
+  height: min(24rem, 42dvh);
+  min-height: 12rem;
+  max-height: 65dvh;
+  background: white;
+  color: black;
+}
+.frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+@media (min-width: 640px) {
+  .toolbar {
+    min-height: 40px;
+    padding-inline: 8px;
+  }
+}

@@ -4,7 +4,7 @@ import type { Prisma } from "@prisma/client";
 
 import { db } from "@/lib/db";
 import { getClientIp } from "@/lib/network";
-import { getRedis } from "@/lib/redis";
+import { getRateLimitRedis } from "@/lib/redis";
 
 export class ConcurrentLimitError extends Error {
   constructor(message = "并发生成任务已达上限") {
@@ -37,10 +37,25 @@ export class LoginRateLimitError extends Error {
   }
 }
 
+export class RegisterRateLimitError extends Error {
+  constructor(
+    readonly retryAfterSeconds: number,
+    message = "注册过于频繁，请稍后再试",
+  ) {
+    super(message);
+    this.name = "RegisterRateLimitError";
+  }
+}
+
 const localRateLimitStore = new Map<
   string,
   { count: number; expiresAt: number }
 >();
+
+type GenerationLimitClient = Pick<
+  Prisma.TransactionClient,
+  "generation" | "user"
+>;
 
 function loginLimitPerMinute(): number {
   const configured = Number(process.env.RATE_LIMIT_LOGIN_PER_MIN ?? 5);
@@ -64,7 +79,7 @@ function localIncrement(key: string, windowSeconds: number) {
 
 async function incrementRateLimit(key: string, windowSeconds: number) {
   try {
-    const redis = getRedis();
+    const redis = getRateLimitRedis();
 
     if (redis.status === "wait") {
       await redis.connect();
@@ -121,12 +136,60 @@ export async function assertLoginAllowed(
   }
 }
 
-export async function assertGenerationAllowed(userId: string): Promise<void> {
-  if (!process.env.DATABASE_URL) {
+function registerLimitPerHour(): number {
+  const configured = Number(process.env.RATE_LIMIT_REGISTER_PER_HOUR ?? 10);
+  return Number.isFinite(configured) && configured > 0 ? configured : 10;
+}
+
+export async function assertRegisterAllowed(headers: Headers): Promise<void> {
+  const limit = registerLimitPerHour();
+
+  if (limit <= 0) {
     return;
   }
 
-  const user = await db.user.findUnique({
+  const identifier = createHash("sha256")
+    .update((getClientIp(headers) ?? "unknown").toLowerCase())
+    .digest("hex");
+  const windowSeconds = 3600;
+  const { count, retryAfterSeconds } = await incrementRateLimit(
+    `ratelimit:register:${identifier}`,
+    windowSeconds,
+  );
+
+  if (count > limit) {
+    throw new RegisterRateLimitError(retryAfterSeconds);
+  }
+}
+
+export async function checkUserActionRateLimit(
+  userId: string,
+  action: string,
+  limitPerMinute: number,
+): Promise<{ allowed: boolean; retryAfterSeconds: number }> {
+  if (!Number.isFinite(limitPerMinute) || limitPerMinute <= 0) {
+    return { allowed: true, retryAfterSeconds: 0 };
+  }
+
+  const identifier = createHash("sha256")
+    .update(`${userId}|${action}`)
+    .digest("hex");
+  const { count, retryAfterSeconds } = await incrementRateLimit(
+    `ratelimit:user-action:${identifier}`,
+    60,
+  );
+
+  return {
+    allowed: count <= limitPerMinute,
+    retryAfterSeconds,
+  };
+}
+
+export async function assertGenerationAllowedForClient(
+  client: GenerationLimitClient,
+  userId: string,
+): Promise<void> {
+  const user = await client.user.findUnique({
     where: { id: userId },
     select: {
       dailyGenLimit: true,
@@ -138,7 +201,7 @@ export async function assertGenerationAllowed(userId: string): Promise<void> {
     return;
   }
 
-  const runningCount = await db.generation.count({
+  const runningCount = await client.generation.count({
     where: {
       userId,
       status: { in: ["PENDING", "RUNNING"] },
@@ -152,7 +215,7 @@ export async function assertGenerationAllowed(userId: string): Promise<void> {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const dailyCount = await db.generation.count({
+  const dailyCount = await client.generation.count({
     where: {
       userId,
       createdAt: { gte: today },
@@ -163,6 +226,14 @@ export async function assertGenerationAllowed(userId: string): Promise<void> {
   if (dailyCount >= user.dailyGenLimit) {
     throw new DailyLimitError();
   }
+}
+
+export async function assertGenerationAllowed(userId: string): Promise<void> {
+  if (!process.env.DATABASE_URL) {
+    return;
+  }
+
+  await assertGenerationAllowedForClient(db, userId);
 }
 
 export async function assertModerationRejectionAllowed(

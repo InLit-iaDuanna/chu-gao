@@ -203,9 +203,13 @@
   }
 
   /* ============================================================
-     Studio 工作区——暖米白主题（v8 设计语言）
+     Studio 工作区——暖米白主题（v8 设计语言 / 浅色基线）
      用 :where() 降低特异性，避免被 html.dark / html.light 覆盖。
      需要比 html.dark(0,1,0) 更高的特异性，所以直接用 .studio-workspace。
+     注意：本块位于 @layer base，深色模式的表面色、墨色、强调与语义色
+     （--text/--icon/--control-*/--brand-primary/--success 等）由
+     styles/studio.css 的 @layer components 覆盖；
+     新增令牌时请两处同步，否则深色模式会继承这里的深墨导致黑字黑底。
      ============================================================ */
   html .studio-workspace,
   html.dark .studio-workspace,
@@ -222,8 +226,9 @@
 
     /* 文字 */
     --text:       26 25 22;      /* #1a1916 深墨 */
-    --text-muted: 154 152 144;   /* #9a9890 辅助灰 */
-    --text-faint: 190 188 182;   /* #bebcb6 极浅提示 */
+    /* Keep secondary copy readable on the warm surface (#f5f3ef). */
+    --text-muted: 100 98 91;     /* #64625b 辅助灰 */
+    --text-faint: 112 110 103;   /* #706e67 弱提示 */
     --foreground: var(--text);
 
     /* 控件 */
@@ -239,8 +244,8 @@
 
     /* 图标 */
     --icon:          26 25 22;
-    --icon-muted:    154 152 144;
-    --icon-disabled: 190 188 182;
+    --icon-muted:    100 98 91;
+    --icon-disabled: 160 158 151;
     --icon-selected: 249 247 244;
 
     /* 品牌 / 强调（初稿绿） */

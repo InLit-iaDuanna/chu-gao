@@ -1,6 +1,11 @@
 import { z } from "zod";
 
+import {
+  getConversationCompileSystemPrompt,
+  getConversationConfig,
+} from "@/lib/ai-config";
 import { fail, ok } from "@/lib/api-response";
+import { userActionRateLimitResponse } from "@/lib/api-rate-limit";
 import { readJsonBodySafe } from "@/lib/request-body";
 import { checkSession } from "@/lib/auth";
 import {
@@ -9,6 +14,7 @@ import {
   type CompiledConversationPrompt,
   type ConversationMessage,
 } from "@/lib/conversation";
+import { isDeepSeekConfigured, optimizeImagePrompt } from "@/lib/deepseek";
 import { fetchWithTimeout } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { getConfiguredModel } from "@/lib/models/runtime-config";
@@ -36,63 +42,52 @@ const compileSchema = z.object({
     .optional(),
 });
 
-function extractOutputText(payload: unknown): string {
+// 提取 OpenAI 兼容 chat/completions 的助手文本内容。
+function extractChatContent(payload: unknown): string {
   if (typeof payload !== "object" || payload === null) {
     return "";
   }
 
-  const maybeOutputText = (payload as { output_text?: unknown }).output_text;
+  const choices = (payload as { choices?: unknown }).choices;
 
-  if (typeof maybeOutputText === "string") {
-    return maybeOutputText;
-  }
-
-  const output = (payload as { output?: unknown }).output;
-
-  if (!Array.isArray(output)) {
+  if (!Array.isArray(choices) || choices.length === 0) {
     return "";
   }
 
-  return output
-    .flatMap((item) => {
-      if (typeof item !== "object" || item === null) {
-        return [];
-      }
+  const message = (choices[0] as { message?: { content?: unknown } }).message;
+  const content = message?.content;
 
-      const content = (item as { content?: unknown }).content;
-
-      if (!Array.isArray(content)) {
-        return [];
-      }
-
-      return content.flatMap((part) => {
-        if (typeof part !== "object" || part === null) {
-          return [];
-        }
-
-        const text = (part as { text?: unknown }).text;
-
-        return typeof text === "string" ? [text] : [];
-      });
-    })
-    .join("\n");
+  return typeof content === "string" ? content : "";
 }
 
 function parseJsonObject(text: string): unknown {
   try {
     return JSON.parse(text);
   } catch {
-    const match = text.match(/\{[\s\S]*\}/);
+    // 容错：剥离 ```json ``` 代码块后再尝试，最后退而求其次截取第一个 {...}。
+    const fenced = text
+      .replace(/```json\s*/gi, "")
+      .replace(/```/g, "")
+      .trim();
 
-    if (!match) {
-      throw new Error("compiler returned non-json response");
+    try {
+      return JSON.parse(fenced);
+    } catch {
+      const match = fenced.match(/\{[\s\S]*\}/);
+
+      if (!match) {
+        throw new Error("compiler returned non-json response");
+      }
+
+      return JSON.parse(match[0]);
     }
-
-    return JSON.parse(match[0]);
   }
 }
 
-function toCompiledPrompt(value: unknown): CompiledConversationPrompt {
+function toCompiledPrompt(
+  value: unknown,
+  compiler: string,
+): CompiledConversationPrompt {
   const parsed = z
     .object({
       prompt: z.string().min(1).max(4000),
@@ -100,8 +95,6 @@ function toCompiledPrompt(value: unknown): CompiledConversationPrompt {
       shouldGenerate: z.boolean().default(true),
     })
     .parse(value);
-
-  const compiler = process.env.CONVERSATION_COMPILER_MODEL ?? "gpt-5.5";
 
   return {
     ...parsed,
@@ -117,7 +110,9 @@ function compilerErrorMessage(error: unknown): string {
   return String(error).slice(0, 240);
 }
 
-async function compileWithGpt55({
+// 用「对话模型」（DeepSeek 兼容）把多轮对话编译成出图 prompt。
+// 系统提示词 = 后台「出图提示词编译指令」。未配置 / 出错时由上层回退本地拼接。
+async function compileWithConversationModel({
   messages,
   modelId,
   params,
@@ -125,16 +120,18 @@ async function compileWithGpt55({
   messages: ConversationMessage[];
   modelId: string;
   params?: Record<string, unknown>;
-}): Promise<CompiledConversationPrompt> {
-  const apiKey = process.env.OPENAI_API_KEY ?? process.env.IMAGE2_API_KEY;
+}): Promise<CompiledConversationPrompt | null> {
+  const config = await getConversationConfig();
+
+  // 未启用 / 无 key：返回 null，让上层走本地回退。
+  if (!config.enabled || !config.apiKey) {
+    return null;
+  }
+
   const trimmedMessages = trimConversationMessages(messages, {
     maxMessages: 40,
     maxContentLength: 1200,
   });
-
-  if (!apiKey) {
-    return compilePromptFallback(trimmedMessages, "OPENAI_API_KEY_MISSING");
-  }
 
   const model = await getConfiguredModel(modelId);
 
@@ -142,83 +139,67 @@ async function compileWithGpt55({
     throw new Error("UNKNOWN_MODEL");
   }
 
-  const response = await fetchWithTimeout(
-    `${process.env.OPENAI_BASE_URL ?? "https://api.openai.com"}/v1/responses`,
-    {
-      method: "POST",
-      timeoutMs: Number(process.env.CONVERSATION_COMPILER_TIMEOUT_MS ?? 20_000),
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: process.env.CONVERSATION_COMPILER_MODEL ?? "gpt-5.5",
-        reasoning: {
-          effort: process.env.CONVERSATION_COMPILER_REASONING ?? "low",
-        },
-        text: {
-          verbosity: "low",
-          format: {
-            type: "json_schema",
-            name: "compiled_image_prompt",
-            strict: true,
-            schema: {
-              type: "object",
-              additionalProperties: false,
-              required: ["prompt", "assistantMessage", "shouldGenerate"],
-              properties: {
-                prompt: {
-                  type: "string",
-                  minLength: 1,
-                  maxLength: 4000,
-                },
-                assistantMessage: {
-                  type: "string",
-                  minLength: 1,
-                  maxLength: 400,
-                },
-                shouldGenerate: {
-                  type: "boolean",
-                },
-              },
-            },
-          },
-        },
-        input: [
-          {
-            role: "system",
-            content:
-              "你是 Chūgǎo Studio 的图像创作上下文编译器。根据多轮对话，把用户最新意图和历史上下文整理成一个可直接传给图像生成模型的中文 prompt。输出必须符合 JSON schema。",
-          },
-          {
-            role: "user",
-            content: JSON.stringify({
-              outputSchema: {
-                prompt: "最终出图 prompt，必须完整、自包含，不超过 4000 字",
-                assistantMessage: "给用户看的短回复，不超过 80 字",
-                shouldGenerate:
-                  "如果信息足够生成则 true；如果需要先追问则 false",
-              },
-              targetModel: model,
-              currentParams: params,
-              messages: trimmedMessages,
-            }),
-          },
-        ],
-      }),
+  const systemPrompt = await getConversationCompileSystemPrompt();
+  const url = `${config.baseUrl.replace(/\/+$/, "")}/v1/chat/completions`;
+
+  const userPayload = JSON.stringify({
+    outputSchema: {
+      prompt: "最终出图 prompt，必须完整、自包含，不超过 4000 字",
+      assistantMessage: "给用户看的短回复，不超过 80 字",
+      shouldGenerate: "信息足够生成则 true；需要先追问则 false",
     },
-  );
+    targetModel: { id: model.id, displayName: model.displayName },
+    currentParams: params,
+    messages: trimmedMessages.map((message) => ({
+      role: message.role,
+      content: message.content,
+    })),
+  });
+
+  const response = await fetchWithTimeout(url, {
+    method: "POST",
+    timeoutMs: Number(process.env.CONVERSATION_COMPILER_TIMEOUT_MS ?? 20_000),
+    headers: {
+      Authorization: `Bearer ${config.apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: config.model,
+      temperature: 0.6,
+      max_tokens: 1200,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPayload },
+      ],
+    }),
+  });
 
   if (!response.ok) {
     throw new Error(
-      `compiler error: ${response.status} ${await response.text()}`,
+      `compiler error: ${response.status} ${(await response.text()).slice(0, 240)}`,
     );
   }
 
   const payload = await response.json();
-  const text = extractOutputText(payload);
+  const text = extractChatContent(payload);
 
-  return toCompiledPrompt(parseJsonObject(text));
+  if (!text.trim()) {
+    throw new Error("compiler returned empty content");
+  }
+
+  return toCompiledPrompt(parseJsonObject(text), config.model);
+}
+
+// 把对话渲染成一段可供 DeepSeek 优化的文本。
+function renderConversation(messages: ConversationMessage[]): string {
+  return messages
+    .filter((message) => message.content.trim())
+    .map(
+      (message) =>
+        `${message.role === "user" ? "用户" : "助手"}：${message.content.trim()}`,
+    )
+    .join("\n");
 }
 
 export async function POST(request: Request) {
@@ -231,6 +212,14 @@ export async function POST(request: Request) {
   if (sessionResult.status === "unauthenticated") {
     return fail("UNAUTHORIZED", "请先登录", { status: 401 });
   }
+
+  const rateLimitFailure = await userActionRateLimitResponse(
+    sessionResult.user.id,
+    "conversation-compile",
+    process.env.RATE_LIMIT_AI_TOOL_PER_MIN,
+    20,
+  );
+  if (rateLimitFailure) return rateLimitFailure;
 
   const body = await readJsonBodySafe(request);
 
@@ -258,13 +247,35 @@ export async function POST(request: Request) {
   });
 
   try {
-    return ok(
-      await compileWithGpt55({
-        ...parsed.data,
-        modelId: parsed.data.modelId,
-        messages,
-      }),
-    );
+    const compiled = await compileWithConversationModel({
+      modelId: parsed.data.modelId,
+      messages,
+      params: parsed.data.params,
+    });
+
+    // 1) 对话模型已配置 → 直接用其编译结果。
+    if (compiled) {
+      return ok(compiled);
+    }
+
+    // 2) 退而求其次：若配置了 DeepSeek，则用其把整段对话优化成出图 prompt。
+    if (await isDeepSeekConfigured()) {
+      const optimized = await optimizeImagePrompt({
+        fixedPrompt: "",
+        variablePrompt: renderConversation(messages),
+      });
+      if (optimized.trim()) {
+        return ok({
+          prompt: optimized.trim(),
+          assistantMessage: "已根据对话整理出图提示词。",
+          shouldGenerate: true,
+          compiler: "deepseek",
+        } satisfies CompiledConversationPrompt);
+      }
+    }
+
+    // 3) 都未配置 → 本地拼接回退（不算错误）。
+    return ok(compilePromptFallback(messages, "NO_COMPILER_MODEL_CONFIGURED"));
   } catch (error) {
     const fallbackReason = compilerErrorMessage(error);
 
@@ -272,7 +283,6 @@ export async function POST(request: Request) {
       {
         error: fallbackReason,
         modelId: parsed.data.modelId,
-        compiler: process.env.CONVERSATION_COMPILER_MODEL ?? "gpt-5.5",
       },
       "Conversation compiler failed; falling back to local prompt compilation.",
     );

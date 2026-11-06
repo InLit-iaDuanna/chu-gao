@@ -15,6 +15,9 @@
 
 # next.js
 /.next/
+/.next-dev/
+/.next-comfyart/
+/.next-comfyart-build/
 /out/
 
 # production
@@ -23,9 +26,14 @@
 # misc
 .DS_Store
 *.pem
+*.bak
+*.backup
+*.tmp
 .data/
 .playwright-cli/
 output/
+/downloads/ComfyArt/
+/public/comfyart-assets/
 
 # debug
 npm-debug.log*
@@ -43,3 +51,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Python research sidecar caches
+__pycache__/
+*.py[cod]
+.pytest_cache/

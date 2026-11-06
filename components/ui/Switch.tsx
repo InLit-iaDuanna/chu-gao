@@ -22,15 +22,18 @@ export function Switch({
     <button
       aria-checked={checked}
       className={cn(
-        "inline-flex shrink-0 items-center rounded-full border border-border bg-surface-2 p-0.5 transition-colors duration-[var(--duration-fast)] ease-out",
-        checked && "border-foreground bg-foreground",
+        "inline-flex shrink-0 items-center rounded-full border border-border bg-surface-2 p-0.5 transition-colors duration-[var(--duration-fast)] ease-out hover:border-border-strong",
+        checked && "border-foreground bg-foreground hover:border-foreground",
         size === "sm" ? "h-5 w-9" : "h-6 w-11",
         className,
       )}
       role="switch"
       type="button"
-      onClick={() => onChange(!checked)}
       {...props}
+      onClick={(event) => {
+        props.onClick?.(event);
+        if (!event.defaultPrevented && !props.disabled) onChange(!checked);
+      }}
     >
       <span
         className={cn(

@@ -98,6 +98,7 @@ export async function GET(
         credits: true,
         dailyGenLimit: true,
         concurrentLimit: true,
+        materialInboxBeta: true,
         bannedAt: true,
         bannedReason: true,
         createdAt: true,
@@ -184,7 +185,7 @@ export async function PATCH(
           parsed.data.bannedReason,
         );
 
-        return tx.user.update({
+        const updated = await tx.user.update({
           where: { id },
           data: {
             email: parsed.data.email,
@@ -193,6 +194,7 @@ export async function PATCH(
             status: nextStatus,
             dailyGenLimit: parsed.data.dailyGenLimit,
             concurrentLimit: parsed.data.concurrentLimit,
+            materialInboxBeta: parsed.data.materialInboxBeta,
             sessionVersion: invalidatesSession ? { increment: 1 } : undefined,
             bannedReason: parsed.data.bannedReason,
             bannedAt:
@@ -212,11 +214,18 @@ export async function PATCH(
             credits: true,
             dailyGenLimit: true,
             concurrentLimit: true,
+            materialInboxBeta: true,
             bannedAt: true,
             bannedReason: true,
             updatedAt: true,
           },
         });
+
+        if (invalidatesSession) {
+          await tx.deviceSession.deleteMany({ where: { userId: id } });
+        }
+
+        return updated;
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
@@ -284,7 +293,7 @@ export async function DELETE(
           status: "BANNED",
         });
 
-        return tx.user.update({
+        const updated = await tx.user.update({
           where: { id },
           data: {
             status: "BANNED",
@@ -299,6 +308,9 @@ export async function DELETE(
             bannedReason: true,
           },
         });
+
+        await tx.deviceSession.deleteMany({ where: { userId: id } });
+        return updated;
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );

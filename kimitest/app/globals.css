@@ -1,0 +1,786 @@
+@import "tailwindcss";
+@import "../styles/tokens.css";
+@import "../styles/typography.css";
+@import "../styles/admin-forms.css";
+
+/* Geist (sans/mono) + Fraunces (serif) via next/font in app/layout.tsx,
+   exposed as --font-geist-sans / --font-geist-mono / --font-fraunces. */
+
+/* Legacy 3px border utility kept for backwards compatibility. */
+@utility border-3 {
+  border-width: 3px;
+}
+
+@theme inline {
+  --color-background: rgb(var(--bg));
+  --color-foreground: rgb(var(--text));
+  --color-surface: rgb(var(--surface));
+  --color-surface-2: rgb(var(--surface-2));
+  --color-surface-3: rgb(var(--surface-3));
+  --color-ink: rgb(var(--ink));
+  --color-border: rgb(var(--ink) / 0.14);
+  --color-border-strong: rgb(var(--ink) / 0.3);
+  --color-text-muted: rgb(var(--text-muted));
+  --color-text-faint: rgb(var(--text-faint));
+  --color-accent: rgb(var(--accent));
+  --color-on-brand: rgb(var(--on-brand));
+  --color-brand: rgb(var(--brand-primary));
+  --color-brand-soft: rgb(var(--brand-primary-soft));
+  --color-aurora: rgb(var(--cyan));
+  --color-success: rgb(var(--success));
+  --color-danger: rgb(var(--danger));
+  --color-warning: rgb(var(--warning));
+  --color-info: rgb(var(--info));
+  --font-sans: var(--font-stack-sans);
+  --font-serif: var(--font-stack-serif);
+  --font-mono: var(--font-stack-mono);
+}
+
+* {
+  border-color: rgb(var(--ink) / 0.12);
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  background: rgb(var(--bg));
+  color: rgb(var(--text));
+  font-family: var(--font-stack-sans);
+  line-height: var(--lh-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings:
+    "ss01" on,
+    "cv11" on,
+    "tnum" on;
+  font-synthesis: none;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+::selection {
+  background: rgb(var(--brand-primary));
+  color: rgb(var(--on-brand));
+}
+
+:::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+:::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+:::-webkit-scrollbar-thumb {
+  background: rgb(var(--ink) / 0.16);
+  border-radius: var(--radius-pill);
+}
+
+:::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--ink) / 0.3);
+}
+
+::focus-visible {
+  outline: 2px solid rgb(var(--brand-primary));
+  outline-offset: 2px;
+}
+
+@layer base {
+  h1,
+  h2,
+  h3 {
+    letter-spacing: var(--ls-snug);
+  }
+
+  h1,
+  h2 {
+    letter-spacing: var(--ls-tight);
+    line-height: var(--lh-tight);
+  }
+}
+
+@layer components {
+  .page-shell {
+    @apply mx-auto w-full max-w-[1520px] px-3 sm:px-5 lg:px-6;
+  }
+
+  /* ── 纸面面板：实心、1px 发丝线、无模糊 ─────────────────────── */
+  .surface-panel {
+    background: rgb(var(--surface));
+    border: 1px solid rgb(var(--ink) / 0.12);
+    border-radius: var(--radius-lg);
+    transition:
+      background-color var(--duration-base) var(--ease-out),
+      border-color var(--duration-base) var(--ease-out),
+      transform var(--duration-base) var(--ease-out);
+  }
+
+  .surface-panel-soft {
+    background: rgb(var(--surface-2) / 0.55);
+    border: 1px solid rgb(var(--ink) / 0.1);
+    border-radius: var(--radius-md);
+    transition:
+      background-color var(--duration-base) var(--ease-out),
+      border-color var(--duration-base) var(--ease-out),
+      transform var(--duration-base) var(--ease-out);
+  }
+
+  /* ── 原玻璃拟态 → 实心纸面（类名契约保留） ───────────────────── */
+  .glass-panel {
+    position: relative;
+    background: rgb(var(--surface));
+    border: 1px solid rgb(var(--ink) / 0.14);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+  }
+
+  .glass-card {
+    background: rgb(var(--surface));
+    border: 1px solid rgb(var(--ink) / 0.12);
+    border-radius: var(--radius-lg);
+    transition:
+      border-color var(--duration-base) var(--ease-out),
+      transform var(--duration-base) var(--ease-out),
+      background-color var(--duration-base) var(--ease-out);
+  }
+
+  .glass-card:hover {
+    border-color: rgb(var(--ink) / 0.34);
+    transform: translateY(-2px);
+  }
+
+  /* 悬浮坞（输入框/工具条）：实心纸面 + 轻投影 */
+  .glass-dock {
+    background: rgb(var(--surface));
+    border: 1px solid rgb(var(--ink) / 0.16);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+  }
+
+  /* 发丝描边 */
+  .hairline {
+    border: 1px solid rgb(var(--ink) / 0.12);
+  }
+
+  .hairline-top {
+    border-top: 1px solid rgb(var(--ink) / 0.12);
+  }
+
+  .hairline-bottom {
+    border-bottom: 1px solid rgb(var(--ink) / 0.12);
+  }
+
+  /* ── glow 契约 → 归零（性能） ───────────────────────────────── */
+  .glow-brand,
+  .glow-brand-soft,
+  .glow-cyan {
+    box-shadow: none;
+  }
+
+  .text-glow-brand,
+  .text-glow-cyan {
+    text-shadow: none;
+  }
+
+  /* ── 极光契约 → 停用（性能），文字渐变 → 专色 ────────────────── */
+  .aurora-blob {
+    display: none;
+  }
+
+  .text-aurora {
+    color: rgb(var(--brand-primary));
+  }
+
+  /* 扫光 / 流光边框契约 → 停用 */
+  .card-shine {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card-shine::before {
+    content: none;
+  }
+
+  .border-beam {
+    position: relative;
+  }
+
+  .border-beam::after {
+    content: none;
+  }
+
+  .field-label {
+    @apply font-mono text-xs uppercase;
+    letter-spacing: var(--ls-eyebrow);
+    color: rgb(var(--text-muted));
+  }
+
+  .eyebrow {
+    @apply font-mono text-xs uppercase;
+    letter-spacing: var(--ls-eyebrow);
+    color: rgb(var(--text-muted));
+  }
+  /* ── 按钮体系：墨块 → 信号橘（瞬时切换，无位移） ─────────────── */
+  .tool-button {
+    @apply inline-flex items-center justify-center gap-2 rounded-[var(--radius-md)] px-3 text-sm transition-colors duration-[var(--duration-fast)] disabled:cursor-not-allowed disabled:opacity-40;
+    border: 1px solid rgb(var(--ink) / 0.14);
+    color: rgb(var(--text-muted));
+    background: transparent;
+  }
+
+  .tool-button:hover {
+    border-color: rgb(var(--ink) / 0.34);
+    color: rgb(var(--text));
+  }
+
+  .button-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-[var(--radius-md)] px-3 text-sm font-medium transition-colors duration-[var(--duration-fast)] disabled:cursor-not-allowed disabled:opacity-50;
+    border: 1px solid rgb(var(--ink));
+    background: rgb(var(--ink));
+    color: rgb(var(--bg));
+  }
+
+  .button-primary:hover {
+    border-color: rgb(var(--brand-primary));
+    background: rgb(var(--brand-primary));
+    color: rgb(var(--on-brand));
+  }
+
+  .button-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-[var(--radius-md)] px-3 text-sm transition-colors duration-[var(--duration-fast)] disabled:cursor-not-allowed disabled:opacity-40;
+    border: 1px solid rgb(var(--ink) / 0.14);
+    color: rgb(var(--text-muted));
+    background: transparent;
+  }
+
+  .button-ghost:hover {
+    border-color: rgb(var(--ink) / 0.34);
+    color: rgb(var(--text));
+  }
+
+  .button-subtle {
+    @apply inline-flex items-center justify-center gap-2 rounded-[var(--radius-md)] px-3 text-sm text-text-muted transition-colors duration-[var(--duration-fast)] hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40;
+  }
+
+  .button-subtle:hover {
+    background: rgb(var(--ink) / 0.05);
+  }
+
+  /* ── 选择控件：选中 = 墨块反色 ───────────────────────────────── */
+  .selection-pill {
+    @apply rounded-[var(--radius-md)] text-text-muted transition-colors duration-[var(--duration-fast)] hover:text-foreground;
+    border: 1px solid rgb(var(--ink) / 0.14);
+    background: transparent;
+  }
+
+  .selection-pill:hover {
+    border-color: rgb(var(--ink) / 0.34);
+  }
+
+  .selection-pill-active,
+  .selection-pill-active:hover {
+    border-color: rgb(var(--ink));
+    background: rgb(var(--ink));
+    color: rgb(var(--bg));
+  }
+
+  .selection-card {
+    border: 1px solid rgb(var(--ink) / 0.12);
+    background: rgb(var(--surface));
+    transition:
+      border-color var(--duration-base) var(--ease-out),
+      box-shadow var(--duration-base) var(--ease-out);
+  }
+
+  .selection-card:hover {
+    border-color: rgb(var(--ink) / 0.32);
+  }
+
+  .selection-card-active {
+    border-color: rgb(var(--brand-primary));
+    box-shadow: inset 0 0 0 1px rgb(var(--brand-primary));
+  }
+
+  /* ── 工作台 ─────────────────────────────────────────────────── */
+  .workbench-shell {
+    color: rgb(var(--text));
+  }
+
+  .workbench-hero {
+    border-bottom: 1px solid rgb(var(--ink) / 0.1);
+    padding: 2px 0 14px;
+  }
+
+  .conversation-panel,
+  .canvas-panel {
+    background: rgb(var(--bg));
+  }
+
+  .canvas-panel {
+    height: 100%;
+  }
+
+  .chat-input {
+    background: rgb(var(--surface));
+    border: 1px solid rgb(var(--ink) / 0.16);
+    border-radius: var(--radius-lg);
+    transition:
+      border-color var(--duration-base) var(--ease-out),
+      box-shadow var(--duration-base) var(--ease-out);
+  }
+
+  .chat-input:focus-within {
+    border-color: rgb(var(--ink));
+    box-shadow: 0 0 0 3px rgb(var(--brand-primary) / 0.18);
+  }
+
+  details > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .img-enter {
+    animation: imageEnter var(--duration-image) var(--ease-out) both;
+    animation-delay: calc(var(--i, 0) * 60ms);
+  }
+
+  .img-reveal {
+    animation: revealFade 420ms var(--ease-out) both;
+  }
+
+  .ambient-drift {
+    animation: ambientDrift 18s ease-in-out infinite;
+  }
+
+  .noise-overlay {
+    background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.1  0 0 0 0 0.08  0 0 0 0 0.05  0 0 0 0.5 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.6'/></svg>");
+    opacity: 0.05;
+    mix-blend-mode: multiply;
+    pointer-events: none;
+  }
+
+  html.dark .noise-overlay {
+    mix-blend-mode: overlay;
+  }
+
+  /* ── 原 brutal 按钮 → 墨块按钮，hover 变信号橘（类名契约） ────── */
+  .button-brutal-brand {
+    @apply inline-flex items-center justify-center gap-2 rounded-[var(--radius-md)] px-6 font-semibold tracking-wide transition-colors duration-[var(--duration-fast)];
+    border: 1px solid rgb(var(--ink));
+    background: rgb(var(--ink));
+    color: rgb(var(--bg));
+  }
+
+  .button-brutal-brand:hover {
+    border-color: rgb(var(--brand-primary));
+    background: rgb(var(--brand-primary));
+    color: rgb(var(--on-brand));
+  }
+
+  .button-brutal-brand:active {
+    transform: translateY(1px);
+  }
+
+  .button-brutal-success {
+    @apply inline-flex items-center justify-center gap-2 rounded-[var(--radius-md)] px-6 font-semibold tracking-wide transition-colors duration-[var(--duration-fast)];
+    border: 1px solid rgb(var(--success));
+    background: transparent;
+    color: rgb(var(--success));
+  }
+
+  .button-brutal-success:hover {
+    background: rgb(var(--success));
+    color: rgb(var(--on-brand));
+  }
+
+  .button-brutal-success:active {
+    transform: translateY(1px);
+  }
+
+  .button-brutal-info {
+    @apply inline-flex items-center justify-center gap-2 rounded-[var(--radius-md)] px-6 font-semibold tracking-wide transition-colors duration-[var(--duration-fast)];
+    border: 1px solid rgb(var(--info));
+    background: transparent;
+    color: rgb(var(--info));
+  }
+
+  .button-brutal-info:hover {
+    background: rgb(var(--info));
+    color: rgb(var(--on-brand));
+  }
+
+  .button-brutal-info:active {
+    transform: translateY(1px);
+  }
+
+  .button-brutal-warning {
+    @apply inline-flex items-center justify-center gap-2 rounded-[var(--radius-md)] px-6 font-semibold tracking-wide transition-colors duration-[var(--duration-fast)];
+    border: 1px solid rgb(var(--warning));
+    background: transparent;
+    color: rgb(var(--warning));
+  }
+
+  .button-brutal-warning:hover {
+    background: rgb(var(--warning));
+    color: rgb(var(--on-brand));
+  }
+
+  .button-brutal-warning:active {
+    transform: translateY(1px);
+  }
+
+  /* 原 brutal 卡片 → 纸面卡片（类名契约保留） */
+  .card-brutal {
+    background: rgb(var(--surface));
+    border: 1px solid rgb(var(--ink) / 0.12);
+    border-radius: var(--radius-lg);
+    transition:
+      border-color var(--duration-base) var(--ease-out),
+      transform var(--duration-base) var(--ease-out);
+  }
+
+  .card-brutal:hover {
+    transform: translateY(-2px);
+    border-color: rgb(var(--ink) / 0.32);
+  }
+
+  /* 渐变契约 → 专色平涂 */
+  .gradient-hero {
+    background: rgb(var(--brand-primary));
+  }
+
+  .gradient-accent {
+    background: rgb(var(--brand-primary));
+  }
+
+  .gradient-danger {
+    background: rgb(var(--danger));
+  }
+
+  .gradient-text-hero,
+  .gradient-text-accent {
+    color: rgb(var(--brand-primary));
+  }
+
+  .deco-pattern-1 {
+    background-color: rgb(var(--deco-1) / 0.1);
+  }
+
+  .deco-pattern-2 {
+    background-color: rgb(var(--deco-2) / 0.1);
+  }
+
+  .deco-pattern-3 {
+    background-color: rgb(var(--deco-3) / 0.1);
+  }
+
+  .deco-pattern-4 {
+    background-color: rgb(var(--deco-4) / 0.1);
+  }
+
+  .spring-bounce {
+    transition-timing-function: var(--ease-spring);
+  }
+
+  /* ── 印刷系签名元素 ─────────────────────────────────────────── */
+
+  /* 竖向栏线（页面骨架网格可视化） */
+  .press-columns {
+    background-image: linear-gradient(
+      to right,
+      rgb(var(--ink) / 0.055) 1px,
+      transparent 1px
+    );
+    background-size: calc(100% / 6) 100%;
+  }
+
+  /* 半调网点（Riso 印刷质感） */
+  .press-dots {
+    background-image: radial-gradient(
+      rgb(var(--ink) / 0.14) 1px,
+      transparent 1px
+    );
+    background-size: 22px 22px;
+  }
+
+  /* 套准十字标记 */
+  .reg-marks {
+    position: relative;
+  }
+
+  .reg-marks::before,
+  .reg-marks::after {
+    content: "+";
+    position: absolute;
+    top: -8px;
+    font-family: var(--font-stack-mono);
+    font-size: 14px;
+    line-height: 1;
+    color: rgb(var(--ink) / 0.38);
+    pointer-events: none;
+  }
+
+  .reg-marks::before {
+    left: -6px;
+  }
+
+  .reg-marks::after {
+    right: -6px;
+  }
+
+  /* 印章徽章 */
+  .stamp {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border: 1px solid rgb(var(--brand-primary));
+    border-radius: 2px;
+    color: rgb(var(--brand-primary-soft));
+    font-family: var(--font-stack-mono);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    transform: rotate(-4deg);
+  }
+
+  /* 跑马灯 */
+  .marquee {
+    overflow: hidden;
+  }
+
+  .marquee-track {
+    display: flex;
+    width: max-content;
+    animation: marqueeX 30s linear infinite;
+  }
+
+  /* CSS 版通知进/出场 */
+  .toast-enter {
+    animation: toastIn 180ms var(--ease-out) both;
+  }
+
+  .toast-enter-down {
+    animation: toastInDown 200ms var(--ease-out) both;
+  }
+
+  .toast-leave {
+    animation: toastOut 160ms var(--ease-out) both;
+    pointer-events: none;
+  }
+
+  /* 表单/面板通用的淡入上升入场。子元素可用 --stagger: N 做步进延迟。 */
+  .anim-rise {
+    animation: imageEnter 0.55s var(--ease-out) both;
+    animation-delay: calc(var(--stagger, 0) * 70ms);
+  }
+
+  .anim-slide-left {
+    animation: slideFromRight 0.65s var(--ease-out) both;
+    animation-delay: calc(var(--stagger, 0) * 70ms);
+  }
+
+  /* 骨架屏流光（墨色微光） */
+  .skeleton-glow {
+    background: linear-gradient(
+      100deg,
+      rgb(var(--ink) / 0.045) 40%,
+      rgb(var(--ink) / 0.09) 50%,
+      rgb(var(--ink) / 0.045) 60%
+    );
+    background-size: 200% 100%;
+    animation: skeletonShimmer 1.8s ease-in-out infinite;
+  }
+}
+
+@keyframes skeletonPulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes skeletonShimmer {
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes ambientDrift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  50% {
+    transform: translate3d(2%, -1%, 0) scale(1.04);
+  }
+}
+
+@keyframes marqueeX {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes floatY {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* 图像加载入场：零滤镜（revealBlur 契约名保留，不再使用 blur） */
+@keyframes revealFade {
+  from {
+    opacity: 0;
+    transform: scale(1.015);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes revealBlur {
+  from {
+    opacity: 0;
+    transform: scale(1.015);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes indeterminate {
+  0% {
+    transform: translateX(-100%) scaleX(0.45);
+  }
+
+  50% {
+    transform: translateX(35%) scaleX(0.7);
+  }
+
+  100% {
+    transform: translateX(120%) scaleX(0.45);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+  }
+
+  /* Essential progress indicators must keep moving. */
+  .animate-spin {
+    animation: spin 0.8s linear infinite !important;
+  }
+
+  [data-motion-keep],
+  [data-motion-keep] * {
+    animation-duration: revert !important;
+    animation-iteration-count: revert !important;
+    transition-duration: revert !important;
+  }
+}
+
+/* 这些 keyframes 用独立的 translate/scale 属性而不是 transform，
+   以免 fill-mode 覆盖元素自带的 inline transform。 */
+@keyframes imageEnter {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+  }
+
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+@keyframes slideFromRight {
+  from {
+    opacity: 0;
+    translate: 40px 0;
+  }
+
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    translate: 0 12px;
+    scale: 0.98;
+  }
+
+  to {
+    opacity: 1;
+    translate: 0 0;
+    scale: 1;
+  }
+}
+
+@keyframes toastOut {
+  from {
+    opacity: 1;
+    translate: 0 0;
+    scale: 1;
+  }
+
+  to {
+    opacity: 0;
+    translate: 0 8px;
+    scale: 0.98;
+  }
+}
+
+@keyframes toastInDown {
+  from {
+    opacity: 0;
+    translate: 0 -10px;
+  }
+
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+

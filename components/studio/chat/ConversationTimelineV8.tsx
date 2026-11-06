@@ -5,11 +5,19 @@
  *
  * 整体纵向滚动；每一轮 = 横向行（序号 | 用户 | 助手）。
  * 长轮自动填满视口高度，proximity snap 提供磁吸停靠感。
- * 助手侧文字内容超过 2 段时自动进入双栏排版。
+ * 助手回答超过可用页高时横向分页，轮次本身始终纵向滚动。
  */
 
-import { useEffect, useRef, useState } from "react";
-import { ArrowDown, ImagePlus, Loader2, RotateCcw, SquarePen } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  ImagePlus,
+  Loader2,
+  RotateCcw,
+  SquarePen,
+} from "lucide-react";
 import { Button, IconButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { CopyTextButton } from "../CopyTextButton";
@@ -58,10 +66,14 @@ function groupIntoTurns(
   let i = 0;
   while (i < messages.length) {
     const msg = messages[i];
-    if (msg.role !== "user") { i++; continue; }
+    if (msg.role !== "user") {
+      i++;
+      continue;
+    }
 
     const userMsg = msg;
-    const asstMsg = messages[i + 1]?.role === "assistant" ? messages[i + 1] : null;
+    const asstMsg =
+      messages[i + 1]?.role === "assistant" ? messages[i + 1] : null;
 
     // 统计本轮之前已有多少图片
     const imagesBefore = globalImageCount;
@@ -101,7 +113,13 @@ function TextRenderReceipt({ message }: { message: ConversationMessage }) {
   const { chatTurnId, chatAttemptId } = message;
   const hasText = Boolean(message.content);
   useEffect(() => {
-    if (!hasText || !chatTurnId || !chatAttemptId || renderedAttempts.has(chatAttemptId)) return;
+    if (
+      !hasText ||
+      !chatTurnId ||
+      !chatAttemptId ||
+      renderedAttempts.has(chatAttemptId)
+    )
+      return;
     let frame = 0;
     let disposed = false;
     const schedule = () => {
@@ -109,13 +127,25 @@ function TextRenderReceipt({ message }: { message: ConversationMessage }) {
       frame = requestAnimationFrame(() => {
         frame = requestAnimationFrame(() => {
           frame = 0;
-          if (disposed || document.visibilityState === "hidden" || renderedAttempts.has(chatAttemptId)) return;
+          if (
+            disposed ||
+            document.visibilityState === "hidden" ||
+            renderedAttempts.has(chatAttemptId)
+          )
+            return;
           renderedAttempts.add(chatAttemptId);
-          if (renderedAttempts.size > 2000) renderedAttempts.delete(renderedAttempts.values().next().value!);
-          void request(`/api/chat/turns/${encodeURIComponent(chatTurnId)}/rendered`, {
-            method: "POST",
-            body: JSON.stringify({ expectedAttemptId: chatAttemptId, renderedAt: new Date().toISOString() }),
-          }).catch(() => undefined);
+          if (renderedAttempts.size > 2000)
+            renderedAttempts.delete(renderedAttempts.values().next().value!);
+          void request(
+            `/api/chat/turns/${encodeURIComponent(chatTurnId)}/rendered`,
+            {
+              method: "POST",
+              body: JSON.stringify({
+                expectedAttemptId: chatAttemptId,
+                renderedAt: new Date().toISOString(),
+              }),
+            },
+          ).catch(() => undefined);
         });
       });
     };
@@ -137,22 +167,51 @@ function ReplyMetadata({ message }: { message: ConversationMessage }) {
     try {
       if (!item || typeof item.url !== "string") return [];
       const url = new URL(item.url);
-      if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || seen.has(url.href)) return [];
+      if (
+        !["http:", "https:"].includes(url.protocol) ||
+        url.username ||
+        url.password ||
+        seen.has(url.href)
+      )
+        return [];
       seen.add(url.href);
-      return [{ url: url.href, title: typeof item.title === "string" && item.title.trim() ? item.title.trim() : url.hostname }];
-    } catch { return []; }
+      return [
+        {
+          url: url.href,
+          title:
+            typeof item.title === "string" && item.title.trim()
+              ? item.title.trim()
+              : url.hostname,
+        },
+      ];
+    } catch {
+      return [];
+    }
   });
   const usage = message.chatUsage;
-  const inputDetails = usage?.input_tokens_details as Record<string, unknown> | undefined;
+  const inputDetails = usage?.input_tokens_details as
+    | Record<string, unknown>
+    | undefined;
   const tokens = (name: string) =>
-    typeof usage?.[name] === "number" ? (usage[name] as number).toLocaleString() : "未报告";
+    typeof usage?.[name] === "number"
+      ? (usage[name] as number).toLocaleString()
+      : "未报告";
   return (
     <>
       {sources.length ? (
-        <nav aria-label="回复来源" className="mt-3 flex min-w-0 flex-wrap gap-x-4 gap-y-1 text-xs leading-5 text-text-muted">
+        <nav
+          aria-label="回复来源"
+          className="mt-3 flex min-w-0 flex-wrap gap-x-4 gap-y-1 text-xs leading-5 text-text-muted"
+        >
           {sources.map((source, index) => (
-            <a key={source.url} href={source.url} target="_blank" rel="noopener noreferrer nofollow" referrerPolicy="no-referrer"
-              className="max-w-full break-words underline underline-offset-2 [overflow-wrap:anywhere]">
+            <a
+              key={source.url}
+              href={source.url}
+              target="_blank"
+              rel="noopener noreferrer nofollow"
+              referrerPolicy="no-referrer"
+              className="max-w-full break-words underline underline-offset-2 [overflow-wrap:anywhere]"
+            >
               {index + 1}. {source.title}
             </a>
           ))}
@@ -161,12 +220,18 @@ function ReplyMetadata({ message }: { message: ConversationMessage }) {
       {usage ? (
         <details className="mt-2 text-xs leading-5 text-text-muted">
           <summary className="cursor-pointer">用量</summary>
-          <p>输入 {tokens("input_tokens")} · 输出 {tokens("output_tokens")}</p>
+          <p>
+            输入 {tokens("input_tokens")} · 输出 {tokens("output_tokens")}
+          </p>
           <p>
             缓存命中{" "}
-            {typeof inputDetails?.cached_tokens === "number" ? inputDetails.cached_tokens.toLocaleString() : "未报告"}
+            {typeof inputDetails?.cached_tokens === "number"
+              ? inputDetails.cached_tokens.toLocaleString()
+              : "未报告"}
             {" · "}缓存写入{" "}
-            {typeof inputDetails?.cache_write_tokens === "number" ? inputDetails.cache_write_tokens.toLocaleString() : "未报告"}
+            {typeof inputDetails?.cache_write_tokens === "number"
+              ? inputDetails.cache_write_tokens.toLocaleString()
+              : "未报告"}
           </p>
         </details>
       ) : null}
@@ -174,12 +239,177 @@ function ReplyMetadata({ message }: { message: ConversationMessage }) {
   );
 }
 
-/* ─── 助手内容是否应双栏 ─────────────────────────────── */
-function shouldTwoCol(content: string | null | undefined): boolean {
-  if (!content) return false;
-  // 超过 2 个段落（空行分隔）且文字足够长时启用双栏
-  const paras = content.split(/\n\n+/).filter((p) => p.trim().length > 0);
-  return paras.length >= 3 && content.length > 300;
+/* ─── 长回答横向分页；对话时间线本身仍纵向滚动 ────────── */
+function AdaptiveAssistantContent({
+  content,
+  streaming,
+  messageStatus,
+}: {
+  content: string;
+  streaming: boolean;
+  messageStatus: string;
+}) {
+  const pagerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [paged, setPaged] = useState(false);
+  const [page, setPage] = useState(0);
+  const [pageCount, setPageCount] = useState(1);
+  const [pageHeight, setPageHeight] = useState<number | null>(null);
+
+  useEffect(() => {
+    const root = pagerRef.current;
+    const element = contentRef.current;
+    const timeline = element?.closest<HTMLElement>("[role='log']");
+    if (!element) return;
+
+    const updateHeight = () => {
+      const rootHeight = root?.clientHeight ?? 0;
+      const controlsHeight =
+        root?.querySelector<HTMLElement>("[data-pager-controls]")
+          ?.offsetHeight ?? 0;
+      const fallback = Math.max(
+        160,
+        (timeline?.clientHeight || window.innerHeight) - 176,
+      );
+      const availableHeight = rootHeight
+        ? Math.max(0, rootHeight - controlsHeight - 8)
+        : fallback;
+      setPageHeight((previous) =>
+        previous === availableHeight ? previous : availableHeight,
+      );
+    };
+
+    updateHeight();
+    window.addEventListener("resize", updateHeight);
+    if (typeof ResizeObserver === "undefined") {
+      return () => window.removeEventListener("resize", updateHeight);
+    }
+
+    const observer = new ResizeObserver(updateHeight);
+    if (root) observer.observe(root);
+    if (timeline && timeline !== root) observer.observe(timeline);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", updateHeight);
+    };
+  }, [content, paged]);
+
+  useEffect(() => {
+    if (paged) return;
+    const element = contentRef.current;
+    if (!element) return;
+    const timeline = element.closest("[role='log']");
+    const availableHeight =
+      pageHeight ??
+      Math.max(160, (timeline?.clientHeight || window.innerHeight) - 176);
+    setPage(0);
+    setPageCount(1);
+    if (element.scrollHeight > availableHeight + 24) setPaged(true);
+  }, [content, pageHeight, paged]);
+
+  const updatePages = useCallback(() => {
+    const element = contentRef.current;
+    if (!element || element.clientWidth === 0) return;
+    const pageWidth = element.clientWidth + 24;
+    const count = Math.max(
+      1,
+      Math.ceil((element.scrollWidth + 24) / pageWidth),
+    );
+    setPageCount(count);
+    setPage(
+      Math.max(
+        0,
+        Math.min(count - 1, Math.round(element.scrollLeft / pageWidth)),
+      ),
+    );
+  }, []);
+
+  useEffect(() => {
+    if (!paged) return;
+    const element = contentRef.current;
+    if (!element) return;
+    const frame = window.requestAnimationFrame(updatePages);
+    const observer = new ResizeObserver(updatePages);
+    observer.observe(element);
+    if (element.firstElementChild) observer.observe(element.firstElementChild);
+    window.addEventListener("resize", updatePages);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      observer.disconnect();
+      window.removeEventListener("resize", updatePages);
+    };
+  }, [content, pageHeight, paged, updatePages]);
+
+  const goToPage = (target: number) => {
+    const element = contentRef.current;
+    if (!element) return;
+    const next = Math.max(0, Math.min(pageCount - 1, target));
+    element.scrollTo({
+      left: next * (element.clientWidth + 24),
+      behavior: "smooth",
+    });
+    setPage(next);
+  };
+
+  return (
+    <div
+      ref={pagerRef}
+      className={styles.pagerRoot}
+      role={paged ? "region" : undefined}
+      aria-label={paged ? "回答分页" : undefined}
+    >
+      <div
+        ref={contentRef}
+        data-assistant-content
+        data-paged={paged ? "true" : "false"}
+        className={paged ? styles.pagedContent : styles.measureContent}
+        style={
+          pageHeight === null
+            ? undefined
+            : paged
+              ? { height: pageHeight }
+              : { maxHeight: pageHeight }
+        }
+        onScroll={updatePages}
+      >
+        <AssistantContent
+          content={content}
+          streaming={streaming}
+          messageStatus={messageStatus}
+        />
+      </div>
+      {paged && pageCount > 1 ? (
+        <div className={styles.pagerControls} data-pager-controls>
+          <span className={styles.pagerHint}>长回答 · 左右翻页</span>
+          <span className={styles.pageIndicator} aria-live="polite">
+            第 {page + 1} / {pageCount} 页
+          </span>
+          <IconButton
+            variant="ghost"
+            size="sm"
+            aria-label="上一页回答"
+            title="上一页回答"
+            disabled={page === 0}
+            onClick={() => goToPage(page - 1)}
+            className="h-8 w-8 text-text-muted"
+          >
+            <ArrowLeft size={14} />
+          </IconButton>
+          <IconButton
+            variant="ghost"
+            size="sm"
+            aria-label="下一页回答"
+            title="下一页回答"
+            disabled={page >= pageCount - 1}
+            onClick={() => goToPage(page + 1)}
+            className="h-8 w-8 text-text-muted"
+          >
+            <ArrowRight size={14} />
+          </IconButton>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 /* ─── 主组件 ──────────────────────────────────────────── */
@@ -224,24 +454,19 @@ export function ConversationTimelineV8({
   };
 
   useEffect(() => {
-    if (following.current && (typeof window === "undefined" || window.getSelection()?.isCollapsed !== false))
+    if (
+      following.current &&
+      (typeof window === "undefined" ||
+        window.getSelection()?.isCollapsed !== false)
+    )
       scrollToBottom();
   }, [conversation?.messages, pending, streaming, status, generations]);
 
   const allMsgs = conversation?.messages ?? [];
   const turns = groupIntoTurns(allMsgs, generations);
 
-  // 全局图片计数（用于 pending / streaming 行）
-  let totalImages = 0;
-  allMsgs.forEach((m) => {
-    if (m.role === "assistant" && m.generationId) {
-      const gen = generations[m.generationId];
-      totalImages += gen?.images.length ? gen.images.length : 1;
-    }
-  });
-
   return (
-    <div className="relative min-h-0 flex-1">
+    <div className="relative min-h-0 flex-1 overflow-hidden">
       <div
         ref={scrollRef}
         role="log"
@@ -250,21 +475,28 @@ export function ConversationTimelineV8({
         className={styles.timeline}
         onScroll={(event) => {
           const el = event.currentTarget;
-          following.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+          following.current =
+            el.scrollHeight - el.scrollTop - el.clientHeight < 120;
           setShowBottom(!following.current);
         }}
       >
         {turns.map((turn, turnIndex) => {
           const { userMsg, asstMsg, imageIndex } = turn;
-          const active = asstMsg ? ["queued", "running"].includes(asstMsg.chatStatus ?? "") : false;
-          const partial = Boolean(asstMsg?.chatStatus && !["completed", "queued", "running"].includes(asstMsg.chatStatus));
+          const active = asstMsg
+            ? ["queued", "running"].includes(asstMsg.chatStatus ?? "")
+            : false;
+          const partial = Boolean(
+            asstMsg?.chatStatus &&
+            !["completed", "queued", "running"].includes(asstMsg.chatStatus),
+          );
           const generation = asstMsg?.generationId
-            ? (generations[asstMsg.generationId] ?? messageGeneration(asstMsg, conversation!.id))
+            ? (generations[asstMsg.generationId] ??
+              messageGeneration(asstMsg, conversation!.id))
             : null;
           const modelName = generation
-            ? (models.find((m) => m.id === generation.modelId)?.displayName ?? "图片生成")
+            ? (models.find((m) => m.id === generation.modelId)?.displayName ??
+              "图片生成")
             : null;
-          const twoCol = shouldTwoCol(asstMsg?.content);
           // 短内容不强制撑满屏幕
           const isShort = !asstMsg?.content || asstMsg.content.length < 80;
 
@@ -286,7 +518,9 @@ export function ConversationTimelineV8({
 
               {/* 用户侧 */}
               <div className={styles.userCol}>
-                <div className={styles.userLabel} aria-hidden>你</div>
+                <div className={styles.userLabel} aria-hidden>
+                  你
+                </div>
                 <p className={styles.userText}>{userMsg.content}</p>
               </div>
 
@@ -309,9 +543,14 @@ export function ConversationTimelineV8({
                     <span className="flex items-center gap-2">
                       <Loader2
                         size={13}
-                        className={connection === "disconnected" ? "shrink-0" : "shrink-0 animate-spin"}
+                        className={
+                          connection === "disconnected"
+                            ? "shrink-0"
+                            : "shrink-0 animate-spin"
+                        }
                       />
-                      {asstMsg!.chatTurnId === managedTurnId && connection !== "connected"
+                      {asstMsg!.chatTurnId === managedTurnId &&
+                      connection !== "connected"
                         ? connection === "reconnecting"
                           ? "连接恢复中…"
                           : "连接暂未恢复"
@@ -333,21 +572,23 @@ export function ConversationTimelineV8({
 
                 {/* 文字回复 */}
                 {asstMsg?.content && !generation ? (
-                  <div className={twoCol ? styles.twoColWrap : undefined}>
-                    <AssistantContent
-                      content={asstMsg.content}
-                      streaming={active}
-                      messageStatus={asstMsg.chatStatus ?? "completed"}
-                    />
-                  </div>
+                  <AdaptiveAssistantContent
+                    content={asstMsg.content}
+                    streaming={active}
+                    messageStatus={asstMsg.chatStatus ?? "completed"}
+                  />
                 ) : null}
 
                 {asstMsg ? <ReplyMetadata message={asstMsg} /> : null}
                 {asstMsg ? <TextRenderReceipt message={asstMsg} /> : null}
 
                 {partial ? (
-                  <p role="status" className="mt-3 text-xs leading-5 text-text-muted">
-                    {asstMsg!.chatError ?? "回复未完成，已保留收到的内容，本轮未收费"}
+                  <p
+                    role="status"
+                    className="mt-3 text-xs leading-5 text-text-muted"
+                  >
+                    {asstMsg!.chatError ??
+                      "回复未完成，已保留收到的内容，本轮未收费"}
                   </p>
                 ) : null}
 
@@ -355,7 +596,9 @@ export function ConversationTimelineV8({
                 {generation ? (
                   <div className="max-w-[320px]">
                     {modelName ? (
-                      <p className="mb-1.5 text-xs font-medium text-text-muted">{modelName}</p>
+                      <p className="mb-1.5 text-xs font-medium text-text-muted">
+                        {modelName}
+                      </p>
                     ) : null}
                     <GenerationCard
                       generation={generation}
@@ -370,20 +613,31 @@ export function ConversationTimelineV8({
 
                 {/* 操作按钮 */}
                 <div className={styles.acts}>
-                  {partial && asstMsg!.chatTurnId === latestUserTurnId && asstMsg!.id === latestChatMessageId && asstMsg!.chatAttemptId && onRetryChat ? (
+                  {partial &&
+                  asstMsg!.chatTurnId === latestUserTurnId &&
+                  asstMsg!.id === latestChatMessageId &&
+                  asstMsg!.chatAttemptId &&
+                  onRetryChat ? (
                     <IconButton
                       variant="ghost"
                       aria-label="重新生成回复"
                       title="重新生成回复"
                       disabled={disabled}
-                      onClick={() => onRetryChat(asstMsg!.chatTurnId!, asstMsg!.chatAttemptId!)}
+                      onClick={() =>
+                        onRetryChat(
+                          asstMsg!.chatTurnId!,
+                          asstMsg!.chatAttemptId!,
+                        )
+                      }
                       className="h-9 w-9 text-text-muted"
                     >
                       <RotateCcw size={14} />
                     </IconButton>
                   ) : null}
                   <CopyTextButton
-                    text={generation?.prompt ?? asstMsg?.content ?? userMsg.content}
+                    text={
+                      generation?.prompt ?? asstMsg?.content ?? userMsg.content
+                    }
                     label={generation ? "复制提示词" : "复制消息"}
                   />
                   <IconButton
@@ -391,7 +645,13 @@ export function ConversationTimelineV8({
                     aria-label={asstMsg ? "使用提示词" : "重新编辑消息"}
                     title={asstMsg ? "使用提示词" : "重新编辑消息"}
                     disabled={disabled}
-                    onClick={() => onEdit(generation?.prompt ?? asstMsg?.content ?? userMsg.content)}
+                    onClick={() =>
+                      onEdit(
+                        generation?.prompt ??
+                          asstMsg?.content ??
+                          userMsg.content,
+                      )
+                    }
                     className="h-9 w-9 text-text-muted"
                   >
                     <SquarePen size={14} />
@@ -424,7 +684,9 @@ export function ConversationTimelineV8({
               {String(turns.length + 1).padStart(2, "0")}
             </span>
             <div className={styles.userCol}>
-              <div className={styles.userLabel} aria-hidden>你</div>
+              <div className={styles.userLabel} aria-hidden>
+                你
+              </div>
               <p className={styles.userText}>{pending}</p>
             </div>
             <div className={styles.asstCol}>
@@ -440,8 +702,8 @@ export function ConversationTimelineV8({
           </article>
         ) : null}
 
-        {/* 无 managedTurnId 时的流式回复行 */}
-        {!managedTurnId && (streaming !== null || status) ? (
+        {/* pending 已包含完整的等待轮次，不能重复渲染流式占位 */}
+        {!pending && !managedTurnId && (streaming !== null || status) ? (
           <article
             aria-label="正在回复"
             className={cn(styles.turn, styles.turnShort)}
@@ -450,7 +712,9 @@ export function ConversationTimelineV8({
               {String(turns.length + (pending ? 2 : 1)).padStart(2, "0")}
             </span>
             <div className={styles.userCol}>
-              <div className={styles.userLabel} aria-hidden>你</div>
+              <div className={styles.userLabel} aria-hidden>
+                你
+              </div>
             </div>
             <div className={styles.asstCol}>
               <div className={styles.asstId}>
@@ -462,7 +726,7 @@ export function ConversationTimelineV8({
                   <p role="status" className="mb-3 text-xs text-text-muted">
                     {status ?? "正在生成回复…"}
                   </p>
-                  <AssistantContent
+                  <AdaptiveAssistantContent
                     content={streaming}
                     streaming
                     messageStatus="running"

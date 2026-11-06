@@ -44,6 +44,13 @@ export function referenceRequest(references: ReferenceItem[]) {
   };
 }
 
+/** Chat turns preserve order through `references`; `referenceOrder` is image-only. */
+export function chatReferenceRequest(references: ReferenceItem[]) {
+  const { referenceOrder, ...request } = referenceRequest(references);
+  void referenceOrder;
+  return request;
+}
+
 export function useReferenceInput({
   model,
   references,

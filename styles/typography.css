@@ -1,0 +1,598 @@
+@layer utilities {
+  /* ============================================
+     Typography System - Neo-Brutalism + Editorial
+     ============================================ */
+
+  /* Display Scale - Hero sections, main headlines
+     Usage: Landing hero, feature titles, section openers
+     Font: Geist Sans Bold (700)
+     Characteristics: Tight leading, negative letter-spacing, max impact */
+
+  .type-display-xl {
+    font-family: var(--font-stack-sans);
+    font-size: var(--fs-60);
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.04em;
+    color: rgb(var(--text));
+  }
+
+  .type-display-lg {
+    font-family: var(--font-stack-sans);
+    font-size: var(--fs-48);
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    color: rgb(var(--text));
+  }
+
+  .type-display-md {
+    font-family: var(--font-stack-sans);
+    font-size: var(--fs-36);
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    color: rgb(var(--text));
+  }
+
+  /* Display variants with serif for editorial emphasis */
+  .type-display-serif {
+    font-family: var(--font-stack-serif);
+    font-style: italic;
+    font-weight: 500;
+  }
+
+  /* Headline Scale - Section headers, card titles, subsection leads
+     Usage: Feature cards, workbench sections, content headers
+     Font: Geist Sans Semibold (600)
+     Characteristics: Snug leading, subtle negative tracking */
+
+  .type-headline-lg {
+    font-family: var(--font-stack-sans);
+    font-size: var(--fs-30);
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    color: rgb(var(--text));
+  }
+
+  .type-headline-md {
+    font-family: var(--font-stack-sans);
+    font-size: var(--fs-24);
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: -0.015em;
+    color: rgb(var(--text));
+  }
+
+  .type-headline-sm {
+    font-family: var(--font-stack-sans);
+    font-size: var(--fs-20);
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+    color: rgb(var(--text));
+  }
+
+  /* Body Scale - Paragraph text, descriptions, UI copy
+     Usage: Marketing copy, feature descriptions, chat messages
+     Font: Geist Sans Regular (400)
+     Characteristics: Comfortable reading line-height, neutral tracking */
+
+  .type-body-lg {
+    font-family: var(--font-stack-sans);
+    font-size: var(--fs-18);
+    font-weight: 400;
+    line-height: 1.6;
+    letter-spacing: 0;
+    color: rgb(var(--text));
+  }
+
+  .type-body-md {
+    font-family: var(--font-stack-sans);
+    font-size: var(--fs-16);
+    font-weight: 400;
+    line-height: 1.6;
+    letter-spacing: 0;
+    color: rgb(var(--text));
+  }
+
+  .type-body-sm {
+    font-family: var(--font-stack-sans);
+    font-size: var(--fs-14);
+    font-weight: 400;
+    line-height: 1.6;
+    letter-spacing: 0;
+    color: rgb(var(--text));
+  }
+
+  /* Body muted variants for secondary text */
+  .type-body-muted {
+    color: rgb(var(--text-muted));
+  }
+
+  /* Caption Scale - Metadata, labels, microcopy
+     Usage: Timestamps, badges, status indicators, footnotes
+     Font: Geist Sans Medium (500)
+     Characteristics: Slightly tighter leading, subtle positive tracking for legibility */
+
+  .type-caption-lg {
+    font-family: var(--font-stack-sans);
+    font-size: var(--fs-13);
+    font-weight: 500;
+    line-height: 1.5;
+    letter-spacing: 0.005em;
+    color: rgb(var(--text-muted));
+  }
+
+  .type-caption-md {
+    font-family: var(--font-stack-sans);
+    font-size: var(--fs-12);
+    font-weight: 500;
+    line-height: 1.5;
+    letter-spacing: 0.01em;
+    color: rgb(var(--text-muted));
+  }
+
+  .type-caption-sm {
+    font-family: var(--font-stack-sans);
+    font-size: var(--fs-11);
+    font-weight: 500;
+    line-height: 1.5;
+    letter-spacing: 0.015em;
+    color: rgb(var(--text-muted));
+  }
+
+  /* Label / Eyebrow Scale - Form labels, categorical tags, navigation
+     Usage: Input labels, table headers, filter categories
+     Font: Geist Mono Regular (400)
+     Characteristics: Uppercase, wide tracking, technical feel */
+
+  .type-label-lg {
+    font-family: var(--font-stack-mono);
+    font-size: var(--fs-13);
+    font-weight: 400;
+    line-height: 1.4;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgb(var(--text-muted));
+  }
+
+  .type-label-md {
+    font-family: var(--font-stack-mono);
+    font-size: var(--fs-12);
+    font-weight: 400;
+    line-height: 1.4;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgb(var(--text-muted));
+  }
+
+  .type-label-sm {
+    font-family: var(--font-stack-mono);
+    font-size: var(--fs-11);
+    font-weight: 400;
+    line-height: 1.4;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgb(var(--text-muted));
+  }
+
+  /* Code / Mono Scale - Technical content, code snippets, monospace UI
+     Usage: Code blocks, file paths, API responses, terminal output
+     Font: Geist Mono Regular (400)
+     Characteristics: Tabular numerals, slightly wider tracking */
+
+  .type-code-lg {
+    font-family: var(--font-stack-mono);
+    font-size: var(--fs-15);
+    font-weight: 400;
+    line-height: 1.6;
+    letter-spacing: 0.02em;
+    color: rgb(var(--text));
+    font-variant-numeric: tabular-nums;
+  }
+
+  .type-code-md {
+    font-family: var(--font-stack-mono);
+    font-size: var(--fs-14);
+    font-weight: 400;
+    line-height: 1.6;
+    letter-spacing: 0.02em;
+    color: rgb(var(--text));
+    font-variant-numeric: tabular-nums;
+  }
+
+  .type-code-sm {
+    font-family: var(--font-stack-mono);
+    font-size: var(--fs-13);
+    font-weight: 400;
+    line-height: 1.6;
+    letter-spacing: 0.02em;
+    color: rgb(var(--text));
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Editorial Accent - Pull quotes, emphasis blocks, decorative numbers
+     Usage: Feature callouts, stat highlights, testimonials
+     Font: Fraunces Serif Medium Italic (500)
+     Characteristics: High contrast, dramatic curves, pairs with sans headlines */
+
+  .type-accent-quote {
+    font-family: var(--font-stack-serif);
+    font-size: var(--fs-24);
+    font-weight: 500;
+    font-style: italic;
+    line-height: 1.4;
+    letter-spacing: -0.01em;
+    color: rgb(var(--text));
+  }
+
+  .type-accent-number {
+    font-family: var(--font-stack-serif);
+    font-size: var(--fs-60);
+    font-weight: 600;
+    font-style: normal;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    color: rgb(var(--brand-primary));
+    font-variant-numeric: lining-nums;
+  }
+
+  .type-accent-emphasis {
+    font-family: var(--font-stack-serif);
+    font-style: italic;
+    font-weight: 500;
+    color: rgb(var(--text));
+  }
+
+  /* Responsive Typography - Fluid scaling for key elements
+     Usage: Hero headlines that adapt between mobile and desktop */
+
+  .type-fluid-hero {
+    font-family: var(--font-stack-sans);
+    font-size: clamp(var(--fs-36), 4vw + 1rem, var(--fs-60));
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.04em;
+    color: rgb(var(--text));
+  }
+
+  .type-fluid-headline {
+    font-family: var(--font-stack-sans);
+    font-size: clamp(var(--fs-20), 2vw + 0.5rem, var(--fs-30));
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    color: rgb(var(--text));
+  }
+
+  .type-fluid-body {
+    font-family: var(--font-stack-sans);
+    font-size: clamp(var(--fs-14), 1vw + 0.25rem, var(--fs-18));
+    font-weight: 400;
+    line-height: 1.6;
+    letter-spacing: 0;
+    color: rgb(var(--text));
+  }
+
+  /* Utility Modifiers - Apply on top of base type classes */
+
+  .type-bold {
+    font-weight: 700;
+  }
+
+  .type-semibold {
+    font-weight: 600;
+  }
+
+  .type-medium {
+    font-weight: 500;
+  }
+
+  .type-balance {
+    text-wrap: balance;
+  }
+
+  .type-pretty {
+    text-wrap: pretty;
+  }
+
+  .type-nowrap {
+    white-space: nowrap;
+  }
+
+  .type-truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Studio 风：渐变字退化为纯色，零渐变。 */
+  .type-gradient {
+    color: rgb(var(--text));
+  }
+
+  .type-gradient-brand {
+    color: rgb(var(--brand-primary));
+  }
+
+  /* Neo-Brutalism 文字特效已废弃，类名保留兼容。 */
+
+  .type-brutal-stroke {
+    text-shadow: none;
+  }
+
+  .type-brutal-shadow {
+    text-shadow: none;
+  }
+
+  .type-brutal-shadow-brand {
+    text-shadow: none;
+  }
+
+  /* Decorative background numbers/text for editorial layouts */
+  .type-decoration {
+    position: absolute;
+    font-family: var(--font-stack-serif);
+    font-size: clamp(120px, 20vw, 240px);
+    font-weight: 600;
+    line-height: 1;
+    color: rgb(var(--text) / 0.03);
+    pointer-events: none;
+    user-select: none;
+    z-index: 0;
+  }
+
+  /* Link Styles with Brutalist Hover */
+  .type-link {
+    color: rgb(var(--text));
+    text-decoration: underline;
+    text-decoration-color: rgb(var(--text) / 0.3);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    transition:
+      text-decoration-color var(--duration-fast) var(--ease-out),
+      color var(--duration-fast) var(--ease-out);
+  }
+
+  .type-link:hover {
+    color: rgb(var(--brand-primary));
+    text-decoration-color: rgb(var(--brand-primary));
+  }
+
+  .type-link-brutal {
+    color: rgb(var(--text));
+    text-decoration: none;
+    position: relative;
+    padding-bottom: 2px;
+  }
+
+  .type-link-brutal::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: rgb(var(--brand-primary));
+    transform: scaleX(0);
+    transform-origin: right;
+    transition: transform var(--duration-base) var(--ease-out);
+  }
+
+  .type-link-brutal:hover::after {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+
+  /* Responsive breakpoint adjustments */
+  @media (max-width: 640px) {
+    .type-display-xl {
+      font-size: var(--fs-48);
+      letter-spacing: -0.03em;
+    }
+
+    .type-display-lg {
+      font-size: var(--fs-36);
+      letter-spacing: -0.02em;
+    }
+
+    .type-headline-lg {
+      font-size: var(--fs-24);
+    }
+
+    .type-accent-number {
+      font-size: var(--fs-48);
+    }
+  }
+
+  @media (max-width: 420px) {
+    .type-display-xl {
+      font-size: var(--fs-36);
+    }
+
+    .type-display-lg {
+      font-size: var(--fs-30);
+    }
+
+    .type-headline-lg {
+      font-size: var(--fs-20);
+    }
+  }
+}
+
+/* ============================================
+   Semantic HTML Defaults
+   Applies type scale to native elements
+   ============================================ */
+
+@layer base {
+  h1 {
+    font-family: var(--font-stack-sans);
+    font-size: var(--fs-48);
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    color: rgb(var(--text));
+  }
+
+  h2 {
+    font-family: var(--font-stack-sans);
+    font-size: var(--fs-30);
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    color: rgb(var(--text));
+  }
+
+  h3 {
+    font-family: var(--font-stack-sans);
+    font-size: var(--fs-24);
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: -0.015em;
+    color: rgb(var(--text));
+  }
+
+  h4 {
+    font-family: var(--font-stack-sans);
+    font-size: var(--fs-20);
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+    color: rgb(var(--text));
+  }
+
+  h5 {
+    font-family: var(--font-stack-sans);
+    font-size: var(--fs-18);
+    font-weight: 600;
+    line-height: 1.6;
+    letter-spacing: 0;
+    color: rgb(var(--text));
+  }
+
+  h6 {
+    font-family: var(--font-stack-sans);
+    font-size: var(--fs-16);
+    font-weight: 600;
+    line-height: 1.6;
+    letter-spacing: 0;
+    color: rgb(var(--text));
+  }
+
+  p {
+    font-family: var(--font-stack-sans);
+    font-size: var(--fs-16);
+    font-weight: 400;
+    line-height: 1.6;
+    letter-spacing: 0;
+    color: rgb(var(--text));
+  }
+
+  small {
+    font-family: var(--font-stack-sans);
+    font-size: var(--fs-12);
+    font-weight: 500;
+    line-height: 1.5;
+    letter-spacing: 0.01em;
+    color: rgb(var(--text-muted));
+  }
+
+  code {
+    font-family: var(--font-stack-mono);
+    font-size: var(--fs-14);
+    font-weight: 400;
+    line-height: 1.6;
+    letter-spacing: 0.02em;
+    color: rgb(var(--text));
+    font-variant-numeric: tabular-nums;
+    background: rgb(var(--surface-2));
+    border: 1px solid rgb(var(--border));
+    border-radius: var(--radius-sm);
+    padding: 2px 6px;
+  }
+
+  pre {
+    font-family: var(--font-stack-mono);
+    font-size: var(--fs-14);
+    font-weight: 400;
+    line-height: 1.6;
+    letter-spacing: 0.02em;
+    color: rgb(var(--text));
+    font-variant-numeric: tabular-nums;
+    background: rgb(var(--surface-2));
+    border: 2px solid rgb(var(--border));
+    border-radius: var(--radius-md);
+    padding: var(--s-16);
+    overflow-x: auto;
+  }
+
+  pre code {
+    background: none;
+    border: none;
+    padding: 0;
+  }
+
+  blockquote {
+    font-family: var(--font-stack-serif);
+    font-size: var(--fs-24);
+    font-weight: 500;
+    font-style: italic;
+    line-height: 1.4;
+    letter-spacing: -0.01em;
+    color: rgb(var(--text));
+    border-left: 4px solid rgb(var(--brand-primary));
+    padding-left: var(--s-20);
+    margin: var(--s-24) 0;
+  }
+
+  strong,
+  b {
+    font-weight: 600;
+  }
+
+  em,
+  i {
+    font-style: italic;
+  }
+
+  a {
+    color: rgb(var(--text));
+    text-decoration: underline;
+    text-decoration-color: rgb(var(--text) / 0.3);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    transition:
+      text-decoration-color var(--duration-fast) var(--ease-out),
+      color var(--duration-fast) var(--ease-out);
+  }
+
+  a:hover {
+    color: rgb(var(--brand-primary));
+    text-decoration-color: rgb(var(--brand-primary));
+  }
+
+  kbd {
+    font-family: var(--font-stack-mono);
+    font-size: var(--fs-13);
+    font-weight: 400;
+    line-height: 1.6;
+    letter-spacing: 0.02em;
+    color: rgb(var(--text));
+    font-variant-numeric: tabular-nums;
+    background: rgb(var(--surface-3));
+    border: 1px solid rgb(var(--border-strong));
+    border-radius: var(--radius-sm);
+    padding: 2px 6px;
+    box-shadow: 0 2px 0 rgb(var(--border-strong));
+  }
+
+  mark {
+    background: rgb(var(--warning) / 0.2);
+    color: rgb(var(--text));
+    padding: 2px 4px;
+    border-radius: var(--radius-sm);
+  }
+}

@@ -12,15 +12,29 @@
 
 ## 本地启动
 
+推荐使用一键脚本准备本地依赖、迁移数据库、seed 初始数据并启动 web + worker：
+
+```bash
+bash start.sh
+```
+
+也可以手动分步启动：
+
 ```bash
 pnpm install
 docker compose up -d postgres redis
 pnpm db:generate
-pnpm db:push
+pnpm db:migrate
 pnpm db:seed
 pnpm dev:doctor
 pnpm dev:all
 ```
+
+生产或共享环境不要使用 `db:push`，请在发布时执行 `pnpm db:deploy` 应用 `prisma/migrations` 下已审计的迁移。`db:push` 仅保留给一次性本地原型同步。
+
+如果你已有一套此前通过 `db:push` 建好的本地数据库，先确认结构与 `prisma/schema.prisma` 一致，再执行 `pnpm exec prisma migrate resolve --applied 000001_init` 把初始迁移登记为已应用，之后继续使用 `pnpm db:migrate`。
+
+使用 Docker Compose 启动完整栈时，`web` 和 `worker` 会自动覆盖容器内的 `DATABASE_URL`/`REDIS_URL` 为 `postgres`、`redis` 服务名，并等待一次性的 `migrate` 服务完成 `prisma migrate deploy`。
 
 `image2` 中转可通过环境变量 seed 到 Provider 表：
 
@@ -42,7 +56,7 @@ Responses 通道仍可用：把 `IMAGE2_PROVIDER_PROTOCOL` 设为 `OPENAI_RESPON
 
 ```bash
 docker compose up -d postgres redis
-pnpm db:push && pnpm db:seed
+pnpm db:migrate && pnpm db:seed
 pnpm dev:doctor
 ```
 
@@ -52,7 +66,7 @@ pnpm dev:doctor
 pnpm dev:all
 ```
 
-账号系统始终使用真实数据库用户。首次本地启动请先准备 Postgres/Redis，执行 `pnpm db:push && pnpm db:seed` 创建初始管理员和 Provider 配置。测试真实出图必须启动 worker：推荐 `pnpm dev:all`，或分别启动 `pnpm dev` 与 `pnpm worker`；只跑 `pnpm dev` 只适合看 UI，生成任务会停在排队中等待 worker 消费。
+账号系统始终使用真实数据库用户。首次本地启动请先准备 Postgres/Redis，执行 `pnpm db:migrate && pnpm db:seed` 创建初始管理员和 Provider 配置。测试真实出图必须启动 worker：推荐 `pnpm dev:all`，或分别启动 `pnpm dev` 与 `pnpm worker`；只跑 `pnpm dev` 只适合看 UI，生成任务会停在排队中等待 worker 消费。
 
 对话式工作台会先把上下文编译成出图 prompt。默认使用本地拼接；配置 `OPENAI_API_KEY` 后可用 `CONVERSATION_COMPILER_MODEL=gpt-5.5` 作为上下文编译器。
 
@@ -72,7 +86,9 @@ pnpm dev:all
 ## 安全开关
 
 - `RATE_LIMIT_LOGIN_PER_MIN`：登录接口按 `IP + email` 限流，默认每分钟 `5` 次。
-- `ADMIN_IP_ALLOWLIST`：为空时不限制；填写后仅允许白名单 IP/CIDR 访问 `/admin` 与 `/api/admin/*`。
+- 登录设备按账号分槽位管理：同一账号最多同时保留 1 个网页端、1 个 iPad 端、1 个手机端设备。一个浏览器里的多个网页/标签页共享同一个设备标识，不会互相挤下线；同类型的新设备登录会替换旧设备。
+- `RATE_LIMIT_REGISTER_PER_HOUR`：注册接口按 IP 限流，默认每小时 `10` 次。
+- `ADMIN_IP_ALLOWLIST`：为空时不限制；填写后仅允许白名单 IP/CIDR 访问 `/admin` 与 `/api/admin/*`。生效前提是反代覆盖客户端伪造的 `X-Real-IP`（仓库内 `Caddyfile` 已用 `header_up X-Real-IP {remote_host}` 处理）。
 - 中间件会统一补安全响应头：`HSTS`、`CSP`、`X-Frame-Options`、`X-Content-Type-Options`、`Referrer-Policy`。
 - 审计日志、导入错误、provider 测试错误都不会记录或返回明文密钥。
 

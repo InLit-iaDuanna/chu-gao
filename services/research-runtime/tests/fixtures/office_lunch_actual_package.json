@@ -1,0 +1,3549 @@
+{
+  "schemaVersion": 2,
+  "policyVersion": "design-evidence-v2",
+  "taskId": "cmve7lhmx00053yo8vp7619en",
+  "briefId": "cmve7lhmv00033yo8hkj73064",
+  "report": {
+    "text": "> 当前质量：研究草稿，存在待核验项\n\n # 办公室快速午餐轻食机｜设计研究草稿\n\n> **研究边界：**本稿依据当前提供的网页摘录和商品资料整理；不把网页摘录视为独立验证的用户研究，也不推断未采集页面的内容。  \n> **研究时间：**brief 未指定研究截止日。证据采集时间为 **2026-10-18**；以下页面价格等信息仅代表该次采集时页面显示，不代表持续有效或实际成交价。\n\n## 1. 当前可以支持与尚不能支持的设计决策\n\n### 可以暂时支持\n\n- **优先探索“单人工作日午餐”的任务流程。**这是适合进入原型研究的工作假设：产品可围绕备餐、制作、取餐和清洁的一次完整午餐任务设计。办公室快速午餐是已确认场景；单人工作日流程则是待验证建议，尚无用户证据证明它是最高优先级。\n- **把“分量明确”转化为可测试的规格与界面问题。**例如单次份量、份量提示是否易理解，是否能减少估量负担；现有资料不足以确定具体容量或单位。\n- **把低油、营养可控作为需求目标，而非已实现的产品能力。**可以探索用量提示、配方信息和烹饪流程来支持用户控制；不宜在缺少测试和营养依据时承诺具体健康效果。\n- **把清洁便利、工作场所适配和操作时间列入验证重点。**这会影响产品是否适合办公室日常使用，但当前资料没有充分回答这些问题。\n\n### 尚不能支持\n\n- 不能确定目标用户对制作时长、可接受价格、设备尺寸、噪音或清洁方式的具体要求。\n- 不能判断用户更偏好在办公室现场烹饪，还是在家做好后带到办公室复热。\n- 不能据现有资料确认任何竞品具备或不具备低油、营养计算、单人份控制等功能。\n- 不能形成市场规模、购买意愿、产品销量或竞品优劣排名结论。\n- 不能把轻食机的功能直接等同于营养更健康、摄入更可控或适合所有控卡需求。\n\n## 2. 研究范围与已确认需求\n\n本研究聚焦办公室快速午餐，面向健身或控卡人群，目标是为产品定位、优先流程、关键功能及竞品机会提供设计输入。\n\n**已确认需求**仅包括：围绕办公室快速午餐场景研究面向健身或控卡人群的轻食机，明确优先使用流程、低油、营养可控、分量明确等核心需求，进而确定产品定位、关键功能与竞品机会。\n\nbrief 中另有建议将单人工作日快速制作作为重点，并评估制作时长、食材范围、清洁便利性与可接受价格；这些是**待确认的研究方向**，不是用户已经确认的产品规格。\n\n## 3. 用户与使用任务证据\n\n### 3.1 已知信息与证据边界\n\n- 办公室快速午餐、健身或控卡人群以及低油、营养可控、分量明确，来自本项目已确认需求。\n- 当前证据中没有直接访谈、问卷或可用性测试材料，不能据此描述用户实际行为、使用频率、购买动机或不满。\n- 一篇有关午休健身与午餐安排的文章指出，午休训练需要结合午餐安排；是否额外补充蛋白，应结合饮食情况判断。它讨论的是饮食与训练安排，不是办公室轻食机需求研究，不能拿来证明用户需要某种设备或营养功能。[cmve7llkw00yj3yyzsdr1urce]\n- 一篇远程办公卡路里追踪器文章提到，在家工作者午餐时间紧、倾向减少记录摩擦等说法；其对象是远程工作者，且为产品推广语境，不能直接外推到办公室用户或作为可靠需求量化依据。[cmve7lldl00xz3yyzjb99wd8n]\n\n### 3.2 至少两条完成午餐任务的路径\n\n以下是设计阶段应公平比较的候选路径，不代表已验证的使用偏好。\n\n| 候选路径 | 任务链 | 可能的设计关注点 | 当前证据与限制 |\n|---|---|---|---|\n| **A. 办公室现场制作** | 取出食材 → 选择份量或程序 → 烹饪 → 取餐 → 清洁或收纳 | 总任务时长、操作步骤、气味与噪音、用电与台面、食材兼容性、清洁和残渣处理 | 尚无用户研究或办公室实测，不能确认流程是否可行、是否被允许或是否更受欢迎。 |\n| **B. 家中预制、办公室复热** | 在家备餐并携带 → 办公室冷藏或暂存 → 复热 → 食用 → 清理容器 | 携带和储存、复热设备可用性、等待时间、食物状态、容器清洗 | 当前证据未比较办公室复热与现场制作；微波复热作为替代路线仍是待研究问题。 |\n| **C. 购买现成午餐** | 选择餐食 → 购买或取餐 → 查看份量与营养信息 → 食用 | 可获得性、价格、等待时间、营养和份量信息是否透明 | 当前没有目标地区、餐饮渠道或用户购买观察，不能判断可比性和机会大小。 |\n\n**比较结论：**目前不足以判断哪条路径应成为产品核心。现场制作路径与预制复热路径都需要纳入用户研究；购买现成午餐可作为基线替代方案。产品概念不应先假定“办公室现做”必然优于另外两种路径。\n\n## 4. 竞品与替代方案\n\n### 4.1 已有产品观察：摩飞 MR9086\n\n摩飞官方产品页列出轻食机 MR9086，页面标价 **¥529**；另一零售页面列出“摩飞轻食机蒸锅三文治机 MR9086 粉色”，页面标价 **¥339.00**，并显示“已售447”。该两种价格为中国地区网页在 **2026-10-18** 采集时的页面标价，来源渠道不同，不代表成交价或可接受价格。[cmve7lk8x00wf3yyzt7apwo35] [cmve7lka700wl3yyz7savsb8c]\n\n零售页列出重量 **2.5 kg**、尺寸 **248×221×133 mm**，产品特点为“多功能早餐机”；并展示商品图片、规格参数、包装售后等内容。[cmve7lka700wl3yyz7savsb8c]\n\n这些资料可用于提出竞品核查问题，但不足以证明其适合办公室午餐，或具备低油、营养控制、明确分量等能力。**商品图片虽在页面中列出，本稿未据此完成视觉分析。**[cmve7lka700wl3yyz7savsb8c]\n\n### 4.2 替代方案对照\n\n| 方案 | 对照意义 | 当前可知与缺口 |\n|---|---|---|\n| **摩飞 MR9086 轻食机** | 可作为轻食机类产品的初步样本 | 有商品名称、页面标价及部分规格信息；缺少可核验的午餐场景测试、容量和营养功能证据。[cmve7lk8x00wf3yyzt7apwo35] [cmve7lka700wl3yyz7savsb8c] |\n| **三明治机** | 可检验较简单加热成型设备是否已满足一部分快速制作任务 | 一篇消费体验描述了准备食材、预热、烹饪及取出的过程，并记录其体验中“三分钟”完成馅料制作；该个案不是标准化测试，也不是午餐用户研究，不能作为普遍制作时间承诺。[cmve7t3j6003p3yo8zoxvte8w] |\n| **办公室微波炉＋自带午餐** | 与现场烹饪公平竞争的替代路径 | 当前没有用户测试、设备可用性或复热时间资料，需实地验证。 |\n| **现成餐食或外卖** | 目标任务的非设备型替代 | 当前没有指定地区、供应渠道或价格样本，不能与产品作数值比较。 |\n\n### 4.3 竞品机会判断\n\n目前更稳妥的机会方向是**待验证的差异化命题**，而非市场空白结论：\n\n1. 测试现有轻食机产品是否让用户容易判断一次做多少、适合什么食材，以及完成午餐所需的总时间。\n2. 测试用户是否需要在设备上获得份量或营养信息，还是只要清楚的食材配比和简单烹饪指引。\n3. 将清洁、携带、收纳、办公室气味与噪音作为竞品比较维度；当前资料未能证明现有产品在这些方面的表现。\n4. 同时对照现场制作、预制复热和现成餐食，避免只在“轻食机”品类内寻找差异。\n\n## 5. 设计取舍与初步定位\n\n### 5.1 定位方向（待验证）\n\n**初步定位假设：**面向健身或控卡人群的办公室午餐轻食设备，以清楚的单次份量和简化的午餐制作流程为候选价值主张，并探索低油与营养可控如何通过食谱、提示和操作流程落地。\n\n该定位是基于已确认需求形成的**设计假设**，不是用户研究结论，也不是已验证的市场定位。\n\n### 5.2 关键取舍\n\n- **现场制作 vs. 预制复热：**现场制作可能减少预先备餐，但是否适合办公室环境未知；应以真实办公室条件测试，而非先指定唯一流程。\n- **营养精确度 vs. 记录负担：**复杂营养录入可能削弱快速午餐体验。先验证用户需要“精确计算”还是“易懂的份量与配方提示”。\n- **功能丰富 vs. 流程简单：**更多程序或食材类型可能增加选择负担；优先验证常见午餐任务，再决定功能范围。\n- **设备体积与性能：**现有样本尺寸和重量可作为讨论起点，但不能据此设定目标规格；办公桌、茶水间和储物条件需要现场测量。\n- **营养表述与可验证性：**低油、营养可控可以作为用户目标，但具体效果需通过配方计算、烹饪测试和合规审查支持；避免将设备本身描述为保证减脂或健康结果的工具。\n\n## 6. 可执行设计 Brief（研究阶段草案）\n\n### 设计目标\n\n验证一种办公室午餐解决方案能否帮助健身或控卡人群更轻松地完成一顿份量清楚、油脂使用可控、营养信息易理解的午餐。\n\n### 优先任务流程假设\n\n1. 用户选择“现场制作”或“预制复热”方式。\n2. 用户确认食材、份量与时间要求。\n3. 用户完成加热或烹饪，并清楚知道何时可取餐。\n4. 用户获取可理解的份量或营养信息。\n5. 用户能快速处理接触食物的部件并收纳。\n\n步骤本身是供原型验证的流程草案，不代表最终产品一定包含数字营养计算、自动识别或特定加热程序。\n\n### 核心设计问题\n\n- 用户所说的“快速”是指准备时间、设备运行时间，还是从开始准备到开始吃饭的总时间？\n- 用户怎样理解“分量明确”？按克数、份数、容器容量，还是按常用食材组合？\n- 营养可控需要显示哪些信息，信息精度到什么程度才有用？\n- 现场制作是否满足办公室对空间、气味、噪音和清洁的要求？\n- 哪些食材是必需支持的，哪些会使设备复杂度或清洁成本明显上升？\n- 用户对设备价格、占地、收纳与清洗需要满足什么条件？\n\n### 暂不设定的规格\n\n下列参数暂无充分证据，暂不作为承诺或设计定值：单次容量、烹饪时长、可用食材范围、营养计算精度、目标售价、清洁时间、设备尺寸、噪音水平与功率。\n\n## 7. 假设清单与验证步骤\n\n| 假设 | 依据类型 | 验证方法 |\n|---|---|---|\n| 单人工作日午餐值得作为首个设计流程 | **用户目标 + 待测试占位**：办公室快速午餐是已确认场景；单人重点流程是待确认建议 | 访谈不同办公室用户，比较单人午餐与多人共餐频率及重要性。 |\n| 份量提示会帮助控卡用户做决策 | **用户目标 + 待测试占位**：分量明确是已确认诉求，但具体提示形式未验证 | 以克数、份数、容器刻度和食材组合卡片制作概念原型，观察理解与选择。 |\n| 用户需要低油烹饪相关功能或指引 | **用户目标 + 待测试占位**：低油是已确认诉求，设备功能与效果尚无证据 | 先定义“低油”对用户的实际含义，再比较不同提示和烹饪方式；配方与效果需单独核实。 |\n| 营养信息应在设备或配套界面中呈现 | **用户目标 + 待测试占位**：营养可控是已确认诉求；信息载体与精度待定 | 对比仅显示份量、显示主要营养信息、要求手动录入等方案的完成率与负担。 |\n| 现场制作可能比预制复热更适合作为产品核心 | **待测试占位**：当前没有路径比较证据 | 让同一批目标用户分别完成现场制作和预制午餐复热任务，记录耗时、步骤、错误、满意度与清洁情况。 |\n| MR9086 的页面信息可作为轻食机类目比较起点 | **竞品观测**：商品页显示名称、价格和部分规格；不代表产品体验评价 | 核查完整说明书、功能与部件信息；通过同任务实测与替代方案比较。 |\n\n### 建议的验证顺序\n\n1. **情境访谈与工作日午餐观察：**覆盖现场制作、自带复热和购买现成午餐者；记录实际地点、时间限制、设备可用性、储存和清洁条件。\n2. **流程比较原型：**使用低保真流程或操作样机比较“现场制作”与“预制复热”，确保两种路径都能完成相同的午餐任务。\n3. **份量与营养信息测试：**测试用户能否在不额外查找复杂资料的情况下理解份量，以及他们是否会依据营养信息改变选择。\n4. **办公室环境测试：**观察台面占用、电源、气味、噪音、清洁和收纳；具体指标待根据目标办公室环境制定。\n5. **竞品与替代方案核查：**用同一任务标准比较轻食机、三明治机、微波复热和现成餐食；明确记录测试条件与样本，避免将单次体验泛化。\n\n## 8. 限制与待补证\n\n- 当前材料主要是网页摘录和商品信息，没有目标用户访谈、实地观察、可用性测试或销售数据。\n- 多个来源为节选，且 `sourceAvailability` 显示本次纳入 **17 / 105** 项来源；**81** 项因预算省略、**6** 项因相关性较低而省略。未采集、未纳入或仅有节选不代表原页面没有相关内容，也不能据此下否定结论。\n- 当前可识别的竞品样本数量有限，且没有同条件产品实测，不适合产出竞品排名或市场机会大小判断。\n- 价格数字仅为中国地区页面于 **2026-10-18** 显示的标价，未提供成交、促销周期或可接受价格研究。\n- **下一步关键问题：**用户主要需要现场烹饪还是预制复热？分量和营养信息具体需要到什么程度？办公室环境是否允许设备日常使用？在这些问题得到验证前，产品定位与规格仍应保持开放。\n\n## 本报告实际引用的来源\n\n- [cmve7llkw00yj3yyzsdr1urce] 午休健身蛋白粉怎么选、什么时候喝？先看训练和午餐怎么接_凤凰网 | https://baby.ifeng.com/c/8xDijTtSoYC | captured（本轮阅读片段，完整可用性见上下文清单）\n- [cmve7lldl00xz3yyzjb99wd8n] 2026年最佳远程工作者卡路里追踪器 | Nutrola | https://nutrola.app/zh/blog/best-calorie-tracker-for-remote-workers-working-from-home | captured（本轮阅读片段，完整可用性见上下文清单）\n- [cmve7lka700wl3yyz7savsb8c] 摩飞 轻食机蒸锅三文治机MR9086粉色 | https://m.anportshop.com/index.php?m=Goods&a=detail&id=284637 | captured（本轮阅读片段，完整可用性见上下文清单）\n- [cmve7lk8x00wf3yyzt7apwo35] Morphy Richards/摩飞电器中国官方网站 | https://www.morphyrichards.net/cpzx/info_41.aspx?itemid=132&lcid=26 | captured（本轮阅读片段，完整可用性见上下文清单）\n- [cmve7t3j6003p3yo8zoxvte8w] 早餐好帮手——九阳三明治机简单体验_厨房小电_什么值得买 | https://post.smzdm.com/p/aqr3wpk2/ | captured（本轮阅读片段，完整可用性见上下文清单）",
+    "stageId": "cmve7lhn4000d3yo81f0hk723",
+    "attemptId": "cmve7u7az005t3yo84gqdmafj",
+    "hash": "d6bc516143c171cf7dfd9e4aae9e428ed1e90ae5a2359e616e9925908f0b9b46"
+  },
+  "finalBrief": {
+    "goal": "验证办公室快速午餐解决方案能否帮助健身或控卡人群完成一顿份量清楚、油脂使用可控、营养信息易理解的午餐，并据研究结果确定产品定位、优先流程、关键功能和竞品机会。",
+    "scope": "聚焦办公室快速午餐场景及健身或控卡人群，围绕优先使用流程、低油、营养可控和分量明确展开设计研究；比较现场制作、预制复热和购买现成午餐，形成定位、流程和功能的验证输入。单人工作日午餐是待验证方向，不是已确认的优先规格。",
+    "alternatives": [
+      {
+        "name": "A. 办公室现场制作",
+        "benefit": "作为办公室现场完成午餐的候选路径，可用于验证设备烹饪流程及现场条件。",
+        "tradeoff": "总任务时长、气味、噪音、用电、台面、食材兼容性和清洁可行性均未实测；不能假定现场制作更受欢迎或更可行。",
+        "evidenceIds": [],
+        "status": "hypothesis"
+      },
+      {
+        "name": "B. 家中预制、办公室复热",
+        "benefit": "作为非现场烹饪路径，可与现场制作比较准备、携带、储存和复热流程。",
+        "tradeoff": "携带、暂存、复热设备可用性、等待时间、食物状态和容器清洗情况尚无本项目实测。",
+        "evidenceIds": [],
+        "status": "hypothesis"
+      },
+      {
+        "name": "C. 购买现成午餐或外卖",
+        "benefit": "作为不依赖自有烹饪设备的基线方案，可用于比较午餐任务的替代完成方式。",
+        "tradeoff": "目标地区、渠道、等待时间、份量及营养信息透明度和价格样本均缺失，不能与设备方案作数值比较。",
+        "evidenceIds": [],
+        "status": "hypothesis"
+      }
+    ],
+    "acceptanceCriteria": [
+      "在目标办公室情境中研究现场制作、自带午餐复热和购买现成午餐等路径，并记录地点、时间限制、设备可用性、储存和清洁条件。",
+      "用相同午餐任务比较候选流程，记录耗时、步骤、错误、满意度和清洁情况；明确测试条件，不预设哪条路径胜出。",
+      "比较克数、份数、容器刻度、食材组合等份量表达方案，检验理解和选择情况，不预设用户偏好的表示方式。",
+      "验证用户需要何种营养信息、信息载体和精度，以及信息带来的理解收益与操作负担。",
+      "在办公室环境中检查台面、电源、气味、噪音、清洁和收纳；具体阈值应根据目标环境另行确定。",
+      "使用同一任务标准比较轻食机、三明治机、微波复热和现成餐食；记录样本与测试条件，不将单次体验泛化。",
+      "对低油或营养效果相关表述，先取得配方、烹饪测试及合规依据；在此之前不作效果承诺。",
+      "在研究验证前，不把容量、时长、食材范围、售价、尺寸、噪音、功率或清洁时间设为已确认规格。"
+    ],
+    "openQuestions": [
+      "用户主要需要办公室现场制作，还是在家预制后于办公室复热？购买现成午餐在实际任务中如何比较？",
+      "用户所说的“快速”是准备时间、设备运行时间，还是从开始准备到开始吃饭的总时间？",
+      "用户如何理解“分量明确”：克数、份数、容器容量，还是常用食材组合？",
+      "营养可控需要展示哪些信息、何种精度才有用，信息应通过何种载体提供？",
+      "办公室的空间、电源、气味、噪音、清洁和收纳条件是什么，是否允许日常现场烹饪？",
+      "哪些食材需要优先支持，清洁或设备复杂度会因此产生什么影响？",
+      "用户对设备价格、占地、收纳与清洗有什么条件或接受范围？当前没有可据以设定的数值。",
+      "低油对目标用户意味着什么；哪些配方和烹饪证据足以支撑相关表述？"
+    ],
+    "confirmedRequirements": [
+      "围绕办公室快速午餐场景，研究面向健身或控卡人群的轻食机，明确优先使用流程、低油、营养可控、分量明确等核心需求，进而确定产品定位、关键功能与竞品机会。"
+    ]
+  },
+  "hypotheses": [
+    {
+      "id": "H1",
+      "text": "单人工作日午餐值得作为首个设计流程。",
+      "basis": "终稿将单人工作日快速制作列为建议重点，同时明确其为待确认研究方向；当前没有用户证据证明其优先级最高。",
+      "status": "unverified",
+      "evidenceIds": []
+    },
+    {
+      "id": "H2",
+      "text": "份量提示能帮助健身或控卡用户作出午餐选择。",
+      "basis": "分量明确属于已确认需求，但终稿未提供用户测试或证据确定提示形式及其对决策的影响。",
+      "status": "unverified",
+      "evidenceIds": []
+    },
+    {
+      "id": "H3",
+      "text": "用户需要低油烹饪相关功能或指引。",
+      "basis": "低油属于已确认诉求；具体功能、指引形式和烹饪效果在终稿中均未验证。",
+      "status": "unverified",
+      "evidenceIds": []
+    },
+    {
+      "id": "H4",
+      "text": "营养信息应由设备或配套界面呈现。",
+      "basis": "营养可控属于已确认诉求，但终稿明确将信息载体、精度及操作负担列为待研究问题。",
+      "status": "unverified",
+      "evidenceIds": []
+    },
+    {
+      "id": "H5",
+      "text": "现场制作可能比预制复热更适合作为产品核心路径。",
+      "basis": "终稿将现场制作与预制复热列为需要比较的候选路径，当前没有路径比较证据。",
+      "status": "unverified",
+      "evidenceIds": []
+    },
+    {
+      "id": "H6",
+      "text": "上述任务链可作为验证办公室午餐方案的初步流程。",
+      "basis": "终稿将选择制作或复热方式、确认食材份量与时间、完成烹饪或加热、获取信息、清洁收纳列为原型验证流程草案；这些步骤尚未被用户研究验证。",
+      "status": "unverified",
+      "evidenceIds": []
+    },
+    {
+      "id": "H7",
+      "text": "摩飞 MR9086 的页面信息可作为轻食机类目比较的初步样本。",
+      "basis": "终稿称商品页面提供名称、价格及部分规格，可用于提出竞品核查问题；页面信息是否足以支持类目比较仍需核实，且不代表产品体验评价。",
+      "status": "unverified",
+      "evidenceIds": [
+        "cmve7lk8x00wf3yyzt7apwo35",
+        "cmve7lka700wl3yyz7savsb8c"
+      ]
+    }
+  ],
+  "competitors": [
+    {
+      "name": "摩飞轻食机 MR9086",
+      "kind": "sku",
+      "positioning": "轻食机；终稿所引页面以多功能早餐机等信息介绍产品。",
+      "price": "官方页标价 ¥529；零售页标价 ¥339.00（均为采集时页面标价，非成交价）",
+      "market": "中国（页面价格所涉地区；目标市场未指定）",
+      "observedAt": "2026-10-18",
+      "observations": "终稿记载官方产品页标价 ¥529；另一零售页标价 ¥339.00，并显示“已售447”。零售页还列出重量 2.5 kg、尺寸 248×221×133 mm，并将产品描述为多功能早餐机。页面信息不构成办公室午餐适用性或功能实测证据。",
+      "evidenceIds": [
+        "cmve7lk8x00wf3yyzt7apwo35",
+        "cmve7lka700wl3yyz7savsb8c"
+      ],
+      "status": "observed"
+    },
+    {
+      "name": "三明治机",
+      "kind": "category",
+      "positioning": "快速加热成型设备类别，可作为轻食机任务比较样本。",
+      "price": "未找到",
+      "market": "",
+      "observedAt": "2026-10-18",
+      "observations": "终稿引用一篇消费体验，描述准备食材、预热、烹饪及取出，并记录个案中“三分钟”完成馅料制作；不是标准化测试，不能泛化为普遍制作时间。",
+      "evidenceIds": [
+        "cmve7t3j6003p3yo8zoxvte8w"
+      ],
+      "status": "observed"
+    },
+    {
+      "name": "自带午餐、办公室复热（包括微波炉路线）",
+      "kind": "alternative",
+      "positioning": "预制后携带并在办公室复热的午餐路径。",
+      "price": "未找到",
+      "market": "",
+      "observedAt": "",
+      "observations": "终稿将其列为与办公室现场制作比较的替代路径；没有用户测试、设备可用性或复热时间资料。",
+      "evidenceIds": [],
+      "status": "unverified"
+    },
+    {
+      "name": "购买现成午餐或外卖",
+      "kind": "alternative",
+      "positioning": "通过购买餐食完成午餐任务的替代路径。",
+      "price": "未找到",
+      "market": "",
+      "observedAt": "",
+      "observations": "终稿将其列为非设备型基线替代方案；未提供目标地区、渠道、用户观察或价格样本。",
+      "evidenceIds": [],
+      "status": "unverified"
+    }
+  ],
+  "caveats": [
+    "仅依据本次提供的终稿整理；引用编号仅表明终稿提供了来源标识，不代表本次已独立核验来源内容。",
+    "终稿没有指定研究截止日。证据采集日期为 2026-10-18；页面价格等仅代表采集时展示，不代表成交价、持续有效价格或用户可接受价格。",
+    "材料主要为网页摘录和商品信息，没有目标用户访谈、问卷、实地观察、可用性测试或销售数据；不得据此推断用户行为、偏好、购买意愿或市场规模。",
+    "终稿称纳入 17/105 项来源，81 项因预算省略、6 项因相关性较低而省略。未纳入或仅有节选不代表原来源没有相关信息，不能据此作否定结论。",
+    "摩飞 MR9086 样本信息来自不同网页渠道；两处标价不可视为成交价或价格可比结论。终稿未提供同条件产品实测，不支持竞品排名或优势结论。",
+    "MR9086 页面中的商品图片未作视觉分析；其页面信息不足以证明产品适合办公室午餐或具备低油、营养控制、明确分量等能力。",
+    "三明治机的“三分钟”记录来自个案体验，不是标准化测试或普遍制作时间承诺。",
+    "远程办公者相关材料对象与语境不同，不能直接外推到办公室用户；午休健身文章也不能证明设备需求。",
+    "“快速”的定义、单次容量、烹饪时长、食材范围、营养计算精度、目标售价、清洁时间、尺寸、噪音和功率均未确定，不应视为已确认规格或用户要求。",
+    "低油、营养可控是需求目标，不等于已验证的产品能力或健康效果；相关产品表述需有配方、烹饪测试及合规依据。",
+    "2 项关键核验仍未解决。",
+    "8 项设计问题仍待回答。",
+    "自动材料门槛与引用存在性检查不能代替事实核验、用户研究和工程测试。"
+  ],
+  "quality": {
+    "schemaVersion": 1,
+    "status": "draft",
+    "label": "研究草稿，存在待核验项",
+    "executionCompleted": true,
+    "evidenceStatus": "draft",
+    "assessmentScope": "material_gate_not_fact_verification",
+    "issues": [
+      {
+        "code": "UNRESOLVED_QUESTIONS",
+        "severity": "warning",
+        "message": "2 项关键核验仍未解决。"
+      },
+      {
+        "code": "OPEN_DESIGN_QUESTIONS",
+        "severity": "warning",
+        "message": "8 项设计问题仍待回答。"
+      }
+    ],
+    "metrics": {
+      "totalSources": 105,
+      "capturedSources": 10,
+      "providedTextSources": 0,
+      "unreadProvidedSources": 0,
+      "externalRelevantCapturedSources": 4,
+      "relevantCapturedSources": 4,
+      "distinctRelevantHosts": 4,
+      "failedSources": 3,
+      "linkOnlySources": 92,
+      "rejectedSources": 6,
+      "citedSources": 5,
+      "unknownCitationIds": 0,
+      "unresolvedQuestions": 2
+    },
+    "thresholds": {
+      "minRelevantCaptured": 3,
+      "minDistinctHosts": 2
+    }
+  },
+  "evidenceManifest": {
+    "schemaVersion": 1,
+    "sources": [
+      {
+        "evidenceId": "cmve7lk8x00wf3yyzt7apwo35",
+        "url": "https://www.morphyrichards.net/cpzx/info_41.aspx?itemid=132&lcid=26",
+        "title": "Morphy Richards/摩飞电器中国官方网站",
+        "status": "captured",
+        "availability": "captured",
+        "contentHash": "fd9609db7267584b1755663067d27cb2e89ded1e74247a95df3d9abacee3f001",
+        "fetchedAt": "2026-10-18T19:22:52.028Z",
+        "capturedChars": 3020,
+        "includedChars": 1200,
+        "truncated": true,
+        "omittedReason": null,
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 21,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "product",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [
+            "轻食机"
+          ],
+          "reasons": [
+            "lexical_match_requires_semantic_review"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lk9e00wh3yyzbsoe1pc8",
+        "url": "https://toolbox.rational-online.com/direct-download/1612581/155427/IFU_20.077_RATIONAL_%E5%8E%9F%E5%A7%8B%E4%BD%BF%E7%94%A8%E8%AF%B4%E6%98%8E%E4%B9%A6_iCombi%20Pro_Table%20Units_zh-CNS.pdf",
+        "title": "iCombi® Pro 膳酷盛® - 原始使用说明书",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "manual",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lk9r00wj3yyz4oqcv69i",
+        "url": "https://media3.gaggenau.com/Documents/9001698670_F.pdf",
+        "title": "使用说明和安装说明BS47.112, BS48.112 | Gaggenau",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lka700wl3yyz7savsb8c",
+        "url": "https://m.anportshop.com/index.php?m=Goods&a=detail&id=284637",
+        "title": "摩飞 轻食机蒸锅三文治机MR9086粉色",
+        "status": "captured",
+        "availability": "captured",
+        "contentHash": "3e7666abf8e9dab7fa9006bfd966ee7c0d1254637d691f95be567df553af2ee5",
+        "fetchedAt": "2026-10-18T19:22:56.890Z",
+        "capturedChars": 1771,
+        "includedChars": 1771,
+        "truncated": false,
+        "omittedReason": null,
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "keep",
+          "score": 29,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "product",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [
+            "轻食机"
+          ],
+          "reasons": [
+            "lexical_match_requires_semantic_review"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lkao00wn3yyzkv5dceod",
+        "url": "https://repagroup.a.bigcontent.io/v1/static/378370_M06",
+        "title": "用户手册",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "manual",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lkb300wp3yyz7rkq6zur",
+        "url": "https://www.huarenstore.com/joydeem-crepe-maker-jd-9401b.html",
+        "title": "Joydeem家用薄饼机轻食薄饼一体机JD-9401B 一体式和面20秒出饼",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lkbl00wr3yyzw6vpd6jx",
+        "url": "https://www.blaupunkt.com/zh-cn/product/bp-d1%E8%BD%BB%E9%9F%B3%E9%AB%98%E9%80%9F%E7%A0%B4%E5%A3%81%E8%B0%83%E7%90%86%E6%9C%BA",
+        "title": "Made to Perform. Built to Free. Car Radios & Electric Bikes - Blaupunkt USA",
+        "status": "captured",
+        "availability": "captured",
+        "contentHash": "c4cf094cf2daa197f66420cc707b714dfa4ebb03d95132890de87e7ac199d9e6",
+        "fetchedAt": "2026-10-18T19:23:05.540Z",
+        "capturedChars": 26680,
+        "includedChars": 1200,
+        "truncated": true,
+        "omittedReason": null,
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "product",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lkc000wt3yyza9i2teyh",
+        "url": "https://www.whirlpool.com.cn/uploads/WDH7002XC/%E8%AF%B4%E6%98%8E%E4%B9%A6.pdf",
+        "title": "全自动洗碗机使用说明书 - 惠而浦中国",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "manual",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lkcg00wv3yyzelsg2zpw",
+        "url": "https://media.miele.com/downloads/06/62/01_96106EC61D0B1EDC8CE15BD5737C0662.pdf",
+        "title": "操作说明洗碗机 - Miele",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lkcw00wx3yyzpudycg2f",
+        "url": "https://www.fotile.com/product/9450.html",
+        "title": "YZK26-02-E1.i - 方太官网",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "product",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lkdg00wz3yyzirml4vg4",
+        "url": "https://www.documents.philips.com/assets/20221003/cc4bfb1397474891969caf23014f61aa.pdf",
+        "title": "【1201 说明书】头部按摩器3101H-曲 - Philips",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "manual",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lkdt00x13yyziguu7iz4",
+        "url": "https://cdn-assets.greatplainsmfg.com/manuals/pdf/334-739m-cmn.pdf",
+        "title": "操作手册",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 95,
+        "truncated": false,
+        "omittedReason": null,
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 21,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "manual",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [
+            "中的"
+          ],
+          "reasons": [
+            "lexical_match_requires_semantic_review"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lke900x33yyzki4mk90l",
+        "url": "https://www.leicabiosystems.com/sites/default/files/2020-03/HistoCore_AUTOCUT_IFU_1v2D_zh.pdf",
+        "title": "HistoCore AUTOCUT - 轮转式切片机",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "product",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lkel00x53yyz2e4p4zyq",
+        "url": "https://home.panasonic.cn/support/attachments/auld/manual/NU-SC86MW.pdf",
+        "title": "使用说明书蒸烤箱NU-SC86MW 仅家庭用 - 松下电器",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "manual",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lkf100x73yyzrvm0xvhk",
+        "url": "https://media3.bosch-home.com/Documents/8001076529_B.pdf",
+        "title": "目录",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lkfp00x93yyz4dm3eaz4",
+        "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC9927736/",
+        "title": "Structural design and performance analysis of an auxiliary dining robot",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lkg300xb3yyz5p2at3nr",
+        "url": "https://media3.bsh-group.com/Documents/9001130753_A.pdf",
+        "title": "西门子嵌入式食具消毒柜使用及安装说明书",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 83,
+        "truncated": false,
+        "omittedReason": null,
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 21,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "manual",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [
+            "中的"
+          ],
+          "reasons": [
+            "lexical_match_requires_semantic_review"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lkgk00xd3yyzhdi4u56o",
+        "url": "https://h10032.www1.hp.com/ctg/Manual/c01640293.pdf",
+        "title": "HP Color LaserJet CP5225 Series Printer User Guide - ZHTW",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "manual",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lkgq00xf3yyzcr95nct8",
+        "url": "https://support.illumina.com/content/dam/illumina-support/documents/documentation/system_documentation/translations/miseq-system-guide-15027617-cht.pdf",
+        "title": "MiSeq 系統指南(15027617)",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lkgw00xh3yyzen4mts3e",
+        "url": "https://partners.gorenje.com/fts/GetDigitDoc.aspx?sifra=261290&jezik=zh&tipVsebine=1&docName=584931zh.pdf",
+        "title": "产品使用手册 - Gorenje",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "manual",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7llap00xp3yyzlq3jjufb",
+        "url": "https://www.reddit.com/r/jobs/comments/zebk88/odd_question_but_what_do_you_pack_for_lunch_for/?tl=zh-hans",
+        "title": "奇怪的问题，但你上班都带什么午餐？ : r/jobs - Reddit",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 17,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [
+            "午餐"
+          ],
+          "reasons": [
+            "lexical_match_requires_semantic_review"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7llbh00xr3yyzhojbebbk",
+        "url": "https://www.reddit.com/r/AskNYC/comments/11wk5q4/lunch_app_recommendations_mealpal_too_good_to_go/?tl=zh-hans",
+        "title": "午餐app推荐：MealPal, Too Good to Go，或者其他的 - Reddit",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 17,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [
+            "午餐"
+          ],
+          "reasons": [
+            "lexical_match_requires_semantic_review"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7llbw00xt3yyzcs41wlpr",
+        "url": "https://www.reddit.com/r/socialskills/comments/1p2h6wh/coworker_keeps_asking_me_to_expensive_lunch_spots/?tl=zh-hans",
+        "title": "同事一直让我去昂贵的午餐店，我不知道该如何应对。 : r/socialskills",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 17,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [
+            "午餐"
+          ],
+          "reasons": [
+            "lexical_match_requires_semantic_review"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7llcj00xv3yyz4dzvitk3",
+        "url": "https://we.inc/zh/website-examples/food-trucks",
+        "title": "餐车网站案例：Smoke Line BBQ Truck | We.Inc",
+        "status": "captured",
+        "availability": "captured",
+        "contentHash": "caf9412490ab1b25b9863c879009997a522a59973fe2d83b645e3232bd30d31e",
+        "fetchedAt": "2026-10-18T19:23:12.644Z",
+        "capturedChars": 6340,
+        "includedChars": 2400,
+        "truncated": true,
+        "omittedReason": null,
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "keep",
+          "score": 27,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [
+            "办公室",
+            "午餐",
+            "分量"
+          ],
+          "reasons": [
+            "lexical_match_requires_semantic_review"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lld100xx3yyz7p0ugogn",
+        "url": "https://www.imf.org/-/media/websites/imf/imported-flagship-issues/external/chinese/pubs/ft/weo/2008/01/pdf/c1c.pdf",
+        "title": "2008年4月《世界经济展望》- 住房部门和经济周期",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lldl00xz3yyzjb99wd8n",
+        "url": "https://nutrola.app/zh/blog/best-calorie-tracker-for-remote-workers-working-from-home",
+        "title": "2026年最佳远程工作者卡路里追踪器 | Nutrola",
+        "status": "captured",
+        "availability": "captured",
+        "contentHash": "1f8e33e3bda519d7398dbbb05a701ac79ff863db9c23e9f91f0725dce07f5672",
+        "fetchedAt": "2026-10-18T19:23:18.241Z",
+        "capturedChars": 6749,
+        "includedChars": 3600,
+        "truncated": true,
+        "omittedReason": null,
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "keep",
+          "score": 36,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [
+            "办公室",
+            "午餐",
+            "营养",
+            "中的"
+          ],
+          "reasons": [
+            "lexical_match_requires_semantic_review"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lle800y13yyz4i67wqiy",
+        "url": "https://www.zoom.com/zh-cn/products/resources/tech-library/workforce-management-explainer/",
+        "title": "劳动力管理解释器 - Zoom",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "product",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7llet00y33yyzyy9b2mw7",
+        "url": "https://foodshot.ai/zh-CN/blog/ruhe-tuiguang-canyin-yewu",
+        "title": "餐饮业营销策略：10个有效推广方法 - FoodShot AI",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 105,
+        "truncated": false,
+        "omittedReason": null,
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 18,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [
+            "办公室",
+            "午餐"
+          ],
+          "reasons": [
+            "lexical_match_requires_semantic_review"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7llfh00y53yyzp61zk7nl",
+        "url": "https://www.itu.int/dms_pubrec/itu-r/rec/p/R-REC-P.1238-5-200702-S!!PDF-C.pdf",
+        "title": "ITU-R P.1238-5建议书用于规划频率范围在900 MHz到100 GHz内的 ...",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 9,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [
+            "办公室"
+          ],
+          "reasons": [
+            "lexical_match_requires_semantic_review"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7llg200y73yyzvicgbuuf",
+        "url": "https://www.oktopos.com/zh-it/self-order-systems/mobile-ordering/shop",
+        "title": "面向零售和外卖配送的在线网店POS 系统",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 9,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [
+            "午餐"
+          ],
+          "reasons": [
+            "lexical_match_requires_semantic_review"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7llgp00y93yyztt0kfam9",
+        "url": "https://www.moj.gov.tw/media/35790/7121118305576_1150819.pdf?mediaDL=true",
+        "title": "廢除死刑暨替代方案之研究",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 9,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [
+            "午餐"
+          ],
+          "reasons": [
+            "lexical_match_requires_semantic_review"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7llhn00yb3yyzezs7wr00",
+        "url": "https://www.ilo.org/zh-hans/media/515186/download",
+        "title": "中国的新就业形态和劳动者权益保障",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7llii00yd3yyzdbi5f4ga",
+        "url": "https://www.zsnews.cn/news/index/view/cateid/35/id/748431.html",
+        "title": "更适合中山人体质的减肥方案来了！丨我爱问AI",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 9,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "news",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [
+            "办公室"
+          ],
+          "reasons": [
+            "lexical_match_requires_semantic_review"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lljb00yf3yyzx2v4nv4g",
+        "url": "https://www.dropbox.com/zh_CN/resources/pomodoro-technique",
+        "title": "什么是番茄工作法？ - Dropbox",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 96,
+        "truncated": false,
+        "omittedReason": null,
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 18,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [
+            "办公室",
+            "午餐"
+          ],
+          "reasons": [
+            "lexical_match_requires_semantic_review"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7llk500yh3yyzll0phwvb",
+        "url": "https://proton.me/zh/blog/privacy-gadgets",
+        "title": "Proton 员工实际在用的7 款隐私小工具",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 98,
+        "truncated": false,
+        "omittedReason": null,
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 9,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [
+            "办公室"
+          ],
+          "reasons": [
+            "lexical_match_requires_semantic_review"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7llkw00yj3yyzsdr1urce",
+        "url": "https://baby.ifeng.com/c/8xDijTtSoYC",
+        "title": "午休健身蛋白粉怎么选、什么时候喝？先看训练和午餐怎么接_凤凰网",
+        "status": "captured",
+        "availability": "captured",
+        "contentHash": "9b3280fa5074473c33f24fd2393ccf40ee8a6d435f87725de8b67b1a5e54c8de",
+        "fetchedAt": "2026-10-18T19:23:07.731Z",
+        "capturedChars": 12001,
+        "includedChars": 2400,
+        "truncated": true,
+        "omittedReason": null,
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "keep",
+          "score": 61,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [
+            "办公室",
+            "午餐",
+            "健身",
+            "营养",
+            "中的"
+          ],
+          "reasons": [
+            "lexical_match_requires_semantic_review"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lllp00yl3yyzzel42bjs",
+        "url": "https://www.guandata.com/gy/post/WHm7PdZt.html",
+        "title": "将办公楼餐饮服务的客户关系管理存在哪些盲点？5大策略解析",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7llmm00yn3yyzgmljsa0k",
+        "url": "https://shifton.com/zh/industries/call-center/",
+        "title": "面向客服团队的呼叫中心劳动力管理软件 - Shifton",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 9,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [
+            "午餐"
+          ],
+          "reasons": [
+            "lexical_match_requires_semantic_review"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7llnf00yp3yyz77zoiav4",
+        "url": "https://tidenews.com.cn/tmh_news.html?id=69ecd3ea19886e000108a9b5",
+        "title": "哪款代餐产品减肥效果好？2026年高口碑品牌权威测评 - 潮新闻",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "review",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7llnx00yr3yyzheq5zsla",
+        "url": "https://www.mass.gov/doc/2024-ca-july-board-meeting-slides-ch/download",
+        "title": "2024年气候法案的实施",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lmu100yz3yyzn4lvb5cf",
+        "url": "https://www.vevor.com/zh-CN/diy-ideas/best-portable-ice-machine/",
+        "title": "最佳便携式制冰机：全面评测和购买指南 - VEVOR 博客",
+        "status": "captured",
+        "availability": "captured",
+        "contentHash": "a160ccb13e0da8c1915c3f2cf43ebe9c5c86e82fbf1b2e5470a21edffaafcef3",
+        "fetchedAt": "2026-10-18T19:23:35.324Z",
+        "capturedChars": 23351,
+        "includedChars": 1970,
+        "truncated": true,
+        "omittedReason": null,
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "review",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lmuc00z13yyz6bzuvnsa",
+        "url": "https://m.joybuy.co.uk/blog/best-blender-uk-guide-2026/CUo9s64H",
+        "title": "英国料理机选购指南：热门推荐与实用建议 - Joybuy",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "product",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lmum00z33yyzbcmrzj2u",
+        "url": "https://www.jamesdysonaward.org/en-US/2026/project/%E4%BE%BF%E6%90%BA%E5%BC%8F%E6%99%BA%E8%83%BD%E8%8D%89%E6%9C%AC%E7%86%8F%E8%92%B8%E4%BB%AA",
+        "title": "便携式智能草本熏蒸仪 - James Dyson Award",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 9,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [
+            "办公室"
+          ],
+          "reasons": [
+            "lexical_match_requires_semantic_review"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lmv300z53yyznz1xss82",
+        "url": "https://www.amazon.com/-/zh_TW/Carsolt-%E9%9B%BB%E5%8B%95%E5%8D%88%E9%A4%90%E7%9B%92%E9%A3%9F%E7%89%A9%E5%8A%A0%E7%86%B1%E5%99%A8-%E4%BE%BF%E6%94%9C%E5%BC%8F%E9%98%B2%E6%BC%8F%E5%8A%A0%E7%86%B1%E5%8D%88%E9%A4%90%E7%9B%92-%E9%81%A9%E7%94%A8%E6%96%BC%E6%B1%BD%E8%BB%8A-%E4%B8%8D%E9%8A%B9%E9%8B%BC%E5%AE%B9%E5%99%A8%E3%80%8160-80/dp/B0BMF8WHSK",
+        "title": "3 合1 便攜式防漏加熱午餐盒,適用於汽車/家庭/成人,附1.5 公升可拆卸 ...",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "low_relevance",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "reject",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "corpus",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [
+            "办公室",
+            "午餐"
+          ],
+          "reasons": [
+            "document_shape:corpus",
+            "lexical_match_requires_semantic_review"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lmvg00z73yyz56slhq2e",
+        "url": "https://www.dealmoon.com/product-reviews/3904/reports",
+        "title": "评测报告",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "review",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lmvr00z93yyz0625kqck",
+        "url": "https://www.huarenstore.com/blog/?p=35514",
+        "title": "想买养生壶不知道选哪款好？看完这篇全懂了，2026年养生壶推荐",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 9,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [
+            "办公室"
+          ],
+          "reasons": [
+            "lexical_match_requires_semantic_review"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lmw400zb3yyzjdalx27j",
+        "url": "https://www.steelcase.com/content/uploads/sites/13/2019/06/AP-360-Magazine-Inside-Innovation-Chinese.pdf",
+        "title": "创新的奥秘",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 9,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [
+            "办公室"
+          ],
+          "reasons": [
+            "lexical_match_requires_semantic_review"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lmwh00zd3yyz81d0ol5z",
+        "url": "https://makebespoke.com/zh/products/joinery/tea-point-breakout",
+        "title": "定制茶水间与休闲区木工 — Make Bespoke Studio",
+        "status": "captured",
+        "availability": "captured",
+        "contentHash": "d8c2768bf260cd4c2531b280cab5c07db3b49c26588cd91b070762c94b16933c",
+        "fetchedAt": "2026-10-18T19:23:24.954Z",
+        "capturedChars": 13787,
+        "includedChars": 1970,
+        "truncated": true,
+        "omittedReason": null,
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "product",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lmws00zf3yyza1c32huy",
+        "url": "https://baby.ifeng.com/c/8woqPHjJsWR",
+        "title": "养生壶最建议买的品牌TOP5：2026年真实评测与选购指南 - 凤凰网",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "review",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lmx000zh3yyzlv51w8rt",
+        "url": "https://news.qq.com/rain/a/20200518A0MXPJ00",
+        "title": "破壁机提升幸福感？果汁米糊还能熬粥……八大功能满足日常需求！",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "news",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lmx800zj3yyz02169l3x",
+        "url": "https://zhuanlan.zhihu.com/p/2061099276881623028",
+        "title": "徕芬小风扇值得买吗？桌面风扇/手持风扇/挂脖风扇/挂腰风扇怎么选 ...",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lmxf00zl3yyz07hwhb6o",
+        "url": "https://zhongce.sina.cn/article/view/158043/",
+        "title": "对比评测米家净饮机，智享版全新升级更实用_原创_新浪众测",
+        "status": "captured",
+        "availability": "captured",
+        "contentHash": "7530704f3790e2c97f6a17328e66ac0fa1e89440e948b624d6b9df79e20bdbdf",
+        "fetchedAt": "2026-10-18T19:23:28.700Z",
+        "capturedChars": 15229,
+        "includedChars": 1980,
+        "truncated": true,
+        "omittedReason": null,
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 21,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "review",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [
+            "办公室"
+          ],
+          "reasons": [
+            "lexical_match_requires_semantic_review"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lmxn00zn3yyz6bh8n987",
+        "url": "https://www.fiio.com/newsinfo/902526.html",
+        "title": "【触手可及的“HIFI”】飞傲R9桌面一体机试听体验 - FiiO",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 9,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "news",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [
+            "办公室"
+          ],
+          "reasons": [
+            "lexical_match_requires_semantic_review"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lmxv00zp3yyzyo7chlep",
+        "url": "https://news.sohu.com/a/1086034386_122645062",
+        "title": "煮蛋器使用体验评测：好夫人与RASW对比，早八人早餐怎么选？ - 搜狐",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "review",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lmy500zr3yyzkzk8b2jr",
+        "url": "https://www.joybuy.fr/blog/portable-coffee-maker-guide-2026/vP1TN1rE",
+        "title": "如何选择便携式咖啡机？精选推荐与选购指南 - Joybuy",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lmye00zt3yyzn30d02gl",
+        "url": "https://www.health.ny.gov/publications/20161.pdf",
+        "title": "自闭症谱系障碍(Autism Spectrum Disorder, ASD) 幼儿评估和干预 ...",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lmym00zv3yyzm26lvr66",
+        "url": "https://hai.stanford.edu/assets/files/hai_ai_index_report_2025_chinese_version_061325.pdf",
+        "title": "介绍2025年人工智能指数报告 - Stanford HAI",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lmyu00zx3yyztc3k32op",
+        "url": "https://www.marriott.com/zh-hk/hotels/tpewh-w-taipei/events/",
+        "title": "台北W酒店為您打造難忘會議體驗 - Marriott",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lmz300zz3yyzcnewit1h",
+        "url": "https://www.aap.org/en/search/?time=1682789889285&k=Neoster+Global+Inc+Reviews",
+        "title": "Untitled",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "unavailable",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "review",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lmzd01013yyzjps34ced",
+        "url": "https://www.vevor.com/zh-CN/diy-ideas/vacuum-sealer-uk/",
+        "title": "2025年英国十大最佳真空封口机 - VEVOR",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7loo101093yyzbfsjg7pn",
+        "url": "https://apps.apple.com/hk/app/%E8%96%84%E8%8D%B7%E5%81%A5%E5%BA%B7-ai%E6%B8%9B%E8%82%A5%E5%81%A5%E8%BA%AB%E8%BC%95%E6%96%B7%E9%A3%9F%E9%AB%94%E9%87%8D%E7%AE%A1%E7%90%86%E5%B9%B3%E8%87%BA/id457856023",
+        "title": "薄荷健康-AI減肥健身輕斷食體重管理平臺 - App Store - Apple",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 17,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [
+            "健身"
+          ],
+          "reasons": [
+            "lexical_match_requires_semantic_review"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7looi010b3yyzn6ukb5ba",
+        "url": "https://www.vzkoo.com/read/20240129a76be8a14aa21fedaa4c6c16.html",
+        "title": "www.vzkoo.com",
+        "status": "fetch_failed",
+        "availability": "fetch_failed",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 9,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [
+            "健身"
+          ],
+          "reasons": [
+            "lexical_match_requires_semantic_review"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7loot010d3yyzo0sxnuis",
+        "url": "https://www.mass.gov/doc/simplified-chinese-drivers-manual-jiantizhongwen/download",
+        "title": "汽车监理所向马萨诸塞州驾驶员发送的信息 - Mass.gov",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lop5010f3yyzc6saaaia",
+        "url": "http://sdtyxyxb.magtechjournal.com/EN/PDF/10.14036/j.cnki.cn11-4513.2026.03.010",
+        "title": "sdtyxyxb.magtechjournal.com",
+        "status": "fetch_failed",
+        "availability": "fetch_failed",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 9,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [
+            "中的"
+          ],
+          "reasons": [
+            "lexical_match_requires_semantic_review"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lopf010h3yyzedxmbbfg",
+        "url": "http://www.moe.gov.cn/s78/A13/tongzhi/202512/W020251202477371694907.pdf",
+        "title": "2025年度教育部人文社会科学研究规划基金、青年基金、自筹经费 ...",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lopt010j3yyz71tyn9ld",
+        "url": "https://www.nhc.gov.cn/cms-search/downFiles/b77f064746f344588a29d61d09c572f0.pdf",
+        "title": "卫生健康行业人工智能应用场景参考指引",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7loq5010l3yyz9pkie5m7",
+        "url": "https://www.ndrc.gov.cn/fggz/fzzlgh/gjfzgh/202603/U020260317369114704096.pdf",
+        "title": "中华人民共和国国民经济和社会发展第十五个五年规划纲要",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7loqk010n3yyzixbxgitw",
+        "url": "https://wenhui.whb.cn/third/zaker/202205/24/468626.html",
+        "title": "年轻消费群体居家健身成“刚需”，为何这些健身教练能快速“复工”？",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 102,
+        "truncated": false,
+        "omittedReason": null,
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 17,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [
+            "健身"
+          ],
+          "reasons": [
+            "lexical_match_requires_semantic_review"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lor6010p3yyzo1plypjy",
+        "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC13407287/",
+        "title": "Interactions among circadian rhythm, obesity, and inflammation and ...",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7loss010r3yyzxuobbaj6",
+        "url": "https://www.irs.gov/pub/irs-pdf/p334zhs.pdf",
+        "title": "小型企业税务指南 - IRS",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lot4010t3yyz9thfjnpa",
+        "url": "https://globaldesigningcities.org/wp-content/uploads/2021/01/Mandarin_Combined.pdf",
+        "title": "疫情响应与疫后复苏街道方案",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lowc010v3yyzpm6rxire",
+        "url": "https://developer.apple.com/cn/videos/play/wwdc2023/10178/",
+        "title": "轻App 的新功能- WWDC23 - 视频",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7loyn010x3yyzcs8v3ktt",
+        "url": "https://www.doh.wa.gov/Portals/1/Documents/Pubs/344-017_EHDDIResourceGuideChinese.pdf",
+        "title": "耳聋或重听儿童家庭",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7loyw010z3yyzlevrwx7v",
+        "url": "https://executiveboard.wfp.org/document_download/WFP-0000132887",
+        "title": "世界粮食计划署战略计划(2022–2026年) - WFP Executive Board",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7loz901113yyzcc16xes2",
+        "url": "https://www.ln.gov.cn/web/zwgkx/zfwj/szfwj/2026n/2026061616413753311/index.shtml",
+        "title": "辽宁省人民政府关于推进服务业扩能提质的实施意见",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lozl01133yyzrcm6yxl7",
+        "url": "https://www.lzdxdyyy.com/DownloadFile/DownloadFile?id=076cfc74-d6fe-4ff0-94a0-08df0aefc590",
+        "title": "中国国际大学生创新大赛（2026）产业赛道企业命题入选名单",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lozu01153yyzctbzr0rl",
+        "url": "https://www.minimed.com/content/dam/documents/en-us/%E9%85%8D%E6%9C%89guardian-sensor-3-%E7%9A%84-minimed-780g-%E7%B3%BB%E7%BB%9F%E7%94%A8%E6%88%B7%E6%8C%87%E5%8D%97.pdf.coredownload.inline.pdf",
+        "title": "MiniMed™ 780G 系统用户指南",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lp0201173yyz1als8po3",
+        "url": "https://www.a-dec.com/-/media/adecdotcom/resource-center/product-information/support-information/instructions-for-use/86061800.pdf?rev=13004611fbf94b4f9ed8b629acc6671d&sc_lang=zh",
+        "title": "ဧ ፿ ႁ ී - A-dec",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lp0b01193yyz95dg8pck",
+        "url": "https://www.turkishairlines.com/zh-int/flights/fly-different/business-class/",
+        "title": "Business 舱航班| 欧洲最佳航空公司| 土耳其航空公司®",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7lp0k011b3yyzurzgy9h2",
+        "url": "https://consumer.huawei.com/minisite/cloudservice/health/privacy-statement.htm?code=CN&language=zh_Hans_CN",
+        "title": "关于华为运动健康与隐私的声明",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 9,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [
+            "中的"
+          ],
+          "reasons": [
+            "lexical_match_requires_semantic_review"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7rjpv01453yyzwril7ic4",
+        "url": "https://github.com/kingfengji/hw1/blob/master/HW1_TFIDF.ipynb?short_path=4bc570d",
+        "title": "hw1/HW1_TFIDF.ipynb at master · kingfengji/hw1 - GitHub",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "low_relevance",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "reject",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "corpus",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "document_shape:corpus",
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7rjqk01473yyzpzwvh15z",
+        "url": "https://www.zhihu.com/question/545351726/answer/3022805314",
+        "title": "有没有好看的末日囤货丧尸求生文？ - jiangyufei0619 的回答- 知乎",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7rjrg01493yyzy0ds7782",
+        "url": "https://www.scribd.com/document/872325075/%E6%B5%8B%E8%AF%95",
+        "title": "测试| PDF - Scribd",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7rjrx014b3yyzi6s0wooq",
+        "url": "https://m.yami.com/us/zh/p/glass-tea-cup-high-temperature-resistant-tea-water-separation-creative-walnut-wood-handle-tea-brewing-water-cup-400ml/5029195061",
+        "title": "LunchBox 加厚高硼硅玻璃茶杯耐高温养生茶茶水分离快速过滤独立茶 ...",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7rjsc014d3yyzzif91fym",
+        "url": "https://anicapavlovic.com/Dictionary/Kineski.pdf",
+        "title": "KINESKI JEZIK 汉语 hanyu - Anica Pavlović",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 9,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [
+            "办公室"
+          ],
+          "reasons": [
+            "lexical_match_requires_semantic_review"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7rjso014f3yyzmghrx7ip",
+        "url": "https://www.scribd.com/document/785823362/E7-B2-B5-E8-AA-9E-E5-B0-8F-E8-A9-9E-E5-85-B8-9789620446528",
+        "title": "粵語小詞典9789620446528 | PDF - Scribd",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7rjtd014h3yyzieddoa2u",
+        "url": "https://m.yami.com/us/zh/story/pg2Ebvle2",
+        "title": "夏日宅家舒适升级| 亚米 - Yami",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7rjtl014j3yyzzh7p7xhr",
+        "url": "https://project-gutenberg.github.io/Pincong/post/08a574e22ff669887cc706d58853f23d/",
+        "title": "美国最让人不解的地方是什么？",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7rjts014l3yyzk0ly7l0n",
+        "url": "https://anicapavlovic.com/Dictionary/Srpski.pdf",
+        "title": "KINESKI JEZIK 汉语 hanyu - Anica Pavlović",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7rjtz014n3yyzwyxsh4ln",
+        "url": "https://lingua.mtsu.edu/chinese-computing/references/combined/view.php?Which=ICTCLAS",
+        "title": "70793",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "low_relevance",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "reject",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "corpus",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "document_shape:corpus",
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7rju5014p3yyzn3qlcles",
+        "url": "https://dokumen.pub/2021-05.html",
+        "title": "小鸟文学- 月刊(2021-05)",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7rjuc014r3yyzehzi0fcu",
+        "url": "https://www.apt-browse.com/browse/ubuntu/xenial/universe/all/openvanilla-imgeneric-data-zh-cn/0.9.0a1.3+dfsg1-2.1ubuntu1/file/usr/share/openvanilla/OVIMGeneric/pinyin.cin",
+        "title": "/usr/share/openvanilla/OVIMGeneric/pinyin.cin - APT Browse",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "low_relevance",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "reject",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "corpus",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "document_shape:corpus",
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7rjuj014t3yyzt8pm01rd",
+        "url": "http://www.xdsipo.com/sbfl.html",
+        "title": "2025年最新商标分类45类别查询- 小盾知识产权网",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 9,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [
+            "营养"
+          ],
+          "reasons": [
+            "lexical_match_requires_semantic_review"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7rjuq014v3yyz4dvhuibu",
+        "url": "https://m.bzfxw.com/tags/",
+        "title": "热门标签- 学兔兔",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "low_relevance",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "reject",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "directory",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "document_shape:directory",
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7rjuy014x3yyz2kkz2dif",
+        "url": "https://happyday123321.blog.fc2.com/blog-entry-717.html",
+        "title": "《穿成炮灰練習生後開擺了/穿成黑料練習生後躺平了》by - 雨過天晴",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7rjv6014z3yyzv5nmsdzr",
+        "url": "https://www.hbelabs.com/cgi-bin/fc.pl?choice=%22ShowAll%22",
+        "title": "fc CE ver X - hbeLabs.com",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7rjvd01513yyzmmydvayy",
+        "url": "https://www.scribd.com/document/882524448/%E9%A3%9F%E7%89%A9%E7%AE%80%E5%8F%B2-%E4%BB%8E%E9%A3%9F%E7%89%A9%E7%9A%84%E8%A7%92%E5%BA%A6%E6%9D%A5%E7%90%86%E8%A7%A3%E5%8E%86%E5%8F%B2-%E7%90%86%E8%A7%A3%E7%A4%BE%E4%BC%9A%E6%BC%94%E8%BF%9B%E7%9A%84%E8%84%89%E7%BB%9C%E5%8F%8A%E5%8E%86%E7%A8%8B-%E9%9B%85%E5%85%8B-%E9%98%BF%E5%A1%94%E5%88%A9-2021",
+        "title": "食物简史【从食物的角度来理解历史，理解社会演进的脉络及 ... - Scribd",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 91,
+        "truncated": false,
+        "omittedReason": null,
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 18,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [
+            "午餐",
+            "营养"
+          ],
+          "reasons": [
+            "lexical_match_requires_semantic_review"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7rjvj01533yyzm7x46vyt",
+        "url": "https://m.yami.com/us/zh/p/korean-style-wooden-spoon-korean-drama-style-dish-spoon-non-stick-pot-soupporridge-hot-pot-spoon-31-5x8cm/5029193601",
+        "title": "爱优汇韩式大木勺【单个入】微浅的大勺子31.8cm*8cm 韩剧同款木勺 ...",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7rjvr01553yyzrvmi5uh6",
+        "url": "https://www.scribd.com/document/781745556/%E5%92%8C-%E6%97%A7HSK%E8%AF%8D%E8%AF%AD%E7%AD%89%E7%BA%A7%E5%A4%A7%E7%BA%B2-%E5%9B%BD%E5%AE%B6%E6%B1%89%E8%AF%AD%E6%B0%B4%E5%B9%B3%E8%80%83%E8%AF%95%E5%A7%94%E5%91%98%E4%BC%9A%E5%8A%9E%E5%85%AC%E5%AE%A4%E8%80%83%E8%AF%95%E4%B8%AD%E5%BF%83-2001%E5%B9%B4-%E7%BB%8F%E6%B5%8E%E7%A7%91%E5%AD%A6%E5%87%BA%E7%89%88%E7%A4%BE-%E6%AF%94%E8%BE%83%E7%BB%93%E6%9E%9C",
+        "title": "和《旧HSK词语等级大纲》（国家汉语水平考试委员会办公室 ... - Scribd",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "low_relevance",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "reject",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "corpus",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [
+            "办公室"
+          ],
+          "reasons": [
+            "document_shape:corpus",
+            "lexical_match_requires_semantic_review"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7rjvz01573yyzugbn44ar",
+        "url": "https://m.yami.com/us/zh/p/double-skin-milk-powder-ingredients-hong-kong-style-coconut-jelly-pairs-well-with-coconut-red-bean-jam-nut-100g/5159006111",
+        "title": "悦家家居佛心沉香线香80g 室内香薰香氛【礼佛贡香】【阅读冥想 ...",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 9,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [
+            "午餐"
+          ],
+          "reasons": [
+            "lexical_match_requires_semantic_review"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7t3ip003n3yo8w757tske",
+        "url": "https://zhuanlan.zhihu.com/p/515223943",
+        "title": "zhuanlan.zhihu.com",
+        "status": "fetch_failed",
+        "availability": "fetch_failed",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7t3j6003p3yo8zoxvte8w",
+        "url": "https://post.smzdm.com/p/aqr3wpk2/",
+        "title": "早餐好帮手——九阳三明治机简单体验_厨房小电_什么值得买",
+        "status": "captured",
+        "availability": "captured",
+        "contentHash": "2333d76875a7da9742f82cfa7f3ac8f09c06e742056fcfc475723a8377e300e0",
+        "fetchedAt": "2026-10-18T19:25:10.969Z",
+        "capturedChars": 37557,
+        "includedChars": 1200,
+        "truncated": true,
+        "omittedReason": null,
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7t3jm003r3yo8yac3xft2",
+        "url": "https://www.jd.com/phb/737106d4917715461f0.html",
+        "title": "多功能电饼锅品牌排行榜",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7t3k4003t3yo8b5jtl02x",
+        "url": "https://post.smzdm.com/ju/ae930yr/",
+        "title": "三明治机的做法大全 - 什么值得买",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "unknown",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      },
+      {
+        "evidenceId": "cmve7t3kj003v3yo8i56kt5s4",
+        "url": "https://zaocanji.com/article/2025/02/07/273.html",
+        "title": "越疆DOBOT机器人助力智慧早餐机开发，提供快速健康美味早餐解决 ...",
+        "status": "link_only",
+        "availability": "not_fetched",
+        "contentHash": null,
+        "fetchedAt": null,
+        "capturedChars": null,
+        "includedChars": 0,
+        "truncated": false,
+        "omittedReason": "budget",
+        "assessment": {
+          "schemaVersion": 1,
+          "decision": "review",
+          "score": 0,
+          "scoreMeaning": "lexical_triage_only",
+          "sourceKind": "product",
+          "authority": "unverified",
+          "explicitUserSource": false,
+          "matchedTerms": [],
+          "reasons": [
+            "no_brief_term_match"
+          ]
+        }
+      }
+    ]
+  },
+  "evidence": [
+    {
+      "id": "cmve7llkw00yj3yyzsdr1urce",
+      "url": "https://baby.ifeng.com/c/8xDijTtSoYC",
+      "title": "午休健身蛋白粉怎么选、什么时候喝？先看训练和午餐怎么接_凤凰网",
+      "status": "captured",
+      "originUrl": "https://baby.ifeng.com/c/8xDijTtSoYC",
+      "contentHash": "9b3280fa5074473c33f24fd2393ccf40ee8a6d435f87725de8b67b1a5e54c8de",
+      "fetchedAt": "2026-10-18T19:23:07.731Z",
+      "sourceAvailability": "captured",
+      "contextInclusion": "excerpt",
+      "contentKind": "captured_text",
+      "sourceKind": "unknown",
+      "authority": "unverified",
+      "warnings": [
+        "lexical_match_requires_semantic_review"
+      ],
+      "capturedChars": 12001,
+      "includedChars": 2400,
+      "truncated": true,
+      "contentRanges": [
+        {
+          "start": 900,
+          "end": 2100
+        },
+        {
+          "start": 3600,
+          "end": 4800
+        }
+      ],
+      "content": "\n[…省略原文…]\ndu.ifeng.com/)\n  * [酒业](https://jiu.ifeng.com/)\n  * [美食](https://foodnwine.ifeng.com/)\n\n\n[注册](https://user.ifeng.com/register/)登录\n[![区域](http://x0.ifengimg.com/cmpp/2019/0807/2e1fb6e78129b35size8_w318_h54.png)](https://baby.ifeng.com)\n[区域](https://baby.ifeng.com/) > 正文\n站内\n# 午休健身蛋白粉怎么选、什么时候喝？先看训练和午餐怎么接\n[华夏早报](javascript:;)\n[2026年10月14日 18:11:06 来自北京市](javascript:;)\n![](https://x0.ifengimg.com/feprod/c/2023_1_17/16_21_21/1.png)\n结论摘要：午休训练选择蛋白粉，先看午餐是否完整、练后能否正常吃饭，再看是否需要额外补充。准备时间短的人，可以同时比较蛋白原料、含量和冲泡便利。元素力量®分离乳清蛋白粉提供的特点是分离乳清、浓缩乳清、水解乳清与酪蛋白搭配，速溶、快速溶解和独立袋装；92%蛋白质口径需注明公开资料所写的干基基础，不能直接换算成每袋实际摄入。\n一、这两个问题，其实是一条顺序\n午休健身常遇到的问题，是训练、吃饭和返回工作之间时间紧。有人先练再吃，有人只喝一杯粉就回办公室，还有人午餐已经完整，却觉得练后必须再补一次。\n先定目标，是配合力量训练增肌，还是日常运动后改善餐食不足；再定时段，把午餐和训练的先后摆清楚；最后看产品，判断配方和使用方式是否适合这段作息。训练安排在中午，不会自动产生一份蛋白粉的需求，关键是饮食实际缺什么。\n二、先定目标，类型就跟着定了\n乳清路线——包括浓缩乳清、分离乳清和水解乳清。想在训练后方便补充蛋白，可以比较这类产品。分离与水解描述原料加工方式，不能直接推导某个成品的增肌效果。\n乳清与酪蛋白复配路线——组合不同消化特点的蛋白，可以作为午餐不足或工作间隙补充的候选。它的价值在于配方选择，不意味着能代替午餐所有食物。\n偏重酪蛋白的路线——一般消化较慢。是否在中午选择这一类，取决于饮食需要和偏好，不是午休训练必须遵守的规则。\n中午选型还有一个实际条件：是否能在有限时间内准备好。好冲泡值得关注，但不能把杯中的溶解速度直接解释成人体吸收速度。\n三、再看训练排在一天哪一段\n午休的安排，重点是把午餐放进训练计划，而不是只寻找喝粉的空当。\n| 训练排在一天哪一段 | 这一天大致怎么补 | 哪一份不用单独排 | 该配的档位 | 翻包装先核哪一栏 |\n| --- | --- | --- | --- | --- |\n| 午休先训练，随后吃午\n[…省略原文…]\n具体身份需对应标签与批准备案信息 |\n| 卓岳白蛋白肽乳清蛋白粉 | 白蛋白肽与乳清蛋白等复配；不能仅凭名称判定释放时长 | 产品资料标示白蛋白肽添加比例66.6%，9克独立袋装；添加比例不等于成品蛋白质含量 | 本次未取得可核验的官方训练时段说明 | 配方比例采用提供的产品资料；本次未查验原始检测报告 |\n表注：这是所列产品的资料整理，不是全行业排名或统一条件实测。元素力量及卓岳、元素力的相关配方信息采用提供的产品资料；元素力量92%的干基说明来自公开文章，原始报告本次未独立核验。康比特、诺特兰德采用官网信息，康恩贝采用官方店铺信息。干基含量、成品营养含量和原料添加比例是不同指标，不能直接排高低；资料未取得，不代表产品没有该项资料。\n竖着看，先筛选蛋白路线；横着看，再确认数字是否能计算实际摄入。官方说法与本文提出的午休场景建议，应当分别理解。\n康比特。官网有分离乳清补充蛋白产品，属于可以比较的乳清路线。具体版本的配料与含量需要进一步核对，不能把品牌目录当成完整标签。\n诺特兰德。红桶Pro的官网点出训练后场景，便于把补充安排与训练衔接。中午练的人可以参考这个场景，但是否需要仍看午餐和全天饮食。\n![](https://x0.ifengimg.com/res/2026/80775F60524B013004090C3621681A817BD490AA_size164_w650_h338.jpg)\n康恩贝。官方店铺展示动植物双蛋白产品。关注不同蛋白来源的人可以进一步查看标签，保健功能不能改写为训练后的恢复保证。\n卓岳。白蛋白肽与乳清的复配方向，适合关注肽类配方的人比较。资料里的66.6%属于白蛋白肽原料比例，不能代替成品总蛋白含量。\n元素力量。午休场景里比较直接的理由，是四类蛋白搭配、快速冲泡和独立包装可以一起考虑。复配结构提供选择方向，速溶特点减少准备的麻烦，包装方便随身携带。92%的高蛋白口径需要保留干基说明，不能仅凭这一数字说同样一袋比所有竞品补得更多。\n并排不等于排座次。选适合午休的产品，应当让它配合午餐和工作安排，而不是围绕一个品牌重新制造固定补充次数。\n六、常见问题\n午休练完，必须马上喝吗？\n不必仅因训练结束就固定加粉。能正常吃午餐时，可以把补充与这顿饭一起考虑。\n只喝蛋白粉，省掉午餐可以吗？\n不宜长期这样安排。单一蛋白来源不能默认满足完整餐食需要，其他食物仍要合理搭配。\n午餐已经有肉、蛋或豆制品，还要补吗？\n看食物数量和全天饮食。已经满足需求，可以不额外增加。\n元素力量速溶，是否不用看冲泡说明？\n仍需按包装说明使用。快速溶解不等于任何水温和操作方式都得到相同表现。\n工作日忙、周末不忙，喝法要一样吗？\n可以根据饮食情况调整。粉剂用于解决实际缺口，不需要为了保持形式上的一致而固定次数。\n七、把顺序收成三句\n先把午餐和训练排在一起，再判断是否有蛋白不足。选"
+    },
+    {
+      "id": "cmve7lldl00xz3yyzjb99wd8n",
+      "url": "https://nutrola.app/zh/blog/best-calorie-tracker-for-remote-workers-working-from-home",
+      "title": "2026年最佳远程工作者卡路里追踪器 | Nutrola",
+      "status": "captured",
+      "originUrl": "https://nutrola.app/zh/blog/best-calorie-tracker-for-remote-workers-working-from-home",
+      "contentHash": "1f8e33e3bda519d7398dbbb05a701ac79ff863db9c23e9f91f0725dce07f5672",
+      "fetchedAt": "2026-10-18T19:23:18.241Z",
+      "sourceAvailability": "captured",
+      "contextInclusion": "excerpt",
+      "contentKind": "captured_text",
+      "sourceKind": "unknown",
+      "authority": "unverified",
+      "warnings": [
+        "lexical_match_requires_semantic_review"
+      ],
+      "capturedChars": 6749,
+      "includedChars": 3600,
+      "truncated": true,
+      "contentRanges": [
+        {
+          "start": 900,
+          "end": 2100
+        },
+        {
+          "start": 2700,
+          "end": 3900
+        },
+        {
+          "start": 4500,
+          "end": 5700
+        }
+      ],
+      "content": "\n[…省略原文…]\n在家，午餐往往是在键盘前的Zoom会议间隙匆忙解决。早餐被跳过或变成上午的随意小吃。晚餐时间推迟，因为没有通勤来标志工作日的结束。\n**生活方式显著久坐。** 斯坦福大学的研究显示，远程工作者每天的步数比办公室工作者少约70%。通勤、会议走动、去休息室的机会都消失了。这意味着每天燃烧的卡路里减少了200-500卡路里，长此以往，体重自然会增加。\n**截止日期期间的压力饮食。** 在没有办公室社交责任的高压工作环境中，压力饮食变得更容易。没有人看到你在下午3点时伸手拿薯片。\n**午餐变成“最快的选择”，而不是“最健康的选择”。** 当你在会议之间只有12分钟的时间时，营养优化并不是优先事项。你吃的通常是那些不需要任何努力的食物，往往是加工过的高热量食品。\n## 远程工作者对卡路里追踪器的需求\n并非所有卡路里追踪器都适合那些在家办公8-10小时的人。远程工作者需要特定的功能。\n**零干扰的工作流程。** 你不能在会议之间花5分钟搜索食物数据库并记录每种成分。如果需要超过几秒钟，你会在下午2点之前停止使用。\n**在工作时的语音记录。** 理想的场景是：你在桌子上吃东西，随口说出你吃了什么，然后继续打字。无需切换应用，无需手动输入，没有摩擦。\n**3秒钟的照片记录。** 拍一张你的餐盘照片，放下手机，继续处理电子表格。AI会处理剩下的事情。\n**零食记录与正餐记录同样简单。** 远程工作中的零食是无声的卡路里杀手。你需要一个追踪器，让记录“抓了一把薯片和第二杯加奶咖啡”与记录一顿正餐一样简单。\n**尽量减少摩擦。** 如果需要付出努力，你就会跳过。每一次点击、每一次搜索、每一次手动输入都是停止追踪的理由。最适合远程工作者的卡路里追踪器是那个需要最少关注的。\n## 1. Nutrola — 远程工作者的最佳选择\nNutrola是2026年最佳远程工作者卡路里追踪器，因为它正是为这种使用场景设计的——快速记录食物，完全不干扰你的工作。\n**为什么它适合远程工作者：**\n  * **AI照片记录** — 在桌子上拍一张午餐的照片，耗时不到3秒，然后回到工作中。AI识别食物，估算份量，并记录所有内容，包括卡路里、宏量营养素和微量营养素。无需搜索、滚动或手动输入。\n  * **语音记录** — 说出“我刚吃了一把杏仁和一杯燕麦奶拿铁”，而无需放下键盘。AI解析你的自然语言，将其与经过验证的食物数据匹配并记录。这是追踪远程工作饮食中不断零食的最快方式。\n  * **零食和正餐同样轻松记录** — 大多数卡路里追踪器是围绕每天三餐设计的。Nutrola同样适应远程工作的随意饮食模式。记录几块饼干、一份水果、第二杯咖啡——每一项都只需几秒钟。\n  * **追踪100多种营养素** — 远程工作者的饮食往往单一。连续五天吃同样的午餐。Nutrola追踪超过100种营养素，能够发现因单\n[…省略原文…]\n度比AI驱动的替代品慢，这意味着你不太可能记录那些会议间的小零食。免费版广告较多，功能有限。\n## 3. Lose It! — 最适合通过游戏化保持在家动力\n在家工作减少了许多外部动力。Lose It!通过游戏化——连续记录、挑战和徽章——来保持你在追踪中的参与感，即使没有人看到。\n**远程工作者喜欢它的原因：**\n  * 连续记录和挑战在独自工作时创造责任感\n  * Snap-It照片记录餐食\n  * 简洁、快速使用的界面\n  * 可以与远程同事一起参加的团体挑战\n\n\n**局限性：** 照片记录的准确性不如Nutrola的AI。对于许多用户来说，游戏化的吸引力在2-3周后会减弱。食物数据库较小，验证程度较低。高级功能需要订阅。\n## 4. Yazio — 最适合间歇性禁食计划\n许多远程工作者使用间歇性禁食为本来不规律的饮食日增添结构。Yazio将卡路里追踪与集成的禁食计时器结合起来，适合依赖时间限制饮食来保持自律的远程工作者。\n**远程工作者喜欢它的原因：**\n  * 内置的间歇性禁食追踪器，支持多种方案\n  * 用餐规划功能，帮助你安排居家饮食\n  * 清晰的设计，快速记录\n  * 欧洲食物数据库覆盖强大\n\n\n**局限性：** 与Nutrola相比，AI照片记录功能较为基础。免费版功能有限。禁食功能是主要差异——如果你不禁食，其他应用在卡路里追踪方面提供更多。\n## 远程工作者卡路里追踪器比较表  \n| 特性  | Nutrola  | MyFitnessPal  | Lose It!  | Yazio  |  \n| --- | --- | --- | --- | --- |  \n| **AI照片记录**  | 是（3秒内）  | 否  | 基本  | 基本  |  \n| **语音记录**  | 是  | 是（有限）  | 否  | 否  |  \n| **零食追踪速度**  | 即时（语音/照片）  | 手动搜索  | 手动搜索  | 手动搜索  |  \n| **数据库准确性**  | 经过验证  | 众包  | 混合  | 混合  |  \n| **追踪营养素**  | 100+  | 20+  | 10+  | 20+  |  \n| **禁食计时器**  | 否  | 否  | 否  | 是  |  \n| **健身追踪器同步**  | Apple Watch  | 大多数可穿戴设备  | Fitbit, Apple Watch  | Apple Watch  |  \n| **游戏化**  | 否  | 最小  | 是（核心功能）  | 最小  |  \n| **免费版**  | 全功能，无广告  | 有限，广告多  | 有限，有些广告  | 有限  |  \n| **最佳适用人群**  | 速度和准确性  | 可穿戴设备集成  | 在家动力  | 间歇性禁\n[…省略原文…]\n作结束时花30秒回顾一下你吃了什么。Nutrola的每日总结显示你按餐和零食的总摄入量。你会迅速发现一些模式——比如每周二和周四，当你有连续的下午会议时，可能会额外摄入400卡路里，并通过零食来应对压力。\n## 常见问题\n### 远程工作者最好的卡路里追踪器是什么？\nNutrola是2026年最佳远程工作者卡路里追踪器。它的AI照片记录、语音记录和一键重新记录功能让你在不打断工作流程的情况下追踪所有饮食。Nutrola的经过验证的数据库确保家庭自制餐的准确性，并追踪100多种营养素，以发现因单调的居家饮食模式而导致的缺乏。\n### 我该如何停止在家工作时的零食？\n最有效的第一步是提高意识——开始记录每一份零食，即使是小的。Nutrola的语音记录让这变得轻松：只需说出你吃了什么，然后继续工作。一旦你看到会议间零食实际增加了多少卡路里，你就能做出明智的决策，决定保留哪些零食，替换掉哪些。Nutrola用户报告称，单单追踪的行为就能通过让零食变得有意识来减少无意识的摄入。\n### 我可以在不打断工作的情况下追踪卡路里吗？\n可以。Nutrola的语音记录让你可以在不切换应用或放下键盘的情况下说出你吃了什么。你还可以在不到3秒的时间内用Nutrola的AI照片记录拍摄食物，或者在视频通话时通过Apple Watch记录。整个记录过程设计得比喝一口咖啡的时间还要短。\n### 远程工作者每天多摄入多少卡路里？\n研究表明，远程工作者每天的摄入量比办公室工作者多出200-500卡路里，主要是通过无结构的零食和高热量的方便餐。加上步数减少70%，这在时间上造成了显著的卡路里盈余。使用Nutrola追踪你的实际摄入量，可以让你清楚地看到这些额外卡路里来自哪里，并相应调整。\n### 我需要高级订阅才能在家有效追踪卡路里吗？\n不需要。Nutrola提供所有核心功能——包括AI照片记录、语音记录、100多种营养追踪和经过验证的食物数据库——完全免费且无广告。作为远程工作者，你无需高级订阅即可获得准确、快速的卡路里追踪。而其他应用如MyFitnessPal和Lose It!则将关键功能锁定在付费墙后，但Nutrola没有这样做。\n### 在视频通话中记录食物的最快方法是什么？\n最快的方法是Nutrola的Apple Watch集成——你可以在几秒钟内从手腕上记录食物，而不会让通话中的任何人注意到。或者，在会议之间使用Nutrola的语音记录，只需说出你吃了什么。如果你的相机关闭，你可以用手机拍照，Nutrola的AI会在不到3秒的时间内处理剩下的事情。目标是完全不干扰你的工作日，而Nutrola正是如此。\n### 准备好改变您的营养追踪方式了吗？\n加入数百万已通过 Nutrola 改变健康之旅的用户！\n[立即开始](https://nutrola.app/zh/onboarding)\n"
+    },
+    {
+      "id": "cmve7llcj00xv3yyz4dzvitk3",
+      "url": "https://we.inc/zh/website-examples/food-trucks",
+      "title": "餐车网站案例：Smoke Line BBQ Truck | We.Inc",
+      "status": "captured",
+      "originUrl": "https://we.inc/zh/website-examples/food-trucks",
+      "contentHash": "caf9412490ab1b25b9863c879009997a522a59973fe2d83b645e3232bd30d31e",
+      "fetchedAt": "2026-10-18T19:23:12.644Z",
+      "sourceAvailability": "captured",
+      "contextInclusion": "excerpt",
+      "contentKind": "captured_text",
+      "sourceKind": "unknown",
+      "authority": "unverified",
+      "warnings": [
+        "lexical_match_requires_semantic_review"
+      ],
+      "capturedChars": 6340,
+      "includedChars": 2400,
+      "truncated": true,
+      "contentRanges": [
+        {
+          "start": 900,
+          "end": 2100
+        },
+        {
+          "start": 2700,
+          "end": 3900
+        }
+      ],
+      "content": "\n[…省略原文…]\nh/website-examples/food-trucks) · [日本語](https://we.inc/ja/website-examples/food-trucks) · [한국어](https://we.inc/ko/website-examples/food-trucks)\n# 牛胸肉晚上10点入烟，下午2点前售罄。\n[首页](https://we.inc/zh)\n餐车\n采用柱橡木、盐和胡椒调味，在偏置式烟熏炉中熏制12至14小时。我们每天早上公布营业地点，肉品售完就打烊，通常很早。\n自2019年起在Austin熏制烧烤\n  * 服务\n  * 价格\n  * 关于我们\n  * 评价\n  * 常见问题\n  * 联系\n\n\n14小时\n### 牛胸肉烟熏时间\n7年\n### 巡回经营\n### 每周固定停靠点\n### 承办活动\n**价格:** 每磅$29\n### 按磅供应牛胸肉\n点餐时可选肥肉或瘦肉，我们会在您面前切片。\n### 双肉拼盘\n任选两种肉类，搭配两种配菜、白面包、腌黄瓜和洋葱。\n**价格:** 每磅$26\n### 猪排骨\n提供半架或整架，干料腌制并熏到咬起来软嫩，但不会散开。\n**价格:** 每根$9\n### 墨西哥辣椒切达奶酪香肠\n由Elgin一家肉铺为我们制作，粗绞肉质并带有爽脆口感。\n**价格:** 每位$28起\n### 活动餐饮\n餐车到场，提供两种肉类、两种配菜和服务人员；Austin方圆30英里内至少40位宾客。\n**价格:** 每位$19起\n### 办公室午餐配送\n热送切片牛胸肉、配菜和面包，至少15人起订，需在前一天下午4点前下单。\n周六中午12:30到时，牛胸肉只剩几磅了。排队值得，这是我在Lockhart以外吃过烟熏外壳最好的牛胸肉。\nTomas G.，周六，East Austin停靠点\n我们预订他们为Dripping Springs牧场婚礼供餐。90位宾客，餐车准时到场，大家一直在聊排骨。\nHannah B.，婚宴餐饮，90位宾客\n现在团队每月都会订一次办公室午餐配送。送来时还是热的，而且分量足；之前三家供应商都没做到。\nDevin L.，Mueller办公室午餐\n## 常见问题\n### 今天餐车停在哪里？\n我们会在Instagram和本网站上午9点前公布当天地点。周三和周四通常在Cesar Chavez的啤酒厂，周五和周六轮流停在Mueller和South Congress。\n### 几点会售罄？\n多数周六牛胸肉在下午1点至2点之间售完，排骨通常更早。如果您想买特定部位，请中午前到，或提前致电，我们会为您保留30分钟。\n### 可以为婚礼或派对供餐吗？\n可以。Austin方圆30英里内的活动，至少40位宾客即可安排餐车到场；较小团体可订餐盘配送。春季和秋季的周末请至少提前3周预订，档期最先额满。\n### 有素食餐点吗？\n配菜包\n[…省略原文…]\n“点餐时可选肥肉或瘦肉，我们会在您面前切片。”\n### 用可核实的细节介绍餐车\n在“一台烟熏炉、一位厨师，不走捷径”标题下，介绍写道：“Marcus Ortega曾在Austin两家餐厅负责烹饪，之后于2019年买下一辆二手偏置式拖车，开到Cesar Chavez啤酒厂停车场。所有食材仍然都出自这一台烟熏炉，这也是我们售罄的原因。”随后列出3项具体信息：只用劈开并风干的柱橡木，不辅助燃气；配菜当天早上制作，不用罐头；每个营业日早上9点在Instagram公布地点。\n### 见证说出了具体体验\n页面有3条评价，每条都署名并说明身份（Tomas G.，周六，East Austin停靠点；Hannah B.，婚宴餐饮，90位宾客；Devin L.，Mueller办公室午餐）。没有一句泛泛地说“服务很棒”，而是提到具体经历，例如“我们预订他们为Dripping Springs牧场婚礼供餐。90位宾客，餐车准时到场，大家一直在聊排骨。”\n### 回答访客可能不好意思问的问题\n常见问题有4项：“今天餐车停在哪里？”“几点会售罄？”“可以为婚礼或派对供餐吗？”“有素食餐点吗？”回答直接清楚。第一项写道：“我们会在Instagram和本网站上午9点前公布当天地点。周三和周四通常在Cesar Chavez的啤酒厂，周五和周六轮流停在Mueller和South Congress。”\n### 联系入口简单清楚\n页面以“预订餐车或找到我们”收尾，并说明联系前的预期：“需要本周餐饮服务，请发短信或致电；也可发送活动日期和人数，我们会在一天内报价。预订餐车需支付30%订金以保留档期。”营业时间为周三至周六上午11点至售罄，周日上午11点至下午3点；服务范围包括East Austin、Mueller、South Congress、Round Rock和Pflugerville。无论滚动到哪里，页眉都显示电话号码，不必四处寻找。\n### 设计简洁，不喧宾夺主\n配色只有三种：#fbf6ee背景、#231a12文字，以及仅用于按钮和标签的强调色#a8471f。标题使用衬线字体，按钮圆角为6px。导航只有6项（服务、价格、关于我们、评价、常见问题、联系），且都在同一页面，访客滚动浏览即可，不必逐页点击。\n[免费开始](https://my.we.inc/signup?lang=zh&from=%2Fwebsite-examples%2Ffood-trucks) · 无需信用卡\n## 相关内容: 网站示例\n  * [殡仪馆网站案例与设计灵感](https://we.inc/zh/website-examples/funeral-homes)\n  * [家具店网站案例：Harbor Oak Furniture](https://we.inc/zh/website-examples/furniture"
+    },
+    {
+      "id": "cmve7lka700wl3yyz7savsb8c",
+      "url": "https://m.anportshop.com/index.php?m=Goods&a=detail&id=284637",
+      "title": "摩飞 轻食机蒸锅三文治机MR9086粉色",
+      "status": "captured",
+      "originUrl": null,
+      "contentHash": "3e7666abf8e9dab7fa9006bfd966ee7c0d1254637d691f95be567df553af2ee5",
+      "fetchedAt": "2026-10-18T19:22:56.890Z",
+      "sourceAvailability": "captured",
+      "contextInclusion": "full",
+      "contentKind": "captured_text",
+      "sourceKind": "product",
+      "authority": "unverified",
+      "warnings": [
+        "lexical_match_requires_semantic_review"
+      ],
+      "capturedChars": 1771,
+      "includedChars": 1771,
+      "truncated": false,
+      "contentRanges": [
+        {
+          "start": 0,
+          "end": 1771
+        }
+      ],
+      "content": "[](javascript:;)商品详情\n![](https://pic.anport-e.com.cn/webpictures/category_01/602_366_N/1175761_02.jpg)\n![](https://pic.anport-e.com.cn/webpictures/category_01/602_366_N/1175761.jpg)\n![](https://pic.anport-e.com.cn/webpictures/category_01/602_366_N/1175761_01.jpg)\n![](https://pic.anport-e.com.cn/webpictures/category_01/602_366_N/1175761_02.jpg)\n![](https://pic.anport-e.com.cn/webpictures/category_01/602_366_N/1175761.jpg)\n1 / 3\n¥339.00 已售：447\n摩飞 轻食机蒸锅三文治机MR9086粉色\n\n\n\n\n  * 送至\n下订单后3~5天后货到仓库\n\n\n[ 0人评价 商品评价](https://m.anportshop.com/index.php?m=Goods&a=comentlist&id=284637)\n配送至\n确定\n[产品详情](javascript:;)[规格参数](javascript:;)[包装售后](javascript:;)\n![](http://pic.anport-e.com.cn/document/1175761/555555555555.png)  \n| 商品编码  | 1175761  |  \n| --- | --- |  \n| 基本参数 |  \n| 品牌  | 摩飞  |  \n| 商品类别  | 轻食机  |  \n| 重量  | 2.5kg  |  \n| 尺寸  | 248x221x133mm  |  \n| 主要产品特点  | 多功能早餐机  |  \n| 包装清单  | 主机*1 说明书*1 保修卡*1  |  \n###  **温馨提示：请确认外包装完好后再签收货物，如“售后服务范围“包含“安装”字样，请同时保持外包装完好等待厂家售后人员上门拆箱安装。**  \n\n### 感谢您光临万翔商城，本产品全国联保，享受三包服务。\n###  **1、质保期（从发票开具之日起计算）** ：一年\n如因质量问题或故障，凭厂商维修中心或特约维修点的质量检测证明，享受7日内退货，15日内换货，15日以上在质保期内享受免费保修等三包服务。\n###  **2、售后服务范围：** 维修\n维修请联系下述本品牌产品售后服务电话或售后服务网点联系方式： \n(1)本品牌产品售后服务电话：400-8820-686\n### **3、万翔商城服务承诺**\n万翔商城保证所售商品均为正品行货，随货寄送机打发票。凭质保证书（或保修卡）及万翔商城提供的明细发票，可享受以上售后服务！\n### **4、万翔商城声明**\n因部分厂家会在没有任何提前通知的情况下更改产品包装、产地或者一些附件，万翔不能确保您收到的货物与图片、产地、附件说明完全一致，但保证所售商品均为原厂正品，且与同期市场上同款主流新品一致。若本商城没能及时更新，请大家谅解！\n**如果您对万翔商城有什么意见或建议，或者您对我们的服务有什么不满意的，请您拨打万翔商城客服热线96363-3告诉我们。谢谢！**\n[客 服](http://p.qiao.baidu.com/cps5/chat?siteId=9463837&userId=20780301)[首 页](https://m.anportshop.com/index.php?m=Index&a=index)[购物车](https://m.anportshop.com/index.php?m=Cart&a=index)\n加入购物车立即购买\n![](https://pic.anport-e.com.cn/webpictures/category_01/300_300/1175761.jpg)\n￥339.00\n商品编号：284637\n数量\n-+\n加入购物车立即购买\n领 券\n"
+    },
+    {
+      "id": "cmve7lmxf00zl3yyz07hwhb6o",
+      "url": "https://zhongce.sina.cn/article/view/158043/",
+      "title": "对比评测米家净饮机，智享版全新升级更实用_原创_新浪众测",
+      "status": "captured",
+      "originUrl": null,
+      "contentHash": "7530704f3790e2c97f6a17328e66ac0fa1e89440e948b624d6b9df79e20bdbdf",
+      "fetchedAt": "2026-10-18T19:23:28.700Z",
+      "sourceAvailability": "captured",
+      "contextInclusion": "excerpt",
+      "contentKind": "captured_text",
+      "sourceKind": "review",
+      "authority": "unverified",
+      "warnings": [
+        "lexical_match_requires_semantic_review"
+      ],
+      "capturedChars": 15229,
+      "includedChars": 1980,
+      "truncated": true,
+      "contentRanges": [
+        {
+          "start": 1029,
+          "end": 2024
+        },
+        {
+          "start": 13500,
+          "end": 14485
+        }
+      ],
+      "content": "\n[…省略原文…]\n080.1080.50/006fXNJwly8ifqt6zozlhj30u00u0acr.jpg?KID=imgbed,tva&Expires=1792362208&ssig=Xmfu5Ps7T9) 好小伙迅哥 ](http://zhongce.sina.com.cn/space/index/5732694562/ \"好小伙迅哥\") 2022-12-31 11:00\n  \n\n**【前言】**\n米家在台式净饮机的细分领域真的下足了功夫。推出了小米台式净饮机、米家台式净饮机冷热版以及米家台式净饮机乐享版，最近，为了在功能上带来更好的使用体验，又推出了米家台式净饮机智享版。正好我手里前前后后买了除冷热版外的其他3款台式净饮机，借这个机会，今天就带大家看看它们之间到底有什么区别，哪一款更适合你？\n![对比评测米家净饮机，智享版全新升级更实用_新浪众测](https://zhongces3.sina.com.cn/product/20221228/53f48b764bfadd6608a6f64ef8b833e1.jpeg)\n这3款台式净饮机大小适中，非常适合装修时没有预留净水器位置的家庭与办公室使用，这种免安装的净饮机不用破坏家装，对了，也适合租房的同学，换房子的时候直接带走。上图中左面是刚发布的米家台式净饮机智享版，右上角是米家台式净饮机乐享版，右下角是小米台式净饮机。关于它们的配置与设计先做一个大概的介绍。\n**【米家台式净饮机智享版】**\n![对比评测米家净饮机，智享版全新升级更实用_新浪众测](https://zhongces3.sina.com.cn/product/20221228/becaec39900d7a80bb188a6040da6af3.jpeg)\n首先介绍刚发布的米家台式净饮机智享版，它基于小米台式净饮机做了全新的升级，在机身设计上也延续了小米台式净饮机，采用极简的设计风格。但是在细节方面做得更加精致与耐看，尤其是深空灰色看起来更加高端，透露着轻奢感，不是那种很土的奢华感，非常符合当下年轻人的审美。\n![对比评测米家净饮机，智享版全新升级更实用_新浪众测](https://zhongces3.sina.com.cn/product/20221228/b910c6d786153df43a3f448a80e4e8fb.png)\n和先发布的两台净饮\n[…省略原文…]\ncn/elec/) [新浪新闻](https://news.sina.com.cn/) [TechWeb](http://www.techweb.com.cn/) [融360](https://www.rong360.com/) [IT之家](https://www.ithome.com/) [去哪儿网](https://www.qunar.com/) [手机中国](http://www.cnmo.com/) [泡泡网](http://www.pcpop.com) [IT168](http://www.it168.com/) [梦芭莎](http://www.moonbasa.com/) [设计癖](http://www.shejipi.com/) [电脑报](http://www.icpcw.com/) [凯撒旅游](http://www.caissa.com.cn) [国美买手机](http://item.gome.com.cn/) [极客网](http://www.fromgeek.com) [赛普健身](http://www.saipujianshen.com) [一带一路](http://silkroad.news.cn/) [和讯科技](http://tech.hexun.com/) [快科技](http://www.mydrivers.com/) [泪雪网](https://www.leiue.com) [TOM生活](http://life.tom.com/)\n关注官方微博 [微博](http://weibo.com/xinlangzhongce)\n关注官方微信 ![](https://zhongce.sina.com.cn/static/images/weixin.jpg?v=2.46)\nCopyright © 1996-2026 SINA Corporation, All Rights Reserved 新浪公司 版权所有\n[下载App](javascript:;) [分享](javascript:;) [商务合作](https://zhongce.sina.com.cn/contact/show) [返回](javascript:;)\n![](http://n.sinaimg.cn/tech/zcapp2018/e"
+    },
+    {
+      "id": "cmve7lk8x00wf3yyzt7apwo35",
+      "url": "https://www.morphyrichards.net/cpzx/info_41.aspx?itemid=132&lcid=26",
+      "title": "Morphy Richards/摩飞电器中国官方网站",
+      "status": "captured",
+      "originUrl": null,
+      "contentHash": "fd9609db7267584b1755663067d27cb2e89ded1e74247a95df3d9abacee3f001",
+      "fetchedAt": "2026-10-18T19:22:52.028Z",
+      "sourceAvailability": "captured",
+      "contextInclusion": "excerpt",
+      "contentKind": "captured_text",
+      "sourceKind": "product",
+      "authority": "unverified",
+      "warnings": [
+        "lexical_match_requires_semantic_review"
+      ],
+      "capturedChars": 3020,
+      "includedChars": 1200,
+      "truncated": true,
+      "contentRanges": [
+        {
+          "start": 0,
+          "end": 1200
+        }
+      ],
+      "content": "[](https://www.morphyrichards.net/index.aspx)\n[新浪微博](http://weibo.com/morphyrichards1936)|[联系我们](https://www.morphyrichards.net/lxwmIQ/index_49.aspx)\n  * [首页](https://www.morphyrichards.net/index.aspx)\n  * [关于摩飞](https://www.morphyrichards.net/mfls/index_13.aspx)\n  * [产品中心](https://www.morphyrichards.net/cpzx/index_41.aspx)\n  * [活动资讯](https://www.morphyrichards.net/hdsd/list_35.aspx)\n  * [技术支持](https://www.morphyrichards.net/cpsms/list_24.aspx)\n  * [摩飞创意](https://www.morphyrichards.net/lscy/index_20.aspx)\n\n\n产品\n产品新闻\n[产品中心](http://www.morphyrichards.net//cpzx/index_41.aspx) [厨房电器](https://www.morphyrichards.net/cpzx/list_41.aspx?lcid=26)摩飞轻食机MR9086\n![](https://www.morphyrichards.net/uploadfiles/2020/06/th_20200611170116116.jpg)\n摩飞轻食机MR9086\n摩飞特色：\n![](https://www.morphyrichards.net/uploadfiles/2020/06/20200611170723723.jpg)![](https://www.morphyrichards.net/uploadfiles/2020/06/20200611170724724.jpg)![](https://www.morphyrichards.net/uploadfiles/2020/06/20200611170726726.jpg)\n_价格：_ ￥529.00 [](https://item.jd.com/100007356345.html)\n分享到：\n规格参数产品特点常见问题解答英伦服务\n![](https://www.morphyrichards.net/uploadfiles/2020/06/20200611170754754.jpg)\n两年质保\n  * _关于摩飞_ [摩飞历史](https://www.morphyrichards.net/mf"
+    },
+    {
+      "id": "cmve7lmu100yz3yyzn4lvb5cf",
+      "url": "https://www.vevor.com/zh-CN/diy-ideas/best-portable-ice-machine/",
+      "title": "最佳便携式制冰机：全面评测和购买指南 - VEVOR 博客",
+      "status": "captured",
+      "originUrl": "https://www.vevor.com/zh-CN/diy-ideas/best-portable-ice-machine/",
+      "contentHash": "a160ccb13e0da8c1915c3f2cf43ebe9c5c86e82fbf1b2e5470a21edffaafcef3",
+      "fetchedAt": "2026-10-18T19:23:35.324Z",
+      "sourceAvailability": "captured",
+      "contextInclusion": "excerpt",
+      "contentKind": "captured_text",
+      "sourceKind": "review",
+      "authority": "unverified",
+      "warnings": [
+        "no_brief_term_match"
+      ],
+      "capturedChars": 23351,
+      "includedChars": 1970,
+      "truncated": true,
+      "contentRanges": [
+        {
+          "start": 4586,
+          "end": 5249
+        },
+        {
+          "start": 6343,
+          "end": 7001
+        },
+        {
+          "start": 20742,
+          "end": 21391
+        }
+      ],
+      "content": "\n[…省略原文…]\n冰块](https://i.vevor.net/wp-content/uploads/2024/08/best-portable-ice-machine-1024x683.png?x-oss-process=image/format%2Cwebp/resize%2Cw_900)\n并非所有饮料都适合冷冻或放入制冰机；你最不希望发生的事情就是在举办大型聚会的前一天晚上啤酒瓶破损，但这并不意味着你不想喝点足够冷的饮料来冲淡辛辣的烧烤。现在，你该如何解决这个问题？冰块机！\n便携式制冰机最近越来越受欢迎，这是理所当然的。由于其有趣的冰模形状，它们既方便又舒适，同时为您的容器增添了优雅的美感。 \n最好的家用制冰机也非常耐用、灵活且便携，因此只要有光源，您就可以在一天中的任何时间随身携带它们。如果您不知道从哪里开始您的旅程，您可以查看 [VEVOR便携式制冰机](https://www.vevor.com/ice-machines-c_10725/vevor-countertop-ice-maker-37lbs-in-24hrs-auto-self-cleaning-portable-ice-maker-with-ice-scoop-basket-and-drainpipe-2-ways-water-refill-stainless-steel-ice-machine-for-home-kitchen-office-party-p_010452692144).\n让我们继续阅读文章的其余部分来探索最好的便携式制冰机。\n#\n[…省略原文…]\n，使冰块以您想要的形状落入托盘中。\n但是，您必须始终牢记，1best 小型制冰机与冷冻机截然不同，因此并非设计用于长时间保存冰块。事实上，冰块一旦形成，可能会开始融化，并返回到储冰器，再次开始冷冻过程。\n便携式制冰机不同于台面制冰机，后者是放在您的台面上供应冰块；您无需安装它们。内置台面不像前两种那样设计为可移动；它们直接安装在您的台面上，以提供一体化饰面并生产更多冰块。\n### **为什么选择便携式制冰机**\n每个人都喜欢轻松地完成看似困难的任务，并且无论什么设施都能确保这一任务总能得到正确方面的关注。 \n这就是为什么您需要最好的家用制冰机来帮助您在使用过程中体验便利（您可以根据您的环境将它们放在台面或橱柜上。\n不仅如此。便携式制冰机非常适合家庭、办公室和户外使用。这些简单的机器具有很强的移动性，这意味着它们重量轻且便于携带，您可以将它们从一个地方带到另一个地方，同时仍能获得最佳生产效率。\n##  **需要寻找的关键特性****最佳便携式制冰机****s**\n![便携式制冰机](https://diy-ideas.oss-accelerate.aliyuncs.com/wp-content/uploads/2024/08/portable-ice-machine.png)\n只要条件合适，购买制冰机就能让您受益匪浅，但如何确保不再需要不断补充冰格呢？这些功能可以帮助您在挑选最佳便携式制冰机时做出正确选择。\n**制冰率**\n您的机器 24 小时能生产多少冰？这是选择设备时要检查的重要项目。经常收到\n[…省略原文…]\n\n  * [2023 年 3 月](https://www.vevor.com/zh-CN/diy-ideas/2023/03/) (141)\n  * [2023 年 2 月](https://www.vevor.com/zh-CN/diy-ideas/2023/02/) (9)\n\n\n## 分类\n分类 请选择广告类别 商用厨房 (257) 商用厨房必备 (239) 车库 (1,024) 汽车维修 (473) DIY 乐趣 (175) 车库设备 (414) 首页 (2,132) 清洁工具 (340) 房屋维修 (481) 厨房必备 (438) 电动工具 (733) 维修工具 (310) 其他（387） 农林设备 (118) 实验室 (22) 办公室 (26) 绘画与艺术(61) 户外（276） 露营 (179) 灾难准备 (58) 露台 (663) 后院烧烤 (117) 享受户外生活 (313) 栽培植物 (185) 泳池必备品 (66) 未分类（63） 影片（209） 后院烧烤 (4) 露营 (10) 汽车维修 (20) 清洁工具 (18) 商用厨房必备 (4) DIY 乐趣 (2) 享受户外生活 (17) 车库设备 (13) 栽培植物 (27) 房屋维修 (32) 厨房必备 (15) 电动工具 (37) 维修工具 (21) 泳池必备品 (6)\n  * [关于维沃](https://www.vevor.com/zh-CN/pages/about-us)\n  * [隐私与安全]("
+    },
+    {
+      "id": "cmve7lmwh00zd3yyz81d0ol5z",
+      "url": "https://makebespoke.com/zh/products/joinery/tea-point-breakout",
+      "title": "定制茶水间与休闲区木工 — Make Bespoke Studio",
+      "status": "captured",
+      "originUrl": "https://makebespoke.com/zh/products/joinery/tea-point-breakout",
+      "contentHash": "d8c2768bf260cd4c2531b280cab5c07db3b49c26588cd91b070762c94b16933c",
+      "fetchedAt": "2026-10-18T19:23:24.954Z",
+      "sourceAvailability": "captured",
+      "contextInclusion": "excerpt",
+      "contentKind": "captured_text",
+      "sourceKind": "product",
+      "authority": "unverified",
+      "warnings": [
+        "no_brief_term_match"
+      ],
+      "capturedChars": 13787,
+      "includedChars": 1970,
+      "truncated": true,
+      "contentRanges": [
+        {
+          "start": 3909,
+          "end": 4572
+        },
+        {
+          "start": 7560,
+          "end": 8218
+        },
+        {
+          "start": 11351,
+          "end": 12000
+        }
+      ],
+      "content": "\n[…省略原文…]\ns)[壁龛储物](https://makebespoke.com/zh/products/joinery/fitted-storage-alcoves)[家庭影院](https://makebespoke.com/zh/products/joinery/home-cinema)[墙面镶板](https://makebespoke.com/zh/products/joinery/wall-panelling)[金属镶嵌](https://makebespoke.com/zh/products/joinery/metal-inlay)[家庭酒吧](https://makebespoke.com/zh/products/joinery/home-bar)[家庭办公室](https://makebespoke.com/zh/products/joinery/home-office)[楼梯](https://makebespoke.com/zh/products/joinery/staircases)[媒体墙](https://makebespoke.com/zh/products/joinery/media-walls)\n[照明](https://makebespoke.com/zh/products/lighting)[水晶吊灯](https://makebespoke.com/zh/products/lighting/crystal-chandeliers)[经典](https://makebespoke.c\n[…省略原文…]\n固且直观易用，同时也有助于塑造空间的整体特色。\n在 Make Bespoke Studio ，我们为工作场所、共享办公环境、住宅设施、酒店和会员俱乐部生产并配送定制茶点和小厨房，与室内设计师、建筑师和运营者紧密合作。\n## 茶点和小厨房的作用\n茶点和小厨房常常处于流通、工作和休闲的交汇点。如果做得好，它们鼓励人们稍作停留、重整状态——不会觉得自己挡住了走廊或大厅。\n  * **支持日常仪式** ——喝咖啡、闲聊、短暂休息——以一种被深思熟虑的方式\n  * 提供简单直观的饮用水、热饮和轻食，无需完整的厨房\n  * 在开放式楼层、设施层级和共享办公空间中，作为微妙的吸引力\n  * 帮助保持主厨房和酒吧的空闲空间，以便更密集的准备和服务\n\n\n## 工作场所中的茶点与共享办公\n在办公室和共享办公空间，茶点和小厨房全天被大量使用。它们需要坚固、易于清洁且新用户易于理解，同时又要与更广泛的内部语言保持一致。\n  * **楼层茶水点** – 紧凑的简易厨房，战略性地布置在办公楼层上，布局清晰，表面耐用，能承受高流量。\n  * **联合办公的餐饮站** ——茶点和零食区，与灵活工位区、专注室和休息室自然并置，常与接待和俱乐部空间共享语言。\n  * **会议室和客户休息室小厨房** – 更隐蔽的小厨房设计用于举办会议和活动，有时隐藏在全高门或口袋门后。\n\n\n这些元素通常与[家庭办公室与书房木工](https://makebespoke.com/zh/products/joinery/home-office),[接\n[…省略原文…]\nlobby-hero.webp) 接待与大厅 为酒店和办公室定制接待台和前台木工。 探索→ ](https://makebespoke.com/zh/products/joinery/reception-lobby) [ ![弧形木质吧台，配有浅色凳子和玻璃酒架，置于带推拉窗的房间内，设有咖啡馆和吧台木工](https://pub-718a95da40f7486cbfd1313d63bcbe4d.r2.dev/Webpages/library-assets/images/chucs.webp) 零售与咖啡馆 适用于零售及餐饮环境的展示木工和咖啡馆柜台。 探索→ ](https://makebespoke.com/zh/products/joinery/retail-cafe) [ ![在施工中的开放式房间里，橡木厨房橱柜带平整抽屉面板](https://pub-718a95da40f7486cbfd1313d63bcbe4d.r2.dev/Webpages/projects/camberwell-house/camberwell-house-assets/images/Private+Residential+Brass+Units-12.webp) 厨房与储藏室 定制住宅厨房木工，设计最高规格。 探索→ ](https://makebespoke.com/zh/products/joinery/kitchens-pantries)\n## 延伸 _阅读_\n  * [定制办公及工作"
+    },
+    {
+      "id": "cmve7t3j6003p3yo8zoxvte8w",
+      "url": "https://post.smzdm.com/p/aqr3wpk2/",
+      "title": "早餐好帮手——九阳三明治机简单体验_厨房小电_什么值得买",
+      "status": "captured",
+      "originUrl": "https://post.smzdm.com/p/aqr3wpk2/",
+      "contentHash": "2333d76875a7da9742f82cfa7f3ac8f09c06e742056fcfc475723a8377e300e0",
+      "fetchedAt": "2026-10-18T19:25:10.969Z",
+      "sourceAvailability": "captured",
+      "contextInclusion": "excerpt",
+      "contentKind": "captured_text",
+      "sourceKind": "unknown",
+      "authority": "unverified",
+      "warnings": [
+        "no_brief_term_match"
+      ],
+      "capturedChars": 37557,
+      "includedChars": 1200,
+      "truncated": true,
+      "contentRanges": [
+        {
+          "start": 5400,
+          "end": 6600
+        }
+      ],
+      "content": "\n[…省略原文…]\nom/p/aqr3wpk2/pic_19/)\n⬇再看看三明治机的底部，这里有两个撑脚和一个外突的长方形区域，能够让三明治机稳固的摆放在桌上。在长方形区域顶部贴有铭牌。在长方形区域周边，有细长的开孔，有助于散热。\n[![早餐好帮手——九阳三明治机简单体验](https://am.zdmimg.com/202604/05/69d25b3f7f2ef6555.jpg_e1080.jpg)](https://post.smzdm.com/p/aqr3wpk2/pic_20/)\n⬇搭配底部L的撑脚，可以将电源线缠绕在底部。而三明治机可以竖放的设计，方便收纳。\n[![早餐好帮手——九阳三明治机简单体验](https://am.zdmimg.com/202604/06/69d30d7025c436419.jpg_e1080.jpg)](https://post.smzdm.com/p/aqr3wpk2/pic_21/)\n## 使用体验\n⬇先来试试在分秒必争的早晨如何短时间内制作出美味的热乎乎的三明治。一呆君觉得三明治好吃核心在于美味的馅料和松脆的面包片。馅料一呆君比较爱吃鸡蛋和午餐肉块之类的，于是花了三分钟切了午餐肉块和打散鸡蛋，顺便预热三明治机。\n[![早餐好帮手——九阳三明治机简单体验](https://am.zdmimg.com/202604/06/69d372edb156b8547.jpg_e1080.jpg)](https://post.smzdm.com/p/aqr3wpk2/pic_22/)\n⬇然后在烤盘中放入午餐肉块，导入蛋液。实践证明，一个鸡蛋的蛋液差不多刚好能倒满烤盘。\n[![早餐好帮手——九阳三明治机简单体验](https://am.zdmimg.com/202604/06/69d329e489da77977.jpg_e1080.jpg)](https://post.smzdm.com/p/aqr3wpk2/pic_23/)\n⬇三分钟后，简单美味的馅料就制作好了。\n[![早餐好帮手——九阳三明治机简单体验](https://am.zdmimg.com/202604/06/69d32a1bbae0e7538.jpg_e1080.jpg)](https://post.smzdm.com/p/aqr3wpk2/pic_24/)\n⬇将馅料从烤盘中取出也是相当的丝滑，烤盘防粘效果不错。\n[![早餐好帮手——九阳三明治机简单体验](https://am.zdmimg.com/202604/06/69d32a4f460169356.jpg_e1080.jpg)](https://post.smzdm.com/p/aqr3wpk2/pic_25/)\n⬇再将面包片和馅料一起放入烤盘内，然后将上盖用力扣在低卡位上。\n[![早餐好帮手——九阳三明治机简单体验](https"
+    },
+    {
+      "id": "cmve7lkdt00x13yyziguu7iz4",
+      "url": "https://cdn-assets.greatplainsmfg.com/manuals/pdf/334-739m-cmn.pdf",
+      "title": "操作手册",
+      "status": "link_only",
+      "originUrl": null,
+      "contentHash": null,
+      "fetchedAt": null,
+      "sourceAvailability": "not_fetched",
+      "contextInclusion": "full",
+      "contentKind": "search_excerpt",
+      "sourceKind": "manual",
+      "authority": "unverified",
+      "warnings": [
+        "lexical_match_requires_semantic_review",
+        "not_full_page_text"
+      ],
+      "capturedChars": null,
+      "includedChars": 95,
+      "truncated": false,
+      "contentRanges": [
+        {
+          "start": 0,
+          "end": 95
+        }
+      ],
+      "content": "May 15, 2019 ... 通过累加本手册中技术参数& 作业能力部分中的重量和测量值与可选配置重量 ... 8. 当从割草机上断开拖拉机时，遵守第27页上“断. 开旋切式割草机”说明。"
+    },
+    {
+      "id": "cmve7llet00y33yyzyy9b2mw7",
+      "url": "https://foodshot.ai/zh-CN/blog/ruhe-tuiguang-canyin-yewu",
+      "title": "餐饮业营销策略：10个有效推广方法 - FoodShot AI",
+      "status": "link_only",
+      "originUrl": null,
+      "contentHash": null,
+      "fetchedAt": null,
+      "sourceAvailability": "not_fetched",
+      "contextInclusion": "full",
+      "contentKind": "search_excerpt",
+      "sourceKind": "unknown",
+      "authority": "unverified",
+      "warnings": [
+        "lexical_match_requires_semantic_review",
+        "not_full_page_text"
+      ],
+      "capturedChars": null,
+      "includedChars": 105,
+      "truncated": false,
+      "contentRanges": [
+        {
+          "start": 0,
+          "end": 105
+        }
+      ],
+      "content": "Apr 14, 2026 ... ... 办公室午餐到300人的婚宴。研究显示，40%的人在社交媒体上看到美食照片后 ... AI 美食摄影是更快速、更经济的替代方案。使用FoodShot AI，你只需 ..."
+    },
+    {
+      "id": "cmve7lkg300xb3yyz5p2at3nr",
+      "url": "https://media3.bsh-group.com/Documents/9001130753_A.pdf",
+      "title": "西门子嵌入式食具消毒柜使用及安装说明书",
+      "status": "link_only",
+      "originUrl": null,
+      "contentHash": null,
+      "fetchedAt": null,
+      "sourceAvailability": "not_fetched",
+      "contextInclusion": "full",
+      "contentKind": "search_excerpt",
+      "sourceKind": "manual",
+      "authority": "unverified",
+      "warnings": [
+        "lexical_match_requires_semantic_review",
+        "not_full_page_text"
+      ],
+      "capturedChars": null,
+      "includedChars": 83,
+      "truncated": false,
+      "contentRanges": [
+        {
+          "start": 0,
+          "end": 83
+        }
+      ],
+      "content": "搬运放置时应从底部抬起，轻搬轻放，切不可将柜门拉 ... 如果您的机器出现异常现象，在联系客户服务之前，请. 先阅读机器说明书中的《异常显现与处理方法》进行排. 查。"
+    },
+    {
+      "id": "cmve7lljb00yf3yyzx2v4nv4g",
+      "url": "https://www.dropbox.com/zh_CN/resources/pomodoro-technique",
+      "title": "什么是番茄工作法？ - Dropbox",
+      "status": "link_only",
+      "originUrl": null,
+      "contentHash": null,
+      "fetchedAt": null,
+      "sourceAvailability": "not_fetched",
+      "contextInclusion": "full",
+      "contentKind": "search_excerpt",
+      "sourceKind": "unknown",
+      "authority": "unverified",
+      "warnings": [
+        "lexical_match_requires_semantic_review",
+        "not_full_page_text"
+      ],
+      "capturedChars": null,
+      "includedChars": 96,
+      "truncated": false,
+      "contentRanges": [
+        {
+          "start": 0,
+          "end": 96
+        }
+      ],
+      "content": "Jan 22, 2025 ... 如何在办公室中使用番茄工作法; 通过番茄工作法计算未来工作时间; 番茄工作法的替代方法 ... 不重要但紧急，例如今天与团队共进午餐; 不重要且不紧急 ..."
+    },
+    {
+      "id": "cmve7rjvd01513yyzmmydvayy",
+      "url": "https://www.scribd.com/document/882524448/%E9%A3%9F%E7%89%A9%E7%AE%80%E5%8F%B2-%E4%BB%8E%E9%A3%9F%E7%89%A9%E7%9A%84%E8%A7%92%E5%BA%A6%E6%9D%A5%E7%90%86%E8%A7%A3%E5%8E%86%E5%8F%B2-%E7%90%86%E8%A7%A3%E7%A4%BE%E4%BC%9A%E6%BC%94%E8%BF%9B%E7%9A%84%E8%84%89%E7%BB%9C%E5%8F%8A%E5%8E%86%E7%A8%8B-%E9%9B%85%E5%85%8B-%E9%98%BF%E5%A1%94%E5%88%A9-2021",
+      "title": "食物简史【从食物的角度来理解历史，理解社会演进的脉络及 ... - Scribd",
+      "status": "link_only",
+      "originUrl": null,
+      "contentHash": null,
+      "fetchedAt": null,
+      "sourceAvailability": "not_fetched",
+      "contextInclusion": "full",
+      "contentKind": "search_excerpt",
+      "sourceKind": "unknown",
+      "authority": "unverified",
+      "warnings": [
+        "lexical_match_requires_semantic_review",
+        "not_full_page_text"
+      ],
+      "capturedChars": null,
+      "includedChars": 91,
+      "truncated": false,
+      "contentRanges": [
+        {
+          "start": 0,
+          "end": 91
+        }
+      ],
+      "content": "... 营养不良的风险（早餐、午餐、晚餐）”。该品牌的“普罗旺斯西红柿”包含了6%的 ... 盐的消费必须控制在每天不超过5克的量［392］ 。 ·取消不容易回收利用的食品和 ..."
+    },
+    {
+      "id": "cmve7lkbl00wr3yyzw6vpd6jx",
+      "url": "https://www.blaupunkt.com/zh-cn/product/bp-d1%E8%BD%BB%E9%9F%B3%E9%AB%98%E9%80%9F%E7%A0%B4%E5%A3%81%E8%B0%83%E7%90%86%E6%9C%BA",
+      "title": "Made to Perform. Built to Free. Car Radios & Electric Bikes - Blaupunkt USA",
+      "status": "captured",
+      "originUrl": "https://www.blaupunkt.com/en-us/",
+      "contentHash": "c4cf094cf2daa197f66420cc707b714dfa4ebb03d95132890de87e7ac199d9e6",
+      "fetchedAt": "2026-10-18T19:23:05.540Z",
+      "sourceAvailability": "captured",
+      "contextInclusion": "excerpt",
+      "contentKind": "captured_text",
+      "sourceKind": "product",
+      "authority": "unverified",
+      "warnings": [
+        "no_brief_term_match"
+      ],
+      "capturedChars": 26680,
+      "includedChars": 1200,
+      "truncated": true,
+      "contentRanges": [
+        {
+          "start": 0,
+          "end": 1200
+        }
+      ],
+      "content": "[ ![Blaupunkt](https://www.blaupunkt.com/build/theme/blaupunkt/assets/white-logo-CXNxhzHO.svg)](https://www.blaupunkt.com/en-us/)\n  * Products ![](data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2012%2021'%3E%3C/svg%3E)\n![Products](data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2012%2021'%3E%3C/svg%3E)\n    * [ Automotive ](https://www.blaupunkt.com/en-us/) ![](data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2012%2021'%3E%3C/svg%3E)\n      * [ Car Radio ](https://www.blaupunkt.com/en-us/product-category/automotive/car-radio-cus)\n    * [ E-mobility ](https://www.blaupunkt.com/en-us/) ![](data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2012%2021'%3E%3C/svg%3E)\n      * [ e-Bikes ](https://www.blaupunkt.com/en-us/product-category/e-mobility-cus/ebikes)\n![Languages](data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2019%2019'%3E%3C/svg%3E) USA | English \nSelect your region \n![](data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2030%2030'%3E%3C/svg%3E)\nAmericas\n![](data:image/svg+xml,%3Csvg%20xmlns='http"
+    },
+    {
+      "id": "cmve7loqk010n3yyzixbxgitw",
+      "url": "https://wenhui.whb.cn/third/zaker/202205/24/468626.html",
+      "title": "年轻消费群体居家健身成“刚需”，为何这些健身教练能快速“复工”？",
+      "status": "link_only",
+      "originUrl": null,
+      "contentHash": null,
+      "fetchedAt": null,
+      "sourceAvailability": "not_fetched",
+      "contextInclusion": "full",
+      "contentKind": "search_excerpt",
+      "sourceKind": "unknown",
+      "authority": "unverified",
+      "warnings": [
+        "lexical_match_requires_semantic_review",
+        "not_full_page_text"
+      ],
+      "capturedChars": null,
+      "includedChars": 102,
+      "truncated": false,
+      "contentRanges": [
+        {
+          "start": 0,
+          "end": 102
+        }
+      ],
+      "content": "May 24, 2022 ... 而注重健康的另一个表现则是对健身运动的热衷。前瞻产业研究院数据显示，2020年我国健身APP使用者中35岁以下消费人群占比达到78.24%，健身房消费者中，18- ..."
+    },
+    {
+      "id": "cmve7llk500yh3yyzll0phwvb",
+      "url": "https://proton.me/zh/blog/privacy-gadgets",
+      "title": "Proton 员工实际在用的7 款隐私小工具",
+      "status": "link_only",
+      "originUrl": null,
+      "contentHash": null,
+      "fetchedAt": null,
+      "sourceAvailability": "not_fetched",
+      "contextInclusion": "full",
+      "contentKind": "search_excerpt",
+      "sourceKind": "unknown",
+      "authority": "unverified",
+      "warnings": [
+        "lexical_match_requires_semantic_review",
+        "not_full_page_text"
+      ],
+      "capturedChars": null,
+      "includedChars": 98,
+      "truncated": false,
+      "contentRanges": [
+        {
+          "start": 0,
+          "end": 98
+        }
+      ],
+      "content": "Sep 7, 2026 ... 它旨在阻止列表中最简单的攻击：有人在火车上、机场或开放式办公室里从您身旁偷看屏幕。 ... 下面介绍如何阻止它，以及可以使用哪些替代方案。 了解Amazon ..."
+    }
+  ],
+  "version": "8e4caa0ea5a21f4f18c589aee96d00380ae7ac15d3f29744632f35bd7d9d7f92",
+  "generatedAt": "2026-10-18T19:27:58.493Z"
+}

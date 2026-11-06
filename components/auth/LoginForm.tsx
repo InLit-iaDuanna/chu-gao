@@ -1,26 +1,53 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { ArrowRight, Eye, EyeOff } from "lucide-react";
-import { motion } from "framer-motion";
 
 import { ActionableStatus } from "@/components/shared/ActionableStatus";
-import { Button, FormField, IconButton, Input, Switch } from "@/components/ui";
+import { Button, FormField, IconButton, Input } from "@/components/ui";
+import {
+  CLIENT_DEVICE_ID_HEADER,
+  CLIENT_DEVICE_TOUCH_POINTS_HEADER,
+  CLIENT_DEVICE_TYPE_HEADER,
+  detectBrowserDeviceType,
+  detectBrowserTouchPoints,
+  getBrowserDeviceId,
+  withBrowserAuthLock,
+} from "@/lib/session-device";
+import { safeNextPath } from "@/lib/safe-next-path";
+import { cn } from "@/lib/utils";
 
 interface LoginFormProps {
   nextPath?: string;
   className?: string;
 }
 
+function readApiErrorMessage(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== "object" || !("error" in payload)) {
+    return undefined;
+  }
+
+  const error = payload.error;
+  if (typeof error === "string") {
+    return error;
+  }
+
+  if (!error || typeof error !== "object") {
+    return undefined;
+  }
+
+  return "message" in error && typeof error.message === "string"
+    ? error.message
+    : undefined;
+}
+
 export function LoginForm({
   nextPath = "/app",
   className,
 }: LoginFormProps): React.ReactElement {
-  const router = useRouter();
+  const safeNext = safeNextPath(nextPath);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [remember, setRemember] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -30,17 +57,25 @@ export function LoginForm({
     setError("");
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+      const res = await withBrowserAuthLock(() => {
+        const deviceId = getBrowserDeviceId();
+
+        return fetch("/api/auth/login", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            [CLIENT_DEVICE_ID_HEADER]: deviceId,
+            [CLIENT_DEVICE_TYPE_HEADER]: detectBrowserDeviceType(),
+            [CLIENT_DEVICE_TOUCH_POINTS_HEADER]: detectBrowserTouchPoints(),
+          },
+          body: JSON.stringify({ email, password }),
+        });
       });
       if (res.ok) {
-        router.push(nextPath);
-        router.refresh();
+        location.assign(safeNext);
       } else {
-        const data = await res.json().catch(() => ({}));
-        setError(data.error ?? "邮箱或密码错误");
+        const data: unknown = await res.json().catch(() => null);
+        setError(readApiErrorMessage(data) ?? "邮箱或密码错误");
       }
     } catch {
       setError("网络错误，请重试");
@@ -50,13 +85,7 @@ export function LoginForm({
   }
 
   return (
-    <motion.form
-      animate={{ opacity: 1, y: 0 }}
-      className={className}
-      initial={{ opacity: 0, y: 8 }}
-      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-      onSubmit={handleSubmit}
-    >
+    <form className={cn("anim-rise", className)} onSubmit={handleSubmit}>
       <div className="flex flex-col gap-4">
         {error ? (
           <ActionableStatus
@@ -71,7 +100,7 @@ export function LoginForm({
           <Input
             id="email"
             type="email"
-            inputSize="lg"
+            controlSize="lg"
             autoComplete="email"
             required
             value={email}
@@ -86,7 +115,7 @@ export function LoginForm({
             <Input
               id="password"
               type={showPassword ? "text" : "password"}
-              inputSize="lg"
+              controlSize="lg"
               autoComplete="current-password"
               required
               value={password}
@@ -99,20 +128,13 @@ export function LoginForm({
               type="button"
               onClick={() => setShowPassword((v) => !v)}
               className="absolute right-1 top-1/2 -translate-y-1/2"
-              tabIndex={-1}
+              aria-pressed={showPassword}
               aria-label={showPassword ? "隐藏密码" : "显示密码"}
             >
               {showPassword ? <EyeOff /> : <Eye />}
             </IconButton>
           </div>
         </FormField>
-
-        <div className="flex items-center justify-between gap-3">
-          <label className="flex items-center gap-2 text-sm text-text-muted">
-            <Switch checked={remember} size="sm" onChange={setRemember} />
-            记住我
-          </label>
-        </div>
 
         <Button
           type="submit"
@@ -126,6 +148,6 @@ export function LoginForm({
           登录
         </Button>
       </div>
-    </motion.form>
+    </form>
   );
 }

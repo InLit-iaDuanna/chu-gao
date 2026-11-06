@@ -39,6 +39,7 @@ export async function GET(request: Request) {
         status: true,
         credits: true,
         dailyGenLimit: true,
+        materialInboxBeta: true,
         createdAt: true,
       },
       take: 50,

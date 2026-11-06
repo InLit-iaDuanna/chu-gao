@@ -1,0 +1,112 @@
+name: chugao-research
+x-runtime: &runtime
+  restart: unless-stopped
+  init: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  environment:
+    HTTP_PROXY: ""
+    HTTPS_PROXY: ""
+    ALL_PROXY: ""
+    NO_PROXY: "*"
+  healthcheck:
+    test:
+      [
+        CMD,
+        python,
+        -c,
+        "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)",
+      ]
+    interval: 30s
+    timeout: 8s
+    start_period: 30s
+    retries: 3
+services:
+  research-gateway:
+    image: nginx:1.28.0-alpine@sha256:30f1c0d78e0ad60901648be663a710bdadf19e4c10ac6782c235200619158284
+    volumes:
+      - ./deploy/research/gateway.conf:/etc/nginx/conf.d/default.conf:ro
+    extra_hosts: [host.docker.internal:host-gateway]
+    ports:
+      - 127.0.0.1:18082:8082
+      - 127.0.0.1:18083:8083
+      - 127.0.0.1:18084:8084
+      - 127.0.0.1:18085:8085
+    networks: [internal, public]
+    mem_limit: 64m
+    restart: unless-stopped
+  searxng:
+    image: searxng/searxng@sha256:8bdd9aa136b2dc3b9332cf24714fa34a375b8a1949a1201ec900c24d7378596e
+    volumes:
+      - ./deploy/research/searxng.yml:/etc/searxng/settings.yml:ro
+    ports: [127.0.0.1:18080:8080]
+    networks: [public]
+    dns: [223.5.5.5, 119.29.29.29]
+    mem_limit: 512m
+    restart: unless-stopped
+    environment:
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
+      ALL_PROXY: ""
+      NO_PROXY: "*"
+  crawl4ai:
+    <<: *runtime
+    build:
+      context: .
+      dockerfile: services/research-runtime/Dockerfile.crawl
+    ports: [127.0.0.1:18081:8000]
+    networks: [public]
+    dns: [223.5.5.5, 119.29.29.29]
+    shm_size: 256m
+    mem_limit: 1200m
+    cpus: 2
+  embedding:
+    <<: *runtime
+    build:
+      context: .
+      dockerfile: services/research-runtime/Dockerfile.embedding
+    networks: [internal]
+    mem_limit: 1100m
+    cpus: 2
+  gpt-researcher:
+    <<: *runtime
+    build:
+      context: .
+      dockerfile: services/research-runtime/Dockerfile.gptr
+    volumes: [gptr_runs:/work/runs]
+    networks: [internal]
+    mem_limit: 1400m
+    cpus: 2
+  vane:
+    image: chugao-research-vane:348feca3
+    build:
+      context: .
+      dockerfile: services/research-runtime/Dockerfile.vane
+    volumes: [vane_data:/home/vane/data]
+    networks: [internal]
+    mem_limit: 1200m
+    cpus: 2
+    restart: unless-stopped
+    init: true
+    environment:
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
+      ALL_PROXY: ""
+      NO_PROXY: "*"
+  deerflow:
+    <<: *runtime
+    build:
+      context: .
+      dockerfile: services/research-runtime/Dockerfile.deerflow
+    volumes: [deerflow_runs:/work/runs]
+    networks: [internal]
+    mem_limit: 1800m
+    cpus: 2
+networks:
+  internal:
+    internal: true
+  public: {}
+volumes:
+  gptr_runs: {}
+  deerflow_runs: {}
+  vane_data: {}

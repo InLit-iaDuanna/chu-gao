@@ -1,4 +1,5 @@
 import { PROVIDER_FETCH_RETRY, fetchWithTimeout } from "@/lib/http";
+import { generationFetchRetry } from "@/lib/providers/single-submit";
 import type {
   GenerateProgressCallback,
   GenerateResult,
@@ -9,10 +10,9 @@ import type { InternalRequest } from "@/lib/models/types";
 import { providerError } from "@/lib/providers/diagnostics";
 import { providerRequestTimeoutMs } from "@/lib/providers/config";
 import {
-  RESOLUTION_TO_QUALITY,
-  RESOLUTION_TO_SYSRV_QUALITY,
-  imagePixelSizeForRequest,
-} from "@/lib/providers/image-params";
+  getChannelRequestConfig,
+  renderBodyTemplate,
+} from "@/lib/provider-channel-request-config";
 
 const TASK_POLL_INTERVAL_MS = 1500;
 
@@ -55,6 +55,17 @@ function shouldSendOutputCompression(format: string, value?: number): boolean {
   return value !== undefined && (format === "jpeg" || format === "webp");
 }
 
+function imageModelForRequest(req: InternalRequest): string {
+  return req.modelId;
+}
+
+function isImage25(req: InternalRequest): boolean {
+  return (
+    req.modelId === "gpt-image-2.5-flare" ||
+    req.modelId === "gpt-image-2.5-sunburst"
+  );
+}
+
 function base64ToBlob(value: string, mimeType: string): Blob {
   const marker = ";base64,";
   const markerIndex = value.indexOf(marker);
@@ -89,20 +100,6 @@ function openAIImagesUrl(
 
 function openAIImageTaskUrl(baseUrl: string, taskId: string): string {
   return `${normalizeOpenAIImagesBaseUrl(baseUrl)}/v1/images/generations/${taskId}`;
-}
-
-function hostForBaseUrl(baseUrl: string): string | null {
-  try {
-    return new URL(normalizeOpenAIImagesBaseUrl(baseUrl)).hostname
-      .replace(/^www\./, "")
-      .toLowerCase();
-  } catch {
-    return null;
-  }
-}
-
-function isSysrvImagesProvider(baseUrl: string): boolean {
-  return hostForBaseUrl(baseUrl) === "sysrv.net";
 }
 
 function sleep(ms: number, signal: AbortSignal): Promise<void> {
@@ -166,44 +163,37 @@ function extractImageItems(
     .filter((item) => item?.b64_json || item?.url);
 }
 
-function imageSizeForRequest(req: InternalRequest): string {
-  return imagePixelSizeForRequest(req.aspectRatio, req.resolution, "OpenAI");
-}
-
-function sysrvQualityForRequest(req: InternalRequest): string {
-  return RESOLUTION_TO_SYSRV_QUALITY[req.resolution] ?? "2k";
-}
-
-function imageModelForRequest(req: InternalRequest): string {
-  if (req.modelId === "gpt-image-2") {
-    return req.image2Mode === "high"
-      ? "gpt-image-2-high"
-      : "gpt-image-2-standard";
-  }
-
-  return req.modelId;
-}
-
-async function generateSingleSysrvImage(
-  adapter: OpenAIImagesAdapter,
-  req: InternalRequest,
-  signal: AbortSignal,
-  onProgress: GenerateProgressCallback | undefined,
-  imageIndex: number,
-): Promise<GenerateResult> {
-  const singleRequest = { ...req, n: 1 };
-  const result = await adapter.generateSingle(
-    singleRequest,
-    signal,
-    onProgress,
-  );
-
+// 结构化请求体：显式 size / quality / response_format / 输出格式 / 背景。
+function structuredBody(req: InternalRequest): Record<string, unknown> {
   return {
-    ...result,
-    rawProviderResponse: {
-      index: imageIndex,
-      response: result.rawProviderResponse,
-    },
+    model: imageModelForRequest(req),
+    prompt: req.prompt,
+    size: req.size,
+    quality: req.quality,
+    n: req.n,
+    response_format: req.responseFormat,
+    ...(!isImage25(req)
+      ? {
+          output_format: req.outputFormat,
+          background: req.background,
+        }
+      : {}),
+    ...(shouldSendOutputCompression(req.outputFormat, req.outputCompression)
+      ? { output_compression: req.outputCompression }
+      : {}),
+  };
+}
+
+function templateVars(req: InternalRequest): Record<string, string | number> {
+  return {
+    model: imageModelForRequest(req),
+    prompt: req.prompt,
+    size: req.size,
+    quality: req.quality,
+    response_format: req.responseFormat,
+    n: req.n,
+    output_format: req.outputFormat,
+    background: req.background,
   };
 }
 
@@ -225,62 +215,38 @@ export class OpenAIImagesAdapter implements ProviderAdapter {
     signal: AbortSignal,
     onProgress?: GenerateProgressCallback,
   ): Promise<GenerateResult> {
-    const usesSysrvFormat = isSysrvImagesProvider(this.config.baseUrl);
+    const channelConfig = await getChannelRequestConfig(this.config.baseUrl);
+    const effectiveRequest: InternalRequest = {
+      ...req,
+      responseFormat: channelConfig.responseFormat,
+    };
 
-    if (usesSysrvFormat && req.n > 1) {
-      const results: GenerateResult[] = [];
+    if (effectiveRequest.referenceImages?.length) {
+      const form = new FormData();
+      form.append("model", imageModelForRequest(effectiveRequest));
+      form.append("prompt", effectiveRequest.prompt);
+      form.append("size", effectiveRequest.size);
+      form.append("quality", effectiveRequest.quality);
+      form.append("n", String(effectiveRequest.n));
+      form.append("response_format", effectiveRequest.responseFormat);
+      if (!isImage25(effectiveRequest)) {
+        form.append("output_format", effectiveRequest.outputFormat);
+        form.append("background", effectiveRequest.background);
+      }
 
-      for (let index = 0; index < req.n; index += 1) {
-        results.push(
-          await generateSingleSysrvImage(this, req, signal, onProgress, index),
+      if (
+        shouldSendOutputCompression(
+          effectiveRequest.outputFormat,
+          effectiveRequest.outputCompression,
+        )
+      ) {
+        form.append(
+          "output_compression",
+          String(effectiveRequest.outputCompression),
         );
       }
 
-      return {
-        images: results.flatMap((result) => result.images),
-        rawProviderResponse: results.map(
-          (result) => result.rawProviderResponse,
-        ),
-      };
-    }
-
-    return this.generateSingle(req, signal, onProgress);
-  }
-
-  async generateSingle(
-    req: InternalRequest,
-    signal: AbortSignal,
-    onProgress?: GenerateProgressCallback,
-  ): Promise<GenerateResult> {
-    const usesSysrvFormat = isSysrvImagesProvider(this.config.baseUrl);
-    const size = usesSysrvFormat ? req.aspectRatio : imageSizeForRequest(req);
-    const model = imageModelForRequest(req);
-    const quality = usesSysrvFormat
-      ? sysrvQualityForRequest(req)
-      : (RESOLUTION_TO_QUALITY[req.resolution] ?? "medium");
-
-    if (req.referenceImages?.length) {
-      const form = new FormData();
-      form.append("model", model);
-      form.append("prompt", req.prompt);
-      form.append("size", size);
-      form.append("quality", quality);
-
-      if (!usesSysrvFormat) {
-        form.append("n", String(req.n));
-        form.append("resolution", req.resolution);
-        form.append("response_format", "url");
-        form.append("output_format", req.outputFormat);
-        form.append("background", req.background);
-
-        if (
-          shouldSendOutputCompression(req.outputFormat, req.outputCompression)
-        ) {
-          form.append("output_compression", String(req.outputCompression));
-        }
-      }
-
-      for (const image of req.referenceImages) {
+      for (const image of effectiveRequest.referenceImages) {
         if (!image.b64) {
           throw new Error(`reference image ${image.key} missing data`);
         }
@@ -297,14 +263,32 @@ export class OpenAIImagesAdapter implements ProviderAdapter {
         method: "POST",
         signal,
         timeoutMs: providerRequestTimeoutMs(),
-        retry: PROVIDER_FETCH_RETRY,
+        retry: generationFetchRetry(effectiveRequest),
         headers: {
           Authorization: `Bearer ${this.config.apiKey}`,
         },
         body: form,
       });
 
-      return this.parseResponse(response, req, endpoint, signal, onProgress);
+      return this.parseResponse(
+        response,
+        effectiveRequest,
+        endpoint,
+        signal,
+        onProgress,
+      );
+    }
+
+    // 无参考图：JSON 请求体。渠道配置了原始模板则用模板，否则结构化拼装。
+    const body =
+      (channelConfig.bodyTemplate
+        ? renderBodyTemplate(
+            channelConfig.bodyTemplate,
+            templateVars(effectiveRequest),
+          )
+        : null) ?? structuredBody(effectiveRequest);
+    if (effectiveRequest.executionPolicy === "single-submit") {
+      Object.assign(body, { n: 1, prompt: effectiveRequest.prompt });
     }
 
     const endpoint = openAIImagesUrl(
@@ -315,35 +299,21 @@ export class OpenAIImagesAdapter implements ProviderAdapter {
       method: "POST",
       signal,
       timeoutMs: providerRequestTimeoutMs(),
-      retry: PROVIDER_FETCH_RETRY,
+      retry: generationFetchRetry(effectiveRequest),
       headers: {
         Authorization: `Bearer ${this.config.apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model,
-        prompt: req.prompt,
-        size,
-        quality,
-        ...(usesSysrvFormat
-          ? {}
-          : {
-              n: req.n,
-              resolution: req.resolution,
-              response_format: "url",
-              output_format: req.outputFormat,
-              background: req.background,
-              ...(shouldSendOutputCompression(
-                req.outputFormat,
-                req.outputCompression,
-              )
-                ? { output_compression: req.outputCompression }
-                : {}),
-            }),
-      }),
+      body: JSON.stringify(body),
     });
 
-    return this.parseResponse(response, req, endpoint, signal, onProgress);
+    return this.parseResponse(
+      response,
+      effectiveRequest,
+      endpoint,
+      signal,
+      onProgress,
+    );
   }
 
   private async parseResponse(

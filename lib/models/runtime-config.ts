@@ -1,40 +1,7 @@
 import { getSystemConfigValue } from "@/lib/system-config";
 import { getModel, listModels } from "@/lib/models/registry";
-import {
-  aspectRatiosForResolution,
-  isResolutionAspectRatioSupported,
-} from "@/lib/models/capabilities";
-import {
-  IMAGE_ASPECT_RATIO_OPTIONS,
-  IMAGE_RESOLUTION_OPTIONS,
-} from "@/lib/models/options";
-import type {
-  AspectRatio,
-  ModelCapabilities,
-  ModelDefinition,
-  Resolution,
-} from "@/lib/models/types";
+import type { ModelDefinition } from "@/lib/models/types";
 import { isImage2ModelId } from "@/lib/provider-channels";
-
-function uniqueKnownValues<T extends string>(
-  values: unknown,
-  allowed: readonly T[],
-  fallback: readonly T[],
-): T[] {
-  if (!Array.isArray(values)) {
-    return [...fallback];
-  }
-
-  const allowedSet = new Set<string>(allowed);
-  const unique = values.filter(
-    (value, index): value is T =>
-      typeof value === "string" &&
-      allowedSet.has(value) &&
-      values.indexOf(value) === index,
-  );
-
-  return unique.length > 0 ? unique : [...fallback];
-}
 
 function positiveInteger(
   value: unknown,
@@ -49,113 +16,8 @@ function positiveInteger(
     : fallback;
 }
 
-function configuredResolutionAspectRatios(
-  base: ModelCapabilities,
-  value: unknown,
-  resolution: Resolution,
-): AspectRatio[] {
-  const record =
-    value && typeof value === "object" && !Array.isArray(value)
-      ? (value as Partial<Record<Resolution, unknown>>)
-      : null;
-
-  return uniqueKnownValues<AspectRatio>(
-    record?.[resolution],
-    IMAGE_ASPECT_RATIO_OPTIONS,
-    aspectRatiosForResolution(base, resolution),
-  );
-}
-
-function configuredImage2Capabilities(
-  base: ModelCapabilities,
-  config: {
-    aspectRatios: unknown;
-    resolutions: unknown;
-    resolutionAspectRatios: unknown;
-    maxN: unknown;
-  },
-): ModelCapabilities {
-  const allowedAspectRatios = uniqueKnownValues<AspectRatio>(
-    config.aspectRatios,
-    IMAGE_ASPECT_RATIO_OPTIONS,
-    base.aspectRatios,
-  );
-  const requestedResolutions = uniqueKnownValues<Resolution>(
-    config.resolutions,
-    IMAGE_RESOLUTION_OPTIONS,
-    base.resolutions,
-  );
-  const resolutionAspectRatios: ModelCapabilities["resolutionAspectRatios"] =
-    {};
-  const resolutions = requestedResolutions.filter((resolution) => {
-    const supported = configuredResolutionAspectRatios(
-      base,
-      config.resolutionAspectRatios,
-      resolution,
-    ).filter(
-      (aspectRatio) =>
-        allowedAspectRatios.includes(aspectRatio) &&
-        isResolutionAspectRatioSupported(base, resolution, aspectRatio),
-    );
-
-    if (supported.length === 0) {
-      return false;
-    }
-
-    resolutionAspectRatios[resolution] = supported;
-    return true;
-  });
-
-  if (resolutions.length === 0) {
-    return {
-      ...base,
-      maxN: positiveInteger(config.maxN, base.maxN, base.maxN),
-    };
-  }
-
-  return {
-    ...base,
-    aspectRatios: allowedAspectRatios.filter((aspectRatio) =>
-      resolutions.some((resolution) =>
-        isResolutionAspectRatioSupported(base, resolution, aspectRatio),
-      ),
-    ),
-    resolutions,
-    maxN: positiveInteger(config.maxN, base.maxN, base.maxN),
-    resolutionAspectRatios,
-  };
-}
-
-function withValidDefaults(model: ModelDefinition): ModelDefinition {
-  const resolution = model.capabilities.resolutions.includes(
-    model.defaults.resolution,
-  )
-    ? model.defaults.resolution
-    : model.capabilities.resolutions[0];
-  const resolutionAspectRatios = resolution
-    ? aspectRatiosForResolution(model.capabilities, resolution)
-    : [];
-  const aspectRatio =
-    resolution &&
-    model.capabilities.aspectRatios.includes(model.defaults.aspectRatio) &&
-    resolutionAspectRatios.includes(model.defaults.aspectRatio)
-      ? model.defaults.aspectRatio
-      : resolutionAspectRatios[0];
-
-  if (!resolution || !aspectRatio) {
-    return model;
-  }
-
-  return {
-    ...model,
-    defaults: {
-      ...model.defaults,
-      resolution,
-      aspectRatio,
-    },
-  };
-}
-
+// 运行时合并后台可调项。出图主参数已改为显式 size（能力来自 registry），
+// 这里仅沿用「单次最多张数」上限（管理员只能下调，不能超过模型上限）。
 export async function applyRuntimeModelConfig(
   model: ModelDefinition,
 ): Promise<ModelDefinition> {
@@ -163,23 +25,19 @@ export async function applyRuntimeModelConfig(
     return model;
   }
 
-  const [aspectRatios, resolutions, resolutionAspectRatios, maxN] =
-    await Promise.all([
-      getSystemConfigValue("generation.image2AspectRatios"),
-      getSystemConfigValue("generation.image2Resolutions"),
-      getSystemConfigValue("generation.image2ResolutionAspectRatios"),
-      getSystemConfigValue("generation.image2MaxN"),
-    ]);
+  const maxN = await getSystemConfigValue("generation.image2MaxN");
 
-  return withValidDefaults({
+  return {
     ...model,
-    capabilities: configuredImage2Capabilities(model.capabilities, {
-      aspectRatios,
-      resolutions,
-      resolutionAspectRatios,
-      maxN,
-    }),
-  });
+    capabilities: {
+      ...model.capabilities,
+      maxN: positiveInteger(
+        maxN,
+        model.capabilities.maxN,
+        model.capabilities.maxN,
+      ),
+    },
+  };
 }
 
 export async function getConfiguredModel(

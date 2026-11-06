@@ -1,5 +1,7 @@
 # 设计系统迁移指南
 
+> 当前规范以 [`UI_LIBRARY.md`](./UI_LIBRARY.md) 为准。本项目已移除旧 `components/admin` 与 `components/workbench` 副本；新代码不得恢复这些目录。
+
 > 将现有组件迁移到统一的设计系统
 
 ## 目录
@@ -22,19 +24,16 @@
 2. ⚠️ `Card.tsx` - 圆角不统一（`rounded-lg` → `rounded-[var(--radius-md)]`）
 3. ⚠️ `Input.tsx` - 需检查样式一致性
 4. ⚠️ `Dialog.tsx` - 需统一圆角和阴影
-5. ⚠️ `Select.tsx` - 下拉样式需统一
 
 ### 第二阶段：辅助组件（2-3天）
 
 **中优先级**：
 
 - `Badge.tsx`
-- `Tooltip.tsx`
-- `Popover.tsx`
-- `Tabs.tsx`
 - `Checkbox.tsx`
-- `Radio.tsx`
 - `Switch.tsx`
+- `Segmented.tsx`
+- `DropdownMenu.tsx`
 
 ### 第三阶段：页面级组件（3-5天）
 
@@ -205,15 +204,15 @@ className = "rounded-[var(--radius-md)]";
 
 **现状**：
 
-- `tokens.css` - 用户端配色
-- `tokens-admin.css` - 管理后台配色
+- `tokens.css` 是唯一设计 token 来源
+- 管理后台通过布局密度、组件组合和语义状态区分，不再维护第二套 token 文件
 
-**问题**：两套系统颜色值不同，导致组件在不同上下文下表现不一致
+**问题**：双 token 文件会让组件在不同上下文下表现不一致，也增加后续迁移成本
 
 **解决方案**：
 
-1. **保留双系统**（推荐）：通过 `data-surface="admin"` 切换
-2. **统一系统**：合并为一套，移除 `tokens-admin.css`
+1. 统一系统：保留 `tokens.css`
+2. 删除独立 token 文件，避免后台和用户端出现不可预测的颜色分叉
 
 **推荐做法**：
 
@@ -224,8 +223,8 @@ className = "rounded-[var(--radius-md)]";
 </div>
 
 // 管理后台页面
-<div className="page-shell" data-surface="admin">
-  <Card /> {/* 使用 tokens-admin.css */}
+<div className="page-shell">
+  <Card /> {/* 同样使用 tokens.css */}
 </div>
 ```
 
@@ -329,7 +328,7 @@ module.exports = {
 - [ ] 间距使用标准刻度（2/4/6/8/12/16/20/24/32...）
 - [ ] 动画时长使用 `--duration-*` 变量
 - [ ] 支持暗色/亮色主题
-- [ ] 支持 `data-surface="admin"` 切换
+- [ ] 用户端与管理端共用同一 token 语义
 - [ ] 焦点样式使用 `--shadow-focus`
 
 ### 页面级检查
@@ -387,7 +386,7 @@ A: 设计系统向后兼容，旧代码可以继续工作。但建议在修改�
 
 ### Q: `tokens-admin.css` 是否应该移除？
 
-A: 不建议移除。管理后台需要更高的视觉区分度，保留独立配色方案是合理的。确保通过 `data-surface="admin"` 正确切换即可。
+A: 应移除。当前项目已统一到 `tokens.css`，管理后台不再通过独立 token 文件换肤。
 
 ---
 
@@ -407,7 +406,7 @@ A: 不建议移除。管理后台需要更高的视觉区分度，保留独立�
    git commit -m "fix: 统一 Card 组件圆角为 --radius-md"
    ```
 
-2. **本周完成**：核心组件迁移（Button, Card, Input, Dialog, Select）
+2. **本周完成**：核心组件迁移（Button, Card, Input, Dialog）
 
 3. **下周完成**：辅助组件迁移 + 页面级检查
 

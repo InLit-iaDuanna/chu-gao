@@ -1,0 +1,66 @@
+{
+  "products": [
+    "pptx",
+    "docx",
+    "html"
+  ],
+  "evidence": [
+    {
+      "id": "fixture-01",
+      "title": "离线测试夹具（非真实调研证据）",
+      "url": "https://example.com/fixture/office-lunch",
+      "status": "captured",
+      "capturedAt": "2026-10-19T00:00:00+08:00",
+      "content": "这条内容只验证来源编号、超链接与证据版本能否正确导出。",
+      "fixture": true,
+      "contentKind": "captured_text",
+      "sourceAvailability": "captured"
+    }
+  ],
+  "finalResearchPackage": {
+    "schemaVersion": 2,
+    "version": "fixture-office-lunch-20261019-v2",
+    "quality": {
+      "status": "insufficient"
+    },
+    "finalBrief": {
+      "confirmedRequirements": [
+        "办公室快速午餐",
+        "低油、营养可控、分量明确"
+      ]
+    },
+    "caveats": [
+      "来源列表含离线测试资料，其链接仅用于验证导出器，不代表真实市场证据。"
+    ],
+    "hypotheses": [
+      {
+        "id": "hyp-container-first",
+        "text": "优先研究可重复清洁的分量容器，再决定是否增加专用加热设备。",
+        "basis": "由分量管理需求提出的概念路线，尚无用户实测支持。",
+        "status": "unverified",
+        "evidenceIds": []
+      },
+      {
+        "id": "hyp-microwave",
+        "text": "分量容器与现有微波炉可能复用办公室设备，但共享设备是否可用需要验证。",
+        "basis": "离线场景推演",
+        "status": "unverified",
+        "evidenceIds": []
+      },
+      {
+        "id": "hyp-lunchbox",
+        "text": "便携加热饭盒可能减少排队等待，但加热与清洁便利尚待验证。",
+        "basis": "离线场景推演",
+        "status": "unverified",
+        "evidenceIds": []
+      },
+      {
+        "id": "hyp-steamer",
+        "text": "台式蒸煮设备可能集中控制烹饪流程，水汽、气味和占地尚待验证。",
+        "basis": "离线场景推演",
+        "status": "unverified",
+        "evidenceIds": []
+      }
+    ]
+  }
+}

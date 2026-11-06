@@ -1,0 +1,902 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>前端重构方案</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+  :root {
+    --paper:   #f7f7f5;
+    --raised:  #ffffff;
+    --ink:     #16171a;
+    --body:    #33353b;
+    --muted:   #5f6268;
+    --faint:   #8b8e94;
+    --rule:    #deddd9;
+    --rule-hi: #bdbfc0;
+    --defect:  #9e3327;
+    --verified:#2c6547;
+    --note:    #7a5c1e;
+
+    --cjk-sans: "PingFang SC", "HarmonyOS Sans SC", "Hiragino Sans GB",
+                "Microsoft YaHei", system-ui, sans-serif;
+    --cjk-serif: "Songti SC", "Source Han Serif SC", "Noto Serif CJK SC",
+                 "SimSun", Georgia, serif;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+    --measure: 40rem;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:   #121215;
+      --raised:  #191a1e;
+      --ink:     #e9eaec;
+      --body:    #c3c5ca;
+      --muted:   #989ba2;
+      --faint:   #73767d;
+      --rule:    #2a2b30;
+      --rule-hi: #43454c;
+      --defect:  #d98a7f;
+      --verified:#7cbb95;
+      --note:    #c8a860;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:   #121215;
+    --raised:  #191a1e;
+    --ink:     #e9eaec;
+    --body:    #c3c5ca;
+    --muted:   #989ba2;
+    --faint:   #73767d;
+    --rule:    #2a2b30;
+    --rule-hi: #43454c;
+    --defect:  #d98a7f;
+    --verified:#7cbb95;
+    --note:    #c8a860;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--body);
+    font-family: var(--cjk-sans);
+    font-size: 1rem;
+    line-height: 1.8;
+    padding-inline: max(1.25rem, 6vw);
+    padding-block: clamp(2.75rem, 7vw, 5.5rem);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  .doc {
+    max-width: var(--measure);
+    margin-inline: auto;
+  }
+
+  /* ── masthead ─────────────────────────────── */
+
+  .slug {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: var(--faint);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem 1.4rem;
+    margin-bottom: 1.5rem;
+  }
+
+  h1 {
+    font-family: var(--cjk-serif);
+    font-weight: 600;
+    font-size: clamp(1.9rem, 5.5vw, 2.5rem);
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .abstract {
+    margin-top: 1.1rem;
+    padding-top: 1.1rem;
+    border-top: 1px solid var(--rule);
+    color: var(--muted);
+    max-width: 34rem;
+  }
+
+  /* ── sections ─────────────────────────────── */
+
+  section { margin-top: 3.75rem; }
+
+  h2 {
+    font-family: var(--cjk-serif);
+    font-weight: 600;
+    font-size: 1.4rem;
+    line-height: 1.45;
+    letter-spacing: -0.005em;
+    color: var(--ink);
+    margin: 0 0 1.1rem;
+    padding-top: 0.85rem;
+    border-top: 2px solid var(--rule-hi);
+    text-wrap: balance;
+  }
+
+  h3 {
+    font-family: var(--cjk-sans);
+    font-weight: 600;
+    font-size: 1.0625rem;
+    line-height: 1.55;
+    color: var(--ink);
+    margin: 2.4rem 0 0.7rem;
+    text-wrap: balance;
+  }
+
+  h3:first-of-type { margin-top: 1.4rem; }
+
+  p { margin: 0 0 1rem; max-width: 34rem; }
+  p:last-child { margin-bottom: 0; }
+
+  .lead { color: var(--muted); }
+
+  em { font-style: normal; color: var(--ink); font-weight: 600; }
+  strong { font-weight: 600; color: var(--ink); }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.828em;
+    color: var(--ink);
+    background: var(--raised);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 0.05em 0.3em;
+    overflow-wrap: anywhere;
+  }
+
+  a { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--rule-hi); }
+  a:hover { text-decoration-color: var(--ink); }
+
+  /* ── hanging-label rows ───────────────────── */
+
+  .rows { margin: 1.2rem 0 0; }
+
+  .row {
+    display: grid;
+    grid-template-columns: 6.5rem 1fr;
+    gap: 1.6rem;
+    padding: 1.05rem 0;
+    border-top: 1px solid var(--rule);
+  }
+
+  .row:last-child { border-bottom: 1px solid var(--rule); }
+
+  .row-key {
+    font-size: 0.8125rem;
+    line-height: 1.7;
+    color: var(--faint);
+    padding-top: 0.16rem;
+  }
+
+  .row-key.defect  { color: var(--defect); }
+  .row-key.verified{ color: var(--verified); }
+  .row-key.note    { color: var(--note); }
+
+  .row-main { min-width: 0; }
+
+  .row-title {
+    font-weight: 600;
+    color: var(--ink);
+    margin: 0 0 0.3rem;
+    line-height: 1.65;
+  }
+
+  .row-main p { margin: 0; color: var(--muted); font-size: 0.9375rem; line-height: 1.75; max-width: 32rem; }
+
+  .src {
+    display: block;
+    margin-top: 0.45rem;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    line-height: 1.7;
+    color: var(--faint);
+    overflow-wrap: anywhere;
+  }
+
+  /* ── metric list ──────────────────────────── */
+
+  .stats { margin: 1.3rem 0 0; border-top: 1px solid var(--rule); }
+
+  .stat {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1.5rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--rule);
+    font-size: 0.9375rem;
+  }
+
+  .stat span:first-child { color: var(--muted); min-width: 0; }
+
+  .stat b {
+    font-family: var(--mono);
+    font-weight: 500;
+    font-size: 0.8125rem;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+
+  .stat b.defect   { color: var(--defect); }
+  .stat b.verified { color: var(--verified); }
+
+  /* ── phases ───────────────────────────────── */
+
+  .phases { margin: 1.3rem 0 0; }
+
+  .phase {
+    display: grid;
+    grid-template-columns: 3rem 1fr;
+    gap: 1.5rem;
+    padding: 1.15rem 0;
+    border-top: 1px solid var(--rule);
+  }
+
+  .phase:last-child { border-bottom: 1px solid var(--rule); }
+
+  .phase-id {
+    font-family: var(--mono);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--ink);
+    padding-top: 0.22rem;
+  }
+
+  .phase-body { min-width: 0; }
+
+  .phase-title {
+    font-weight: 600;
+    color: var(--ink);
+    margin: 0 0 0.4rem;
+    line-height: 1.6;
+  }
+
+  .phase-title small {
+    font-weight: 400;
+    color: var(--faint);
+    font-size: 0.8125rem;
+    margin-left: 0.6rem;
+  }
+
+  ul { margin: 0; padding: 0; list-style: none; }
+
+  li {
+    position: relative;
+    padding-left: 1.05rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.9375rem;
+    line-height: 1.75;
+    color: var(--muted);
+  }
+
+  li:last-child { margin-bottom: 0; }
+
+  li::before {
+    content: "—";
+    position: absolute;
+    left: 0;
+    color: var(--rule-hi);
+  }
+
+  /* ── table ────────────────────────────────── */
+
+  .scroll {
+    margin-top: 1.3rem;
+    overflow-x: auto;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+  }
+
+  table { border-collapse: collapse; width: 100%; min-width: 32rem; }
+
+  th {
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.8125rem;
+    color: var(--ink);
+    padding: 0.7rem 1.1rem 0.6rem 0;
+    border-bottom: 1px solid var(--rule-hi);
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 0.75rem 1.1rem 0.75rem 0;
+    border-bottom: 1px solid var(--rule);
+    font-size: 0.9rem;
+    line-height: 1.7;
+    vertical-align: top;
+    color: var(--muted);
+  }
+
+  tr:last-child td { border-bottom: 0; }
+  th:last-child, td:last-child { padding-right: 0; }
+
+  /* ── pull statement ───────────────────────── */
+
+  .pull {
+    margin: 2.2rem 0 0;
+    padding-left: 1.6rem;
+    border-left: 1px solid var(--rule-hi);
+  }
+
+  .pull p {
+    font-family: var(--cjk-serif);
+    font-size: 1.0625rem;
+    line-height: 1.85;
+    color: var(--ink);
+    max-width: 30rem;
+  }
+
+  /* ── closing ──────────────────────────────── */
+
+  .next {
+    margin-top: 2.5rem;
+    padding-top: 1.3rem;
+    border-top: 1px solid var(--rule-hi);
+  }
+
+  .next ol {
+    margin: 0.9rem 0 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: pick;
+  }
+
+  .next li {
+    counter-increment: pick;
+    padding-left: 1.6rem;
+    margin-bottom: 0.75rem;
+    color: var(--muted);
+  }
+
+  .next li::before {
+    content: counter(pick) ".";
+    font-family: var(--mono);
+    font-size: 0.8125rem;
+    color: var(--faint);
+    left: 0;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  @media (max-width: 34rem) {
+    .row, .phase { grid-template-columns: 1fr; gap: 0.45rem; }
+    .row-key { padding-top: 0; }
+    .phase-id { padding-top: 0; }
+    .stat { flex-wrap: wrap; gap: 0.2rem 1rem; }
+  }
+</style>
+
+<div class="doc">
+
+  <header>
+    <div class="slug">
+      <span>sichuan-image-station</span>
+      <span>Next 15 · React 19 · Tailwind v4</span>
+      <span>2026-09-29</span>
+    </div>
+
+    <h1>前端重构方案</h1>
+
+    <p class="abstract">
+      四个方向都查了一遍，每条结论都在代码或构建产物里验证过。
+      结论和预期不同：地基是好的，问题集中在少数几处结构性负债上，
+      而且有一处需要你先决策。
+    </p>
+  </header>
+
+  <section>
+    <h2>开工前提</h2>
+
+    <p>
+      工作区有 <strong>169 个已修改文件</strong>（+11,986 / −20,090 行）和
+      <strong>147 个未跟踪文件</strong>，最后一次提交是 <code>2026-06-07</code>。
+      未跟踪列表里包含 <code>components/canvas/</code>、<code>components/inspiration/</code>、
+      <code>components/admin-console/</code> 等整个目录——最近几轮重构的成果从未入库。
+    </p>
+
+    <p>
+      在这个状态下做重构，改坏了没有任何可回退的基准。所以要做的第一件事不是改代码，
+      而是<strong>把当前工作区提交成一个还原点</strong>。
+    </p>
+
+    <p>
+      验证链我实测过，全部可用，就是重构要用的安全网：
+      <code>tsc --noEmit</code> 零错误，<code>vitest</code> 307 个用例全过，
+      <code>next build</code> 56 个页面全部生成成功。基线在，只是没落盘。
+    </p>
+  </section>
+
+  <section>
+    <h2>已经做对的部分</h2>
+
+    <p class="lead">
+      这些不用动。有四项我原本预期要补，实测发现已经在了——所以「不够好」不在这个层面。
+    </p>
+
+    <div class="stats">
+      <div class="stat"><span>业务代码直接 import <code>@radix-ui</code></span><b class="verified">0 处</b></div>
+      <div class="stat"><span><code>any</code> 类型 / <code>console.log</code></span><b class="verified">0 / 0</b></div>
+      <div class="stat"><span><code>app/**/page.tsx</code> 标 <code>use client</code></span><b class="verified">0 个</b></div>
+      <div class="stat"><span>动画里的布局属性（width / height / top / left）</span><b class="verified">0 处</b></div>
+      <div class="stat"><span>事件监听器配对（6 处 <code>addEventListener</code>）</span><b class="verified">全部正确</b></div>
+      <div class="stat"><span>列表 <code>key</code> 稳定性</span><b class="verified">全部用 id</b></div>
+      <div class="stat"><span><code>next/font</code> 配置（subset / swap / preload）</span><b class="verified">正确</b></div>
+      <div class="stat"><span>Tailwind v3 遗留配置</span><b class="verified">无</b></div>
+      <div class="stat"><span><code>prefers-reduced-motion</code> 全局兜底</span><b class="verified">已覆盖</b></div>
+      <div class="stat"><span>UI 原语采用率（<code>Button</code> import）</span><b class="verified">90 处</b></div>
+    </div>
+
+    <p style="margin-top:1.4rem">
+      <code>tokens.css</code> 是一套完整的双主题令牌系统，数值经过调校；
+      <code>components/ui/</code> 有 25 个包装过的原语；动画全部走合成友好属性。
+      项目已经做过一轮严肃的设计系统重构，这轮不该推倒重来。
+    </p>
+  </section>
+
+  <section>
+    <h2>需要你先决策的一件事</h2>
+
+    <p>
+      <code>/app/canvas</code> 和 <code>/app/nodes</code> 两个路由现在都是
+      <code>redirect("/app")</code>。我从 141 个真实入口出发做了完整的可达性分析：
+      这两棵子树<strong>共 9,400 行、25 个文件，连测试都不引用</strong>。
+    </p>
+
+    <p>
+      包括 <code>DesignStudio.tsx</code>（2,369 行）、<code>InfiniteCanvas.tsx</code>（1,099 行）、
+      <code>DockWorkspace.tsx</code>（678 行）、<code>NodesApp.tsx</code>（773 行）。
+      无动态导入，无 barrel 重导出，构建产物里这两个路由都只有 375 B。
+    </p>
+
+    <div class="pull">
+      <p>
+        这两个功能是「已下线待删」，还是「暂时停用、之后恢复」？
+      </p>
+    </div>
+
+    <ul style="margin-top:1.3rem">
+      <li><strong>已下线</strong> → 直接删 9,400 行，「巨型组件」这一整类问题随之消失。</li>
+      <li><strong>要恢复</strong> → 组件拆分才需要排期，且接回路由前必须先修移动端那批问题（纯鼠标事件、触控死区）。</li>
+    </ul>
+
+    <p style="margin-top:1.3rem">
+      这个答案会让方案的工作量在 <strong>9,400 行</strong>和<strong>约 60 行</strong>之间摆动，
+      所以它排在所有工程动作之前。
+    </p>
+  </section>
+
+  <section>
+    <h2>四个方向的实证发现</h2>
+
+    <h3>视觉：系统建好了，但被绕过</h3>
+
+    <div class="rows">
+      <div class="row">
+        <div class="row-key defect">根因</div>
+        <div class="row-main">
+          <p class="row-title">字号令牌对 Tailwind 不可见</p>
+          <p>
+            <code>@theme inline</code> 只映射了颜色和字体，没有映射 <code>--fs-*</code>，
+            所以 <code>text-11</code> 这类工具类不存在，只能写 <code>text-[11px]</code>。
+            实测：注册 <code>--text-11: 11px</code> 后 Tailwind v4.3 直接生成 <code>.text-11</code>。
+            这条修完，下面 208 处才有收敛的可能。
+          </p>
+          <span class="src">app/globals.css:16–37 · 已用 Tailwind v4.3 实测</span>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="row-key defect">功能缺陷</div>
+        <div class="row-main">
+          <p class="row-title">管理端图表静默不渲染</p>
+          <p>
+            <code>DashboardView.tsx</code> 用了 <code>text-primary</code>、<code>bg-primary</code>、
+            <code>bg-muted</code>，但 <code>@theme</code> 从未定义 <code>--color-primary</code>。
+            编译产物里这些类<strong>出现 0 次</strong>，Tailwind 直接丢弃。
+            总量折线、24 小时直方图、进度条底槽全部不可见。同文件 success / danger 正常，
+            所以看起来像「数据为空」而不是报错。
+          </p>
+          <span class="src">components/admin-console/DashboardView.tsx:181, 192, 234, 340, 342</span>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="row-key defect">无障碍</div>
+        <div class="row-main">
+          <p class="row-title">焦点环被 outline-none 吃掉</p>
+          <p>
+            全局 <code>:focus-visible</code> 定义在 <code>@layer base</code>，
+            而 <code>.outline-none</code> 在 <code>@layer utilities</code>——后者后声明、优先级更高，会覆盖它。
+            51 处 <code>outline-none</code> 里只有 9 处补了替代样式，其余 <strong>42 处</strong>键盘焦点不可见。
+            最严重的是 <code>Dialog.tsx</code>：Radix 打开时会主动移焦到该元素。
+          </p>
+          <span class="src">app/globals.css:101–125 · 已按 cascade layer 顺序核实</span>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="row-key">死代码</div>
+        <div class="row-main">
+          <p class="row-title">两套排版系统都是死的</p>
+          <p>
+            <code>styles/typography.css</code> 598 行、40 个 <code>.type-*</code> 类，
+            <strong>引用次数全部为 0</strong>，但被 <code>globals.css:3</code> import，
+            规则原样发给每个用户，占编译 CSS 的 4.7%。
+            <code>globals.css</code> 里另有约 30 个旧风格类同样零引用。
+            真正的危害不是体积，是<em>误导</em>——一个看似权威的排版系统摆在那里，后来者会照着写。
+          </p>
+          <span class="src">styles/typography.css（整文件）· app/globals.css:220–424</span>
+        </div>
+      </div>
+    </div>
+
+    <h3>架构：三套并行，状态无边界</h3>
+
+    <div class="rows">
+      <div class="row">
+        <div class="row-key">重复</div>
+        <div class="row-main">
+          <p class="row-title">三套 API 层是同一份封装抄了三遍</p>
+          <p>
+            <code>ApiError</code> / <code>AdminApiError</code> / <code>InspirationApiError</code>
+            是三个平行实现。差异不只是冗余，是<strong>契约分叉</strong>：studio 和 admin
+            把断网归一成 <code>NETWORK_ERROR</code>，inspiration 没有 try/catch，
+            让裸 <code>TypeError</code> 冒泡。同一个断网事件，三处给用户三种错误。
+          </p>
+          <span class="src">studio/lib/api.ts:52–114 · admin-console/lib/api.ts:35–94 · inspiration/api.ts:1–31</span>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="row-key">状态</div>
+        <div class="row-main">
+          <p class="row-title">StudioApp 用 33 个 useState 编码了 6 类状态</p>
+          <p>
+            其中 8 个瞬时加载标志（<code>planning</code>、<code>quotingCreative</code>、<code>busy</code> 等）
+            只参与一个 <code>locked</code> 表达式的计算，等价于一个 <code>Set&lt;Operation&gt;</code>。
+            而且 <code>locked</code> 列了 8 项、<code>busy</code> 列了 6 项，<strong>两处不同步</strong>——
+            这正是重复状态导致的既存不一致。另有 3 处 <code>useSessionDraft</code> 各写一遍同样的锁判断。
+          </p>
+          <span class="src">components/studio/StudioApp.tsx:117–176, 202 / 222 / 230</span>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="row-key">错误处理</div>
+        <div class="row-main">
+          <p class="row-title">12 种数据获取模式，23 处静默吞错</p>
+          <p>
+            同一件事（挂载时拉数据）有 12 种写法：3 种竞态防护互不兼容，14 条加载路径零 abort 零防护。
+            23 处 <code>.catch(() =&gt; undefined)</code>。但并非全盘失守——
+            <code>InspirationFeed.tsx</code> 是正确范本（prior-abort + cleanup + 双 loading + 双 error），
+            <code>components/inspiration/</code> 全树<strong>零处静默吞</strong>。
+          </p>
+          <span class="src">ppt/PptStudio.tsx（6 处）· StudioApp.tsx（5 处）· ConversationPanel.tsx（4 处）</span>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="row-key defect">真实缺陷</div>
+        <div class="row-main">
+          <p class="row-title">许愿池失败会让界面永久卡死</p>
+          <p>
+            <code>load()</code> 没有 try/catch。网络失败 → 未处理拒绝，且
+            <code>setLoading(false)</code> <strong>永不执行</strong>，UI 永久停在 loading。
+            这是全项目唯一「失败导致界面挂死」的地方，而它在<strong>公网首页</strong>。
+            同一个 effect 还无防抖——每敲一个字符发一个请求。
+          </p>
+          <span class="src">components/wish-pool/WishPoolPage.tsx:84–112</span>
+        </div>
+      </div>
+    </div>
+
+    <h3>性能：平台税吃掉了大头</h3>
+
+    <div class="rows">
+      <div class="row">
+        <div class="row-key defect">最高杠杆</div>
+        <div class="row-main">
+          <p class="row-title">根布局强制全站动态渲染，且阻塞在 DB 查询上</p>
+          <p>
+            <code>app/layout.tsx:27</code> 的 <code>force-dynamic</code> 让全站无法静态化；
+            <code>:43</code> 在 <code>&lt;html&gt;</code> 之前 <code>await</code> 一个公告查询。
+            公告的 DB 延迟 = 全站 TTFB。旁边的 <code>Suspense</code> 不起作用——
+            数据在它外面就已经 await 完了。静态路由只剩三个：favicon、sitemap、robots。
+          </p>
+          <span class="src">app/layout.tsx:27, 38–53 · .next/prerender-manifest.json</span>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="row-key">体积</div>
+        <div class="row-main">
+          <p class="row-title">Radix 全家桶 61.85 KB 进了每一条路由</p>
+          <p>
+            <code>components/ui/index.ts</code> 是没有 <code>"use client"</code> 的 barrel，
+            <code>export *</code> 了 7 个 Radix 原语。根布局只想 import 两个 Provider，
+            却把整条 barrel 拖了进来。实测落地页 176.5 KB gz 里，页面自身只写了 9.1 KB。
+          </p>
+          <span class="src">components/ui/index.ts · app/layout.tsx:9 · 从 app-build-manifest.json 实测</span>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="row-key">LCP / CLS</div>
+        <div class="row-main">
+          <p class="row-title">图像产品，却没有图片策略</p>
+          <p>
+            <code>next/image</code> 用了 <strong>0 次</strong>（配置块还在，是死配置）。
+            30 个裸 <code>&lt;img&gt;</code>，全站零 <code>priority</code> / <code>preload</code>。
+            <code>PostDetail.tsx:184</code> 没有宽高比 → 加载后整页下推，CLS 估 0.15–0.4。
+            <code>ImageGallery.tsx:49</code> 是生成详情页的 LCP 元素，却要等 hydrate 后才发起请求。
+          </p>
+          <span class="src">inspiration/PostDetail.tsx:184 · studio/ImageGallery.tsx:49</span>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="row-key note">投入产出最高</div>
+        <div class="row-main">
+          <p class="row-title">loading.tsx 只覆盖 2 处</p>
+          <p>
+            <code>loading.tsx</code> 只对其所在段的 page 生效。<code>/app/history</code>（服务端双查询）、
+            <code>/app/g/[id]</code>、<code>/app/settings</code>、落地页、5 个公开页——
+            <strong>全部没有 loading 边界</strong>，每次导航 200–600ms 完全空白。
+            加一个约 20 行的模板就能覆盖，可以从现有那个直接复用。
+          </p>
+          <span class="src">app/(app)/app/loading.tsx（唯一可复用模板）</span>
+        </div>
+      </div>
+    </div>
+
+    <h3>移动端：创作页做对了，表单没有</h3>
+
+    <div class="rows">
+      <div class="row">
+        <div class="row-key defect">全站最高频</div>
+        <div class="row-main">
+          <p class="row-title">所有输入框小于 16px，iOS 聚焦即强制缩放</p>
+          <p>
+            <code>Input.tsx</code> 三档是 <code>text-xs</code>(12) / <code>text-sm</code>(14) /
+            <code>text-sm</code>(14)，<code>Textarea.tsx</code> 相同。
+            iOS Safari 聚焦 <code>font-size &lt; 16px</code> 的输入框时会<strong>放大整页且不还原</strong>。
+            登录、注册、设置、后台的每一个输入框都中招。而主创作输入框
+            （<code>CommandDock.tsx:279</code>）用了 <code>text-[15px]</code>——
+            这解释了为什么体验是「创作页还行，一登录就难受」。
+          </p>
+          <span class="src">components/ui/Input.tsx:13–15 · components/ui/Textarea.tsx:19–21</span>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="row-key defect">功能不可用</div>
+        <div class="row-main">
+          <p class="row-title">参考图移除按钮在触屏上不存在</p>
+          <p>
+            <code>opacity-0</code> 加仅 <code>group-hover:opacity-100</code>，触屏没有 hover，
+            控件<strong>根本不被绘制</strong>。这是登录后可达的路径：误加的参考图无法移除，
+            会静默带进每一次生成，用户会以为「模型不听话」。
+          </p>
+          <span class="src">components/studio/panels/ReferencesPanel.tsx:76</span>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="row-key">结构性问题</div>
+        <div class="row-main">
+          <p class="row-title">IconButton 上限 40px，低于 44px 标准</p>
+          <p>
+            <code>sm: h-7</code> / <code>md: h-8</code> / <code>lg: h-10</code>——
+            <strong>任何正确使用该原语的代码都无法达标</strong>。
+            而 <code>Button.lg = h-11</code> 证明 44px 已在设计词汇表里。
+            结果就是 28/32px 的触控目标遍地，包括 <code>Dialog</code> 关闭按钮
+            和登录后唯一的公告关闭入口。
+          </p>
+          <span class="src">components/ui/IconButton.tsx:45–49 · Button.tsx:39–42（对照）</span>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="row-key">可读性</div>
+        <div class="row-main">
+          <p class="row-title">12px 是主力正文字号</p>
+          <p>
+            <code>text-xs</code>(12px) 用了 341 次，是事实上的正文尺寸；
+            另有 162 处小于 12px（<code>text-[11px]</code> 104 处、<code>text-[10px]</code> 60 处）。
+            信息密度按桌面设计，手机上「看得见但读不动」。
+            令牌阶梯底端从 11px 起，没有 16px 以下的移动端放大策略。
+          </p>
+          <span class="src">styles/tokens.css:93–105 · 全组件区字号统计</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>分阶段方案</h2>
+
+    <p class="lead">
+      P0 是前提，P1 是所有后续工作的地基——令牌不修，样式收敛只能靠手改。
+      每个阶段结束都保持绿灯：类型检查、测试、构建三重验证。
+    </p>
+
+    <div class="phases">
+      <div class="phase">
+        <div class="phase-id">P0</div>
+        <div class="phase-body">
+          <p class="phase-title">安全网与清理<small>半天</small></p>
+          <ul>
+            <li><strong>把当前工作区提交成一个还原点</strong>——169 个修改文件加 147 个未跟踪文件。这是唯一的阻塞项。</li>
+            <li>回答上一节的产品问题：canvas / nodes 是删除还是恢复。</li>
+            <li>删两个残留副本：<code>notifications/route 2.ts</code>、<code>lineage/route 2.ts</code>（旧版草稿，不参与路由）。</li>
+            <li>修 ESLint：<code>globalIgnores</code> 补 <code>.claude/**</code>。它现在因为扫两个工作树副本而 <code>ETIMEDOUT</code> 失败。</li>
+            <li>删 <code>styles/typography.css</code>，以及 <code>globals.css</code> 里的 30 个死类、8 个死 keyframe、48 个死令牌。纯删，无行为变化。</li>
+            <li>卸载 <code>zustand</code>（0 引用）和 <code>framer-motion</code>（唯一使用者 <code>MotionProvider</code> 从未被渲染）。</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-id">P1</div>
+        <div class="phase-body">
+          <p class="phase-title">地基修复<small>1–2 天</small></p>
+          <ul>
+            <li><strong>在 <code>@theme</code> 注册字号令牌</strong>——唯一根因级修复。注意间距<em>不要</em>照搬令牌名：Tailwind v4 的间距是乘法模型（<code>p-4 = var(--spacing) × 4 = 16px</code>），注册 <code>--spacing-4: 4px</code> 会让全站 <code>p-4</code> 塌成 4px。字号没有这个问题，可以安全映射。</li>
+            <li><strong>修管理端图表</strong>：补 <code>--color-primary</code> / <code>--color-muted</code>，或改 <code>DashboardView</code> 的类名。改动最小、收益最确定。</li>
+            <li><strong>修焦点环</strong>：把全局 <code>:focus-visible</code> 提到 utilities 层，或给 42 处 <code>outline-none</code> 补替代样式（<code>Tabs.tsx:47</code> 是现成范例）。</li>
+            <li><strong>修两个真实缺陷</strong>：<code>WishPoolPage</code> 补 try/catch + finally + 防抖；<code>PptStudio</code> 轮询依赖改 <code>[deck.id]</code>，消除定时器自重建。</li>
+            <li>补 <code>loading.tsx</code> 到 5 个缺失目录（约 20 行 × 5，从现有那个复用）。</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-id">P2</div>
+        <div class="phase-body">
+          <p class="phase-title">样式收敛<small>2–3 天</small></p>
+          <ul>
+            <li>把 208 处 <code>text-[Npx]</code> 换成新令牌工具类。<strong>这一步依赖 P1 的令牌注册</strong>，否则要手写。</li>
+            <li>统一 eyebrow：17 处手写变体漂移在 6 种字号 × 7 种字距之间，规范值 <code>0.12em</code> 反而一次都没用上。收敛到已有的 <code>.eyebrow</code>。</li>
+            <li>统一 muted 说明文字的写法（现在有 244 种拼写）。</li>
+            <li>修标题层级倒挂：<code>h3</code> 比 <code>h1</code> 大 54%，同为 <code>h1</code> 的 <code>text-[13px]</code> 与 <code>text-xl</code> 并存，5 个 <code>h2</code> 与正文同号。</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-id">P3</div>
+        <div class="phase-body">
+          <p class="phase-title">性能<small>2–3 天</small></p>
+          <ul>
+            <li><strong>拆 barrel</strong>：根布局的 Provider 改深路径导入，把 Select / Tabs / RadioGroup / DropdownMenu 移出全站共享块。预估全站 −35~45 KB gz。</li>
+            <li><strong>去掉根布局的 <code>force-dynamic</code></strong>，把公告查询移进 <code>Suspense</code> 之后。落地页与公开页恢复可静态化、可 CDN 缓存。</li>
+            <li>图片：<code>PostDetail</code> 主图补宽高比（消 CLS），<code>ImageGallery</code> 首图补 preload，首屏卡片改 eager。</li>
+            <li>20 处 <code>shadow-[var(...)]</code> / <code>rounded-[Npx]</code> 收敛为工具类——顺带修掉「裸 <code>shadow-md</code> 不生成 CSS」的静默失效。</li>
+            <li><code>use-session-draft.ts</code> 的 zod 校验（21.76 KB gz）改成手写 type guard，或移到服务端。</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-id">P4</div>
+        <div class="phase-body">
+          <p class="phase-title">架构收敛<small>3–5 天</small></p>
+          <ul>
+            <li><strong>合并三套 API 层</strong>成一个 <code>lib/client-fetch.ts</code>：保留 <code>details</code> 字段与 <code>error.name</code>，修掉 admin 的展开顺序，给 inspiration 补网络异常归一化。<code>ConversationPricing</code> 以 <code>lib/ai-config.ts:308</code> 为唯一源（另两份是它的客户端镜像）。</li>
+            <li><strong>StudioApp 状态收敛</strong>：线程状态合成判别联合；8 个瞬时 flag 合并成一个 <code>Set&lt;Operation&gt;</code>（顺带修掉 <code>locked</code> / <code>busy</code> 不同步）；错误字段合并。</li>
+            <li><strong>统一数据获取</strong>：以 <code>InspirationFeed.tsx</code> 为范本，淘汰另外 10 种模式；消除 23 处静默吞错。</li>
+            <li>引入 <code>React.memo</code>（现在 0 处）——但<strong>放在最后</strong>，且只对确认存活的大组件做。</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-id">P5</div>
+        <div class="phase-body">
+          <p class="phase-title">移动端<small>2 天</small></p>
+          <ul>
+            <li><strong>输入框移动端字号提到 16px</strong>——修掉 iOS 聚焦缩放。改动量极小，覆盖全部移动用户。</li>
+            <li><strong><code>IconButton</code> 补 44px 档位</strong>——原语层修一次，全站受益。</li>
+            <li>参考图移除按钮去掉 hover-only 依赖，给触屏可见状态。</li>
+            <li>两个抽屉补 <code>env(safe-area-inset-*)</code>；7 处 <code>100vh</code> 改 <code>dvh</code>。</li>
+            <li>移动端正文基准字号上调（12px → 14px 起步）。</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>我修正了勘察组的三处判断</h2>
+
+    <p class="lead">
+      四组分析都是证据驱动的，但有三条结论我复核后认为不成立或过重，没有放进上面的方案。
+    </p>
+
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>原判断</th>
+            <th>复核结果</th>
+            <th>处理</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>@theme</code> 未映射圆角令牌，导致 <code>rounded-*</code> 失效</td>
+            <td><code>--radius-lg: 10px</code> 定义在 <code>@layer base</code>，晚于 <code>@theme</code> 默认值，实际生效。真实问题只在字号。</td>
+            <td>降级，只留字号那半条</td>
+          </tr>
+          <tr>
+            <td>StudioApp 用伪造消息掩盖持久化失败</td>
+            <td>该分支显式设置了 <code>setSendError("回复暂未保存…")</code>。这是有意的优雅降级，不是静默掩盖。</td>
+            <td>移出方案</td>
+          </tr>
+          <tr>
+            <td><code>p-3.5</code> / <code>gap-2.5</code> 是令牌阶梯缺档</td>
+            <td>Tailwind v4 间距是乘法模型，小数倍数原生支持。<code>p-3.5 = 0.25rem × 3.5 = 14px</code>，本来就合法。</td>
+            <td>移出方案</td>
+          </tr>
+          <tr>
+            <td>DesignStudio 是首屏性能热点</td>
+            <td>它零引用、不可达，浏览器加载 0 字节。性能影响为零，影响的是维护认知。</td>
+            <td>改为死代码议题</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p style="margin-top:1.3rem">
+      另有一条我实测后下调了严重度：admin 的 <code>headers</code> 展开顺序确实是 bug，
+      但实测 <code>Request</code> 会自动补 <code>Content-Type</code>，服务端也不校验，
+      当前能跑通——属于埋着的地雷，不是正在流血。
+    </p>
+  </section>
+
+  <section>
+    <h2>下一步</h2>
+
+    <p>
+      整体判断：这个项目的<strong>地基比表面看起来好</strong>——类型干净、测试全绿、构建通过、
+      设计系统已经建立、无障碍有覆盖。问题不在能力，在<em>治理</em>：
+      上一轮重构的产物没有清场，两套死掉的排版系统并存；
+      而绕过令牌的写法因为没有工具类可用，不断累积。
+    </p>
+
+    <p>
+      所以我不建议从组件拆分开始。P0 和 P1 加起来不到三天，
+      但它们决定了后面所有工作是「在正确坐标系里收敛」还是「手写补丁对冲」。
+    </p>
+
+    <div class="next">
+      <p>你可以从这三条里挑一条让我继续：</p>
+      <ol>
+        <li>先答 canvas / nodes 的产品问题 → 我据此给出 P0 的具体删除清单和提交计划。</li>
+        <li>直接开工 P0 + P1 → 我先做安全网提交，再做令牌注册和那三个缺陷修复，每步跑三重验证。</li>
+        <li>只要某一块（比如移动端，或性能）→ 我把它单独展开成可执行清单。</li>
+      </ol>
+    </div>
+  </section>
+
+</div>

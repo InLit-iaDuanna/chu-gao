@@ -4,8 +4,10 @@ type CostRequest = Pick<InternalRequest, "n" | "resolution"> &
   Partial<
     Pick<
       InternalRequest,
-      | "aspectRatio"
+      | "providerChannelId"
+      | "size"
       | "image2Mode"
+      | "aspectRatio"
       | "outputFormat"
       | "background"
       | "referenceImages"
@@ -16,8 +18,10 @@ type CostRequest = Pick<InternalRequest, "n" | "resolution"> &
 
 function ruleSpecificity(
   rule: NonNullable<ModelDefinition["pricingRules"]>[number],
+  req: CostRequest,
 ) {
-  return [
+  const fieldCount = [
+    rule.providerChannelId,
     rule.image2Mode,
     rule.resolution,
     rule.aspectRatio,
@@ -25,6 +29,8 @@ function ruleSpecificity(
     rule.background,
     rule.usesReference,
   ].filter((value) => value !== null && value !== undefined).length;
+
+  return fieldCount + (rule.resolution === req.size ? 2 : 0);
 }
 
 function matchesRule(
@@ -36,8 +42,12 @@ function matchesRule(
     Boolean(req.referenceImages && req.referenceImages.length > 0);
 
   return (
+    (!rule.providerChannelId ||
+      rule.providerChannelId === req.providerChannelId) &&
     (!rule.image2Mode || rule.image2Mode === req.image2Mode) &&
-    (!rule.resolution || rule.resolution === req.resolution) &&
+    (!rule.resolution ||
+      rule.resolution === req.resolution ||
+      rule.resolution === req.size) &&
     (!rule.aspectRatio || rule.aspectRatio === req.aspectRatio) &&
     (!rule.outputFormat || rule.outputFormat === req.outputFormat) &&
     (!rule.background || rule.background === req.background) &&
@@ -54,7 +64,8 @@ export function resolvePerImageCredits(
   const rule = model.pricingRules
     ?.filter((item) => matchesRule(item, req))
     .sort((a, b) => {
-      const specificityDelta = ruleSpecificity(b) - ruleSpecificity(a);
+      const specificityDelta =
+        ruleSpecificity(b, req) - ruleSpecificity(a, req);
 
       if (specificityDelta !== 0) {
         return specificityDelta;

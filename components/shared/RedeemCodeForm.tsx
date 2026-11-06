@@ -62,7 +62,7 @@ export function RedeemCodeForm(): React.ReactElement {
       <div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
         <FormField label="兑换码">
           <Input
-            inputSize="lg"
+            controlSize="lg"
             placeholder="输入兑换码"
             required
             value={code}
