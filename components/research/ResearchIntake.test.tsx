@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ComponentProps } from "react";
 import {
   act,
   fireEvent,
@@ -95,8 +95,8 @@ function Harness({
   initialInput = intakeInput(),
 }: {
   projectId?: string;
-  onDraft?: ReturnType<typeof vi.fn>;
-  onUpload?: ReturnType<typeof vi.fn>;
+  onDraft?: ComponentProps<typeof ResearchIntake>["onDraft"];
+  onUpload?: ComponentProps<typeof ResearchIntake>["onUpload"];
   ensureProject?: () => Promise<string>;
   initialInput?: ResearchPlanInput;
 }) {

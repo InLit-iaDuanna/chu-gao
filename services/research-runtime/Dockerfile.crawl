@@ -2,7 +2,7 @@ FROM python:3.12-slim-bookworm@sha256:34386ef0cb081344d7ec1c103ba398e6e9f64e9ab3
 ENV PYTHONUNBUFFERED=1 PLAYWRIGHT_BROWSERS_PATH=/opt/browsers HTTP_PROXY= HTTPS_PROXY= ALL_PROXY= NO_PROXY=*
 ENV PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
 RUN sed -i 's|http://deb.debian.org/debian-security|https://mirrors.ustc.edu.cn/debian-security|g;s|http://deb.debian.org/debian|https://mirrors.ustc.edu.cn/debian|g' /etc/apt/sources.list.d/debian.sources
-RUN --mount=type=cache,target=/root/.cache/pip pip install --timeout 30 --retries 2 crawl4ai==0.9.5 fastapi==0.128.0 uvicorn==0.40.0 httpx==0.28.1 pypdf==5.9.0 python-docx==1.2.0 trafilatura==2.3.1
+RUN --mount=type=cache,target=/root/.cache/pip pip install --timeout 30 --retries 2 crawl4ai==0.9.5 fastapi==0.135.2 uvicorn==0.40.0 httpx==0.28.1 pypdf==6.21.4 python-docx==1.2.0 trafilatura==2.3.1
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked playwright install-deps chromium
 RUN playwright install chromium
 COPY services/research-runtime/requirements.crawl.lock /bridge/requirements.lock
