@@ -10,8 +10,8 @@ anyio==4.15.1
 attrs==26.1.0
 babel==2.18.0
 beautifulsoup4==4.15.0
-brotli==1.2.0
-certifi==2026.7.22
+brotli==1.2.1
+certifi==2026.10.23
 cffi==2.1.1
 chardet==7.7.0
 charset-normalizer==3.5.2
@@ -25,7 +25,7 @@ cssselect==1.6.0
 dateparser==1.4.3
 defusedxml==0.7.1
 fake-useragent==2.2.0
-fastapi==0.128.0
+fastapi==0.135.2
 fastuuid==0.14.0
 filelock==4.2.2
 frozenlist==1.8.0
@@ -59,7 +59,7 @@ MarkupSafe==3.0.4
 mdurl==0.1.2
 multidict==7.1.0
 networkx==3.7
-nltk==3.10.3
+nltk==3.10.4
 numpy==2.5.4
 openai==3.35.1
 packaging==26.3
@@ -75,7 +75,7 @@ pydantic_core==2.50.1
 pyee==14.0.0
 Pygments==2.21.0
 pyOpenSSL==26.4.0
-pypdf==5.9.0
+pypdf==6.21.4
 python-docx==1.2.0
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.4
@@ -94,7 +94,7 @@ six==1.17.0
 sniffio==1.3.1
 snowballstemmer==2.2.0
 soupsieve==3.0.3
-starlette==0.50.0
+starlette==1.3.1
 tiktoken==0.14.0
 tokenizers==0.23.3
 tld==0.13.2

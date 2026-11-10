@@ -46,12 +46,12 @@
     "clsx": "^2.1.1",
     "dompurify": "^3.4.17",
     "eventsource-parser": "^4.1.2",
-    "fflate": "0.8.2",
+    "fflate": "0.8.3",
     "framer-motion": "^12.38.0",
     "geist": "^1.7.2",
     "ioredis": "^5.10.1",
     "lucide-react": "^1.14.0",
-    "next": "15.5.18",
+    "next": "15.5.29",
     "next-themes": "^0.4.6",
     "pino": "^10.3.1",
     "prisma": "^6.16.2",
@@ -59,16 +59,16 @@
     "react-dom": "19.2.4",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
-    "sharp": "^0.34.5",
+    "sharp": "^0.35.5",
     "tailwind-merge": "^3.5.0",
     "tldraw": "5.5.2",
     "tsx": "^4.21.0",
-    "zod": "^4.4.3",
+    "zod": "^4.6.7",
     "zustand": "^5.0.13"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.5",
-    "@next/eslint-plugin-next": "15.5.18",
+    "@next/eslint-plugin-next": "15.5.29",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/react": "16.3.0",
@@ -78,11 +78,11 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "15.5.18",
+    "eslint-config-next": "15.5.29",
     "jsdom": "26.1.0",
     "prettier": "^3.8.3",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "3.2.4"
+    "vitest": "4.1.12"
   }
 }

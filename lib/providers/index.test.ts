@@ -33,6 +33,11 @@ vi.mock("@/lib/providers/availability", () => ({
 vi.mock("@/lib/providers/config", () => ({
   generationTimeoutMs: vi.fn(() => 10_000),
 }));
+vi.mock("@/lib/providers/channel-circuit-breaker", () => ({
+  isChannelCircuitOpen: vi.fn(async () => false),
+  resetChannelCircuit: vi.fn(async () => undefined),
+  tripChannelCircuit: vi.fn(async () => undefined),
+}));
 vi.mock("@/lib/providers/diagnostics", () => ({
   serializeProviderError: vi.fn((error) => String(error)),
 }));

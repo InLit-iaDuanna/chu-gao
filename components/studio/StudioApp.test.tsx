@@ -582,7 +582,7 @@ it("creates the conversation lazily and shows an accepted image job inline", asy
   fireEvent.change(screen.getByRole("textbox", { name: "提示词" }), {
     target: { value: "画一个庭院" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "生成" }));
+  fireEvent.click(screen.getByRole("button", { name: "生成图片" }));
   await waitFor(() =>
     expect(mocks.generate).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -609,7 +609,7 @@ it("preserves prompt and references if submitting the first image fails", async 
     />,
   );
   await ready();
-  fireEvent.click(screen.getByRole("button", { name: "生成" }));
+  fireEvent.click(screen.getByRole("button", { name: "生成图片" }));
   await screen.findByRole("alert");
   expect(screen.getByRole("textbox", { name: "提示词" })).toHaveValue(
     "保留坡道",
@@ -644,7 +644,7 @@ it("keeps one image result, restores preview at index zero, and uses it for the 
   fireEvent.change(screen.getByRole("textbox", { name: "提示词" }), {
     target: { value: "改成白天" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "生成" }));
+  fireEvent.click(screen.getByRole("button", { name: "生成图片" }));
   await waitFor(() =>
     expect(mocks.generate).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -727,7 +727,7 @@ it("does not create a replacement thread when the requested conversation failed 
   fireEvent.change(screen.getByRole("textbox", { name: "提示词" }), {
     target: { value: "继续修改" },
   });
-  expect(screen.getByRole("button", { name: "生成" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "生成图片" })).toBeDisabled();
   expect(mocks.create).not.toHaveBeenCalled();
 });
 
@@ -749,7 +749,7 @@ it("does not restore an already sent prompt when starting the next conversation"
   fireEvent.change(screen.getByRole("textbox", { name: "提示词" }), {
     target: { value: "画一个庭院" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "生成" }));
+  fireEvent.click(screen.getByRole("button", { name: "生成图片" }));
   await screen.findByText("排队中 · 0%");
   await waitFor(() =>
     expect(screen.getByRole("textbox", { name: "提示词" })).toHaveValue(""),
@@ -778,7 +778,7 @@ it("can remove the implicit previous image before sending another image request"
   fireEvent.change(screen.getByRole("textbox", { name: "提示词" }), {
     target: { value: "画新的建筑" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "生成" }));
+  fireEvent.click(screen.getByRole("button", { name: "生成图片" }));
   await waitFor(() =>
     expect(mocks.generate).toHaveBeenCalledWith(
       expect.objectContaining({ sourceImageIds: [] }),
@@ -803,7 +803,7 @@ it("keeps clarification feedback local instead of appending an unmanaged assista
   fireEvent.change(screen.getByRole("textbox", { name: "提示词" }), {
     target: { value: "修改一下" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "生成" }));
+  fireEvent.click(screen.getByRole("button", { name: "生成图片" }));
   expect(await screen.findByRole("alert")).toHaveTextContent(
     "请补充要修改的位置",
   );
