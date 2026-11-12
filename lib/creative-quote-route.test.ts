@@ -4,10 +4,6 @@ const mocks = vi.hoisted(() => ({
   model: vi.fn(),
   image: vi.fn(),
   stat: vi.fn(),
-  enabled: vi.fn(),
-}));
-vi.mock("@/lib/creative-config", () => ({
-  creativeAssistantEnabled: mocks.enabled,
 }));
 vi.mock("@/lib/auth", () => ({ checkSession: mocks.session }));
 vi.mock("@/lib/model-pricing", () => ({ getModelWithPricing: mocks.model }));
@@ -38,7 +34,6 @@ const run = (baseReference: unknown = null) =>
   );
 beforeEach(() => {
   vi.resetAllMocks();
-  mocks.enabled.mockReturnValue(true);
   mocks.session.mockResolvedValue({
     status: "authenticated",
     user: { id: "owner" },
@@ -61,12 +56,6 @@ beforeEach(() => {
   });
 });
 describe("creative quote without generation", () => {
-  it("keeps the feature disabled without reading an image or quoting a price", async () => {
-    mocks.enabled.mockReturnValue(false);
-    expect((await run()).status).toBe(503);
-    expect(mocks.image).not.toHaveBeenCalled();
-    expect(mocks.model).not.toHaveBeenCalled();
-  });
   it("quotes the selected source as a reference image and checks ownership", async () => {
     const response = await run({ kind: "source", key: "image-1" });
     expect(response.status).toBe(200);

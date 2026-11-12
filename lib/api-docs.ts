@@ -41,13 +41,15 @@ ${MODELS_PLACEHOLDER}
 | \`quality\` | string | 否 | 质量档位，必须是该模型支持的值 |
 | \`n\` | integer | 否 | 张数，默认 1，不超过该模型的 n 上限 |
 | \`referenceImageKeys\` | string[] | 否 | 参考图，先用 \`POST /uploads\` 上传拿到 key |
-| \`outputFormat\` | string | 否 | \`png\` / \`jpeg\` / \`webp\`，仅部分模型支持 |
+| \`outputFormat\` | string | 否 | \`png\` / \`jpeg\` / \`webp\` / \`gif\`，以模型能力为准；Image 2.6 支持 GIF |
 | \`background\` | string | 否 | \`auto\` / \`opaque\` / \`transparent\`，仅部分模型支持 |
 | \`outputCompression\` | integer | 否 | 0–100，仅 jpeg/webp 且模型支持时有效 |
 
 可选请求头 \`Idempotency-Key\`：网络重试时带同一个值，不会重复出图和扣费。
 
 可选查询参数 \`?wait=false\`：不等待，立即返回 202 和任务 ID，之后用 \`GET /generations/:id\` 取结果。
+
+GIF 使用 Image 2.6 系列，设置 \`outputFormat: "gif"\` 和 \`size: "512x512"\` 或 \`"768x768"\`。实际帧尺寸以返回的 \`width\`、\`height\` 为准；Base64 返回完整动图，MIME 类型为 \`image/gif\`。GIF 不支持 1K / 2K / 4K 请求尺寸。
 
 ### 示例：Nano Banana 文生图
 
@@ -168,7 +170,7 @@ else:
 | --- | --- | --- |
 | \`UNAUTHORIZED\` | 401 | 密钥无效、已撤销或已过期 |
 | \`UNSUPPORTED_PARAM\` | 400 | 参数不被该模型支持（尺寸、质量、张数等） |
-| \`MODERATION_REJECTED\` | 400 | 提示词或参考图未通过内容审核 |
+| \`MODERATION_REJECTED\` | 400 | \`[MODERATION_REJECTED] 提示词或参考图包含不允许的内容，请调整后再试。\` |
 | \`INSUFFICIENT_CREDITS\` | 402 | 积分不足 |
 | \`IDEMPOTENCY_CONFLICT\` | 409 | 同一 Idempotency-Key 提交了不同参数 |
 | \`RATE_LIMITED\` | 429 | 超出并发、每分钟或每日上限 |
@@ -182,7 +184,9 @@ export async function getApiDocsMarkdown(): Promise<{
 }> {
   if (process.env.DATABASE_URL) {
     try {
-      const row = await db.systemConfig.findUnique({ where: { key: KEY_DOCS } });
+      const row = await db.systemConfig.findUnique({
+        where: { key: KEY_DOCS },
+      });
       if (typeof row?.value === "string" && row.value.trim()) {
         return { markdown: row.value, isDefault: false };
       }

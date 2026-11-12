@@ -2,11 +2,10 @@
 // 配置来源：lib/ai-config（DB 优先，env 兜底）。
 // 设计原则：永不让增强失败中断主流程——任何错误都回退到原始/拼接提示词。
 
-import {
-  getDeepSeekConfig,
-  getDeepSeekSystemPrompt,
-} from "@/lib/ai-config";
+import { getDeepSeekConfig, getDeepSeekSystemPrompt } from "@/lib/ai-config";
 import { logger } from "@/lib/logger";
+import { withModelCall, type ModelCallContext } from "@/lib/model-call-log";
+import { providerError } from "@/lib/providers/diagnostics";
 import type { SlideType } from "@/lib/ppt-templates";
 
 const REQUEST_TIMEOUT_MS = 20_000;
@@ -45,6 +44,7 @@ function extractContent(data: unknown): string | null {
 async function callDeepSeek(
   systemPrompt: string,
   userPrompt: string,
+  logContext?: ModelCallContext & { operation?: string },
 ): Promise<string | null> {
   const config = await getDeepSeekConfig();
 
@@ -53,44 +53,68 @@ async function callDeepSeek(
   }
 
   const url = `${config.baseUrl.replace(/\/+$/, "")}/v1/chat/completions`;
+  const requestBody = {
+    model: config.model,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ],
+    temperature: 0.7,
+    max_tokens: 400,
+  };
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeout = setTimeout(
+    () => controller.abort(new Error("Prompt optimizer timeout")),
+    REQUEST_TIMEOUT_MS,
+  );
 
   try {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${config.apiKey}`,
+    return await withModelCall(
+      {
+        ...logContext,
+        secrets: [config.apiKey],
+        kind: "llm",
+        operation: logContext?.operation ?? "prompt.optimize",
+        modelId: config.model,
+        providerName: "DeepSeek",
+        endpoint: url,
+        requestContent: requestBody,
       },
-      body: JSON.stringify({
-        model: config.model,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        temperature: 0.7,
-        max_tokens: 400,
-      }),
-      signal: controller.signal,
-    });
+      async (call) => {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${config.apiKey}`,
+          },
+          body: JSON.stringify(requestBody),
+          signal: controller.signal,
+        });
 
-    if (!response.ok) {
-      logger.warn(
-        { status: response.status },
-        "DeepSeek returned non-OK; falling back.",
-      );
-      return null;
-    }
+        call.response(response);
+        if (!response.ok)
+          throw await providerError(
+            response,
+            "DeepSeek",
+            "chat-completions",
+            url,
+          );
 
-    const data: unknown = await response.json();
-    return extractContent(data);
+        const data: unknown = await response.json();
+        call.usage(data);
+        const content = extractContent(data);
+        if (!content)
+          throw new Error("Invalid or empty content from prompt optimizer");
+        return content;
+      },
+    );
   } finally {
     clearTimeout(timeout);
   }
 }
 
 export interface OptimizeImagePromptInput {
+  logContext?: ModelCallContext & { operation?: string };
   // 额外的上下文系统提示词（如 PPT 专属约束），叠加在 DeepSeek 优化系统提示词之上。
   contextSystemPrompt?: string;
   // 不变提示词（整套统一风格 / 约束）。
@@ -106,6 +130,7 @@ export async function optimizeImagePrompt({
   contextSystemPrompt,
   fixedPrompt,
   variablePrompt,
+  logContext,
 }: OptimizeImagePromptInput): Promise<string> {
   const fallback = concatPrompt(fixedPrompt, variablePrompt);
 
@@ -124,7 +149,7 @@ export async function optimizeImagePrompt({
       .filter(Boolean)
       .join("\n\n");
 
-    const optimized = await callDeepSeek(systemPrompt, userPrompt);
+    const optimized = await callDeepSeek(systemPrompt, userPrompt, logContext);
     return optimized && optimized.length > 0 ? optimized : fallback;
   } catch (error) {
     logger.warn({ error }, "DeepSeek optimize failed; using concatenation.");
@@ -133,6 +158,7 @@ export async function optimizeImagePrompt({
 }
 
 interface EnhanceInput {
+  logContext?: ModelCallContext;
   prompt: string;
   theme: string;
   slideType: SlideType;
@@ -143,6 +169,7 @@ export async function enhanceSlidePrompt({
   prompt,
   theme,
   slideType,
+  logContext,
 }: EnhanceInput): Promise<string> {
   try {
     const systemPrompt = `你是图像生成提示词优化专家，负责优化 PPT 幻灯片的英文图像提示词。
@@ -155,6 +182,7 @@ export async function enhanceSlidePrompt({
     const optimized = await callDeepSeek(
       systemPrompt,
       `优化这条提示词：\n${prompt}`,
+      { ...logContext, operation: "ppt.optimize" },
     );
     return optimized && optimized.length > 0 ? optimized : prompt;
   } catch (error) {

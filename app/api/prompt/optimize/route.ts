@@ -1,12 +1,14 @@
-// 提示词优化端点：把当前草稿用 DeepSeek 润色成更具体的出图 prompt。
-// 复用 lib/deepseek 的 optimizeImagePrompt——未配置 / 出错时本就回退原文，
+// 提示词优化端点：把当前草稿用 Opus 5.5 润色成更具体的出图 prompt。
+// 未配置 / 出错时本就回退原文，
 // 因此本端点始终 200 返回 { prompt }，前端无感降级。
 
-import { getDeepSeekConfig } from "@/lib/ai-config";
 import { fail, ok } from "@/lib/api-response";
 import { userActionRateLimitResponse } from "@/lib/api-rate-limit";
 import { checkSession } from "@/lib/auth";
-import { optimizeImagePrompt } from "@/lib/deepseek";
+import {
+  isPromptOptimizerConfigured,
+  optimizeImagePrompt,
+} from "@/lib/prompt-optimizer";
 import { readJsonBodySafe } from "@/lib/request-body";
 import { z } from "zod";
 
@@ -51,15 +53,18 @@ export async function POST(request: Request) {
   }
 
   const optimized = await optimizeImagePrompt({
+    logContext: {
+      source: "web",
+      userId: sessionResult.user.id,
+      operation: "prompt.optimize",
+    },
     fixedPrompt: "",
     variablePrompt: parsed.data.prompt,
   });
 
-  const { enabled, apiKey } = await getDeepSeekConfig();
-
   return ok({
     prompt: optimized,
-    // 告知前端是否真正经过了 DeepSeek 优化（否则为原样回退）。
-    optimized: enabled && Boolean(apiKey),
+    // 告知前端是否真正经过了 Opus 优化（否则为原样回退）。
+    optimized: await isPromptOptimizerConfigured(),
   });
 }

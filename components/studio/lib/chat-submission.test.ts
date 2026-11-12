@@ -66,27 +66,6 @@ it("persists before submission and replays the same immutable input after unknow
   });
 });
 
-it("removes the image-only order field when replaying an older chat receipt", async () => {
-  prepareChatCreate("user", input);
-  const key = chatReceiptKey("user", "conversation");
-  const receipt = JSON.parse(localStorage.getItem(key)!);
-  receipt.pending.input.referenceOrder = [
-    "generated:generated",
-    "upload:upload",
-  ];
-  localStorage.setItem(key, JSON.stringify(receipt));
-  mocks.request.mockResolvedValueOnce(null).mockResolvedValueOnce(turn);
-
-  await resolveChatSubmission("user", "conversation");
-
-  const post = mocks.request.mock.calls.find(
-    ([, init]) => init?.method === "POST",
-  );
-  const body = JSON.parse(post![1].body);
-  expect(body).not.toHaveProperty("referenceOrder");
-  expect(body.references).toEqual(input.references);
-});
-
 it("isolates receipts by authenticated user and conversation", () => {
   const a = prepareChatCreate("user-a", input);
   const b = prepareChatCreate("user-b", input);

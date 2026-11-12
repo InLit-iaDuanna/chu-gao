@@ -7,7 +7,7 @@ import {
 describe("web search citations", () => {
   it("leaves refund promises to the route's confirmed billing outcome", () => {
     expect(new ChatSearchUnavailableError().message).toBe(
-      "联网检索未能完成，请稍后重试",
+      "联网检索未能完成，可关闭联网后重试",
     );
   });
   it("formats citations from structured annotations without exposing internal markers", () => {

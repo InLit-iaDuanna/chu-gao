@@ -17,6 +17,9 @@ const mocks = vi.hoisted(() => ({
   profile: vi.fn(),
   touch: vi.fn(),
   remove: vi.fn(),
+  callUsage: vi.fn(),
+  callFinish: vi.fn(),
+  submitImage: vi.fn(),
   active: true,
 }));
 vi.mock("@/lib/db", () => ({
@@ -40,8 +43,18 @@ vi.mock("@/lib/chat-turns", () => ({
 }));
 vi.mock("@/lib/chat-context", () => ({ prepareChatContext: mocks.context }));
 vi.mock("@/lib/chat-profiles", () => ({ getChatProfile: mocks.profile }));
+vi.mock("@/lib/model-call-log", () => ({
+  startModelCall: async () => ({
+    response: vi.fn(),
+    usage: mocks.callUsage,
+    finish: mocks.callFinish,
+  }),
+}));
 vi.mock("@/lib/chat-references", () => ({
   resolveChatReferences: async () => [],
+}));
+vi.mock("@/lib/chat-image-tool", () => ({
+  submitChatImageTool: mocks.submitImage,
 }));
 vi.mock("@/lib/logger", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
@@ -57,6 +70,10 @@ import {
   recoverStaleChatAttempts,
   startChatWorker,
 } from "@/lib/chat-worker";
+import { OPUS_MODEL_ID } from "@/lib/chat-model-options";
+import { chatInputTokenUpperBound } from "@/lib/chat-token-billing";
+import { chatCompletionsRequestBody } from "@/lib/chat-upstream";
+import { CHAT_IMAGE_TOOL } from "@/lib/chat-image-tool-definition";
 
 const sseResponse = (text: string) =>
   new Response(
@@ -100,6 +117,13 @@ describe("chat worker boundaries", () => {
     mocks.transaction.mockImplementation((operation) => operation(tx));
     mocks.appendActive.mockImplementation(async () => mocks.active);
     mocks.finish.mockResolvedValue(true);
+    mocks.submitImage.mockResolvedValue({
+      ok: true,
+      generationId: "generation-image-tool",
+      status: "PENDING",
+      estimatedCredits: 6,
+      modelId: "gpt-image-2",
+    });
     mocks.findQueued.mockResolvedValue([]);
     mocks.touch.mockResolvedValue(undefined);
     mocks.remove.mockResolvedValue(undefined);
@@ -158,6 +182,529 @@ describe("chat worker boundaries", () => {
     vi.unstubAllGlobals();
   });
 
+  const opus = async () => {
+    const attempt = await mocks.findAttempt();
+    attempt.turn.modelId = OPUS_MODEL_ID;
+    Object.assign(attempt.turn.configSnapshot, {
+      model: OPUS_MODEL_ID,
+      effort: "xhigh",
+      transport: "chat_completions_sse",
+      tokenPricing: {
+        version: 1,
+        maxInputTokens: 4096,
+        maxOutputTokens: 64,
+        pricing: {
+          type: "per_million_tokens",
+          input: 100,
+          output: 500,
+          cacheRead: 5,
+          cacheCreation: 60,
+        },
+      },
+    });
+    mocks.findAttempt.mockResolvedValue(attempt);
+    mocks.profile.mockResolvedValue({
+      enabled: true,
+      apiKey: "fixture-key",
+      baseUrl: "https://upstream.invalid",
+      model: OPUS_MODEL_ID,
+    });
+  };
+
+  it("retains final Chat Completions usage after finish_reason and stops at DONE on an open stream", async () => {
+    await opus();
+    const usage = {
+      prompt_tokens: 270,
+      completion_tokens: 1,
+      input_tokens: 270,
+      output_tokens: 0,
+      prompt_tokens_details: {
+        cached_tokens: 35,
+        cached_creation_tokens: 227,
+        cache_write_tokens: 227,
+      },
+      claude_cache_creation_5_m_tokens: 227,
+      claude_cache_creation_1_h_tokens: 0,
+    };
+    const cancel = vi.fn();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            new ReadableStream<Uint8Array>({
+              start(controller) {
+                controller.enqueue(
+                  new TextEncoder().encode(
+                    event({
+                      choices: [
+                        { delta: { content: "answer" }, finish_reason: null },
+                      ],
+                    }) +
+                      event({
+                        choices: [{ delta: {}, finish_reason: "stop" }],
+                      }) +
+                      event({ choices: [], usage }) +
+                      "data: [DONE]\n\n",
+                  ),
+                );
+              },
+              cancel,
+            }),
+            { headers: { "content-type": "text/event-stream" } },
+          ),
+      ),
+    );
+    await executeChatAttempt("attempt-a", new AbortController());
+    expect(mocks.finish.mock.calls[0][0]).toMatchObject({
+      status: "completed",
+      text: "answer",
+      usage,
+    });
+    expect(mocks.callUsage).toHaveBeenCalledExactlyOnceWith({
+      ...usage,
+      input_tokens: 270,
+      output_tokens: 1,
+      uncached_input_tokens: 8,
+      cache_read_input_tokens: 35,
+      cache_creation_input_tokens: 227,
+      input_tokens_details: {
+        cached_tokens: 35,
+        cached_creation_tokens: 227,
+        cache_write_tokens: 227,
+      },
+    });
+    const request = JSON.parse(
+      vi.mocked(fetch).mock.calls[0][1]!.body as string,
+    );
+    expect(request).toMatchObject({
+      model: OPUS_MODEL_ID,
+      reasoning_effort: "xhigh",
+      max_tokens: 64,
+      stream_options: { include_usage: true },
+    });
+    expect(mocks.context.mock.calls[0][0]).not.toHaveProperty("skipCompaction");
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("executes one image tool call and resumes the same chat turn with its result", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          sseResponse(
+            event({
+              type: "response.output_item.added",
+              output_index: 0,
+              item: {
+                id: "function-item",
+                type: "function_call",
+                call_id: "call-image",
+                name: "generate_image",
+              },
+            }) +
+              event({
+                type: "response.function_call_arguments.done",
+                output_index: 0,
+                item_id: "function-item",
+                call_id: "call-image",
+                arguments: '{"prompt":"a paper bird"}',
+              }) +
+              event({
+                type: "response.completed",
+                response: {
+                  status: "completed",
+                  output: [
+                    {
+                      id: "function-item",
+                      type: "function_call",
+                      call_id: "call-image",
+                      name: "generate_image",
+                      arguments: '{"prompt":"a paper bird"}',
+                    },
+                  ],
+                },
+              }),
+          ),
+        )
+        .mockResolvedValueOnce(
+          sseResponse(
+            event({
+              type: "response.output_text.delta",
+              item_id: "answer",
+              delta: "图片任务已提交。",
+            }) +
+              event({
+                type: "response.completed",
+                response: { status: "completed" },
+              }),
+          ),
+        ),
+    );
+    mocks.updateMessage.mockResolvedValue({ count: 1 });
+
+    await executeChatAttempt("attempt-a", new AbortController());
+
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(mocks.submitImage).toHaveBeenCalledWith(
+      '{"prompt":"a paper bird"}',
+      expect.objectContaining({
+        conversationId: "conversation-a",
+        callId: "call-image",
+      }),
+    );
+    expect(mocks.updateMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { generationId: "generation-image-tool" },
+      }),
+    );
+    expect(
+      mocks.appendActive.mock.calls.some(
+        ([, input]) =>
+          input.type === "generation.created" &&
+          input.payload.generationId === "generation-image-tool",
+      ),
+    ).toBe(true);
+    expect(mocks.finish.mock.calls.at(-1)?.[0]).toMatchObject({
+      status: "completed",
+      text: "图片任务已提交。",
+    });
+    const resumed = JSON.parse(
+      vi.mocked(fetch).mock.calls[1][1]!.body as string,
+    );
+    expect(resumed.input).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "function_call",
+          call_id: "call-image",
+        }),
+        expect.objectContaining({
+          type: "function_call_output",
+          call_id: "call-image",
+        }),
+      ]),
+    );
+  });
+
+  const imageToolFrames = (complete = true, withUsage = true) =>
+    event({
+      choices: [
+        {
+          delta: {
+            content: "先提交图片。",
+            tool_calls: [
+              {
+                index: 0,
+                id: "image-call",
+                type: "function",
+                function: {
+                  name: "generate_image",
+                  arguments: '{"prompt":"街景  保留空格"}',
+                },
+              },
+            ],
+          },
+          finish_reason: complete ? "tool_calls" : null,
+        },
+      ],
+    }) +
+    (withUsage
+      ? event({
+          choices: [],
+          usage: { prompt_tokens: 270, completion_tokens: 12 },
+        })
+      : "") +
+    "data: [DONE]\n\n";
+
+  const imageOpus = async () => {
+    await opus();
+    const attempt = await mocks.findAttempt();
+    const firstRequest = chatCompletionsRequestBody(
+      OPUS_MODEL_ID,
+      [{ role: "user", content: "synthetic" }],
+      "synthetic",
+      {
+        effort: "xhigh",
+        maxOutputTokens: 64,
+        includeUsage: true,
+        tools: [CHAT_IMAGE_TOOL],
+      },
+    );
+    const firstBound = chatInputTokenUpperBound(firstRequest);
+    Object.assign(attempt.turn.configSnapshot.tokenPricing, {
+      maxInputTokens: firstBound * 2 + 32_768,
+      maxOutputTokens: 128,
+    });
+    Object.assign(attempt.turn.configSnapshot, {
+      tokenRequestLimits: {
+        maxInputTokens: 262_144,
+        maxOutputTokens: 64,
+        maxRequests: 2,
+      },
+    });
+    mocks.updateMessage.mockResolvedValue({ count: 1 });
+    return firstBound;
+  };
+
+  it("reserves and bills both Opus tool segments, preserves prose, and sends the actual tool result without another tool", async () => {
+    const originalBound = await imageOpus();
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(sseResponse(imageToolFrames()))
+        .mockResolvedValueOnce(
+          sseResponse(
+            event({
+              choices: [
+                { delta: { content: "任务已提交。" }, finish_reason: "stop" },
+              ],
+            }) +
+              event({
+                choices: [],
+                usage: { prompt_tokens: 300, completion_tokens: 8 },
+              }) +
+              "data: [DONE]\n\n",
+          ),
+        ),
+    );
+    await executeChatAttempt("attempt-a", new AbortController());
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(mocks.submitImage).toHaveBeenCalledTimes(1);
+    const second = JSON.parse(
+      vi.mocked(fetch).mock.calls[1][1]!.body as string,
+    );
+    const withoutTools = { ...second };
+    delete withoutTools.tools;
+    delete withoutTools.tool_choice;
+    const first = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string);
+    delete first.tools;
+    delete first.tool_choice;
+    // This is the exact condition that rejected every original tool continuation.
+    expect(chatInputTokenUpperBound(withoutTools)).toBeGreaterThan(
+      chatInputTokenUpperBound(first),
+    );
+    expect(chatInputTokenUpperBound(second)).toBeLessThan(
+      originalBound + 32_768,
+    );
+    expect(second.max_tokens).toBe(64);
+    expect(second.tools).toBeUndefined();
+    expect(second.messages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ role: "assistant", content: "先提交图片。" }),
+        expect.objectContaining({
+          role: "tool",
+          tool_call_id: "image-call",
+          content: expect.stringContaining("generation-image-tool"),
+        }),
+      ]),
+    );
+    expect(mocks.finish.mock.calls.at(-1)?.[0]).toMatchObject({
+      status: "completed",
+      text: "先提交图片。任务已提交。",
+      usage: {
+        prompt_tokens: 570,
+        completion_tokens: 20,
+        usage_availability: "reported",
+        usage_segments: [
+          { prompt_tokens: 270, completion_tokens: 12 },
+          { prompt_tokens: 300, completion_tokens: 8 },
+        ],
+      },
+    });
+  });
+
+  it("never submits an image from a truncated tool call without its completion marker", async () => {
+    await imageOpus();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => sseResponse(imageToolFrames(false))),
+    );
+    await executeChatAttempt("attempt-a", new AbortController());
+    expect(mocks.submitImage).not.toHaveBeenCalled();
+    expect(mocks.finish.mock.calls.at(-1)?.[0].status).toBe("interrupted");
+  });
+
+  it("keeps image submission separate when the following prose request fails, without claiming the round was free", async () => {
+    await imageOpus();
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(sseResponse(imageToolFrames()))
+        .mockRejectedValueOnce(new Error("fetch failed")),
+    );
+    await executeChatAttempt("attempt-a", new AbortController());
+    expect(mocks.submitImage).toHaveBeenCalledTimes(1);
+    expect(mocks.finish.mock.calls.at(-1)?.[0]).toMatchObject({
+      status: "interrupted",
+      text: "先提交图片。",
+      usage: { usage_availability: "unknown" },
+      error: { publicMessage: expect.stringContaining("文字回复未收费") },
+    });
+    expect(
+      mocks.finish.mock.calls.at(-1)?.[0].error.publicMessage,
+    ).not.toContain("本轮未收费");
+  });
+
+  it("does not drop an unknown first segment from token settlement", async () => {
+    await imageOpus();
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(sseResponse(imageToolFrames(true, false)))
+        .mockResolvedValueOnce(
+          sseResponse(
+            event({
+              choices: [
+                { delta: { content: "完成回复" }, finish_reason: "stop" },
+              ],
+            }) +
+              event({
+                choices: [],
+                usage: { prompt_tokens: 300, completion_tokens: 8 },
+              }) +
+              "data: [DONE]\n\n",
+          ),
+        ),
+    );
+    await executeChatAttempt("attempt-a", new AbortController());
+    expect(mocks.finish.mock.calls.at(-1)?.[0]).toMatchObject({
+      status: "completed",
+      usage: {
+        usage_availability: "unknown",
+        usage_segments: [null, { prompt_tokens: 300, completion_tokens: 8 }],
+      },
+    });
+  });
+
+  it("retries only prose when a previous image submission was retained", async () => {
+    await imageOpus();
+    const attempt = await mocks.findAttempt();
+    attempt.parts = {
+      imageContinuation: {
+        generationId: "existing-image",
+        status: "SUCCEEDED",
+        prompt: "original",
+      },
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        sseResponse(
+          event({
+            choices: [
+              { delta: { content: "这是上一张图片。" }, finish_reason: "stop" },
+            ],
+          }) + "data: [DONE]\n\n",
+        ),
+      ),
+    );
+    await executeChatAttempt("attempt-a", new AbortController());
+    const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string);
+    expect(body.tools).toBeUndefined();
+    expect(JSON.stringify(body.messages)).toContain("existing-image");
+    expect(mocks.submitImage).not.toHaveBeenCalled();
+    expect(mocks.finish.mock.calls.at(-1)?.[0].status).toBe("completed");
+  });
+
+  it("keeps an explicit completion when the subsequent usage tail disconnects", async () => {
+    await opus();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            new ReadableStream({
+              start(controller) {
+                controller.enqueue(
+                  new TextEncoder().encode(
+                    event({
+                      choices: [
+                        {
+                          delta: { content: "完整回复" },
+                          finish_reason: "stop",
+                        },
+                      ],
+                    }),
+                  ),
+                );
+              },
+              pull() {
+                throw new Error("terminated");
+              },
+            }),
+            { headers: { "content-type": "text/event-stream" } },
+          ),
+      ),
+    );
+    await executeChatAttempt("attempt-a", new AbortController());
+    expect(mocks.finish.mock.calls.at(-1)?.[0]).toMatchObject({
+      status: "completed",
+      text: "完整回复",
+      usage: null,
+    });
+  });
+
+  it("leaves missing final usage explicit and never synthesizes token counts", async () => {
+    await opus();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        sseResponse(
+          event({
+            choices: [
+              {
+                delta: { content: "answer" },
+                finish_reason: "stop",
+              },
+            ],
+          }) + "data: [DONE]\n\n",
+        ),
+      ),
+    );
+    await executeChatAttempt("attempt-a", new AbortController());
+    expect(mocks.finish.mock.calls[0][0]).toMatchObject({
+      status: "completed",
+      usage: null,
+    });
+    expect(mocks.callUsage).toHaveBeenCalledWith({});
+  });
+
+  it("does not automatically issue an extra paid request after an Opus stream interruption", async () => {
+    await opus();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        sseResponse(event({ choices: [{ delta: { content: "partial" } }] })),
+      ),
+    );
+    await executeChatAttempt("attempt-a", new AbortController());
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(mocks.finish.mock.calls[0][0]).toMatchObject({
+      status: "interrupted",
+      text: "partial",
+    });
+  });
+
+  it("checks the exact prepared request against its accepted bound before upstream execution", async () => {
+    await opus();
+    mocks.context.mockResolvedValue({
+      messages: [{ role: "user", content: "a".repeat(5000) }],
+      status: {},
+      manifest: {},
+    });
+    await executeChatAttempt("attempt-a", new AbortController());
+    expect(fetch).not.toHaveBeenCalled();
+    expect(mocks.finish.mock.calls[0][0]).toMatchObject({
+      status: "interrupted",
+      error: { code: "token_pricing_input_bound_exceeded" },
+    });
+  });
+
   it("saves the complete accumulator after a bad frame inside the flush interval", async () => {
     vi.stubGlobal(
       "fetch",
@@ -169,7 +716,7 @@ describe("chat worker boundaries", () => {
       status: "interrupted",
       text: "last parsed content",
       parts: {
-        version: 2,
+        version: 3,
         parts: [{ itemId: "answer", text: "last parsed content" }],
       },
       sources: [],

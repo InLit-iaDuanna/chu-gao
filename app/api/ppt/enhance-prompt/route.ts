@@ -3,7 +3,7 @@ import { z } from "zod";
 import { fail, ok } from "@/lib/api-response";
 import { userActionRateLimitResponse } from "@/lib/api-rate-limit";
 import { checkSession } from "@/lib/auth";
-import { enhanceSlidePrompt } from "@/lib/deepseek";
+import { enhanceSlidePrompt } from "@/lib/prompt-optimizer";
 import { readJsonBodySafe } from "@/lib/request-body";
 
 export const dynamic = "force-dynamic";
@@ -56,7 +56,10 @@ export async function POST(request: Request) {
     });
   }
 
-  const enhancedPrompt = await enhanceSlidePrompt(parsed.data);
+  const enhancedPrompt = await enhanceSlidePrompt({
+    ...parsed.data,
+    logContext: { source: "web", userId: sessionResult.user.id },
+  });
 
   return ok({ enhancedPrompt });
 }

@@ -8,14 +8,14 @@ function remoteHosts() {
 }
 
 const nextConfig: NextConfig = {
-  distDir: process.env.NEXT_DIST_DIR ?? (process.env.NODE_ENV === "development" ? ".next-dev" : ".next"),
+  distDir: process.env.NODE_ENV === "development" ? ".next-dev" : ".next",
   output: "standalone",
   devIndicators: false,
   outputFileTracingExcludes: {
     "*": [".data/**", "output/**"],
   },
   experimental: {
-    middlewareClientMaxBodySize: "22mb",
+    middlewareClientMaxBodySize: "12mb",
     optimizePackageImports: ["lucide-react", "framer-motion"],
   },
   images: {

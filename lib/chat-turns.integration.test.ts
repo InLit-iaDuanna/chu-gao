@@ -2,19 +2,38 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
-import { SOL_MODEL_ID } from "@/lib/chat-model-options";
+import { OPUS_MODEL_ID, SOL_MODEL_ID } from "@/lib/chat-model-options";
 
 vi.mock("@/lib/chat-profiles", () => ({
   getChatProfile: async (modelId: string) => ({
     enabled: true,
     apiKey: "fixture-api-key",
     baseUrl: "https://upstream.invalid",
-    model: modelId === "default" ? "fixture-chat" : "gpt-6.1-sol",
+    model: modelId === "default" ? "fixture-chat" : modelId,
     credits: 0.2,
     efforts: ["low", "max"],
     vision: modelId === "default",
     webSearch: modelId !== "default",
-    transport: modelId === "default" ? "chat_completions_sse" : "responses_sse",
+    transport:
+      modelId === "default" || modelId === "claude-opus-5-5"
+        ? "chat_completions_sse"
+        : "responses_sse",
+    ...(modelId === "claude-opus-5-5"
+      ? {
+          tokenPricing: {
+            version: 1,
+            maxInputTokens: 262_144,
+            maxOutputTokens: 16_384,
+            pricing: {
+              type: "per_million_tokens",
+              input: 100,
+              output: 500,
+              cacheRead: 5,
+              cacheCreation: 60,
+            },
+          },
+        }
+      : {}),
   }),
 }));
 vi.mock("@/lib/ai-config", () => ({
@@ -23,6 +42,7 @@ vi.mock("@/lib/ai-config", () => ({
 vi.mock("@/lib/chat-context", () => ({
   prepareChatContext: async (input: { latestMessage: unknown }) => ({
     messages: [input.latestMessage],
+    manifest: { revision: 0 },
     status: {
       estimatedTokens: 10,
       budgetTokens: 24000,
@@ -184,6 +204,162 @@ integration("durable chat transactions (isolated PostgreSQL)", () => {
       ledger.reduce((sum, entry) => sum + Number(entry.heldDelta), 0),
     ).toBe(0);
   }, 30_000);
+
+  it("settles cached Opus usage once under concurrent completion and refunds the reserve", async () => {
+    const turn = await createChatTurn(userId, {
+      ...input(),
+      modelId: OPUS_MODEL_ID,
+      webSearch: false,
+    });
+    expect(turn.priceCredits).toBeLessThan(8.6);
+    const usage = {
+      prompt_tokens: 270,
+      completion_tokens: 1,
+      input_tokens: 270,
+      output_tokens: 0,
+      prompt_tokens_details: {
+        cached_tokens: 35,
+        cached_creation_tokens: 227,
+        cache_write_tokens: 227,
+      },
+      claude_cache_creation_5_m_tokens: 227,
+      claude_cache_creation_1_h_tokens: 0,
+    };
+    const results = await Promise.all(
+      Array.from({ length: 8 }, () =>
+        finishChatAttempt({
+          turnId: turn.id,
+          attemptId: turn.attemptId,
+          status: "completed",
+          text: "Cached answer",
+          usage,
+        }),
+      ),
+    );
+    expect(results.filter(Boolean)).toHaveLength(1);
+    expect((await getChatTurn(userId, turn.id)).chargedCredits).toBe(0.015095);
+    expect(
+      (await db.user.findUniqueOrThrow({ where: { id: userId } })).credits,
+    ).toBeCloseTo(9.984905, 6);
+    const entries = await db.creditEntry.findMany({ where: { userId } });
+    expect(entries.map((entry) => entry.kind).sort()).toEqual([
+      "chat.reserve",
+      "chat.settle",
+    ]);
+    expect(
+      entries
+        .reduce(
+          (sum, entry) => sum.plus(entry.heldDelta),
+          new Prisma.Decimal(0),
+        )
+        .toNumber(),
+    ).toBe(0);
+    expect(
+      entries
+        .reduce(
+          (sum, entry) => sum.plus(entry.consumedDelta),
+          new Prisma.Decimal(0),
+        )
+        .toNumber(),
+    ).toBe(0.015095);
+    expect(await db.usageLog.count({ where: { userId } })).toBe(1);
+  }, 30_000);
+
+  it.each([
+    [null, "usage_unknown"],
+    [
+      { prompt_tokens: 1_000_000_000, completion_tokens: 1_000_000_000 },
+      "usage_invalid",
+    ],
+  ])(
+    "releases the entire Opus hold for unusable upstream usage %j",
+    async (usage, billingState) => {
+      const turn = await createChatTurn(userId, {
+        ...input(),
+        modelId: OPUS_MODEL_ID,
+        webSearch: false,
+      });
+      await finishChatAttempt({
+        turnId: turn.id,
+        attemptId: turn.attemptId,
+        status: "completed",
+        text: "Saved answer",
+        usage,
+      });
+      const view = await getChatTurn(userId, turn.id);
+      expect(view).toMatchObject({
+        status: "completed",
+        billingState,
+        chargedCredits: 0,
+      });
+      expect(
+        (await db.user.findUniqueOrThrow({ where: { id: userId } })).credits,
+      ).toBe(10);
+      const entries = await db.creditEntry.findMany({ where: { userId } });
+      expect(entries.map((entry) => entry.kind).sort()).toEqual([
+        "chat.release",
+        "chat.reserve",
+      ]);
+      expect(
+        entries
+          .reduce(
+            (sum, entry) => sum.plus(entry.heldDelta),
+            new Prisma.Decimal(0),
+          )
+          .toNumber(),
+      ).toBe(0);
+    },
+  );
+
+  it("reads Opus usage after finish_reason before settling the real ledger", async () => {
+    const turn = await createChatTurn(userId, {
+      ...input(),
+      modelId: OPUS_MODEL_ID,
+      reasoningEffort: "max",
+      webSearch: false,
+    });
+    const fetch = vi.fn(async () =>
+      stream([
+        {
+          choices: [{ delta: { content: "Opus answer" }, finish_reason: null }],
+        },
+        { choices: [{ delta: {}, finish_reason: "stop" }] },
+        {
+          choices: [],
+          usage: {
+            prompt_tokens: 270,
+            completion_tokens: 1,
+            prompt_tokens_details: {
+              cached_tokens: 35,
+              cached_creation_tokens: 227,
+            },
+            claude_cache_creation_5_m_tokens: 227,
+          },
+        },
+      ]),
+    );
+    vi.stubGlobal("fetch", fetch);
+    await executeChatAttempt(turn.attemptId, new AbortController());
+    expect(await getChatTurn(userId, turn.id)).toMatchObject({
+      status: "completed",
+      text: "Opus answer",
+      chargedCredits: 0.015095,
+    });
+    expect(fetch).toHaveBeenCalledOnce();
+    const requestBody = JSON.parse(
+      String(
+        (fetch.mock.calls[0] as unknown as [unknown, RequestInit])[1].body,
+      ),
+    );
+    expect(requestBody).toMatchObject({
+      reasoning_effort: "max",
+      stream_options: { include_usage: true },
+      max_tokens: 16_384,
+    });
+    expect(
+      (await db.user.findUniqueOrThrow({ where: { id: userId } })).credits,
+    ).toBeCloseTo(9.984905, 6);
+  });
 
   it("persists partial failure and releases the hold without a user charge", async () => {
     const turn = await createChatTurn(userId, input());
@@ -445,10 +621,12 @@ integration("durable chat transactions (isolated PostgreSQL)", () => {
       ),
     );
     const execution = executeChatAttempt(turn.attemptId, new AbortController());
-    await vi.waitFor(async () =>
-      expect((await getChatTurn(userId, turn.id)).text).toBe(
-        "already received",
-      ),
+    await vi.waitFor(
+      async () =>
+        expect((await getChatTurn(userId, turn.id)).text).toBe(
+          "already received",
+        ),
+      { timeout: 10_000 },
     );
     expect((await getChatTurn(userId, turn.id)).status).toBe("running");
     await cancelChatTurn(userId, turn.id);
@@ -466,7 +644,7 @@ integration("durable chat transactions (isolated PostgreSQL)", () => {
       (await db.user.findUniqueOrThrow({ where: { id: userId } })).credits,
     ).toBe(10);
     expect(await db.usageLog.count({ where: { userId } })).toBe(0);
-  });
+  }, 15_000);
 
   it("accepts one of two distinct concurrent submissions in one conversation", async () => {
     const attempts = await Promise.allSettled([

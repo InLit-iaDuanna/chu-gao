@@ -174,6 +174,38 @@ describe("confirmed creative generation", () => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("generation reference pricing and ordering", () => {
+  it.each(["/生图", "/image"])(
+    "submits %s prompts verbatim in the same conversation with no language-model step",
+    async (command) => {
+      const prompt = '  原样  保留\n第二行\t"文字"  ';
+      const userMessage = `${command} ${prompt}`;
+      expect(
+        (
+          await run({
+            prompt,
+            userMessage,
+            conversationId: "same-conversation",
+          })
+        ).status,
+      ).toBe(200);
+      expect(submission()).toMatchObject({
+        conversationId: "same-conversation",
+        userMessage,
+        request: { prompt },
+        normalizedRequestParams: { prompt },
+      });
+      expect(mocks.create).toHaveBeenCalledTimes(1);
+    },
+  );
+  it("rejects empty and changed direct prompts before submitting or charging", async () => {
+    for (const params of [
+      { prompt: " ", userMessage: "/生图  " },
+      { prompt: "rewritten", userMessage: "/image original" },
+    ])
+      expect((await run(params)).status).toBe(400);
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.user).not.toHaveBeenCalled();
+  });
   it("prices history-only references as image editing and persists the matching snapshot", async () => {
     const response = await run({ sourceImageIds: [source.id] });
     expect(response.status).toBe(200);

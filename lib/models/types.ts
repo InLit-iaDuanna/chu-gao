@@ -19,6 +19,8 @@ export type Resolution = "1K" | "2K" | "4K";
 // 出图尺寸：用户面向的主参数，直接发给上游。
 export type ImageSize =
   | "auto"
+  | "512x512"
+  | "768x768"
   | "1024x1024"
   | "1536x1024"
   | "1024x1536"
@@ -43,7 +45,7 @@ export type ProtocolName =
   | "openai-images"
   | "openai-responses-image"
   | "gemini-image";
-export type OutputFormat = "png" | "jpeg" | "webp";
+export type OutputFormat = "png" | "jpeg" | "webp" | "gif";
 export type ImageBackground = "auto" | "opaque" | "transparent";
 export type CostAxis = "resolution" | "flat";
 
@@ -64,6 +66,7 @@ export interface PricingRule {
 export interface ModelCapabilities {
   // 出图尺寸（用户可选）。计费档位由 size 派生。
   sizes: ImageSize[];
+  gifSizes?: ImageSize[];
   // 返回格式（用户可选）。
   responseFormats: ResponseFormat[];
   // 计费档位集合（内部，配合 costTable / 定价规则）。
@@ -104,6 +107,7 @@ export interface ModelDefinition {
 
 export type PublicModelDefinition = ModelDefinition & {
   available: boolean;
+  fallbackCostMultiplier?: number;
   providerChannels?: PublicProviderChannel[];
 };
 

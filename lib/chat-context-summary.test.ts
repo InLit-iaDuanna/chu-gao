@@ -7,6 +7,8 @@ import {
   createContextSummarizer,
   estimateTextTokens,
   MAX_SUMMARY_TOKENS,
+  normalizeStructuredChatMemory,
+  renderStructuredChatMemory,
 } from "@/lib/chat-context-summary";
 
 function sse(events: unknown[], chunkSize = 17) {
@@ -57,6 +59,24 @@ afterEach(() => {
 });
 
 describe("summary transport follows the existing profile", () => {
+  it("normalizes structured memory and renders it without exposing raw JSON", () => {
+    const summary = normalizeStructuredChatMemory(
+      JSON.stringify({
+        version: 1,
+        goals: ["完成工作台改版"],
+        facts: ["Opus 已启用"],
+        constraints: [],
+        decisions: ["按 85% 自动压缩"],
+        references: [],
+        pending: ["补充移动端检查"],
+      }),
+    );
+    expect(summary).toContain('"goals":["完成工作台改版"]');
+    expect(renderStructuredChatMemory(summary)).toContain("目标：");
+    expect(renderStructuredChatMemory(summary)).toContain("- 按 85% 自动压缩");
+    expect(renderStructuredChatMemory(summary)).not.toContain('"version"');
+  });
+
   it.each(["gpt-6.1-sol", "gpt-5.6-luna"])(
     "uses native Responses SSE for %s, with low effort and no unverified tool_choice",
     async (modelId) => {
@@ -90,7 +110,7 @@ describe("summary transport follows the existing profile", () => {
     },
   );
 
-  it("uses chat-completions SSE for the default profile and requires a stop finish", async () => {
+  it("uses Opus-compatible chat-completions SSE for the legacy default alias", async () => {
     mocks.fetch.mockResolvedValue(
       sse([
         { choices: [{ delta: { content: "Earlier " }, finish_reason: null }] },
@@ -108,7 +128,7 @@ describe("summary transport follows the existing profile", () => {
     );
     expect(JSON.parse(mocks.fetch.mock.calls[0][1].body)).toMatchObject({
       stream: true,
-      thinking: { type: "disabled" },
+      reasoning_effort: "low",
       max_tokens: 2048,
     });
   });

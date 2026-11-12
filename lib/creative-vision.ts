@@ -1,8 +1,10 @@
 import sharp from "sharp";
 import { z } from "zod";
 
-import { getConversationConfig } from "@/lib/ai-config";
+import { getOpusConfig } from "@/lib/opus-config";
 import { fetchWithTimeout } from "@/lib/http";
+import { withModelCall, type ModelCallContext } from "@/lib/model-call-log";
+import { providerError } from "@/lib/providers/diagnostics";
 
 export interface VisionImagePart {
   type: "image_url";
@@ -89,49 +91,71 @@ export async function requestStructuredVision<T>({
   images,
   schema,
   maxTokens = 1400,
+  logContext,
 }: {
   systemPrompt: string;
   userText: string;
   images: VisionImagePart[];
   schema: z.ZodType<T>;
   maxTokens?: number;
+  logContext?: ModelCallContext & { operation: string };
 }): Promise<T> {
-  const config = await getConversationConfig();
+  const config = await getOpusConfig();
   if (!config.enabled || !config.apiKey) {
     throw new Error("VISION_UNAVAILABLE");
   }
 
-  const response = await fetchWithTimeout(
-    `${config.baseUrl.replace(/\/+$/, "")}/v1/chat/completions`,
-    {
-      method: "POST",
-      timeoutMs: Number(process.env.CREATIVE_VISION_TIMEOUT_MS ?? 30_000),
-      headers: {
-        Authorization: `Bearer ${config.apiKey}`,
-        "Content-Type": "application/json",
+  const endpoint = `${config.baseUrl.replace(/\/+$/, "")}/v1/chat/completions`;
+  const requestBody = {
+    model: config.model,
+    reasoning_effort: "low",
+    temperature: 0.1,
+    max_tokens: maxTokens,
+    response_format: { type: "json_object" },
+    messages: [
+      { role: "system", content: systemPrompt },
+      {
+        role: "user",
+        content: [{ type: "text", text: userText }, ...images],
       },
-      body: JSON.stringify({
-        model: config.model,
-        temperature: 0.1,
-        max_tokens: maxTokens,
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: systemPrompt },
-          {
-            role: "user",
-            content: [{ type: "text", text: userText }, ...images],
-          },
-        ],
-      }),
+    ],
+  };
+  return withModelCall(
+    {
+      ...logContext,
+      secrets: [config.apiKey],
+      kind: "llm",
+      operation: logContext?.operation ?? "creative.inspect",
+      modelId: config.model,
+      providerName: "Opus 5.5",
+      endpoint,
+      requestContent: requestBody,
+    },
+    async (call) => {
+      const response = await fetchWithTimeout(endpoint, {
+        method: "POST",
+        timeoutMs: Number(process.env.CREATIVE_VISION_TIMEOUT_MS ?? 30_000),
+        headers: {
+          Authorization: `Bearer ${config.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      call.response(response);
+      if (!response.ok)
+        throw await providerError(
+          response,
+          "Opus 5.5",
+          "chat-completions",
+          endpoint,
+        );
+
+      const payload = await response.json();
+      call.usage(payload);
+      const content = extractAssistantText(payload);
+      if (!content.trim()) throw new Error("INVALID_VISION_OUTPUT");
+      return schema.parse(parseJsonContent(content));
     },
   );
-
-  if (!response.ok) {
-    throw new Error("VISION_UPSTREAM_ERROR");
-  }
-
-  const payload = await response.json();
-  const content = extractAssistantText(payload);
-  if (!content.trim()) throw new Error("INVALID_VISION_OUTPUT");
-  return schema.parse(parseJsonContent(content));
 }

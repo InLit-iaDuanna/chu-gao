@@ -11,6 +11,9 @@ export interface ConversationMessage {
   chatError?: string | null;
   chatSources?: import("@/lib/chat-search").ChatSearchSource[];
   chatUsage?: Record<string, unknown> | null;
+  chatBilling?: import("@/lib/turn-credit-types").CreditSettlement | null;
+  chatAttemptNumber?: number;
+  chatActivityHistory?: string[];
   chatReferences?: import("@/lib/chat-references-types").ChatReference[];
   generationPrompt?: string;
   generationModelId?: string;
@@ -39,6 +42,8 @@ export interface ConversationMessage {
   generationStartedAt?: string | null;
   generationFinishedAt?: string | null;
   generationProgress?: number | null;
+  generationCostCredits?: number;
+  generationBilling?: import("@/lib/turn-credit-types").CreditSettlement;
   createdAt?: string;
 }
 

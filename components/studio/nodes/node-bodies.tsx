@@ -15,13 +15,14 @@ import {
   SlidersHorizontal,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { cn } from "@/lib/utils";
 
 import { sizeLabel } from "../CommandDock";
 import { QualitySlider, qualityLabel } from "../QualitySlider";
 import type { Generation, ModelInfo } from "../lib/types";
+import { resolveGenerationOptions } from "../lib/generation-options";
 import {
   INPUT_PORTS,
   PORT_LABEL,
@@ -563,9 +564,30 @@ export function ModelNodeBody({
   onUpdate: (patch: Record<string, unknown>) => void;
 }) {
   const model = models.find((item) => item.id === node.data.modelId) ?? null;
-  const sizes = model?.capabilities.sizes ?? [];
+  const {
+    sizes,
+    size: selectedSize,
+    outputFormat: selectedFormat,
+  } = resolveGenerationOptions(model, node.data);
   const formats = model?.capabilities.outputFormats ?? [];
   const maxN = Math.min(model?.capabilities.maxN ?? 1, 4);
+
+  useEffect(() => {
+    if (
+      model &&
+      (node.data.size !== selectedSize ||
+        node.data.outputFormat !== selectedFormat)
+    ) {
+      onUpdate({ size: selectedSize, outputFormat: selectedFormat });
+    }
+  }, [
+    model,
+    node.data.size,
+    node.data.outputFormat,
+    selectedSize,
+    selectedFormat,
+    onUpdate,
+  ]);
 
   return (
     <div className="space-y-1.5 p-2">
@@ -577,11 +599,15 @@ export function ModelNodeBody({
         value={node.data.modelId ?? ""}
         onValueChange={(value) => {
           const nextModel = models.find((item) => item.id === value);
+          const { size, outputFormat } = resolveGenerationOptions(
+            nextModel ?? null,
+            node.data,
+          );
           onUpdate({
             modelId: value || null,
-            size: nextModel?.defaults.size,
+            size,
             n: Math.min(node.data.n || 1, nextModel?.capabilities.maxN ?? 1),
-            outputFormat: nextModel?.defaults.outputFormat,
+            outputFormat,
           });
         }}
         options={models.map((item) => ({
@@ -596,7 +622,7 @@ export function ModelNodeBody({
           aria-label="尺寸"
           controlSize="sm"
           className="text-[11px]"
-          value={node.data.size ?? model?.defaults.size ?? ""}
+          value={selectedSize ?? ""}
           onValueChange={(value) => onUpdate({ size: value })}
           options={sizes.map((size) => ({
             value: size,
@@ -621,8 +647,14 @@ export function ModelNodeBody({
           aria-label="输出格式"
           controlSize="sm"
           className="text-[11px]"
-          value={node.data.outputFormat ?? model?.defaults.outputFormat ?? ""}
-          onValueChange={(value) => onUpdate({ outputFormat: value })}
+          value={selectedFormat ?? ""}
+          onValueChange={(value) => {
+            const { size, outputFormat } = resolveGenerationOptions(model, {
+              ...node.data,
+              outputFormat: value,
+            });
+            onUpdate({ size, outputFormat });
+          }}
           options={formats.map((format) => ({
             value: format,
             label: format.toUpperCase(),
@@ -698,14 +730,44 @@ export function GenerateNodeBody({
     ? (effectiveModelId ?? node.data.modelId)
     : node.data.modelId;
   const model = models.find((item) => item.id === selectedModelId) ?? null;
-  const sizes = model?.capabilities.sizes ?? [];
+  const {
+    sizes,
+    size: selectedSize,
+    outputFormat: selectedFormat,
+  } = resolveGenerationOptions(
+    model,
+    modelConnected
+      ? { size: effectiveSize, outputFormat: effectiveOutputFormat }
+      : node.data,
+  );
   const formats = model?.capabilities.outputFormats ?? [];
   const qualities = model?.capabilities.qualities ?? [];
   const backgrounds = model?.capabilities.backgrounds ?? ["auto", "opaque"];
   const maxN = Math.min(model?.capabilities.maxN ?? 1, 4);
-  const backgroundValue = backgrounds.includes(node.data.background ?? "auto")
+  const backgroundValue = backgrounds.some(
+    (background) => background === (node.data.background ?? "auto"),
+  )
     ? (node.data.background ?? "auto")
     : (backgrounds[0] ?? "auto");
+
+  useEffect(() => {
+    if (
+      model &&
+      !modelConnected &&
+      (node.data.size !== selectedSize ||
+        node.data.outputFormat !== selectedFormat)
+    ) {
+      onUpdate({ size: selectedSize, outputFormat: selectedFormat });
+    }
+  }, [
+    model,
+    modelConnected,
+    node.data.size,
+    node.data.outputFormat,
+    selectedSize,
+    selectedFormat,
+    onUpdate,
+  ]);
 
   return (
     <div>
@@ -806,14 +868,18 @@ export function GenerateNodeBody({
             value={selectedModelId ?? ""}
             onValueChange={(modelId) => {
               const nextModel = models.find((item) => item.id === modelId);
+              const { size, outputFormat } = resolveGenerationOptions(
+                nextModel ?? null,
+                node.data,
+              );
               onUpdate({
                 modelId: modelId || null,
-                size: nextModel?.defaults.size,
+                size,
                 n: Math.min(
                   node.data.n ?? 1,
                   nextModel?.capabilities.maxN ?? 1,
                 ),
-                outputFormat: nextModel?.defaults.outputFormat,
+                outputFormat,
                 quality:
                   nextModel?.defaults.quality ??
                   nextModel?.capabilities.qualities?.[0],
@@ -833,11 +899,7 @@ export function GenerateNodeBody({
               className="text-[11px]"
               disabled={modelConnected || sizes.length === 0}
               placeholder="尺寸"
-              value={
-                modelConnected
-                  ? (effectiveSize ?? model?.defaults.size ?? "")
-                  : (node.data.size ?? model?.defaults.size ?? "")
-              }
+              value={selectedSize ?? ""}
               onValueChange={(size) => onUpdate({ size })}
               options={sizes.map((size) => ({
                 value: size,
@@ -865,16 +927,14 @@ export function GenerateNodeBody({
               controlSize="sm"
               className="text-[11px]"
               disabled={modelConnected}
-              value={
-                modelConnected
-                  ? (effectiveOutputFormat ??
-                    model?.defaults.outputFormat ??
-                    "")
-                  : (node.data.outputFormat ??
-                    model?.defaults.outputFormat ??
-                    "")
-              }
-              onValueChange={(outputFormat) => onUpdate({ outputFormat })}
+              value={selectedFormat ?? ""}
+              onValueChange={(value) => {
+                const { size, outputFormat } = resolveGenerationOptions(model, {
+                  ...node.data,
+                  outputFormat: value,
+                });
+                onUpdate({ size, outputFormat });
+              }}
               options={formats.map((format) => ({
                 value: format,
                 label: format.toUpperCase(),

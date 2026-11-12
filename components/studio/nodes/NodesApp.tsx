@@ -40,6 +40,7 @@ import {
   uploadReferenceImage,
 } from "../lib/api";
 import { subscribeGeneration } from "../lib/sse";
+import { resolveGenerationOptions } from "../lib/generation-options";
 import {
   isActiveStatus,
   type CreateGenerationInput,
@@ -318,10 +319,13 @@ export function NodesApp() {
       ) {
         return { error: "当前模型不支持所选 Image2 质量" };
       }
-      if (!quality || !supportedQualities.includes(quality)) {
+      if (!quality || !supportedQualities.some((item) => item === quality)) {
         return { error: "当前模型不支持所选质量档位" };
       }
-      if (background && !model.capabilities.backgrounds.includes(background)) {
+      if (
+        background &&
+        !model.capabilities.backgrounds.some((item) => item === background)
+      ) {
         return { error: "当前模型不支持所选背景模式" };
       }
 
@@ -339,22 +343,21 @@ export function NodesApp() {
         return { error: "至少连接一条提示词或一张参考图" };
       }
 
+      const { size, outputFormat } = resolveGenerationOptions(
+        model,
+        modelNode?.kind === "model" ? modelNode.data : generateNode.data,
+      );
+
       return {
         input: {
           modelId: model.id,
           prompt: prompt || "以参考图为基础生成",
-          size:
-            modelNode?.kind === "model"
-              ? (modelNode.data.size ?? model.defaults.size)
-              : (generateNode.data.size ?? model.defaults.size),
+          size,
           n:
             modelNode?.kind === "model"
               ? modelNode.data.n
               : (generateNode.data.n ?? 1),
-          outputFormat:
-            modelNode?.kind === "model"
-              ? modelNode.data.outputFormat
-              : generateNode.data.outputFormat,
+          outputFormat,
           quality,
           image2Mode: model.capabilities.image2Modes ? image2Mode : undefined,
           background,

@@ -1,9 +1,6 @@
 import { z } from "zod";
 
-import {
-  getConversationCompileSystemPrompt,
-  getConversationConfig,
-} from "@/lib/ai-config";
+import { getConversationCompileSystemPrompt } from "@/lib/ai-config";
 import { fail, ok } from "@/lib/api-response";
 import { userActionRateLimitResponse } from "@/lib/api-rate-limit";
 import { readJsonBodySafe } from "@/lib/request-body";
@@ -14,10 +11,17 @@ import {
   type CompiledConversationPrompt,
   type ConversationMessage,
 } from "@/lib/conversation";
-import { isDeepSeekConfigured, optimizeImagePrompt } from "@/lib/deepseek";
+import { getOpusConfig } from "@/lib/opus-config";
 import { fetchWithTimeout } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { getConfiguredModel } from "@/lib/models/runtime-config";
+import { withModelCall, type ModelCallContext } from "@/lib/model-call-log";
+import { providerError } from "@/lib/providers/diagnostics";
+import { OPUS_MODEL_ID } from "@/lib/chat-model-options";
+import {
+  extractChatContent,
+  parseCompilerResponse,
+} from "@/lib/conversation-compiler-response";
 
 const messageSchema = z.object({
   id: z.string().optional(),
@@ -41,48 +45,6 @@ const compileSchema = z.object({
     })
     .optional(),
 });
-
-// 提取 OpenAI 兼容 chat/completions 的助手文本内容。
-function extractChatContent(payload: unknown): string {
-  if (typeof payload !== "object" || payload === null) {
-    return "";
-  }
-
-  const choices = (payload as { choices?: unknown }).choices;
-
-  if (!Array.isArray(choices) || choices.length === 0) {
-    return "";
-  }
-
-  const message = (choices[0] as { message?: { content?: unknown } }).message;
-  const content = message?.content;
-
-  return typeof content === "string" ? content : "";
-}
-
-function parseJsonObject(text: string): unknown {
-  try {
-    return JSON.parse(text);
-  } catch {
-    // 容错：剥离 ```json ``` 代码块后再尝试，最后退而求其次截取第一个 {...}。
-    const fenced = text
-      .replace(/```json\s*/gi, "")
-      .replace(/```/g, "")
-      .trim();
-
-    try {
-      return JSON.parse(fenced);
-    } catch {
-      const match = fenced.match(/\{[\s\S]*\}/);
-
-      if (!match) {
-        throw new Error("compiler returned non-json response");
-      }
-
-      return JSON.parse(match[0]);
-    }
-  }
-}
 
 function toCompiledPrompt(
   value: unknown,
@@ -110,18 +72,20 @@ function compilerErrorMessage(error: unknown): string {
   return String(error).slice(0, 240);
 }
 
-// 用「对话模型」（DeepSeek 兼容）把多轮对话编译成出图 prompt。
+// 用 Opus 5.5 把多轮对话编译成出图 prompt。
 // 系统提示词 = 后台「出图提示词编译指令」。未配置 / 出错时由上层回退本地拼接。
-async function compileWithConversationModel({
+async function compileWithOpusModel({
   messages,
   modelId,
   params,
+  logContext,
 }: {
   messages: ConversationMessage[];
   modelId: string;
   params?: Record<string, unknown>;
+  logContext?: ModelCallContext;
 }): Promise<CompiledConversationPrompt | null> {
-  const config = await getConversationConfig();
+  const config = await getOpusConfig();
 
   // 未启用 / 无 key：返回 null，让上层走本地回退。
   if (!config.enabled || !config.apiKey) {
@@ -156,50 +120,62 @@ async function compileWithConversationModel({
     })),
   });
 
-  const response = await fetchWithTimeout(url, {
-    method: "POST",
-    timeoutMs: Number(process.env.CONVERSATION_COMPILER_TIMEOUT_MS ?? 20_000),
-    headers: {
-      Authorization: `Bearer ${config.apiKey}`,
-      "Content-Type": "application/json",
+  const requestBody = {
+    model: config.model,
+    reasoning_effort: "low",
+    temperature: 0,
+    max_tokens: 1200,
+    response_format: { type: "json_object" },
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPayload },
+    ],
+  };
+
+  return withModelCall(
+    {
+      ...logContext,
+      secrets: [config.apiKey],
+      kind: "llm",
+      operation: "prompt.compile",
+      modelId: config.model,
+      providerName: "Opus 5.5",
+      endpoint: url,
+      requestContent: requestBody,
     },
-    body: JSON.stringify({
-      model: config.model,
-      temperature: 0.6,
-      max_tokens: 1200,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPayload },
-      ],
-    }),
-  });
+    async (call) => {
+      const response = await fetchWithTimeout(url, {
+        method: "POST",
+        timeoutMs: Number(
+          process.env.CONVERSATION_COMPILER_TIMEOUT_MS ?? 20_000,
+        ),
+        headers: {
+          Authorization: `Bearer ${config.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+      });
 
-  if (!response.ok) {
-    throw new Error(
-      `compiler error: ${response.status} ${(await response.text()).slice(0, 240)}`,
-    );
-  }
+      call.response(response);
+      if (!response.ok)
+        throw await providerError(
+          response,
+          "Opus 5.5",
+          "chat-completions",
+          url,
+        );
 
-  const payload = await response.json();
-  const text = extractChatContent(payload);
+      const payload = await response.json();
+      call.usage(payload);
+      const text = extractChatContent(payload);
 
-  if (!text.trim()) {
-    throw new Error("compiler returned empty content");
-  }
+      if (!text.trim()) {
+        throw new Error("compiler returned empty content");
+      }
 
-  return toCompiledPrompt(parseJsonObject(text), config.model);
-}
-
-// 把对话渲染成一段可供 DeepSeek 优化的文本。
-function renderConversation(messages: ConversationMessage[]): string {
-  return messages
-    .filter((message) => message.content.trim())
-    .map(
-      (message) =>
-        `${message.role === "user" ? "用户" : "助手"}：${message.content.trim()}`,
-    )
-    .join("\n");
+      return toCompiledPrompt(parseCompilerResponse(text), OPUS_MODEL_ID);
+    },
+  );
 }
 
 export async function POST(request: Request) {
@@ -247,34 +223,19 @@ export async function POST(request: Request) {
   });
 
   try {
-    const compiled = await compileWithConversationModel({
+    const compiled = await compileWithOpusModel({
       modelId: parsed.data.modelId,
       messages,
       params: parsed.data.params,
+      logContext: { source: "web", userId: sessionResult.user.id },
     });
 
-    // 1) 对话模型已配置 → 直接用其编译结果。
+    // 1) Opus 5.5 已配置 → 直接用其编译结果。
     if (compiled) {
       return ok(compiled);
     }
 
-    // 2) 退而求其次：若配置了 DeepSeek，则用其把整段对话优化成出图 prompt。
-    if (await isDeepSeekConfigured()) {
-      const optimized = await optimizeImagePrompt({
-        fixedPrompt: "",
-        variablePrompt: renderConversation(messages),
-      });
-      if (optimized.trim()) {
-        return ok({
-          prompt: optimized.trim(),
-          assistantMessage: "已根据对话整理出图提示词。",
-          shouldGenerate: true,
-          compiler: "deepseek",
-        } satisfies CompiledConversationPrompt);
-      }
-    }
-
-    // 3) 都未配置 → 本地拼接回退（不算错误）。
+    // 2) 未配置 Opus → 本地拼接回退（不算错误）。
     return ok(compilePromptFallback(messages, "NO_COMPILER_MODEL_CONFIGURED"));
   } catch (error) {
     const fallbackReason = compilerErrorMessage(error);

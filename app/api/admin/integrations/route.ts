@@ -5,41 +5,14 @@ import {
   authenticatedUser,
   checkSession,
 } from "@/lib/auth";
-import {
-  getConversationCompileSystemPrompt,
-  getConversationStatus,
-  getConversationSystemPrompt,
-  getDeepSeekStatus,
-  getPptSystemPrompt,
-  setConversationConfig,
-  setDeepSeekConfig,
-  setPptSystemPrompt,
-} from "@/lib/ai-config";
+import { getPptSystemPrompt, setPptSystemPrompt } from "@/lib/ai-config";
 import { readJsonBodySafe } from "@/lib/request-body";
 import { integrationsPatchSchema } from "@/lib/validators";
 
 async function currentIntegrations() {
-  const [
-    deepseek,
-    pptSystemPrompt,
-    conversation,
-    conversationSystemPrompt,
-    conversationCompileSystemPrompt,
-  ] = await Promise.all([
-    getDeepSeekStatus(),
-    getPptSystemPrompt(),
-    getConversationStatus(),
-    getConversationSystemPrompt(),
-    getConversationCompileSystemPrompt(),
-  ]);
+  const pptSystemPrompt = await getPptSystemPrompt();
 
-  return {
-    deepseek,
-    pptSystemPrompt,
-    conversation,
-    conversationSystemPrompt,
-    conversationCompileSystemPrompt,
-  };
+  return { pptSystemPrompt };
 }
 
 export async function GET(request: Request) {
@@ -93,49 +66,16 @@ export async function PATCH(request: Request) {
     });
   }
 
-  if (parsed.data.deepseek) {
-    await setDeepSeekConfig(parsed.data.deepseek);
-  }
-
-  if (parsed.data.conversation) {
-    await setConversationConfig(parsed.data.conversation);
-  }
-
   if (parsed.data.pptSystemPrompt !== undefined) {
     await setPptSystemPrompt(parsed.data.pptSystemPrompt);
   }
 
   // 审计不记录明文密钥，仅记录是否更新了密钥。
-  const apiKeyTouched = parsed.data.deepseek?.apiKey !== undefined;
-  const conversationApiKeyTouched =
-    parsed.data.conversation?.apiKey !== undefined;
   await audit({
     actorId: admin.id,
     action: "admin.integrations.update",
     target: "ai-config",
     diff: {
-      deepseek: parsed.data.deepseek
-        ? {
-            enabled: parsed.data.deepseek.enabled,
-            baseUrl: parsed.data.deepseek.baseUrl,
-            model: parsed.data.deepseek.model,
-            systemPromptChanged: parsed.data.deepseek.systemPrompt !== undefined,
-            apiKeyChanged: apiKeyTouched,
-          }
-        : undefined,
-      conversation: parsed.data.conversation
-        ? {
-            enabled: parsed.data.conversation.enabled,
-            baseUrl: parsed.data.conversation.baseUrl,
-            model: parsed.data.conversation.model,
-            reasoning: parsed.data.conversation.reasoning,
-            systemPromptChanged:
-              parsed.data.conversation.systemPrompt !== undefined,
-            compileSystemPromptChanged:
-              parsed.data.conversation.compileSystemPrompt !== undefined,
-            apiKeyChanged: conversationApiKeyTouched,
-          }
-        : undefined,
       pptSystemPromptChanged: parsed.data.pptSystemPrompt !== undefined,
     },
     request,

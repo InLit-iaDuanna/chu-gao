@@ -29,6 +29,14 @@ export const studioDraftSchema = z.object({
   modelId: z.string().nullable(),
   chatModelId: z.string().min(1).nullable().optional().catch(undefined),
   chatReasoningEffort: reasoningEffortSchema.optional().catch(undefined),
+  chatContextBudgetTokens: z
+    .number()
+    .int()
+    .min(100_000)
+    .max(1_000_000)
+    .optional()
+    .catch(undefined),
+  chatWebSearch: z.boolean().optional().catch(undefined),
   params: z.object({
     n: z.number().int().min(1).max(4),
     size: z.string().optional(),

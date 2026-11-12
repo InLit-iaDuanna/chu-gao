@@ -2,6 +2,8 @@ import { fail, ok } from "@/lib/api-response";
 import { adminFailureResponse, checkSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { GENERATION_STATUSES, isGenerationStatus } from "@/lib/generations";
+import { generationCallSource } from "@/lib/model-call-types";
+import { sanitizeCallText } from "@/lib/model-call-log";
 
 function msBetween(start: Date | null, end: Date | null) {
   if (!start) {
@@ -43,15 +45,25 @@ export async function GET(request: Request) {
     const providerId = searchParams.get("providerId")?.trim();
     const providerAccountId = searchParams.get("providerAccountId")?.trim();
     const errorCode = searchParams.get("errorCode")?.trim();
+    const source = searchParams.get("source");
+    if (source && !["web", "api", "agent"].includes(source))
+      return fail("VALIDATION_ERROR", "任务来源不正确", { status: 400 });
     const activeOnly = searchParams.get("active") === "true";
     const from = dateBoundary(searchParams.get("from"));
     const to = dateBoundary(searchParams.get("to"), true);
-    const limit = Math.min(
-      Math.max(Number(searchParams.get("limit") ?? 100), 1),
-      200,
-    );
+    const rawLimit = Number(searchParams.get("limit") ?? 100);
+    const limit = Number.isFinite(rawLimit)
+      ? Math.min(Math.max(Math.floor(rawLimit), 1), 200)
+      : 100;
     const generations = await db.generation.findMany({
       where: {
+        ...(source === "web"
+          ? { apiKeyId: null, agentAuthorizationId: null }
+          : source === "api"
+            ? { apiKeyId: { not: null }, agentAuthorizationId: null }
+            : source === "agent"
+              ? { agentAuthorizationId: { not: null } }
+              : {}),
         ...(statuses.length
           ? { status: { in: statuses } }
           : activeOnly
@@ -118,6 +130,12 @@ export async function GET(request: Request) {
     return ok({
       items: generations.map((generation) => ({
         id: generation.id,
+        source: generationCallSource(generation),
+        conversationId: generation.conversationId,
+        references: generation.referenceImageKeys.map((_, index) => ({
+          index,
+          thumbnailUrl: `/api/admin/generations/${generation.id}/references/${index}`,
+        })),
         userId: generation.userId,
         user: generation.user,
         modelId: generation.modelId,
@@ -138,7 +156,9 @@ export async function GET(request: Request) {
         runMs: msBetween(generation.startedAt, generation.finishedAt),
         totalMs: msBetween(generation.createdAt, generation.finishedAt),
         errorCode: generation.errorCode,
-        errorMessage: generation.errorMessage,
+        errorMessage: generation.errorMessage
+          ? sanitizeCallText(generation.errorMessage)
+          : null,
         aspectRatio: generation.aspectRatio,
         resolution: generation.resolution,
         n: generation.n,

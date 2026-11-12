@@ -124,6 +124,9 @@ export interface AdminGenerationImage {
 
 export interface AdminGenerationItem {
   id: string;
+  source: "web" | "api" | "agent";
+  conversationId: string | null;
+  references: Array<{ index: number; thumbnailUrl: string }>;
   userId: string;
   user: { id: string; email: string; name: string | null } | null;
   modelId: string;
@@ -356,38 +359,11 @@ export interface AuditEntry {
 
 // ---------- AI 集成 ----------
 
-export interface AiIntegrationStatus {
-  enabled: boolean;
-  baseUrl: string;
-  model: string;
-  hasKey: boolean;
-}
-
 export interface AdminIntegrations {
-  deepseek: AiIntegrationStatus & { systemPrompt: string };
   pptSystemPrompt: string;
-  conversation: AiIntegrationStatus & { reasoning: boolean };
-  conversationSystemPrompt: string;
-  conversationCompileSystemPrompt: string;
 }
 
 export interface AdminIntegrationsPatch {
-  deepseek?: {
-    enabled?: boolean;
-    baseUrl?: string;
-    model?: string;
-    systemPrompt?: string;
-    apiKey?: string;
-  };
-  conversation?: {
-    enabled?: boolean;
-    baseUrl?: string;
-    model?: string;
-    systemPrompt?: string;
-    compileSystemPrompt?: string;
-    reasoning?: boolean;
-    apiKey?: string;
-  };
   pptSystemPrompt?: string;
 }
 

@@ -8,6 +8,7 @@ import { getChatProfile } from "@/lib/chat-profiles";
 import { prepareChatContext } from "@/lib/chat-context";
 import {
   chatEndpoint,
+  chatCompletionsRequestBody,
   responsesRequestBody,
   type UpstreamChatMessage,
 } from "@/lib/chat-upstream";
@@ -32,8 +33,22 @@ import {
   withChatRuntimeTimeout,
 } from "@/lib/chat-runtime-health";
 import { logger } from "@/lib/logger";
+import { startModelCall } from "@/lib/model-call-log";
+import { providerError } from "@/lib/providers/diagnostics";
 import type { ChatTurnInput } from "@/lib/chat-turn-types";
 import type { ReasoningEffort } from "@/lib/chat-model-options";
+import { OPUS_MODEL_ID } from "@/lib/chat-model-options";
+import {
+  CHAT_IMAGE_TOOL,
+  CHAT_IMAGE_RESPONSES_TOOL,
+  CHAT_IMAGE_TOOL_NAME,
+} from "@/lib/chat-image-tool-definition";
+import { submitChatImageTool } from "@/lib/chat-image-tool";
+import {
+  chatInputTokenUpperBound,
+  chatModelCallUsage,
+  readChatTokenPricingSnapshot,
+} from "@/lib/chat-token-billing";
 
 export { chatWorkerOnline } from "@/lib/chat-runtime-health";
 const json = (value: unknown) =>
@@ -106,8 +121,8 @@ export async function recoverStaleChatAttempts() {
               : "QUEUE_TIMEOUT",
           publicMessage:
             attempt.status === "queued"
-              ? "任务排队等待超时，本轮未收费；可以重新生成"
-              : "任务执行已中断，已有内容已保存，本轮未收费；不会自动重复生成",
+              ? "任务排队等待超时，文字回复未收费；可以重新生成"
+              : "文字回复已中断，已有内容已保存，文字回复未收费；不会自动重复生成",
         },
       })
     )
@@ -146,8 +161,20 @@ export async function executeChatAttempt(
   });
   const input = turn.input as unknown as ChatTurnInput;
   const snapshot = record(turn.configSnapshot);
+  let tokenPricing: ReturnType<typeof readChatTokenPricingSnapshot> = null;
   const recovery = new ChatResponseRecovery();
   let state = recovery.state;
+  const toolMessages: UpstreamChatMessage[] = [];
+  const responseToolContinuations: Array<{
+    callId: string;
+    name: string;
+    arguments: string;
+    output: string;
+  }> = [];
+  const handledToolCalls = new Set<string>();
+  let imageToolCalls = 0;
+  let requestedInputTokens = 0;
+  let requestCount = 0;
   const startedAt = Date.now();
   let lastSemanticAt = startedAt;
   let lastFlushAt = 0;
@@ -199,8 +226,10 @@ export async function executeChatAttempt(
     const sources = JSON.stringify(recovery.sources);
     const activity = state.activity;
     const revision = state.revision;
-    const parts = json(recovery.checkpoint());
+    const checkpoint = recovery.checkpoint();
+    const parts = json(checkpoint);
     const sourceData = json(recovery.sources);
+    const usage = recovery.usage;
     const textChanged = text !== publishedText;
     const activityChanged = state.activity !== publishedActivity;
     const sourcesChanged = sources !== publishedSources;
@@ -224,7 +253,8 @@ export async function executeChatAttempt(
           payload: {
             revision,
             providerStatus: state.providerStatus,
-            usageAvailability: state.usage ? "reported" : "unknown",
+            usageAvailability:
+              usage?.usage_availability ?? (usage ? "reported" : "unknown"),
           },
         }))
       )
@@ -243,7 +273,7 @@ export async function executeChatAttempt(
           sources: sourceData,
           activity,
           responseId: state.responseId,
-          usage: state.usage ? json(state.usage) : Prisma.DbNull,
+          usage: usage ? json(usage) : Prisma.DbNull,
           timings: json(timings),
         },
       });
@@ -254,12 +284,14 @@ export async function executeChatAttempt(
           content: text,
           chatStatus: "running",
           chatSources: sourceData,
-          chatUsage: state.usage ? json(state.usage) : Prisma.DbNull,
+          chatUsage: usage ? json(usage) : Prisma.DbNull,
+          chatActivityHistory: json(checkpoint.activityHistory),
         },
       });
       if (activityChanged)
         await appendChatEvent(tx, turn.id, attemptId, "activity.updated", {
           activity,
+          activityHistory: checkpoint.activityHistory,
           searched: recovery.searched,
           recovery: record(parts).recovery,
         });
@@ -317,6 +349,14 @@ export async function executeChatAttempt(
 
   try {
     abort.signal.throwIfAborted();
+    tokenPricing = readChatTokenPricingSnapshot(snapshot.tokenPricing);
+    const requestLimits = record(snapshot.tokenRequestLimits);
+    const requestOutputTokens =
+      typeof requestLimits.maxOutputTokens === "number"
+        ? requestLimits.maxOutputTokens
+        : tokenPricing?.maxOutputTokens;
+    if (turn.modelId === OPUS_MODEL_ID && !tokenPricing)
+      throw new Error("missing_token_pricing_snapshot");
     const config = await getChatProfile(turn.modelId);
     apiKey = config.apiKey ?? "";
     if (
@@ -327,6 +367,23 @@ export async function executeChatAttempt(
       throw new Error("model_configuration_changed");
     if (turn.activeAttemptId !== attemptId)
       throw new Error("attempt_no_longer_active");
+    const retainedImage = record(record(attempt.parts).imageContinuation);
+    if (typeof retainedImage.generationId === "string") {
+      handledToolCalls.add("retained-image");
+      imageToolCalls = 1;
+      state.recordToolResult("retained-image", CHAT_IMAGE_TOOL_NAME, {
+        ok: true,
+        generationId: retainedImage.generationId,
+        status:
+          typeof retainedImage.status === "string"
+            ? retainedImage.status
+            : undefined,
+      });
+      toolMessages.push({
+        role: "user",
+        content: `[已提交的图片任务]\n${JSON.stringify(retainedImage)}\n本次仅重新生成文字回复，不要再次提交图片任务。以上是已保存的任务状态，不代表图片已经生成成功。`,
+      });
+    }
     state.activity = "context";
     timings.context_started_at = new Date().toISOString();
     await flush(true);
@@ -346,12 +403,17 @@ export async function executeChatAttempt(
       responses
         ? responsesRequestBody(
             String(snapshot.model),
-            continuationMessages(messages, recovery.prefix),
+            continuationMessages(
+              [...messages, ...toolMessages],
+              recovery.retries.length ? recovery.prefix : "",
+            ),
             String(snapshot.instructions),
             snapshot.effort as ReasoningEffort,
             {
               webSearch: input.webSearch,
               maxOutputTokens: 16_384,
+              tools: handledToolCalls.size ? [] : [CHAT_IMAGE_RESPONSES_TOOL],
+              toolContinuations: responseToolContinuations,
               ...(snapshot.model === "gpt-6.1-sol"
                 ? {
                     promptCacheKey,
@@ -363,14 +425,22 @@ export async function executeChatAttempt(
                 : {}),
             },
           )
-        : {
-            model: snapshot.model,
-            messages: [
-              { role: "system", content: snapshot.instructions },
-              ...continuationMessages(messages, recovery.prefix),
-            ],
-            stream: true,
-          };
+        : chatCompletionsRequestBody(
+            String(snapshot.model),
+            continuationMessages(
+              [...messages, ...toolMessages],
+              recovery.retries.length ? recovery.prefix : "",
+            ),
+            String(snapshot.instructions),
+            tokenPricing
+              ? {
+                  effort: snapshot.effort as ReasoningEffort,
+                  maxOutputTokens: requestOutputTokens,
+                  includeUsage: true,
+                  tools: handledToolCalls.size ? [] : [CHAT_IMAGE_TOOL],
+                }
+              : { tools: handledToolCalls.size ? [] : [CHAT_IMAGE_TOOL] },
+          );
     type PreparedContext = Awaited<ReturnType<typeof prepareChatContext>> & {
       manifest?: unknown;
       contextManifest?: unknown;
@@ -392,6 +462,10 @@ export async function executeChatAttempt(
       referenceImageKeys: input.referenceImageKeys,
       sourceImageIds: input.sourceImageIds,
       buildRequest,
+      budgetTokens:
+        typeof input.contextBudgetTokens === "number"
+          ? input.contextBudgetTokens
+          : undefined,
       signal: abort.signal,
     });
     abort.signal.throwIfAborted();
@@ -401,6 +475,18 @@ export async function executeChatAttempt(
     await flush(true);
     for (;;) {
       const body = buildRequest(context.messages);
+      const inputBound = chatInputTokenUpperBound(body);
+      if (
+        tokenPricing &&
+        (requestedInputTokens + inputBound > tokenPricing.maxInputTokens ||
+          (typeof requestLimits.maxInputTokens === "number" &&
+            inputBound > requestLimits.maxInputTokens) ||
+          (typeof requestLimits.maxRequests === "number" &&
+            requestCount >= requestLimits.maxRequests))
+      )
+        throw new Error("token_pricing_input_bound_exceeded");
+      requestedInputTokens += inputBound;
+      requestCount++;
       const requestBody = JSON.stringify(body);
       const requestHash = createHash("sha256")
         .update(requestBody)
@@ -415,7 +501,9 @@ export async function executeChatAttempt(
         );
       if (
         typeof manifest.requestHash === "string" &&
-        manifest.requestHash !== requestHash
+        manifest.requestHash !== requestHash &&
+        !toolMessages.length &&
+        !responseToolContinuations.length
       )
         throw new Error("context_request_hash_mismatch");
       const contextRetained = await db.$transaction(async (tx) => {
@@ -465,28 +553,48 @@ export async function executeChatAttempt(
       abort.signal.addEventListener("abort", stopRequest, { once: true });
       if (abort.signal.aborted) stopRequest();
       let transportError: unknown;
+      let toolRoundComplete = false;
+      const endpoint = chatEndpoint(String(snapshot.baseUrl), responses);
+      const completionToolCalls = new Map<
+        number,
+        { id: string; name: string; arguments: string }
+      >();
+      let responseToolCalls = state
+        .functionCalls()
+        .filter((toolCall) => !handledToolCalls.has(toolCall.callId));
+      const call = await startModelCall({
+        kind: "llm",
+        source: "web",
+        secrets: [apiKey],
+        operation: "chat.reply",
+        modelId: String(snapshot.model),
+        providerName: turn.modelId,
+        endpoint,
+        requestContent: requestBody,
+        userId: turn.userId,
+        conversationId: turn.conversationId,
+        chatAttemptId: attemptId,
+      });
       try {
         timings.upstream_sent_at = new Date().toISOString();
         headersTimer = setTimeout(
           () => requestAbort.abort(new Error("headers_timeout")),
           90_000,
         );
-        const response = await fetch(
-          chatEndpoint(String(snapshot.baseUrl), responses),
-          {
-            method: "POST",
-            redirect: "error",
-            headers: {
-              Authorization: `Bearer ${apiKey}`,
-              "Content-Type": "application/json",
-              Accept: "text/event-stream",
-              "Accept-Encoding": "identity",
-            },
-            body: requestBody,
-            signal: requestAbort.signal,
+        const response = await fetch(endpoint, {
+          method: "POST",
+          redirect: "error",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+            Accept: "text/event-stream",
+            "Accept-Encoding": "identity",
           },
-        );
+          body: requestBody,
+          signal: requestAbort.signal,
+        });
         clearTimeout(headersTimer);
+        call.response(response);
         const requestId = response.headers.get("x-request-id");
         timings.upstream_headers_at = new Date().toISOString();
         timings.upstream_http_status = response.status;
@@ -510,6 +618,14 @@ export async function executeChatAttempt(
           !response.body ||
           !response.headers.get("content-type")?.includes("text/event-stream")
         ) {
+          const requestError = !response.ok
+            ? await providerError(
+                response.clone(),
+                turn.modelId,
+                responses ? "responses" : "chat-completions",
+                endpoint,
+              )
+            : undefined;
           // A JSON response to stream:true is not silently presented as genuine streaming.
           const payload = await response.json().catch(() => null);
           state.terminal = "failed";
@@ -521,7 +637,10 @@ export async function executeChatAttempt(
                   ? "NON_STREAMING_RESPONSE"
                   : `HTTP_${response.status}`,
               };
-          throw new Error(`upstream_http_${response.status}`);
+          throw (
+            requestError ??
+            new Error(`Invalid response: upstream_http_${response.status}`)
+          );
         }
         await consumeChatSse(
           response.body,
@@ -540,10 +659,35 @@ export async function executeChatAttempt(
                   item_id: "answer",
                   delta: delta.content,
                 });
+              const toolCalls = Array.isArray(delta.tool_calls)
+                ? delta.tool_calls
+                : [];
+              for (const rawToolCall of toolCalls) {
+                const toolCall = record(rawToolCall);
+                const index =
+                  typeof toolCall.index === "number" ? toolCall.index : 0;
+                const current = completionToolCalls.get(index) ?? {
+                  id: `image-${attemptId}-${index}`,
+                  name: "",
+                  arguments: "",
+                };
+                if (typeof toolCall.id === "string" && toolCall.id)
+                  current.id = toolCall.id;
+                const functionValue = record(toolCall.function);
+                if (typeof functionValue.name === "string")
+                  current.name += functionValue.name;
+                if (typeof functionValue.arguments === "string")
+                  current.arguments += functionValue.arguments;
+                completionToolCalls.set(index, current);
+                state.activity = "image_tool";
+              }
               if (value.usage) state.usage = record(value.usage);
               if (value.error) {
                 state.terminal = "failed";
                 state.error = record(value.error);
+              } else if (choice.finish_reason === "tool_calls") {
+                state.activity = "image_tool";
+                toolRoundComplete = true;
               } else if (choice.finish_reason)
                 state.terminal =
                   choice.finish_reason === "stop" ? "completed" : "incomplete";
@@ -551,6 +695,7 @@ export async function executeChatAttempt(
             const type = typeof value.type === "string" ? value.type : "";
             if (
               (state.rawText !== before && state.rawText.trim()) ||
+              completionToolCalls.size > 0 ||
               /web_search_call\.(searching|completed)$/.test(type) ||
               type === "response.output_item.added"
             )
@@ -562,7 +707,9 @@ export async function executeChatAttempt(
             if (recovery.text.length > 512_000)
               throw new Error("output_limit_exceeded");
             await flush(Boolean(state.terminal));
-            return !state.terminal;
+            // Chat Completions sends its authoritative usage AFTER finish_reason.
+            // Read through [DONE]/EOF so a successful answer retains that frame.
+            return responses ? !state.terminal : state.terminal !== "failed";
           },
           { signal: requestAbort.signal, idleMs: 90_000 },
         );
@@ -570,9 +717,163 @@ export async function executeChatAttempt(
         transportError = requestAbort.signal.aborted
           ? requestAbort.signal.reason
           : error;
+        // A broken usage tail cannot undo an explicit provider completion.
+        if (
+          !abort.signal.aborted &&
+          (state.terminal === "completed" || toolRoundComplete)
+        )
+          transportError = undefined;
       } finally {
         clearTimeout(headersTimer);
         abort.signal.removeEventListener("abort", stopRequest);
+        call.usage(
+          tokenPricing ? chatModelCallUsage(state.usage) : state.usage,
+        );
+        call.responseContent?.({
+          text: state.rawText,
+          error: state.error,
+        });
+        responseToolCalls = responses
+          ? state
+              .functionCalls()
+              .filter((toolCall) => !handledToolCalls.has(toolCall.callId))
+          : [];
+        const hasToolCall =
+          (responses ? state.terminal === "completed" : toolRoundComplete) &&
+          (responseToolCalls.length > 0 || completionToolCalls.size > 0);
+        await call.finish(
+          transportError ??
+            (hasToolCall || state.terminal === "completed"
+              ? undefined
+              : new Error(
+                  typeof state.error?.message === "string"
+                    ? state.error.message
+                    : "Invalid response: stream ended before completion",
+                )),
+        );
+      }
+      const chatToolCalls = !responses ? [...completionToolCalls.values()] : [];
+      if (
+        !transportError &&
+        (responses ? state.terminal === "completed" : toolRoundComplete) &&
+        (responseToolCalls.length || chatToolCalls.length)
+      ) {
+        const calls = [
+          ...responseToolCalls.map((toolCall) => ({
+            id: toolCall.callId,
+            name: toolCall.name,
+            arguments: toolCall.arguments,
+          })),
+          ...chatToolCalls,
+        ];
+        if (handledToolCalls.size)
+          throw new Error("unexpected_tool_call_after_continuation");
+        for (const toolCall of calls) {
+          let toolResult:
+            | Awaited<ReturnType<typeof submitChatImageTool>>
+            | {
+                ok: false;
+                code: string;
+                message: string;
+              };
+          if (!toolCall.id || !toolCall.name || !toolCall.arguments) {
+            toolResult = {
+              ok: false,
+              code: "INVALID_TOOL_CALL",
+              message: "生图工具调用不完整，请重新描述图片需求",
+            };
+          } else if (
+            imageToolCalls >= 1 ||
+            toolCall.name !== CHAT_IMAGE_TOOL_NAME
+          ) {
+            toolResult = {
+              ok: false,
+              code: "UNSUPPORTED_TOOL_CALL",
+              message: "本轮只支持一次生图调用，请把多个要求合并后再试",
+            };
+          } else {
+            imageToolCalls++;
+            state.activity = "image_generating";
+            await flush(true);
+            toolResult = await submitChatImageTool(toolCall.arguments, {
+              userId: turn.userId,
+              conversationId: turn.conversationId,
+              turnId: turn.id,
+              attemptId,
+              callId: toolCall.id || `image-${attemptId}-${imageToolCalls}`,
+              imageModelId: input.imageModelId,
+              imageSize: input.imageSize,
+              imageQuality: input.imageQuality,
+              imageOutputFormat: input.imageOutputFormat,
+              imageN: input.imageN,
+              referenceImageKeys: input.referenceImageKeys,
+              sourceImageIds: input.sourceImageIds,
+              references: input.references,
+            });
+          }
+          const callId = toolCall?.id || `image-${attemptId}-${imageToolCalls}`;
+          handledToolCalls.add(callId);
+          if (toolResult.ok) {
+            const linked = await db.$transaction(async (tx) => {
+              const updated = await tx.conversationMessage.updateMany({
+                where: {
+                  chatAttemptId: attemptId,
+                  role: "ASSISTANT",
+                },
+                data: { generationId: toolResult.generationId },
+              });
+              if (!updated.count) return false;
+              return appendActiveChatEvent(tx, {
+                turnId: turn.id,
+                attemptId,
+                executionToken,
+                type: "generation.created",
+                payload: {
+                  generationId: toolResult.generationId,
+                  status: toolResult.status,
+                  modelId: toolResult.modelId,
+                },
+              });
+            });
+            if (!linked) throw new Error("attempt_no_longer_active");
+          }
+          state.recordToolResult(callId, CHAT_IMAGE_TOOL_NAME, toolResult);
+          const output = JSON.stringify(toolResult);
+          if (responses) {
+            responseToolContinuations.push({
+              callId,
+              name: toolCall?.name || CHAT_IMAGE_TOOL_NAME,
+              arguments: toolCall?.arguments || "{}",
+              output,
+            });
+          } else {
+            toolMessages.push({
+              role: "assistant",
+              content: state.finalText ?? state.rawText,
+              tool_calls: [
+                {
+                  id: callId,
+                  type: "function",
+                  function: {
+                    name: toolCall?.name || CHAT_IMAGE_TOOL_NAME,
+                    arguments: toolCall?.arguments || "{}",
+                  },
+                },
+              ],
+            });
+            toolMessages.push({
+              role: "tool",
+              tool_call_id: callId,
+              name: CHAT_IMAGE_TOOL_NAME,
+              content: output,
+            });
+          }
+        }
+        state = recovery.continueAfterTool();
+        state.activity = "waiting_upstream";
+        lastSemanticAt = Date.now();
+        await flush(true);
+        continue;
       }
       const reason =
         transportError instanceof Error
@@ -581,6 +882,7 @@ export async function executeChatAttempt(
             ? "stream_error"
             : undefined;
       if (
+        !tokenPricing &&
         canRetryChatResponse({
           aborted: abort.signal.aborted,
           retries: recovery.retries.length,
@@ -654,8 +956,8 @@ export async function executeChatAttempt(
             message: providerMessage,
             publicMessage:
               status === "incomplete"
-                ? "回复未完成，收到的内容已保存，本轮未收费"
-                : "上游在生成过程中中断，收到的内容已保存，本轮未收费",
+                ? "文字回复未完成，收到的内容已保存，文字回复未收费"
+                : "文字回复在生成过程中中断，收到的内容已保存，文字回复未收费",
           };
     await finishWithRetries({
       turnId: turn.id,
@@ -665,7 +967,7 @@ export async function executeChatAttempt(
       text: recovery.text,
       parts: recovery.checkpoint(),
       sources: recovery.sources,
-      usage: state.usage,
+      usage: recovery.usage,
       error: failure,
     });
     logger.info(
@@ -709,7 +1011,7 @@ export async function executeChatAttempt(
       text: recovery.text,
       parts: recovery.checkpoint(),
       sources: recovery.sources,
-      usage: state.usage,
+      usage: recovery.usage,
       status:
         state.terminal && state.terminal !== "completed"
           ? state.terminal
@@ -731,7 +1033,8 @@ export async function executeChatAttempt(
                 .replace(/https?:\/\/\S+/gi, "[UPSTREAM]")
                 .slice(0, 400)
             : undefined,
-        publicMessage: "对话未完成，已保存收到的内容，本轮未收费；可以重新生成",
+        publicMessage:
+          "文字回复未完成，已保存收到的内容，文字回复未收费；可以重新生成回复",
       },
     });
   } finally {

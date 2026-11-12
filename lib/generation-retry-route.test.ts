@@ -11,6 +11,7 @@ vi.mock("@/lib/db", () => ({
   db: {
     generation: { findFirst: mocks.generation },
     generatedImage: { findMany: mocks.images },
+    usageLog: { groupBy: async () => [] },
   },
 }));
 vi.mock("@/lib/generations", () => ({

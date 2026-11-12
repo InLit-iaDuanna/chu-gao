@@ -10,20 +10,9 @@ import { db } from "@/lib/db";
 import { isDatabaseUnavailableError } from "@/lib/service-errors";
 import {
   createPrivateStorageReadStream,
+  extensionForMimeType,
   statPrivateStorageKey,
 } from "@/lib/storage";
-
-function extensionForMimeType(mimeType: string): string {
-  if (mimeType === "image/jpeg") {
-    return "jpg";
-  }
-
-  if (mimeType === "image/webp") {
-    return "webp";
-  }
-
-  return "png";
-}
 
 function timestampForFilename(date = new Date()): string {
   const parts = [

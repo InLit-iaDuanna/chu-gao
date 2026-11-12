@@ -56,7 +56,7 @@ export function DialogContent({
       <RadixDialog.Overlay className="fixed inset-0 z-50 bg-black/40" />
       <RadixDialog.Content
         className={cn(
-          "fixed left-1/2 top-1/2 z-50 w-[calc(100%-32px)] max-w-[480px] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-surface shadow-[var(--shadow-lg)] outline-none",
+          "smooth-surface surface-modal fixed left-1/2 top-1/2 z-50 max-h-[calc(100dvh-32px)] w-[calc(100%-32px)] max-w-[480px] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border bg-surface shadow-[var(--shadow-lg)] outline-none",
           className,
         )}
         {...props}
@@ -90,7 +90,7 @@ export function DialogTitle({
 >): React.ReactElement {
   return (
     <RadixDialog.Title
-      className={cn("text-base font-semibold tracking-[-0.01em]", className)}
+      className={cn("text-base font-semibold tracking-normal", className)}
       {...props}
     />
   );

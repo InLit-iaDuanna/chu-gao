@@ -1,14 +1,9 @@
 .git
 .next
-.next-dev
-.next-comfyart
-.next-comfyart-build
 .data
 .playwright-cli
 node_modules
 output
-downloads/ComfyArt
-public/comfyart-assets
 *.log
 tsconfig.tsbuildinfo
 **/._*

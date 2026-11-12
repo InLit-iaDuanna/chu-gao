@@ -7,8 +7,9 @@ import { Button } from "@/components/ui";
 import { Input, Select, Skeleton } from "@/components/ui";
 
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Check, LogOut, RotateCcw, Ticket } from "lucide-react";
+import { Check, LogOut, RotateCcw, Ticket, Wallet } from "lucide-react";
 
 import {
   ACCENT_PRESETS,
@@ -61,7 +62,15 @@ export function SettingsView({ user, models }: SettingsViewProps) {
             </div>
             <div>
               <dt className="text-text-muted">余额</dt>
-              <dd className="mt-1 font-mono">{user.credits} 点</dd>
+              <dd className="mt-2 flex flex-wrap items-center gap-3">
+                <span className="font-mono">{user.credits} 积分</span>
+                <Button asChild size="sm" variant="secondary">
+                  <Link href="/app/recharge">
+                    <Wallet className="h-4 w-4" />
+                    充值
+                  </Link>
+                </Button>
+              </dd>
             </div>
             <div>
               <dt className="text-text-muted">今日用量</dt>
@@ -260,7 +269,9 @@ function UsageSection() {
               </span>
               <span className="min-w-0 flex-1 truncate">
                 {USAGE_ACTION_LABEL[entry.action] ?? entry.action}
-                {entry.source === "agent" ? <span className="ml-2 text-xs text-text-muted">Agent</span> : null}
+                {entry.source === "agent" ? (
+                  <span className="ml-2 text-xs text-text-muted">Agent</span>
+                ) : null}
                 {entry.reason && USAGE_REASON_LABEL[entry.reason] ? (
                   <span className="ml-2 text-xs text-text-faint">
                     {USAGE_REASON_LABEL[entry.reason]}

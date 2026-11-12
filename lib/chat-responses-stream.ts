@@ -32,15 +32,24 @@ export interface ResponseOutputItem {
   finishedAt?: string;
 }
 
+export interface ResponseFunctionCall {
+  itemId: string;
+  outputIndex: number;
+  callId: string;
+  name: string;
+  arguments: string;
+}
+
 export class ResponsesAccumulator {
   readonly parts = new Map<string, ResponseTextPart>();
   readonly items = new Map<string, ResponseOutputItem>();
   readonly eventCounts: Record<string, number> = {};
+  readonly activityHistory: string[] = [];
   revision = 0;
   lastSequence: number | null = null;
   providerStatus: string | null = null;
   terminal: ChatTerminalStatus | null = null;
-  activity = "waiting_upstream";
+  private currentActivity = "waiting_upstream";
   responseId: string | null = null;
   searched = false;
   sources: ChatSearchSource[] = [];
@@ -49,6 +58,18 @@ export class ResponsesAccumulator {
   finalText: string | null = null;
   private seenSequences = new Set<number>();
   private deltaParts = new Map<string, string>();
+  private functionArguments = new Map<string, string>();
+
+  get activity() {
+    return this.currentActivity;
+  }
+
+  set activity(value: string) {
+    if (this.currentActivity === value) return;
+    this.currentActivity = value;
+    if (this.activityHistory.at(-1) !== value) this.activityHistory.push(value);
+    this.revision++;
+  }
 
   get rawText() {
     return this.orderedParts()
@@ -65,11 +86,14 @@ export class ResponsesAccumulator {
 
   checkpoint() {
     return {
-      version: 2,
+      version: 3,
       revision: this.revision,
       responseId: this.responseId,
       providerStatus: this.providerStatus,
       lastSequence: this.lastSequence,
+      activityHistory: this.activityHistory.length
+        ? [...this.activityHistory]
+        : [this.activity],
       usageAvailability: this.usage ? "reported" : "unknown",
       items: [...this.items.values()].sort(
         (a, b) => a.outputIndex - b.outputIndex,
@@ -155,6 +179,9 @@ export class ResponsesAccumulator {
       if (typeof value[key] === "string") item[key] = value[key];
     if (typeof value.call_id === "string") item.callId = value.call_id;
     if (typeof value.name === "string") item.name = value.name;
+    if (item.type === "function_call" && typeof value.arguments === "string") {
+      this.functionArguments.set(item.callId ?? item.itemId, value.arguments);
+    }
     // Only retain public tool metadata, never reasoning/encrypted content or
     // arbitrary provider item payloads.
     if (item.type === "web_search_call") {
@@ -222,6 +249,7 @@ export class ResponsesAccumulator {
 
   private item(item: Record<string, unknown>, outputIndex: number) {
     this.outputItem(item, outputIndex);
+    if (item.type === "function_call") this.activity = "image_tool";
     if (item.type === "web_search_call" && item.status === "completed") {
       this.searched = true;
       if (this.activity !== "answering")
@@ -342,6 +370,36 @@ export class ResponsesAccumulator {
       );
       if (item.type === "reasoning") this.activity = "reasoning";
       if (item.type === "web_search_call") this.activity = "searching";
+      if (item.type === "function_call") this.activity = "image_tool";
+    } else if (
+      type === "response.function_call_arguments.delta" ||
+      type === "response.function_call_arguments.done"
+    ) {
+      const outputIndex =
+        typeof payload.output_index === "number" ? payload.output_index : 0;
+      const item = this.outputItem(
+        {
+          id: payload.item_id,
+          call_id: payload.call_id,
+          name: payload.name,
+          type: "function_call",
+        },
+        outputIndex,
+      );
+      const key = item.callId ?? item.itemId;
+      const argumentsValue =
+        type.endsWith(".done") && typeof payload.arguments === "string"
+          ? payload.arguments
+          : string(payload.delta);
+      if (type.endsWith(".done"))
+        this.functionArguments.set(key, argumentsValue);
+      else if (argumentsValue)
+        this.functionArguments.set(
+          key,
+          (this.functionArguments.get(key) ?? "") + argumentsValue,
+        );
+      this.activity = "image_tool";
+      if (argumentsValue) this.revision++;
     } else if (type.startsWith("response.web_search_call.")) {
       const outputIndex =
         typeof payload.output_index === "number" ? payload.output_index : 0;
@@ -441,6 +499,72 @@ export class ResponsesAccumulator {
       this.sources = cited.sources ?? [];
     }
   }
+
+  functionCalls(): ResponseFunctionCall[] {
+    return [...this.items.values()]
+      .filter((item) => item.type === "function_call")
+      .map((item) => {
+        const callId = item.callId ?? item.itemId;
+        const args = this.functionArguments.get(callId);
+        if (!args) return null;
+        return {
+          itemId: item.itemId,
+          outputIndex: item.outputIndex,
+          callId,
+          name: item.name ?? "",
+          arguments: args,
+        };
+      })
+      .filter((item): item is ResponseFunctionCall => Boolean(item));
+  }
+
+  recordToolResult(
+    callId: string,
+    name: string,
+    result: {
+      ok: boolean;
+      generationId?: string;
+      status?: string;
+      message?: string;
+    },
+  ) {
+    const itemId = `tool-${callId}`;
+    this.items.set(itemId, {
+      itemId,
+      outputIndex:
+        Math.max(
+          -1,
+          ...[...this.items.values()].map((item) => item.outputIndex),
+        ) + 1,
+      type: "tool_result",
+      status: result.ok ? "completed" : "failed",
+      callId,
+      name,
+      action: {
+        status: result.status ?? (result.ok ? "accepted" : "failed"),
+        ...(result.generationId ? { generationId: result.generationId } : {}),
+        ...(result.message ? { message: result.message } : {}),
+      },
+    });
+    this.revision++;
+  }
+
+  resetForContinuation() {
+    for (const [itemId, item] of this.items) {
+      if (item.type === "function_call" || item.type === "function_call_output")
+        this.items.delete(itemId);
+    }
+    this.functionArguments.clear();
+    this.terminal = null;
+    this.error = null;
+    this.finalText = null;
+    this.providerStatus = null;
+    this.usage = null;
+    this.responseId = null;
+    this.seenSequences.clear();
+    this.currentActivity = "waiting_upstream";
+    this.revision++;
+  }
 }
 
 export class ChatProtocolError extends Error {}
@@ -453,13 +577,17 @@ export async function consumeChatSse(
   const reader = stream.getReader();
   const decoder = new TextDecoder();
   let values: unknown[] = [];
+  const done = Symbol("sse.done");
   let parseError: Error | null = null;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const parser = createParser({
     maxBufferSize: 2_000_000,
     onEvent(event) {
       if (parseError) return;
-      if (event.data === "[DONE]") return;
+      if (event.data === "[DONE]") {
+        values.push(done);
+        return;
+      }
       try {
         values.push(JSON.parse(event.data));
       } catch {
@@ -494,7 +622,8 @@ export async function consumeChatSse(
       parser.feed(decoder.decode(part.value, { stream: !part.done }));
       if (part.done) parser.feed("\n\n");
       // Never discard a complete event parsed immediately before a protocol error.
-      for (const value of values) if ((await onEvent(value)) === false) return;
+      for (const value of values)
+        if (value === done || (await onEvent(value)) === false) return;
       values = [];
       if (parseError) throw parseError;
       if (part.done) return;

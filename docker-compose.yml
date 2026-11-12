@@ -51,6 +51,8 @@ services:
     environment:
       DATABASE_URL: postgresql://app:${POSTGRES_PASSWORD}@postgres:5432/app?schema=public
       REDIS_URL: redis://redis:6379
+      NODE_OPTIONS: "--max-old-space-size=512"
+    mem_limit: 700m
     depends_on:
       storage-init:
         condition: service_completed_successfully
@@ -87,6 +89,8 @@ services:
     environment:
       DATABASE_URL: postgresql://app:${POSTGRES_PASSWORD}@postgres:5432/app?schema=public
       REDIS_URL: redis://redis:6379
+      NODE_OPTIONS: "--max-old-space-size=768"
+    mem_limit: 1g
     depends_on:
       storage-init:
         condition: service_completed_successfully
@@ -99,8 +103,8 @@ services:
     volumes:
       - private_storage:/app/.data/storage
     healthcheck:
-      # The application health endpoint verifies DB, Redis, queue, and worker heartbeats.
-      # Keep the container probe cheap so it cannot compile tsx every 30 seconds.
+      # Application health verifies DB, Redis, queue, and worker heartbeats.
+      # Keep this container probe cheap so it cannot compile tsx periodically.
       test: ["CMD-SHELL", "test -r /proc/1/cmdline"]
       interval: 30s
       timeout: 3s

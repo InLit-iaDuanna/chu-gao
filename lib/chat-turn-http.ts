@@ -5,6 +5,7 @@ import {
 } from "@/lib/auth";
 import { fail } from "@/lib/api-response";
 import { ChatTurnError } from "@/lib/chat-turns";
+import { ChatContextError } from "@/lib/chat-context-types";
 import { logger } from "@/lib/logger";
 import { ChatRuntimeAdmissionError } from "@/lib/chat-runtime-config";
 
@@ -22,6 +23,11 @@ export function chatTurnFailure(error: unknown) {
     error instanceof ChatRuntimeAdmissionError
   )
     return fail(error.code, error.message, { status: error.status });
+  if (error instanceof ChatContextError)
+    return fail(error.code, error.message, {
+      status: error.statusCode,
+      details: error.contextStatus,
+    });
   logger.error(
     { errorName: error instanceof Error ? error.name : "unknown" },
     "Chat task API unavailable.",

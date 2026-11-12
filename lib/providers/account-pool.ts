@@ -10,6 +10,24 @@ import {
 import { providerAccountMaxAttempts } from "@/lib/providers/config";
 import { modelProtocolToProviderProtocol } from "@/lib/providers/protocols";
 
+// This pool is deliberately separate from ordinary providers sharing its URL.
+export const FALLBACK_PROVIDER_ID = "ldai-fallback";
+
+export function isFallbackProvider(provider: { id: string }): boolean {
+  return provider.id === FALLBACK_PROVIDER_ID;
+}
+
+export function providerCostMultiplier(provider: {
+  id: string;
+  costMultiplier: number;
+}): number {
+  return Number.isFinite(provider.costMultiplier) && provider.costMultiplier > 0
+    ? provider.costMultiplier
+    : isFallbackProvider(provider)
+      ? 2
+      : 1;
+}
+
 export type ProviderAccountWithProvider = ProviderAccount & {
   provider: Provider;
 };
@@ -63,12 +81,35 @@ function compareProviderAccounts(
   left: ProviderAccountWithProvider,
   right: ProviderAccountWithProvider,
 ): number {
+  const fallbackOrder =
+    Number(isFallbackProvider(left.provider)) -
+    Number(isFallbackProvider(right.provider));
+  if (fallbackOrder !== 0) {
+    return fallbackOrder;
+  }
+
   if (right.provider.priority !== left.provider.priority) {
     return right.provider.priority - left.provider.priority;
   }
 
   if (right.priority !== left.priority) {
     return right.priority - left.priority;
+  }
+
+  // Keep equally prioritized pools grouped so each pool's strategy defines
+  // a consistent order, even when neighboring pools use different strategies.
+  if (left.provider.id !== right.provider.id) {
+    return left.provider.id.localeCompare(right.provider.id);
+  }
+
+  const leaseDifference =
+    (left.lastLeaseAt?.getTime() ?? 0) - (right.lastLeaseAt?.getTime() ?? 0);
+  if (left.provider.selectionStrategy === "ROUND_ROBIN") {
+    if (leaseDifference !== 0) {
+      return leaseDifference;
+    }
+  } else if (left.inFlight !== right.inFlight) {
+    return left.inFlight - right.inFlight;
   }
 
   const reliabilityDifference =
@@ -87,12 +128,10 @@ function compareProviderAccounts(
     return right.weight - left.weight;
   }
 
-  if (left.inFlight !== right.inFlight) {
-    return left.inFlight - right.inFlight;
-  }
-
   return (
-    (left.lastLeaseAt?.getTime() ?? 0) - (right.lastLeaseAt?.getTime() ?? 0)
+    leaseDifference ||
+    left.createdAt.getTime() - right.createdAt.getTime() ||
+    left.id.localeCompare(right.id)
   );
 }
 
@@ -233,6 +272,7 @@ export async function leaseProviderAccount(
         id: account.id,
         isActive: true,
         health: { not: "DOWN" },
+        provider: { isActive: true, health: { not: "DOWN" } },
         // Use the current database value rather than the candidate snapshot;
         // an admin concurrency change must take effect immediately.
         inFlight: { lt: db.providerAccount.fields.maxConcurrency },
@@ -430,18 +470,6 @@ export async function findEligibleProviderAccounts(
 
 export function maxAttemptsForAccounts(
   accounts: ProviderAccountWithProvider[],
-  providerChannelId?: string | null,
 ): number {
-  if (!providerChannelId) {
-    return Math.min(providerAccountMaxAttempts(), accounts.length);
-  }
-
-  const successfulAccountCount = accounts.filter(
-    (account) => account.lastHealthyAt,
-  ).length;
-
-  return Math.min(
-    accounts.length,
-    Math.max(providerAccountMaxAttempts(), successfulAccountCount, 12),
-  );
+  return Math.min(providerAccountMaxAttempts(), accounts.length);
 }

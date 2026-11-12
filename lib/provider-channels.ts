@@ -68,7 +68,10 @@ export function isImage2ModelId(modelId?: string | null): boolean {
   return (
     modelId === "gpt-image-2" ||
     modelId === "gpt-image-2.5-flare" ||
-    modelId === "gpt-image-2.5-sunburst"
+    modelId === "gpt-image-2.5-sunburst" ||
+    modelId === "gpt-image-2.6" ||
+    modelId === "gpt-image-2.6-flare" ||
+    modelId === "gpt-image-2.6-sunburst"
   );
 }
 

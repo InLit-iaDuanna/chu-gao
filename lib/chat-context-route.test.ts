@@ -81,6 +81,34 @@ describe("context status and manual compaction API", () => {
     expect(mocks.status).toHaveBeenCalledTimes(1);
   });
 
+  it("forwards the selected Opus context budget to status and compaction", async () => {
+    await GET(
+      getRequest(
+        "conversationId=chat-a&modelId=claude-opus-5-5&budgetTokens=600000",
+      ),
+    );
+    expect(mocks.status).toHaveBeenCalledWith(
+      "alice",
+      "chat-a",
+      "claude-opus-5-5",
+      600_000,
+    );
+
+    const request = postRequest({
+      conversationId: "chat-a",
+      modelId: "claude-opus-5-5",
+      budgetTokens: 1_000_000,
+    });
+    await POST(request);
+    expect(mocks.compact).toHaveBeenCalledWith({
+      userId: "alice",
+      conversationId: "chat-a",
+      modelId: "claude-opus-5-5",
+      budgetTokens: 1_000_000,
+      signal: request.signal,
+    });
+  });
+
   it("manually compacts only stored history at two requests per minute", async () => {
     const request = postRequest();
     const response = await POST(request);

@@ -1,0 +1,173 @@
+/* One continuous-corner family. Only backgrounds are masked: focus rings,
+   menus, text selection and overflowing content retain their native behavior. */
+@layer components {
+  .smooth-surface {
+    --smooth-fill: rgb(var(--surface));
+    --smooth-stroke: rgb(var(--border));
+    --smooth-mask: url("/ui/surfaces/8-fill.svg");
+    --smooth-edge: url("/ui/surfaces/8-stroke.svg");
+    --smooth-slice: 13;
+    --smooth-width: 13px;
+    --smooth-radius: var(--radius-control);
+    isolation: isolate;
+    border-radius: var(--smooth-radius);
+  }
+
+  .smooth-surface.surface-inset {
+    --smooth-mask: url("/ui/surfaces/4-fill.svg");
+    --smooth-edge: url("/ui/surfaces/4-stroke.svg");
+    --smooth-slice: 7;
+    --smooth-width: 7px;
+    --smooth-radius: var(--radius-sm);
+  }
+
+  .smooth-surface.surface-overlay,
+  .smooth-surface.studio-message,
+  .smooth-surface.studio-mode-switch {
+    --smooth-mask: url("/ui/surfaces/12-fill.svg");
+    --smooth-edge: url("/ui/surfaces/12-stroke.svg");
+    --smooth-slice: 20;
+    --smooth-width: 20px;
+    --smooth-radius: var(--radius-overlay);
+  }
+
+  .smooth-surface.surface-modal,
+  .smooth-surface.studio-composer {
+    --smooth-mask: url("/ui/surfaces/20-fill.svg");
+    --smooth-edge: url("/ui/surfaces/20-stroke.svg");
+    --smooth-slice: 32;
+    --smooth-width: 32px;
+    --smooth-radius: var(--radius-composer);
+  }
+
+  .surface-primary {
+    --smooth-fill: rgb(var(--brand-primary));
+    --smooth-stroke: transparent;
+  }
+  .surface-primary:hover:not(:disabled) {
+    --smooth-fill: rgb(var(--brand-primary) / 0.88);
+  }
+  .surface-secondary {
+    --smooth-fill: rgb(var(--control-bg));
+    --smooth-stroke: rgb(var(--border-strong) / 0.65);
+  }
+  .surface-secondary:hover:not(:disabled) {
+    --smooth-fill: rgb(var(--control-bg-hover));
+    --smooth-stroke: rgb(var(--border-strong));
+  }
+  .surface-ghost,
+  .surface-outline {
+    --smooth-fill: transparent;
+    --smooth-stroke: transparent;
+  }
+  .surface-outline {
+    --smooth-stroke: rgb(var(--border-strong) / 0.65);
+  }
+  .surface-ghost:hover:not(:disabled),
+  .surface-outline:hover:not(:disabled) {
+    --smooth-fill: rgb(var(--control-bg-hover));
+  }
+  .surface-selected {
+    --smooth-fill: rgb(var(--control-selected-bg));
+    --smooth-stroke: transparent;
+  }
+  .surface-danger {
+    --smooth-fill: rgb(var(--danger));
+    --smooth-stroke: transparent;
+  }
+  .surface-danger-ghost {
+    --smooth-fill: transparent;
+    --smooth-stroke: transparent;
+  }
+  .surface-danger-ghost:hover:not(:disabled) {
+    --smooth-fill: rgb(var(--danger) / 0.1);
+  }
+  .smooth-surface:is(:disabled, [aria-disabled="true"]) {
+    --smooth-fill: rgb(var(--control-disabled-bg));
+    --smooth-stroke: transparent;
+  }
+  .surface-ghost:is(:disabled, [aria-disabled="true"]) {
+    --smooth-fill: transparent;
+  }
+
+  .ui-button,
+  .ui-icon-button,
+  .ui-input,
+  .ui-select,
+  .ui-textarea {
+    border-radius: var(--radius-control);
+  }
+  .ui-button,
+  .ui-icon-button {
+    touch-action: manipulation;
+  }
+  .ui-button:active:not(:disabled),
+  .ui-icon-button:active:not(:disabled) {
+    transform: none;
+    opacity: 0.78;
+  }
+  .ui-input,
+  .ui-textarea {
+    border-color: rgb(var(--border-strong) / 0.65);
+  }
+  .ui-card {
+    border-radius: var(--radius-card);
+  }
+  .ui-card:hover {
+    --smooth-stroke: rgb(var(--border-strong));
+  }
+  .ui-menu-item {
+    --smooth-fill: transparent;
+    --smooth-stroke: transparent;
+  }
+  .ui-menu-item[data-highlighted],
+  .ui-menu-item:hover {
+    --smooth-fill: rgb(var(--surface-2));
+  }
+  .ui-segment {
+    --smooth-fill: transparent;
+    --smooth-stroke: transparent;
+  }
+  .ui-segment[aria-checked="true"] {
+    --smooth-fill: rgb(var(--surface));
+    --smooth-stroke: rgb(var(--border) / 0.5);
+  }
+
+  @supports (corner-shape: squircle) {
+    .ui-input,
+    .ui-textarea {
+      corner-shape: superellipse(1.5);
+    }
+  }
+}
+
+/* WebKit and Chromium support nine-slice masks. Other engines retain the
+   same radii, borders and hit targets, without a JavaScript layout observer. */
+@supports (-webkit-mask-box-image-source: none) {
+  .smooth-surface:not(.rounded-none):not(.rounded-full) {
+    background: transparent;
+    border-color: transparent;
+    border-radius: var(--smooth-radius);
+  }
+
+  .smooth-surface:not(.rounded-none):not(.rounded-full)::before,
+  .smooth-surface:not(.rounded-none):not(.rounded-full)::after {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    z-index: -1;
+    pointer-events: none;
+    -webkit-mask-box-image: var(--smooth-mask) var(--smooth-slice) fill /
+      var(--smooth-width) / 0 stretch;
+    transition: background-color var(--duration-base) var(--ease-out);
+  }
+
+  .smooth-surface:not(.rounded-none):not(.rounded-full)::before {
+    background: var(--smooth-fill);
+  }
+
+  .smooth-surface:not(.rounded-none):not(.rounded-full)::after {
+    background: var(--smooth-stroke);
+    -webkit-mask-box-image-source: var(--smooth-edge);
+  }
+}

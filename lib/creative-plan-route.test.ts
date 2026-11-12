@@ -4,13 +4,9 @@ const mocks = vi.hoisted(() => ({
   config: vi.fn(),
   fetch: vi.fn(),
   limit: vi.fn(),
-  enabled: vi.fn(),
-}));
-vi.mock("@/lib/creative-config", () => ({
-  creativeAssistantEnabled: mocks.enabled,
 }));
 vi.mock("@/lib/auth", () => ({ checkSession: mocks.session }));
-vi.mock("@/lib/ai-config", () => ({ getConversationConfig: mocks.config }));
+vi.mock("@/lib/opus-config", () => ({ getOpusConfig: mocks.config }));
 vi.mock("@/lib/http", () => ({ fetchWithTimeout: mocks.fetch }));
 vi.mock("@/lib/api-rate-limit", () => ({
   userActionRateLimitResponse: mocks.limit,
@@ -38,7 +34,6 @@ const run = (overrides: Record<string, unknown> = {}) =>
   );
 beforeEach(() => {
   vi.resetAllMocks();
-  mocks.enabled.mockReturnValue(true);
   mocks.session.mockResolvedValue({
     status: "authenticated",
     user: { id: "user-1" },
@@ -72,12 +67,6 @@ beforeEach(() => {
   );
 });
 describe("creative planning endpoint", () => {
-  it("keeps the feature disabled without invoking authentication or a model", async () => {
-    mocks.enabled.mockReturnValue(false);
-    expect((await run()).status).toBe(503);
-    expect(mocks.session).not.toHaveBeenCalled();
-    expect(mocks.fetch).not.toHaveBeenCalled();
-  });
   it("keeps locks server-side and makes only a single non-generating request", async () => {
     const response = await run();
     expect(response.status).toBe(200);

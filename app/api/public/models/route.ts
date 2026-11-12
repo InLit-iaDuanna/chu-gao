@@ -3,6 +3,10 @@ import { db } from "@/lib/db";
 import { listModelsWithPricing } from "@/lib/model-pricing";
 import { providerProtocolToModelProtocol } from "@/lib/providers/protocols";
 import type { ModelDefinition } from "@/lib/models/types";
+import {
+  isFallbackProvider,
+  providerCostMultiplier,
+} from "@/lib/providers/account-pool";
 
 function modelAliases(modelId: string): string[] {
   if (modelId === "gpt-image-2") {
@@ -16,10 +20,15 @@ function modelAliases(modelId: string): string[] {
   return [modelId];
 }
 
-function publicModel(model: ModelDefinition, available: boolean) {
+function publicModel(
+  model: ModelDefinition,
+  available: boolean,
+  fallbackCostMultiplier?: number,
+) {
   return {
     ...model,
     available,
+    ...(fallbackCostMultiplier === undefined ? {} : { fallbackCostMultiplier }),
     pricingRules: model.pricingRules?.filter((rule) => !rule.providerChannelId),
   };
 }
@@ -37,6 +46,8 @@ export async function GET() {
         isActive: true,
       },
       select: {
+        id: true,
+        costMultiplier: true,
         protocol: true,
         modelsSupported: true,
         _count: {
@@ -57,6 +68,7 @@ export async function GET() {
     });
 
     const availableModelIds = new Set<string>();
+    const fallbackMultipliers = new Map<string, number>();
 
     for (const provider of providers) {
       const expectedProtocol = providerProtocolToModelProtocol(
@@ -67,6 +79,13 @@ export async function GET() {
 
       for (const model of models) {
         const aliases = modelAliases(model.id);
+        if (
+          isFallbackProvider(provider) &&
+          model.protocol === expectedProtocol &&
+          aliases.some((id) => providerModelIds.has(id))
+        ) {
+          fallbackMultipliers.set(model.id, providerCostMultiplier(provider));
+        }
 
         if (
           model.protocol === expectedProtocol &&
@@ -85,7 +104,11 @@ export async function GET() {
 
     return ok(
       models.map((model) =>
-        publicModel(model, availableModelIds.has(model.id)),
+        publicModel(
+          model,
+          availableModelIds.has(model.id),
+          fallbackMultipliers.get(model.id),
+        ),
       ),
     );
   } catch {

@@ -1,7 +1,13 @@
 "use client";
 
 import type { ModelInfo } from "@/components/studio/lib/types";
-import type { LunaConfigUpdate, LunaStatus } from "@/lib/chat-model-options";
+import type {
+  LunaConfigUpdate,
+  LunaStatus,
+  OpusConfigUpdate,
+  OpusStatus,
+} from "@/lib/chat-model-options";
+import type { AdminModelCall } from "@/lib/model-call-types";
 
 import type {
   AccountImportResult,
@@ -245,6 +251,7 @@ export const deleteAdminUserGenerations = (
 // ---------- 生成记录 ----------
 
 export interface AdminGenerationQuery {
+  source?: "web" | "api" | "agent";
   status?: string[];
   userId?: string;
   q?: string;
@@ -260,6 +267,7 @@ export interface AdminGenerationQuery {
 
 export const listAdminGenerations = (query: AdminGenerationQuery = {}) => {
   const search = new URLSearchParams();
+  if (query.source) search.set("source", query.source);
   for (const status of query.status ?? []) search.append("status", status);
   if (query.userId) search.set("userId", query.userId);
   if (query.q) search.set("q", query.q);
@@ -277,6 +285,38 @@ export const listAdminGenerations = (query: AdminGenerationQuery = {}) => {
     `/api/admin/generations${qs ? `?${qs}` : ""}`,
   );
 };
+
+export interface ModelCallQuery {
+  kind?: string;
+  source?: string;
+  status?: string;
+  operation?: string;
+  q?: string;
+  modelId?: string;
+  providerId?: string;
+  generationId?: string;
+  from?: string;
+  to?: string;
+  errorCategory?: string;
+  cursor?: string;
+}
+export const listAdminModelCalls = (
+  query: ModelCallQuery = {},
+  signal?: AbortSignal,
+) => {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(query))
+    if (value) search.set(key, value);
+  return request<{ items: AdminModelCall[]; nextCursor: string | null }>(
+    `/api/admin/model-calls?${search}`,
+    { signal },
+  );
+};
+
+export const getAdminModelCall = (id: string, signal?: AbortSignal) =>
+  request<AdminModelCall>(`/api/admin/model-calls/${encodeURIComponent(id)}`, {
+    signal,
+  });
 
 export const clearRecentAdminGenerations = (limit = 20) =>
   post<{ cleared: number }>("/api/admin/generations/clear-recent", { limit });
@@ -475,8 +515,10 @@ export const getAdminSol = () =>
 export const patchAdminSol = (input: LunaConfigUpdate) =>
   patch<LunaStatus>("/api/admin/integrations/sol", input);
 
-export const testAdminDeepseek = () =>
-  post<{ ok: boolean; model: string }>("/api/admin/integrations/test");
+export const getAdminOpus = () =>
+  request<OpusStatus>("/api/admin/integrations/opus");
+export const patchAdminOpus = (input: OpusConfigUpdate) =>
+  patch<OpusStatus>("/api/admin/integrations/opus", input);
 
 // ---------- 系统配置 ----------
 
@@ -508,7 +550,10 @@ export const deleteAdminAnnouncement = (id: string) =>
 // ---------- API Key 配置 ----------
 
 export type ApiPriceTier = "1K" | "2K" | "4K";
-export type ApiPriceTable = Record<string, Partial<Record<ApiPriceTier, number>>>;
+export type ApiPriceTable = Record<
+  string,
+  Partial<Record<ApiPriceTier, number>>
+>;
 
 export interface ApiKeyAdminConfig {
   creditMultiplier: number;

@@ -45,7 +45,6 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
 vi.mock("./lib/api", () => ({
-  request: vi.fn(async () => ({})),
   getMe: mocks.me,
   listModels: mocks.models,
   listConversations: mocks.list,
@@ -128,8 +127,8 @@ const chatPricing: ConversationPricing = {
   defaultModelId: "gpt-5.6-luna",
   models: [
     {
-      id: "deepseek-chat",
-      displayName: "DeepSeek",
+      id: "text-only",
+      displayName: "Text-only model",
       reasoningEfforts: [],
       credits: 0.5,
       supportsVision: false,
@@ -559,6 +558,172 @@ async function ready() {
   await screen.findByRole("button", { name: "选择模型，当前 Image2.5" });
 }
 
+it("submits GIF request sizes, corrects model changes, and shows the credit range", async () => {
+  const gifModel = {
+    ...model,
+    id: "gpt-image-2.6",
+    displayName: "Image 2.6",
+    fallbackCostMultiplier: 2,
+    capabilities: {
+      ...model.capabilities,
+      gifSizes: ["512x512", "768x768"],
+      outputFormats: ["png", "gif"],
+    },
+  };
+  mocks.models.mockResolvedValue([model, gifModel]);
+  mocks.generate.mockResolvedValue({
+    generationId: "gif-generation",
+    status: "PENDING",
+    estimatedCredits: 8,
+    queueWaiting: 0,
+  });
+  render(<StudioApp />);
+  await ready();
+  const user = userEvent.setup();
+
+  await user.click(
+    screen.getByRole("button", { name: "选择模型，当前 Image2.5" }),
+  );
+  await user.click(screen.getByRole("menuitem", { name: "Image 2.6" }));
+  await user.click(screen.getByRole("button", { name: "生成参数" }));
+  await user.click(screen.getByRole("combobox", { name: "图片格式" }));
+  await user.click(screen.getByRole("option", { name: "GIF" }));
+  expect(screen.getByRole("combobox", { name: "图片尺寸" })).toHaveTextContent(
+    "512x512",
+  );
+  await user.keyboard("{Escape}");
+
+  await user.click(
+    screen.getByRole("button", { name: "选择模型，当前 Image 2.6" }),
+  );
+  await user.click(screen.getByRole("menuitem", { name: "Image2.5" }));
+  await user.click(screen.getByRole("button", { name: "生成参数" }));
+  expect(
+    screen.queryByRole("combobox", { name: "图片格式" }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByRole("combobox", { name: "图片尺寸" })).toHaveTextContent(
+    "1024x1024",
+  );
+  await user.keyboard("{Escape}");
+
+  await user.click(
+    screen.getByRole("button", { name: "选择模型，当前 Image2.5" }),
+  );
+  await user.click(screen.getByRole("menuitem", { name: "Image 2.6" }));
+  await user.click(screen.getByRole("button", { name: "生成参数" }));
+  expect(screen.getByRole("combobox", { name: "图片格式" })).toHaveTextContent(
+    "PNG",
+  );
+  await user.click(screen.getByRole("combobox", { name: "图片格式" }));
+  await user.click(screen.getByRole("option", { name: "GIF" }));
+  await user.click(screen.getByRole("combobox", { name: "图片尺寸" }));
+  expect(
+    screen.queryByRole("option", { name: "自动" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("option", { name: /1024/ }),
+  ).not.toBeInTheDocument();
+  await user.click(screen.getByRole("option", { name: "768x768 · 1:1" }));
+  await user.keyboard("{Escape}");
+  fireEvent.change(screen.getByRole("textbox", { name: "提示词" }), {
+    target: { value: "生成一段动画" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "生成图片" }));
+  await waitFor(() =>
+    expect(mocks.generate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        modelId: gifModel.id,
+        outputFormat: "gif",
+        size: "768x768",
+        n: 1,
+      }),
+    ),
+  );
+  expect(mocks.toast).toHaveBeenCalledWith(
+    expect.objectContaining({
+      description: "本次预计消耗 8 至 16 积分",
+    }),
+  );
+});
+
+it("shows the ordinary-to-fallback credit range in the existing confirmation", async () => {
+  mocks.models.mockResolvedValue([{ ...model, fallbackCostMultiplier: 2 }]);
+  mocks.quote.mockResolvedValue({ estimatedCredits: 8, prompt: "设计栏杆" });
+  render(<StudioApp creativeEnabled />);
+  await ready();
+  fireEvent.click(screen.getByRole("radio", { name: "创作 Agent" }));
+  fireEvent.click(screen.getByRole("button", { name: "编辑方案" }));
+  fireEvent.change(screen.getByRole("textbox", { name: "画面目标" }), {
+    target: { value: "设计栏杆" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "核对并生成" }));
+  const confirmation = await screen.findByRole("dialog", {
+    name: "确认本次生成",
+  });
+  expect(within(confirmation).getByText("8 至 16 积分")).toBeVisible();
+  expect(within(confirmation).queryByText(/上游|渠道/)).not.toBeInTheDocument();
+  fireEvent.click(
+    within(confirmation).getByRole("button", {
+      name: "确认生成 · 8 至 16 积分",
+    }),
+  );
+  await waitFor(() =>
+    expect(mocks.generate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        creative: expect.objectContaining({ maxCredits: 8 }),
+      }),
+    ),
+  );
+});
+
+it("shows actual-size billing for auto without presenting the estimate as a minimum or maximum", async () => {
+  mocks.models.mockResolvedValue([
+    {
+      ...model,
+      defaults: { ...model.defaults, size: "auto" },
+      fallbackCostMultiplier: 2,
+    },
+  ]);
+  mocks.quote.mockResolvedValue({ estimatedCredits: 9, prompt: "设计栏杆" });
+  mocks.generate.mockResolvedValue({
+    generationId: "auto-generation",
+    status: "PENDING",
+    estimatedCredits: 9,
+    queueWaiting: 0,
+  });
+  render(<StudioApp creativeEnabled />);
+  await ready();
+  fireEvent.click(screen.getByRole("radio", { name: "创作 Agent" }));
+  fireEvent.click(screen.getByRole("button", { name: "编辑方案" }));
+  fireEvent.change(screen.getByRole("textbox", { name: "画面目标" }), {
+    target: { value: "设计栏杆" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "核对并生成" }));
+  const confirmation = await screen.findByRole("dialog", {
+    name: "确认本次生成",
+  });
+  expect(within(confirmation).getByText("按实际尺寸计费")).toBeVisible();
+  expect(within(confirmation).queryByText(/9.*积分/)).not.toBeInTheDocument();
+  expect(
+    within(confirmation).queryByText("9 至 18 积分"),
+  ).not.toBeInTheDocument();
+  fireEvent.click(
+    within(confirmation).getByRole("button", {
+      name: "确认生成 · 按实际尺寸计费",
+    }),
+  );
+  await waitFor(() =>
+    expect(mocks.generate).toHaveBeenCalledWith(
+      expect.objectContaining({ size: "auto" }),
+    ),
+  );
+  expect(mocks.toast).toHaveBeenCalledWith(
+    expect.objectContaining({
+      description: "按实际尺寸计费",
+    }),
+  );
+});
+
 it("opens a single conversation composer without the old dock panels", async () => {
   render(<StudioApp />);
   await ready();
@@ -582,7 +747,7 @@ it("creates the conversation lazily and shows an accepted image job inline", asy
   fireEvent.change(screen.getByRole("textbox", { name: "提示词" }), {
     target: { value: "画一个庭院" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "生成" }));
+  fireEvent.click(screen.getByRole("button", { name: "生成图片" }));
   await waitFor(() =>
     expect(mocks.generate).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -609,7 +774,7 @@ it("preserves prompt and references if submitting the first image fails", async 
     />,
   );
   await ready();
-  fireEvent.click(screen.getByRole("button", { name: "生成" }));
+  fireEvent.click(screen.getByRole("button", { name: "生成图片" }));
   await screen.findByRole("alert");
   expect(screen.getByRole("textbox", { name: "提示词" })).toHaveValue(
     "保留坡道",
@@ -644,7 +809,7 @@ it("keeps one image result, restores preview at index zero, and uses it for the 
   fireEvent.change(screen.getByRole("textbox", { name: "提示词" }), {
     target: { value: "改成白天" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "生成" }));
+  fireEvent.click(screen.getByRole("button", { name: "生成图片" }));
   await waitFor(() =>
     expect(mocks.generate).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -727,7 +892,7 @@ it("does not create a replacement thread when the requested conversation failed 
   fireEvent.change(screen.getByRole("textbox", { name: "提示词" }), {
     target: { value: "继续修改" },
   });
-  expect(screen.getByRole("button", { name: "生成" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "生成图片" })).toBeDisabled();
   expect(mocks.create).not.toHaveBeenCalled();
 });
 
@@ -749,7 +914,7 @@ it("does not restore an already sent prompt when starting the next conversation"
   fireEvent.change(screen.getByRole("textbox", { name: "提示词" }), {
     target: { value: "画一个庭院" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "生成" }));
+  fireEvent.click(screen.getByRole("button", { name: "生成图片" }));
   await screen.findByText("排队中 · 0%");
   await waitFor(() =>
     expect(screen.getByRole("textbox", { name: "提示词" })).toHaveValue(""),
@@ -778,7 +943,7 @@ it("can remove the implicit previous image before sending another image request"
   fireEvent.change(screen.getByRole("textbox", { name: "提示词" }), {
     target: { value: "画新的建筑" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "生成" }));
+  fireEvent.click(screen.getByRole("button", { name: "生成图片" }));
   await waitFor(() =>
     expect(mocks.generate).toHaveBeenCalledWith(
       expect.objectContaining({ sourceImageIds: [] }),
@@ -803,7 +968,7 @@ it("keeps clarification feedback local instead of appending an unmanaged assista
   fireEvent.change(screen.getByRole("textbox", { name: "提示词" }), {
     target: { value: "修改一下" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "生成" }));
+  fireEvent.click(screen.getByRole("button", { name: "生成图片" }));
   expect(await screen.findByRole("alert")).toHaveTextContent(
     "请补充要修改的位置",
   );
@@ -892,12 +1057,12 @@ async function openEffort() {
   return screen.findByRole("slider", { name: "思考强度" });
 }
 
-it("keeps DeepSeek selectable, updates pricing, and omits unsupported reasoning effort", async () => {
+it("keeps a text-only model selectable and omits unsupported reasoning effort", async () => {
   render(<StudioApp />);
   await ready();
   await openChat();
-  await selectChatModel("DeepSeek");
-  expect(chatModelTrigger()).toHaveTextContent("DeepSeek");
+  await selectChatModel("Text-only model");
+  expect(chatModelTrigger()).toHaveTextContent("Text-only model");
   expect(
     screen.queryByRole("slider", { name: "思考强度" }),
   ).not.toBeInTheDocument();
@@ -905,31 +1070,64 @@ it("keeps DeepSeek selectable, updates pricing, and omits unsupported reasoning 
   await waitFor(() => expect(mocks.chat).toHaveBeenCalledOnce());
   expect(mocks.chat).toHaveBeenCalledWith(
     expect.objectContaining({
-      modelId: "deepseek-chat",
+      modelId: "text-only",
       reasoningEffort: undefined,
-      webSearch: false,
     }),
   );
 });
 
-it("enables supported search automatically and ignores the retired draft switch", async () => {
-  const pricing = structuredClone(chatPricing);
-  pricing.models[1].supportsWebSearch = true;
-  mocks.pricing.mockResolvedValue(pricing);
-  sessionStorage.setItem(
-    "chugao.dialogue-draft.v1.test-user.new",
-    JSON.stringify({ mode: "chat", chatWebSearch: false }),
-  );
+it("retains Opus token pricing, displays all four rates, and submits its selected effort", async () => {
+  const opus = {
+    id: "claude-opus-5-5",
+    displayName: "Opus 5.5",
+    reasoningEfforts: ["low", "medium", "high", "xhigh", "max"] as const,
+    defaultReasoningEffort: "low" as const,
+    credits: 0,
+    pricing: {
+      type: "per_million_tokens" as const,
+      input: 100,
+      output: 500,
+      cacheRead: 5,
+      cacheCreation: 60,
+    },
+    supportsVision: false,
+    maxReferenceImages: 0,
+    supportsWebSearch: false,
+    supportsDurableTurns: true,
+  };
+  mocks.pricing.mockResolvedValue({
+    ...chatPricing,
+    models: [...chatPricing.models, opus],
+  });
+  mocks.chat.mockImplementation(async () => {
+    throw new Error("测试结束");
+  });
   render(<StudioApp />);
   await ready();
   await openChat();
-  expect(
-    screen.queryByRole("button", { name: "联网检索" }),
-  ).not.toBeInTheDocument();
+  await selectChatModel("Opus 5.5");
+  expect(chatModelTrigger()).toHaveTextContent("Opus 5.5Low");
+  expect(screen.getByText("积分 / 百万 Token")).toBeVisible();
+  for (const rate of ["输入 100", "输出 500", "缓存读取 5", "缓存写入 60"]) {
+    expect(screen.getByText(rate)).toBeVisible();
+  }
+  expect(screen.queryByText("0 积分 / 轮")).not.toBeInTheDocument();
+  expect(screen.queryByText(/预扣|冻结|免费/)).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("选择参考图文件")).not.toBeInTheDocument();
+  const slider = await openEffort();
+  expect(slider).toHaveAttribute("max", "4");
+  expect(slider).toHaveAttribute("aria-valuetext", "Low");
+  fireEvent.change(slider, { target: { value: "4" } });
+  expect(slider).toHaveAttribute("aria-valuetext", "Max");
+  await userEvent.setup().keyboard("{Escape}");
   fireEvent.click(screen.getByRole("button", { name: "发送" }));
-  await waitFor(() => expect(mocks.chat).toHaveBeenCalledOnce());
-  expect(mocks.chat).toHaveBeenCalledWith(
-    expect.objectContaining({ webSearch: true }),
+  await waitFor(() =>
+    expect(mocks.chat).toHaveBeenCalledWith(
+      expect.objectContaining({
+        modelId: opus.id,
+        reasoningEffort: "max",
+      }),
+    ),
   );
 });
 
@@ -1167,7 +1365,7 @@ it("preserves incompatible references and blocks sending with a text-only model"
   render(<StudioApp initialReferenceKeys={["uploads/ref.png"]} />);
   await ready();
   await openChat();
-  await selectChatModel("DeepSeek");
+  await selectChatModel("Text-only model");
   expect(
     screen.getByText("当前聊天模型不支持参考图，请移除参考图或切换模型"),
   ).toBeVisible();
@@ -1216,26 +1414,26 @@ it("restores the selected model even when pricing loads after the session draft"
     "chugao.dialogue-draft.v1.test-user.new",
     JSON.stringify({
       mode: "chat",
-      prompt: "保留 DeepSeek 选择",
+      prompt: "保留文本模型选择",
       modelId: "image",
-      chatModelId: "deepseek-chat",
+      chatModelId: "text-only",
       params: { n: 1, referenceImages: [] },
     }),
   );
   render(<StudioApp />);
   await waitFor(() =>
     expect(screen.getByRole("textbox", { name: "对话输入" })).toHaveValue(
-      "保留 DeepSeek 选择",
+      "保留文本模型选择",
     ),
   );
   expect(screen.getByRole("button", { name: "发送" })).toBeDisabled();
   await act(async () => resolvePricing(chatPricing));
-  expect(chatModelTrigger()).toHaveTextContent("DeepSeek");
+  expect(chatModelTrigger()).toHaveTextContent("Text-only model");
   fireEvent.click(screen.getByRole("button", { name: "发送" }));
   await waitFor(() =>
     expect(mocks.chat).toHaveBeenCalledWith(
       expect.objectContaining({
-        modelId: "deepseek-chat",
+        modelId: "text-only",
         reasoningEffort: undefined,
       }),
     ),
@@ -1249,7 +1447,7 @@ it("restores separate chat settings when moving between conversations", async ()
       mode: "chat",
       prompt: "第二段草稿",
       modelId: "image",
-      chatModelId: "deepseek-chat",
+      chatModelId: "text-only",
       params: { n: 1, referenceImages: [] },
     }),
   );
@@ -1271,7 +1469,9 @@ it("restores separate chat settings when moving between conversations", async ()
   await userEvent
     .setup()
     .click(screen.getByRole("button", { name: "海报设计" }));
-  await waitFor(() => expect(chatModelTrigger()).toHaveTextContent("DeepSeek"));
+  await waitFor(() =>
+    expect(chatModelTrigger()).toHaveTextContent("Text-only model"),
+  );
   expect(screen.getByRole("textbox", { name: "对话输入" })).toHaveValue(
     "第二段草稿",
   );

@@ -296,6 +296,13 @@ describe("Responses native stream", () => {
       phase: "final_answer",
     });
     expect(state.rawText).toBe("No");
+    expect(state.checkpoint().activityHistory).toEqual([
+      "reasoning",
+      "searching",
+      "waiting_upstream",
+      "searching",
+      "waiting_upstream",
+    ]);
     expect(JSON.stringify(checkpoint)).not.toMatch(
       /private|secret|encrypted_content/,
     );

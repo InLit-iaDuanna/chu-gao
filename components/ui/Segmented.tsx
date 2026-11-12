@@ -89,7 +89,7 @@ export function Segmented<T extends string>({
             title={option.ariaLabel}
             tabIndex={index === rovingIndex ? 0 : -1}
             className={cn(
-              "h-7 rounded-[4px] px-2.5 text-xs text-text-muted transition-colors duration-[var(--duration-fast)]",
+              "smooth-surface ui-segment relative h-7 rounded-md px-2.5 text-xs text-text-muted transition-colors duration-[var(--duration-fast)]",
               active && "bg-surface text-foreground shadow-[var(--shadow-xs)]",
               !active && "hover:text-foreground",
             )}

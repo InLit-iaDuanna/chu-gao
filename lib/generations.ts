@@ -9,6 +9,10 @@ import {
 import { logger } from "@/lib/logger";
 import type { InternalRequest } from "@/lib/models/types";
 import {
+  parsePricingSnapshot,
+  snapshotProviderMultipliers,
+} from "@/lib/model-pricing";
+import {
   displayNameForProviderChannelWithMap,
   getImage2ProviderChannelName,
   resolveImage2ProviderChannelId,
@@ -63,6 +67,7 @@ export function serializeGeneration(
   options: {
     displayNameMap?: Image2ChannelDisplayNameMap;
     exposeProviderDetails?: boolean;
+    billing?: import("@/lib/turn-credit-types").CreditSettlement;
   } = {},
 ) {
   const images = [...row.images]
@@ -138,6 +143,7 @@ export function serializeGeneration(
     errorMessage: row.errorMessage,
     credits: row.costCredits,
     costCredits: row.costCredits,
+    ...(options.billing ? { billing: options.billing } : {}),
     attempts: row.attempts,
     startedAt: row.startedAt,
     finishedAt: row.finishedAt,
@@ -244,9 +250,17 @@ export async function createAndEnqueueGeneration(
     if (operation) {
       const replay = await findGenerationOperation(userId, operation, tx);
       if (agentAuthorizationId) {
-        const grant = await assertAgentSubmission(tx, agentAuthorizationId, userId, replay?.generationId);
+        const grant = await assertAgentSubmission(
+          tx,
+          agentAuthorizationId,
+          userId,
+          replay?.generationId,
+        );
         if (replay && grant.mode === "single" && !grant.boundGenerationId)
-          await tx.agentAuthorization.update({where: {id: grant.id}, data: {boundGenerationId: replay.generationId}});
+          await tx.agentAuthorization.update({
+            where: { id: grant.id },
+            data: { boundGenerationId: replay.generationId },
+          });
       }
       if (replay) return { kind: "replay" as const, replay };
     } else if (agentAuthorizationId) {
@@ -270,6 +284,14 @@ export async function createAndEnqueueGeneration(
       }
     }
 
+    const pricingSnapshot = parsePricingSnapshot(pricingSnapshotJson);
+    const frozenPricingSnapshotJson = pricingSnapshot
+      ? ((await snapshotProviderMultipliers(
+          pricingSnapshot,
+          request,
+          tx,
+        )) as unknown as Prisma.InputJsonObject)
+      : pricingSnapshotJson;
     const created = await tx.generation.create({
       data: {
         userId,
@@ -294,12 +316,19 @@ export async function createAndEnqueueGeneration(
         status: "PENDING",
         progress: 0,
         costCredits: estimatedCredits,
-        pricingSnapshot: pricingSnapshotJson,
+        pricingSnapshot: frozenPricingSnapshotJson,
       },
     });
 
     if (agentAuthorizationId) {
-      await tx.agentAuthorization.updateMany({where: {id: agentAuthorizationId, mode: "single", boundGenerationId: null}, data: {boundGenerationId: created.id}});
+      await tx.agentAuthorization.updateMany({
+        where: {
+          id: agentAuthorizationId,
+          mode: "single",
+          boundGenerationId: null,
+        },
+        data: { boundGenerationId: created.id },
+      });
     }
 
     // Persist the deterministic queue ID before dispatch. A failed database
@@ -360,8 +389,10 @@ export async function createAndEnqueueGeneration(
         creditsDelta: -estimatedCredits,
         metadata: {
           estimatedCredits,
-          ...(agentAuthorizationId ? {source: "agent", agentAuthorizationId} : {}),
-          pricingSnapshot: pricingSnapshotJson,
+          ...(agentAuthorizationId
+            ? { source: "agent", agentAuthorizationId }
+            : {}),
+          pricingSnapshot: frozenPricingSnapshotJson,
         },
       },
     });

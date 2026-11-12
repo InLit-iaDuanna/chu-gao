@@ -15,15 +15,37 @@ import type {
   Resolution,
 } from "@/lib/models/types";
 import { IMAGE_RESOLUTION_OPTIONS } from "@/lib/models/options";
+import { channelIdFromProvider } from "@/lib/provider-channels";
+import {
+  isFallbackProvider,
+  providerCostMultiplier,
+} from "@/lib/providers/account-pool";
+import {
+  providerChannelMatchesBaseUrl,
+  supportedModelIds,
+} from "@/lib/providers/availability";
+import { modelProtocolToProviderProtocol } from "@/lib/providers/protocols";
 
-export interface PricingSnapshot {
-  modelId: string;
+export interface SnapshotPrices {
   ruleId: string | null;
   perImageCredits: number;
   // Keep the resolved price for each tier at submission time. This makes
   // auto-size settlement deterministic even if an admin changes pricing while
   // the job is running.
   perImageCreditsByResolution?: Partial<Record<Resolution, number>>;
+}
+
+export interface PricingSnapshot extends SnapshotPrices {
+  modelId: string;
+  providerChannelPrices?: Record<string, SnapshotPrices>;
+  providerMultipliers?: Record<string, number>;
+  selectedProvider?: SnapshotPrices & {
+    providerId: string;
+    providerAccountId: string | null;
+    providerChannelId: string;
+    multiplier: number;
+    reservedCredits: number;
+  };
   estimatedCredits: number;
   /** "api" when re-priced from the API price list; absent for web jobs. */
   channel?: "web" | "api";
@@ -121,23 +143,40 @@ export function createPricingSnapshot(
   request: InternalRequest,
   estimatedCredits = estimateCost(model, request),
 ): PricingSnapshot {
-  const perImage = resolvePerImageCredits(model, request);
-  const perImageCreditsByResolution = Object.fromEntries(
-    IMAGE_RESOLUTION_OPTIONS.map((resolution) => [
-      resolution,
-      resolvePerImageCredits(model, {
-        ...request,
-        resolution,
-        n: 1,
-      }).credits,
-    ]),
-  ) as Partial<Record<Resolution, number>>;
+  const pricesForChannel = (providerChannelId?: string): SnapshotPrices => {
+    const channelRequest = { ...request, providerChannelId };
+    const perImage = resolvePerImageCredits(model, channelRequest);
+    return {
+      ruleId: perImage.ruleId,
+      perImageCredits: perImage.credits,
+      perImageCreditsByResolution: Object.fromEntries(
+        IMAGE_RESOLUTION_OPTIONS.map((resolution) => [
+          resolution,
+          resolvePerImageCredits(model, {
+            ...channelRequest,
+            // An auto quote is an estimate, not the returned image's tier.
+            size: request.size === "auto" ? undefined : request.size,
+            resolution,
+            n: 1,
+          }).credits,
+        ]),
+      ),
+    };
+  };
+  const channelIds = [
+    ...new Set(
+      model.pricingRules?.flatMap((rule) =>
+        rule.providerChannelId ? [rule.providerChannelId] : [],
+      ) ?? [],
+    ),
+  ];
 
   return {
+    ...pricesForChannel(request.providerChannelId),
     modelId: model.id,
-    ruleId: perImage.ruleId,
-    perImageCredits: perImage.credits,
-    perImageCreditsByResolution,
+    providerChannelPrices: Object.fromEntries(
+      channelIds.map((channelId) => [channelId, pricesForChannel(channelId)]),
+    ),
     estimatedCredits,
     request: {
       providerChannelId: request.providerChannelId,
@@ -153,6 +192,106 @@ export function createPricingSnapshot(
   };
 }
 
+export async function snapshotProviderMultipliers(
+  snapshot: PricingSnapshot,
+  request: InternalRequest,
+  client: Pick<Prisma.TransactionClient, "provider"> = db,
+): Promise<PricingSnapshot> {
+  const providers = await client.provider.findMany({
+    where: {
+      isActive: true,
+      protocol: modelProtocolToProviderProtocol(request.protocol),
+      OR: supportedModelIds(request.modelId).map((id) => ({
+        modelsSupported: { has: id },
+      })),
+    },
+    select: { id: true, costMultiplier: true },
+  });
+  return {
+    ...snapshot,
+    providerMultipliers: Object.fromEntries(
+      providers.map((provider) => [
+        provider.id,
+        providerCostMultiplier(provider),
+      ]),
+    ),
+  };
+}
+
+export function pricingSnapshotForProvider(
+  snapshot: PricingSnapshot,
+  selection: {
+    providerId: string;
+    providerAccountId: string | null;
+    baseUrl: string;
+  },
+  request: InternalRequest,
+): PricingSnapshot {
+  const provider = { id: selection.providerId };
+  const frozenMultiplier = snapshot.providerMultipliers?.[provider.id];
+  if (
+    (isFallbackProvider(provider) || snapshot.providerMultipliers) &&
+    !(
+      typeof frozenMultiplier === "number" &&
+      Number.isFinite(frozenMultiplier) &&
+      frozenMultiplier > 0
+    )
+  ) {
+    throw new Error("Provider pricing was not frozen at submission");
+  }
+  const multiplier = frozenMultiplier ?? 1;
+  if (
+    isFallbackProvider(provider) &&
+    request.size === "auto" &&
+    !snapshot.perImageCreditsByResolution
+  ) {
+    throw new Error("Provider resolution pricing was not frozen at submission");
+  }
+  const providerChannelId = channelIdFromProvider(
+    provider.id,
+    selection.baseUrl,
+  );
+  const channelPrices = snapshot.providerChannelPrices ?? {};
+  const matchingChannel = Object.keys(channelPrices).filter((channelId) =>
+    providerChannelMatchesBaseUrl(channelId, selection.baseUrl, provider.id),
+  );
+  const selectedChannel = [
+    providerChannelId,
+    request.providerChannelId,
+    ...matchingChannel,
+  ].find((channelId) => channelId && matchingChannel.includes(channelId));
+  const prices = selectedChannel ? channelPrices[selectedChannel] : snapshot;
+  const count = request.executionPolicy === "single-submit" ? 1 : request.n;
+  const maxPerImage =
+    isFallbackProvider(provider) && request.size === "auto"
+      ? Math.max(
+          prices.perImageCredits,
+          ...Object.values(prices.perImageCreditsByResolution ?? {}),
+        )
+      : prices.perImageCredits;
+  const requiredCredits = Math.ceil(maxPerImage * count * multiplier);
+  const reservedCredits =
+    request.executionPolicy === "single-submit" && !isFallbackProvider(provider)
+      ? Math.min(requiredCredits, snapshot.estimatedCredits)
+      : requiredCredits;
+
+  return {
+    ...snapshot,
+    selectedProvider: {
+      ruleId: prices.ruleId,
+      perImageCredits: prices.perImageCredits,
+      ...(prices.perImageCreditsByResolution
+        ? { perImageCreditsByResolution: prices.perImageCreditsByResolution }
+        : {}),
+      providerId: provider.id,
+      providerAccountId: selection.providerAccountId,
+      providerChannelId,
+      multiplier,
+      reservedCredits,
+    },
+  };
+}
+
 export function estimateCostFromSnapshot(
   snapshot: PricingSnapshot | null | undefined,
   count: number,
@@ -163,26 +302,25 @@ export function estimateCostFromSnapshot(
     return null;
   }
 
-  if (
-    actualResolutionTiers?.length &&
-    snapshot.perImageCreditsByResolution
-  ) {
+  const prices = snapshot.selectedProvider ?? snapshot;
+  const effectiveMultiplier =
+    multiplier * (snapshot.selectedProvider?.multiplier ?? 1);
+
+  if (actualResolutionTiers?.length && prices.perImageCreditsByResolution) {
     const total = actualResolutionTiers.reduce(
       (sum, resolution) =>
         sum +
-        (snapshot.perImageCreditsByResolution?.[resolution] ??
-          snapshot.perImageCredits),
+        (prices.perImageCreditsByResolution?.[resolution] ??
+          prices.perImageCredits),
       0,
     );
-    return Math.ceil(total * multiplier);
+    return Math.ceil(total * effectiveMultiplier);
   }
 
-  return Math.ceil(snapshot.perImageCredits * count * multiplier);
+  return Math.ceil(prices.perImageCredits * count * effectiveMultiplier);
 }
 
-export function parsePricingSnapshot(
-  value: Prisma.JsonValue | null | undefined,
-): PricingSnapshot | null {
+export function parsePricingSnapshot(value: unknown): PricingSnapshot | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
   }

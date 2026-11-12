@@ -4,7 +4,6 @@ import {
   delayGenerationForProviderCapacity,
   positiveInteger,
   providerCapacityRetryDelay,
-  workerConcurrencyTarget,
 } from "@/lib/generation-capacity";
 
 describe("generation capacity retry", () => {
@@ -70,20 +69,5 @@ describe("generation capacity retry", () => {
     expect(positiveInteger(Number.NaN, 4)).toBe(4);
     expect(positiveInteger(-1, 4)).toBe(4);
     expect(positiveInteger(8, 4)).toBe(8);
-  });
-});
-
-describe("worker concurrency target", () => {
-  it("follows the total channel account slots", () => {
-    expect(workerConcurrencyTarget(150, { min: 4, max: 256 })).toBe(150);
-  });
-
-  it("clamps to the configured floor and ceiling", () => {
-    expect(workerConcurrencyTarget(0, { min: 4, max: 256 })).toBe(4);
-    expect(workerConcurrencyTarget(5000, { min: 4, max: 256 })).toBe(256);
-  });
-
-  it("falls back to the floor for invalid totals", () => {
-    expect(workerConcurrencyTarget(Number.NaN, { min: 4, max: 256 })).toBe(4);
   });
 });

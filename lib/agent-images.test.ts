@@ -143,7 +143,9 @@ describe("Agent image service", () => {
     mocks.blocked.mockResolvedValue(true);
     await expect(
       submitAgentGeneration(principal, body, "operation-4"),
-    ).rejects.toThrow("内容审核");
+    ).rejects.toThrow(
+      "[MODERATION_REJECTED] 提示词或参考图包含不允许的内容，请调整后再试。",
+    );
     expect(mocks.create).not.toHaveBeenCalled();
   });
   it("does not bind a grant to another user's image or a website-only task", async () => {
@@ -156,10 +158,7 @@ describe("Agent image service", () => {
         where: {
           id: "another-job",
           userId: "owner",
-          OR: [
-            { agentAuthorizationId: { not: null } },
-            { apiKeyId: { not: null } },
-          ],
+          agentAuthorizationId: { not: null },
           deletedAt: null,
         },
       }),
@@ -167,7 +166,9 @@ describe("Agent image service", () => {
     expect(mocks.bind).not.toHaveBeenCalled();
   });
   it("maps stored errors to customer messages without upstream content", () => {
-    expect(publicAgentFailure("MODERATION_REJECTED")).toContain("内容审核");
+    expect(publicAgentFailure("MODERATION_REJECTED")).toBe(
+      "[MODERATION_REJECTED] 提示词或参考图包含不允许的内容，请调整后再试。",
+    );
     expect(publicAgentFailure("PROVIDER_ERROR")).not.toMatch(
       /https:|Provider|account/i,
     );

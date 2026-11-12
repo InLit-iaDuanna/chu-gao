@@ -1,6 +1,7 @@
 import { ResponsesAccumulator } from "@/lib/chat-responses-stream";
 import type { ChatSearchSource } from "@/lib/chat-search";
 import type { UpstreamChatMessage } from "@/lib/chat-upstream";
+import { aggregateChatUsage } from "@/lib/chat-token-billing";
 
 export const CHAT_AUTO_RETRY_LIMIT = 2;
 
@@ -116,6 +117,8 @@ export class ChatResponseRecovery {
   private retainedParts: ReturnType<
     ResponsesAccumulator["checkpoint"]
   >["parts"] = [];
+  private retainedActivityHistory: string[] = [];
+  private continuedUsages: Array<Record<string, unknown> | null> = [];
   readonly retries: Array<{
     number: number;
     reason: string;
@@ -150,16 +153,47 @@ export class ChatResponseRecovery {
     );
   }
 
+  get usage() {
+    return aggregateChatUsage([
+      ...this.retries.map((retry) => retry.usage),
+      ...this.continuedUsages,
+      this.state.usage,
+    ]);
+  }
+
+  retainUsage(usage: Record<string, unknown> | null) {
+    this.continuedUsages.push(usage);
+  }
+
+  continueAfterTool() {
+    const checkpoint = this.checkpoint();
+    this.prefix = this.text;
+    this.retainedSources = this.sources;
+    this.retainedItems = checkpoint.items;
+    this.retainedParts = checkpoint.parts;
+    this.retainedActivityHistory = checkpoint.activityHistory;
+    this.retainUsage(this.state.usage);
+    this.state = new ResponsesAccumulator();
+    return this.state;
+  }
+
   checkpoint() {
     const current = this.state.checkpoint();
-    if (!this.retries.length) return current;
+    if (!this.retries.length && !this.continuedUsages.length) return current;
     const offset = this.retainedItems.reduce(
       (max, item) => Math.max(max, item.outputIndex + 1),
       0,
     );
-    const id = (value: string) => `recovery-${this.retries.length}:${value}`;
+    const id = (value: string) =>
+      `recovery-${this.retries.length}-tool-${this.continuedUsages.length}:${value}`;
     return {
       ...current,
+      activityHistory: [
+        ...this.retainedActivityHistory,
+        ...current.activityHistory,
+      ].filter(
+        (value, index, values) => index === 0 || value !== values[index - 1],
+      ),
       items: [
         ...this.retainedItems,
         ...current.items.map((item) => ({
@@ -196,6 +230,7 @@ export class ChatResponseRecovery {
     this.retainedSources = this.sources;
     this.retainedItems = checkpoint.items;
     this.retainedParts = checkpoint.parts;
+    this.retainedActivityHistory = checkpoint.activityHistory;
     this.retries.push({
       number: this.retries.length + 1,
       reason,

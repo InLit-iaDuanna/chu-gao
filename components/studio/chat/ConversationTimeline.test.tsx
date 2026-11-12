@@ -27,7 +27,6 @@ vi.mock("../GenerationCard", () => ({
 }));
 
 import { ConversationTimeline } from "./ConversationTimeline";
-import { ConversationTimelineV8 } from "./ConversationTimelineV8";
 
 beforeEach(() => parsed.mockClear());
 afterEach(() => {
@@ -127,7 +126,7 @@ function managedConversation(
   content: string,
   status = "running",
   id = "assistant",
-) {
+): Conversation {
   return {
     ...conversation,
     messages: [
@@ -144,7 +143,7 @@ function managedConversation(
   };
 }
 
-it("shows cache usage exactly as reported and distinguishes missing writes", () => {
+it("shows total, uncached, read and creation token counts separately", () => {
   const history = managedConversation("complete", "completed");
   render(
     <ToastProvider>
@@ -157,15 +156,47 @@ it("shows cache usage exactly as reported and distinguishes missing writes", () 
             chatUsage: {
               input_tokens: 4517,
               output_tokens: 33,
-              input_tokens_details: { cached_tokens: 4328 },
+              input_tokens_details: {
+                cached_tokens: 4328,
+                cache_write_tokens: 0,
+              },
             },
           })),
         }}
       />
     </ToastProvider>,
   );
-  expect(screen.getByText(/缓存命中 4,328/)).toHaveTextContent(
-    "缓存写入 未报告",
+  fireEvent.click(screen.getByText("用量"));
+  expect(screen.getByText(/输入总量 4,517 · 输出 33/)).toBeVisible();
+  expect(screen.getByText(/未缓存输入 189 · 缓存读取 4,328/)).toBeVisible();
+  expect(screen.getByText("缓存创建 0")).toBeVisible();
+});
+
+it("renders the streamed process as separate bubbles from the final result", () => {
+  const history = managedConversation("最终答案", "completed");
+  history.messages[0].chatActivityHistory = [
+    "context",
+    "reasoning",
+    "searching",
+    "answering",
+  ];
+  history.messages[0].chatActivity = "answering";
+  const view = render(
+    <ToastProvider>
+      <ConversationTimeline {...timelineProps} conversation={history} />
+    </ToastProvider>,
+  );
+  expect(screen.getByRole("group", { name: "过程" })).toHaveTextContent(
+    "正在整理上下文",
+  );
+  expect(screen.getByRole("group", { name: "过程" })).toHaveTextContent(
+    "正在生成回复",
+  );
+  expect(screen.getByRole("region", { name: "回答" })).toHaveTextContent(
+    "最终答案",
+  );
+  expect(view.container.querySelectorAll('[aria-label="回答"]')).toHaveLength(
+    1,
   );
 });
 
@@ -243,7 +274,7 @@ it("shows honest search/reconnect waiting feedback and skips malformed historica
       />
     </ToastProvider>,
   );
-  expect(screen.getByText("检索已完成，正在等待回复…")).toBeVisible();
+  expect(screen.getAllByText("检索已完成，正在等待回复…")[0]).toBeVisible();
   expect(screen.getByText(/已等待 1[5-6] 秒/)).toBeVisible();
   const sources = screen.getByRole("navigation", { name: "回复来源" });
   expect(within(sources).getAllByRole("link")).toHaveLength(1);
@@ -260,7 +291,7 @@ it("shows honest search/reconnect waiting feedback and skips malformed historica
       />
     </ToastProvider>,
   );
-  expect(screen.getByText("连接暂未恢复，生成状态待确认")).toBeVisible();
+  expect(screen.getAllByText("连接暂未恢复，生成状态待确认")[0]).toBeVisible();
   expect(screen.queryByText(/生成已结束/)).not.toBeInTheDocument();
 });
 
@@ -327,114 +358,4 @@ it("reports first text only after paint frames, once per attempt, without blocki
   expect(fetch).toHaveBeenCalledTimes(1);
   expect(screen.getByText("首次正文，继续")).toBeVisible();
   expect(screen.getByRole("alert")).toBeEmptyDOMElement();
-});
-
-it("renders only one V8 pending turn before the managed reply arrives", () => {
-  render(
-    <ToastProvider>
-      <ConversationTimelineV8
-        {...timelineProps}
-        conversation={{ ...conversation, messages: [] }}
-        pending="生成一个设计的表格"
-        streaming=""
-      />
-    </ToastProvider>,
-  );
-
-  expect(screen.getByRole("article", { name: "正在发送的消息" })).toBeVisible();
-  expect(
-    screen.queryByRole("article", { name: "正在回复" }),
-  ).not.toBeInTheDocument();
-  expect(screen.getAllByRole("article")).toHaveLength(1);
-});
-
-it("paginates a long V8 answer horizontally while keeping the timeline vertical", async () => {
-  const scrollHeight = vi
-    .spyOn(HTMLElement.prototype, "scrollHeight", "get")
-    .mockImplementation(function (this: HTMLElement) {
-      return this.hasAttribute("data-assistant-content") ? 900 : 1000;
-    });
-  const clientHeight = vi
-    .spyOn(HTMLElement.prototype, "clientHeight", "get")
-    .mockImplementation(function (this: HTMLElement) {
-      return this.getAttribute("role") === "log" ? 600 : 400;
-    });
-  const clientWidth = vi
-    .spyOn(HTMLElement.prototype, "clientWidth", "get")
-    .mockReturnValue(500);
-  const scrollWidth = vi
-    .spyOn(HTMLElement.prototype, "scrollWidth", "get")
-    .mockImplementation(function (this: HTMLElement) {
-      return this.hasAttribute("data-assistant-content") ? 1024 : 500;
-    });
-
-  try {
-    const rows = Array.from(
-      { length: 12 },
-      (_, index) => `| 维度 ${index + 1} | 详细说明 ${index + 1} |`,
-    ).join("\n");
-    render(
-      <ToastProvider>
-        <ConversationTimelineV8
-          {...timelineProps}
-          conversation={{
-            ...conversation,
-            messages: [
-              {
-                id: "long-user",
-                role: "user",
-                content: "做一个设计维度表",
-                createdAt: "2026-10-30",
-                chatTurnId: "long-turn",
-              },
-              {
-                id: "long-assistant",
-                role: "assistant",
-                content: `# 设计维度表\n\n| 项目 | 内容 |\n| --- | --- |\n${rows}\n\n补充说明`,
-                createdAt: "2026-10-30",
-                chatTurnId: "long-turn",
-                chatStatus: "completed",
-              },
-            ],
-          }}
-        />
-      </ToastProvider>,
-    );
-
-    const pager = await screen.findByRole("region", { name: "回答分页" });
-    await within(pager).findByText("第 1 / 2 页");
-    const content = pager.querySelector<HTMLElement>(
-      "[data-assistant-content]",
-    )!;
-    expect(content).toHaveAttribute("data-paged", "true");
-    expect(screen.getByRole("log")).toHaveAttribute("aria-label", "创作对话");
-    const previous = within(pager).getByRole("button", {
-      name: "上一页回答",
-    });
-    const next = within(pager).getByRole("button", { name: "下一页回答" });
-    expect(previous).toBeDisabled();
-    expect(next).toBeEnabled();
-
-    const scrollTo = vi.fn((options: ScrollToOptions) => {
-      content.scrollLeft = options.left ?? 0;
-      fireEvent.scroll(content);
-    });
-    Object.defineProperty(content, "scrollTo", {
-      configurable: true,
-      value: scrollTo,
-    });
-    fireEvent.click(next);
-    expect(scrollTo).toHaveBeenCalledWith({ left: 524, behavior: "smooth" });
-    expect(within(pager).getByText("第 2 / 2 页")).toBeVisible();
-    expect(next).toBeDisabled();
-
-    fireEvent.click(previous);
-    expect(scrollTo).toHaveBeenLastCalledWith({ left: 0, behavior: "smooth" });
-    expect(within(pager).getByText("第 1 / 2 页")).toBeVisible();
-  } finally {
-    scrollHeight.mockRestore();
-    clientHeight.mockRestore();
-    clientWidth.mockRestore();
-    scrollWidth.mockRestore();
-  }
 });

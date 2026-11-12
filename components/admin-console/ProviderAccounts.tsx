@@ -15,6 +15,7 @@ import {
 
 import { Button, Input, Textarea } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import { formatCallTime } from "@/lib/model-call-types";
 
 import {
   createAdminProviderAccount,
@@ -367,9 +368,12 @@ function AccountRow({
 
       {/* Error detail (collapsible) */}
       {detailOpen && account.lastErrorMsg && (
-        <p className="mt-2 rounded bg-danger/[0.04] px-2 py-1.5 font-mono text-[11px] leading-relaxed text-danger">
+        <div className="mt-2 rounded bg-danger/[0.04] px-2 py-1.5 text-[11px] leading-relaxed text-danger">
+          <p className="mb-1 text-text-muted">错误时间（北京）：{formatCallTime(account.lastErrorAt)}</p>
+          <p className="whitespace-pre-wrap break-all font-mono">
           {account.lastErrorMsg}
-        </p>
+          </p>
+        </div>
       )}
       {detailOpen && !account.lastErrorMsg && (
         <p className="mt-2 text-[11px] text-text-faint">暂无错误记录</p>

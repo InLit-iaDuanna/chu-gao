@@ -2,11 +2,14 @@ import { decrypt } from "@/lib/crypto";
 import { ProviderSubmissionUnknownError } from "@/lib/providers/single-submit";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { withModelCall } from "@/lib/model-call-log";
 import { getModel } from "@/lib/models/registry";
+import { providerSupportsGif } from "@/lib/provider-channel-request-config";
 import type { InternalRequest } from "@/lib/models/types";
 import {
   displayNameForProviderChannel,
   getImage2ProviderChannel,
+  supportsProviderChannels,
 } from "@/lib/provider-channels";
 import { serializeProviderError } from "@/lib/providers/diagnostics";
 import { buildAdapter } from "@/lib/providers/factory";
@@ -21,8 +24,10 @@ import type {
 } from "@/lib/providers/types";
 import {
   findEligibleProviderAccounts,
+  isFallbackProvider,
   leaseProviderAccount,
   maxAttemptsForAccounts,
+  providerCostMultiplier,
   releaseAccountLease,
   type ProviderLeaseContext,
 } from "@/lib/providers/account-pool";
@@ -33,7 +38,6 @@ import {
 import {
   isDowngradable,
   isFatalAccountError,
-  isRateLimited,
   providerRejectedError,
   shouldRecordProviderPoolError,
 } from "@/lib/providers/failure-policy";
@@ -105,6 +109,8 @@ export async function selectAndGenerate(
       providerName: string;
       providerAccountId: string | null;
       providerAccountName: string | null;
+      baseUrl: string;
+      costMultiplier: number;
     }) => Promise<void> | void;
     onProgress?: GenerateProgressCallback;
   },
@@ -120,21 +126,54 @@ export async function selectAndGenerate(
     throw new ProviderUnavailableError(request.modelId);
   }
 
+  const providerChannelId = supportsProviderChannels(request.modelId)
+    ? request.providerChannelId
+    : undefined;
+  const providerChannel = getImage2ProviderChannel(providerChannelId);
+
+  // Check before the account query: a tripped pool may now have no eligible
+  // accounts because they are cooling, but it still needs a capacity retry.
+  if (await isChannelCircuitOpen(providerChannelId, request.modelId)) {
+    throw new ProviderCapacityError(
+      request.modelId,
+      providerChannel?.displayName ?? null,
+    );
+  }
+
   // Healthy but saturated accounts must remain candidates: saturation is a
   // queueing condition, not an outage. The atomic lease below decides which
   // job can start immediately.
-  const accountCandidates = await findEligibleProviderAccounts(
+  let accountCandidates = await findEligibleProviderAccounts(
     request.modelId,
-    request.providerChannelId,
+    providerChannelId,
   );
-  const providerChannel = getImage2ProviderChannel(request.providerChannelId);
+  let legacyCandidates = providerChannelId
+    ? []
+    : await findLegacyProviders(request.modelId);
+  if (request.outputFormat === "gif") {
+    const baseUrls = [
+      ...new Set([
+        ...accountCandidates.map((account) => account.baseUrl),
+        ...legacyCandidates.map((provider) => provider.baseUrl),
+      ]),
+    ];
+    const supportedUrls = new Set<string>();
+    for (const baseUrl of baseUrls) {
+      if (await providerSupportsGif(baseUrl)) supportedUrls.add(baseUrl);
+    }
+    accountCandidates = accountCandidates.filter((account) =>
+      supportedUrls.has(account.baseUrl),
+    );
+    legacyCandidates = legacyCandidates.filter((provider) =>
+      supportedUrls.has(provider.baseUrl),
+    );
+  }
   const providerChannelName =
     providerChannel?.displayName ??
     displayNameForProviderChannel(
       accountCandidates[0]?.baseUrl,
       accountCandidates[0]?.provider.name,
     );
-  const legacyCandidates = await findAvailableProviders(request.modelId);
 
   if (accountCandidates.length === 0 && legacyCandidates.length === 0) {
     throw new ModelNotAvailableError(
@@ -143,315 +182,305 @@ export async function selectAndGenerate(
     );
   }
 
-  // Short-circuit if this channel was recently tripped by a full rate-limit
-  // sweep — avoids redundant DB lease attempts when the upstream is cooling off.
-  if (await isChannelCircuitOpen(request.providerChannelId)) {
-    throw new ProviderCapacityError(
-      request.modelId,
-      providerChannelName ?? null,
-    );
-  }
-
   const errors: unknown[] = [];
   const providerPoolErrors = new Map<string, unknown[]>();
   let accountAttempts = 0;
-  const filteredAccountCandidates = request.providerChannelId
-    ? accountCandidates.filter((account) =>
-        providerChannelMatchesBaseUrl(
-          request.providerChannelId,
-          account.baseUrl,
-          account.provider.id,
-        ),
-      )
-    : accountCandidates;
-  const maxAccountAttempts = maxAttemptsForAccounts(
-    filteredAccountCandidates,
-    request.providerChannelId,
+  let capacityBlocked = false;
+  const attemptedAccountIds = new Set<string>();
+  const phases = [false, true].map((fallback) => {
+    const accounts = accountCandidates.filter(
+      (account) => isFallbackProvider(account.provider) === fallback,
+    );
+    return {
+      fallback,
+      accounts,
+      providers: legacyCandidates.filter(
+        (provider) => isFallbackProvider(provider) === fallback,
+      ),
+      maxAttempts: maxAttemptsForAccounts(accounts),
+    };
+  });
+  const maxAccountAttempts = phases.reduce(
+    (total, phase) => total + phase.maxAttempts,
+    0,
   );
 
-  for (const account of filteredAccountCandidates) {
-    if (accountAttempts >= maxAccountAttempts) {
-      break;
-    }
-
-    const target = options?.leaseContext
-      ? await leaseProviderAccount(account, options.leaseContext)
-      : null;
-
-    if (!target) {
-      continue;
-    }
-
-    accountAttempts += 1;
-
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), generationTimeoutMs());
-
-    try {
-      const adapter = buildAdapter({
-        id: target.account.id,
-        name: target.account.name ?? target.provider.name,
-        protocol: providerProtocolToModelProtocol(target.provider.protocol),
-        baseUrl: target.account.baseUrl,
-        apiKey: decrypt(target.account.apiKeyEnc),
-      });
-
-      await options?.onProviderSelected?.({
-        providerId: target.provider.id,
-        providerName: target.provider.name,
-        providerAccountId: target.account?.id ?? null,
-        providerAccountName: target.account?.name ?? null,
-      });
-      const result = await adapter.generate(
-        request,
-        controller.signal,
-        options?.onProgress,
+  // Explicit channel selection stays within that channel. Automatic selection
+  // exhausts its normal attempt budget (including legacy providers) first.
+  for (const phase of phases) {
+    if (
+      phase.fallback &&
+      (capacityBlocked ||
+        accountCandidates.some(
+          (account) =>
+            !isFallbackProvider(account.provider) &&
+            !attemptedAccountIds.has(account.id) &&
+            account.inFlight >= account.maxConcurrency,
+        ))
+    ) {
+      throw new ProviderCapacityError(
+        request.modelId,
+        providerChannelName ?? null,
       );
-      const healthUpdates = await Promise.allSettled([
-        markProviderHealthy(target.provider.id),
-        markAccountHealthy(target.account.id),
-        // A successful generation means the channel is healthy — clear any breaker.
-        resetChannelCircuit(request.providerChannelId),
-      ]);
-      for (const update of healthUpdates) {
-        if (update.status === "rejected") {
-          logger.warn(
-            {
-              providerId: target.provider.id,
-              providerAccountId: target.account.id,
-              error: serializeProviderError(update.reason),
-            },
-            "Provider generated an image, but its health status could not be updated.",
-          );
-        }
-      }
-
-      return {
-        result,
-        providerId: target.provider.id,
-        providerName: target.provider.name,
-        providerAccountId: target.account.id,
-        providerAccountName: target.account.name ?? null,
-        multiplier: target.provider.costMultiplier,
-      };
-    } catch (error) {
-      const rejectedError = providerRejectedError(error);
-
-      if (rejectedError) {
-        throw rejectedError;
-      }
-
-      const downgradable = isDowngradable(error);
-      errors.push(error);
-
-      if (shouldRecordProviderPoolError(error)) {
-        const providerErrors = providerPoolErrors.get(target.provider.id) ?? [];
-        providerErrors.push(error);
-        providerPoolErrors.set(target.provider.id, providerErrors);
-      }
-
-      await markAccountErrored(target.account.id, error, downgradable);
-
-      if (request.executionPolicy === "single-submit") {
-        throw downgradable ? new ProviderSubmissionUnknownError(error) : error;
-      }
-
-      if (!downgradable && !isFatalAccountError(error)) {
-        throw error;
-      }
-    } finally {
-      clearTimeout(timer);
-      try {
-        await releaseAccountLease(target.leaseId, "provider_attempt_finished");
-      } catch (error) {
-        logger.warn(
-          { leaseId: target.leaseId, error: serializeProviderError(error) },
-          "Provider account lease release failed; worker reconciliation will retry.",
-        );
-      }
     }
-  }
-
-  // If the specified channel exhausted all its accounts, fall back to accounts
-  // from other channels that support the same model.  This lets the job succeed
-  // instead of surfacing a hard failure to the user when a single channel is
-  // temporarily degraded.
-  if (
-    request.providerChannelId &&
-    accountAttempts === 0 &&
-    filteredAccountCandidates.length > 0
-  ) {
-    // All candidates for this channel were busy/skipped — try the wider pool.
-    const fallbackCandidates = accountCandidates.filter(
-      (account) =>
-        !providerChannelMatchesBaseUrl(
-          request.providerChannelId,
-          account.baseUrl,
-          account.provider.id,
-        ),
-    );
-
-    const fallbackMaxAttempts = maxAttemptsForAccounts(fallbackCandidates, null);
-
-    for (const account of fallbackCandidates) {
-      if (accountAttempts >= fallbackMaxAttempts) break;
+    let phaseAttempts = 0;
+    for (const account of phase.accounts) {
+      if (phaseAttempts >= phase.maxAttempts) {
+        break;
+      }
 
       const target = options?.leaseContext
         ? await leaseProviderAccount(account, options.leaseContext)
         : null;
-      if (!target) continue;
+
+      if (!target) {
+        capacityBlocked = true;
+        continue;
+      }
 
       accountAttempts += 1;
+      phaseAttempts += 1;
+      attemptedAccountIds.add(account.id);
+
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), generationTimeoutMs());
+      let dispatched = false;
 
       try {
+        const apiKey = decrypt(target.account.apiKeyEnc);
         const adapter = buildAdapter({
           id: target.account.id,
           name: target.account.name ?? target.provider.name,
           protocol: providerProtocolToModelProtocol(target.provider.protocol),
           baseUrl: target.account.baseUrl,
-          apiKey: decrypt(target.account.apiKeyEnc),
+          apiKey,
         });
+
+        if (phase.fallback && !options?.onProviderSelected) {
+          throw new Error(
+            "Fallback provider requires a pre-dispatch credit reservation",
+          );
+        }
         await options?.onProviderSelected?.({
           providerId: target.provider.id,
           providerName: target.provider.name,
-          providerAccountId: target.account.id,
-          providerAccountName: target.account.name ?? null,
+          providerAccountId: target.account?.id ?? null,
+          providerAccountName: target.account?.name ?? null,
+          baseUrl: target.account.baseUrl,
+          costMultiplier: providerCostMultiplier(target.provider),
         });
-        const result = await adapter.generate(
-          request,
-          controller.signal,
-          options?.onProgress,
+        dispatched = true;
+        const result = await withModelCall(
+          {
+            kind: "image",
+            secrets: [apiKey],
+            operation: "image.generate",
+            modelId: request.modelId,
+            requestContent: request,
+            userId: options?.leaseContext?.userId,
+            generationId: options?.leaseContext?.generationId,
+            providerId: target.provider.id,
+            providerAccountId: target.account.id,
+            providerName: `${target.provider.name} / ${target.account.name ?? target.account.id}`,
+            endpoint: target.account.baseUrl,
+          },
+          () =>
+            adapter.generate(request, controller.signal, options?.onProgress),
         );
-        await Promise.allSettled([
+        const healthUpdates = await Promise.allSettled([
           markProviderHealthy(target.provider.id),
           markAccountHealthy(target.account.id),
-          resetChannelCircuit(request.providerChannelId),
+          // A successful generation means the channel is healthy — clear any breaker.
+          resetChannelCircuit(providerChannelId, request.modelId),
         ]);
+        for (const update of healthUpdates) {
+          if (update.status === "rejected") {
+            logger.warn(
+              {
+                providerId: target.provider.id,
+                providerAccountId: target.account.id,
+                error: serializeProviderError(update.reason),
+              },
+              "Provider generated an image, but its health status could not be updated.",
+            );
+          }
+        }
+
         return {
           result,
           providerId: target.provider.id,
           providerName: target.provider.name,
           providerAccountId: target.account.id,
           providerAccountName: target.account.name ?? null,
-          multiplier: target.provider.costMultiplier,
+          multiplier: providerCostMultiplier(target.provider),
         };
       } catch (error) {
+        // Local reservation/ownership failures have not submitted anything and
+        // must not penalize a provider or turn into an ambiguous submission.
+        if (!dispatched) throw error;
         const rejectedError = providerRejectedError(error);
-        if (rejectedError) throw rejectedError;
+
+        if (rejectedError) {
+          throw rejectedError;
+        }
+
+        const downgradable = isDowngradable(error);
         errors.push(error);
-        await markAccountErrored(target.account.id, error, isDowngradable(error));
-        if (!isDowngradable(error) && !isFatalAccountError(error)) throw error;
+
+        if (shouldRecordProviderPoolError(error)) {
+          const providerErrors =
+            providerPoolErrors.get(target.provider.id) ?? [];
+          providerErrors.push(error);
+          providerPoolErrors.set(target.provider.id, providerErrors);
+        }
+
+        await markAccountErrored(target.account.id, error, downgradable);
+
+        if (request.executionPolicy === "single-submit") {
+          throw downgradable
+            ? new ProviderSubmissionUnknownError(error)
+            : error;
+        }
+
+        if (!downgradable && !isFatalAccountError(error)) {
+          throw error;
+        }
       } finally {
         clearTimeout(timer);
         try {
-          await releaseAccountLease(target.leaseId, "provider_attempt_finished");
-        } catch (err) {
-          logger.warn({ leaseId: target.leaseId, error: serializeProviderError(err) }, "Fallback lease release failed.");
+          await releaseAccountLease(
+            target.leaseId,
+            "provider_attempt_finished",
+          );
+        } catch (error) {
+          logger.warn(
+            { leaseId: target.leaseId, error: serializeProviderError(error) },
+            "Provider account lease release failed; worker reconciliation will retry.",
+          );
+        }
+      }
+    }
+
+    // A selected base URL can cover only part of a provider's accounts. Even
+    // automatic selection must exhaust the eligible pool before penalizing it.
+    if (!providerChannelId) {
+      await Promise.all(
+        Array.from(providerPoolErrors.entries())
+          .filter(
+            ([providerId, providerErrors]) =>
+              providerErrors.length ===
+              phase.accounts.filter(
+                (account) => account.providerId === providerId,
+              ).length,
+          )
+          .map(([providerId, providerErrors]) =>
+            markProviderPoolErrored(providerId, providerErrors),
+          ),
+      );
+    }
+
+    // A partial sweep cannot establish a channel outage: untried or busy
+    // accounts may still succeed. Only cool a fully attempted eligible pool.
+    if (
+      providerChannelId &&
+      phase.accounts.length > 0 &&
+      phaseAttempts === phase.accounts.length &&
+      errors.length > 0 &&
+      errors.every(isDowngradable)
+    ) {
+      await tripChannelCircuit(providerChannelId, undefined, request.modelId);
+    }
+
+    for (const provider of phase.providers) {
+      const apiKey = decrypt(provider.apiKeyEnc);
+      const adapter = buildAdapter({
+        id: provider.id,
+        name: provider.name,
+        protocol: providerProtocolToModelProtocol(provider.protocol),
+        baseUrl: provider.baseUrl,
+        apiKey,
+      });
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), generationTimeoutMs());
+      let dispatched = false;
+
+      try {
+        if (phase.fallback && !options?.onProviderSelected) {
+          throw new Error(
+            "Fallback provider requires a pre-dispatch credit reservation",
+          );
+        }
+        await options?.onProviderSelected?.({
+          providerId: provider.id,
+          providerName: provider.name,
+          providerAccountId: null,
+          providerAccountName: null,
+          baseUrl: provider.baseUrl,
+          costMultiplier: providerCostMultiplier(provider),
+        });
+        dispatched = true;
+        const result = await withModelCall(
+          {
+            kind: "image",
+            secrets: [apiKey],
+            operation: "image.generate",
+            modelId: request.modelId,
+            requestContent: request,
+            userId: options?.leaseContext?.userId,
+            generationId: options?.leaseContext?.generationId,
+            providerId: provider.id,
+            providerName: provider.name,
+            endpoint: provider.baseUrl,
+          },
+          () =>
+            adapter.generate(request, controller.signal, options?.onProgress),
+        );
+        clearTimeout(timer);
+        try {
+          await markProviderHealthy(provider.id);
+        } catch (error) {
+          logger.warn(
+            { providerId: provider.id, error: serializeProviderError(error) },
+            "Provider generated an image, but its health status could not be updated.",
+          );
+        }
+
+        return {
+          result,
+          providerId: provider.id,
+          providerName: provider.name,
+          providerAccountId: null,
+          providerAccountName: null,
+          multiplier: providerCostMultiplier(provider),
+        };
+      } catch (error) {
+        clearTimeout(timer);
+        if (!dispatched) throw error;
+        const rejectedError = providerRejectedError(error);
+
+        if (rejectedError) {
+          throw rejectedError;
+        }
+
+        const downgradable = isDowngradable(error);
+        errors.push(error);
+        await markProviderErrored(provider.id, error, downgradable);
+
+        if (request.executionPolicy === "single-submit") {
+          throw downgradable
+            ? new ProviderSubmissionUnknownError(error)
+            : error;
+        }
+
+        if (!downgradable) {
+          throw error;
         }
       }
     }
   }
 
-  await Promise.all(
-    Array.from(providerPoolErrors.entries()).map(
-      ([providerId, providerErrors]) =>
-        markProviderPoolErrored(providerId, providerErrors),
-    ),
-  );
-
-  // If every error in this round was a rate-limit or transient failure (no
-  // fatal/content errors), trip the channel circuit so the next N seconds of
-  // jobs skip the DB and get queued instead of hammering the upstream further.
-  if (
-    request.providerChannelId &&
-    errors.length > 0 &&
-    errors.every((e) => isRateLimited(e) || isDowngradable(e))
-  ) {
-    await tripChannelCircuit(request.providerChannelId);
-  }
-
-  let legacyAttempts = 0;
-  for (const provider of request.providerChannelId ? [] : legacyCandidates) {
-    const hasAccounts = await db.providerAccount.count({
-      where: { providerId: provider.id },
-    });
-
-    if (hasAccounts > 0) {
-      continue;
-    }
-
-    legacyAttempts += 1;
-
-    const adapter = buildAdapter({
-      id: provider.id,
-      name: provider.name,
-      protocol: providerProtocolToModelProtocol(provider.protocol),
-      baseUrl: provider.baseUrl,
-      apiKey: decrypt(provider.apiKeyEnc),
-    });
-
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), generationTimeoutMs());
-
-    try {
-      await options?.onProviderSelected?.({
-        providerId: provider.id,
-        providerName: provider.name,
-        providerAccountId: null,
-        providerAccountName: null,
-      });
-      const result = await adapter.generate(
-        request,
-        controller.signal,
-        options?.onProgress,
-      );
-      clearTimeout(timer);
-      try {
-        await markProviderHealthy(provider.id);
-      } catch (error) {
-        logger.warn(
-          { providerId: provider.id, error: serializeProviderError(error) },
-          "Provider generated an image, but its health status could not be updated.",
-        );
-      }
-
-      return {
-        result,
-        providerId: provider.id,
-        providerName: provider.name,
-        providerAccountId: null,
-        providerAccountName: null,
-        multiplier: provider.costMultiplier,
-      };
-    } catch (error) {
-      clearTimeout(timer);
-      const rejectedError = providerRejectedError(error);
-
-      if (rejectedError) {
-        throw rejectedError;
-      }
-
-      const downgradable = isDowngradable(error);
-      errors.push(error);
-      await markProviderErrored(provider.id, error, downgradable);
-
-      if (request.executionPolicy === "single-submit") {
-        throw downgradable ? new ProviderSubmissionUnknownError(error) : error;
-      }
-
-      if (!downgradable) {
-        throw error;
-      }
-    }
-  }
-
-  if (
-    accountAttempts === 0 &&
-    legacyAttempts === 0 &&
-    filteredAccountCandidates.length > 0
-  ) {
+  if (capacityBlocked) {
     throw new ProviderCapacityError(
       request.modelId,
       providerChannelName ?? null,
@@ -495,28 +524,33 @@ export async function findAvailableProviders(modelId: string) {
   });
 }
 
+async function findLegacyProviders(modelId: string) {
+  const providers = await findAvailableProviders(modelId);
+  const accountCounts = await Promise.all(
+    providers.map((provider) =>
+      db.providerAccount.count({ where: { providerId: provider.id } }),
+    ),
+  );
+
+  // A configured pool must use its account leases, even when every account
+  // is disabled or cooling. Its provider credentials cannot bypass that state.
+  return providers.filter((_, index) => accountCounts[index] === 0);
+}
+
 export async function assertProviderAvailable(
   modelId: string,
   providerChannelId?: string,
 ): Promise<void> {
-  const [accounts, providers] = await Promise.all([
-    findEligibleProviderAccounts(modelId, providerChannelId),
-    findAvailableProviders(modelId),
+  const channelId = supportsProviderChannels(modelId)
+    ? providerChannelId
+    : undefined;
+  const [accounts, legacyProviders] = await Promise.all([
+    findEligibleProviderAccounts(modelId, channelId),
+    channelId ? [] : findLegacyProviders(modelId),
   ]);
-  const providerChannel = getImage2ProviderChannel(providerChannelId);
-  const legacyProviders = await Promise.all(
-    (providerChannelId ? [] : providers).map(async (provider) => ({
-      provider,
-      accountCount: await db.providerAccount.count({
-        where: { providerId: provider.id },
-      }),
-    })),
-  );
+  const providerChannel = getImage2ProviderChannel(channelId);
 
-  if (
-    accounts.length === 0 &&
-    legacyProviders.every((item) => item.accountCount > 0)
-  ) {
+  if (accounts.length === 0 && legacyProviders.length === 0) {
     throw new ModelNotAvailableError(
       modelId,
       providerChannel?.displayName ??

@@ -2,6 +2,7 @@ import { fail, ok } from "@/lib/api-response";
 import { checkSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { serializeGeneration } from "@/lib/generations";
+import { loadGenerationBilling } from "@/lib/generation-billing";
 import { getProviderChannelDisplayNameMap } from "@/lib/provider-channel-config";
 import { isDatabaseUnavailableError } from "@/lib/service-errors";
 import { privateImageUrl, statPrivateStorageKey } from "@/lib/storage";
@@ -56,6 +57,9 @@ export async function GET(
     }
 
     const displayNameMap = await getProviderChannelDisplayNameMap();
+    const billing = (await loadGenerationBilling(session.id, [generation])).get(
+      generation.id,
+    );
 
     if (new URL(request.url).searchParams.get("retry") === "1") {
       const sourceImages = await db.generatedImage.findMany({
@@ -105,12 +109,12 @@ export async function GET(
         );
       }
       return ok({
-        ...serializeGeneration(generation, { displayNameMap }),
+        ...serializeGeneration(generation, { displayNameMap, billing }),
         retryReferences,
       });
     }
 
-    return ok(serializeGeneration(generation, { displayNameMap }));
+    return ok(serializeGeneration(generation, { displayNameMap, billing }));
   } catch (error) {
     if (isDatabaseUnavailableError(error)) {
       return fail("SERVICE_UNAVAILABLE", "生成服务暂时不可用", { status: 503 });

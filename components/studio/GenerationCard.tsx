@@ -12,6 +12,7 @@ import {
   Maximize2,
   RefreshCw,
   Share2,
+  Sparkles,
 } from "lucide-react";
 
 import { friendlyErrorMessage } from "@/components/shared/error-copy";
@@ -20,12 +21,14 @@ import { cn, formatDate } from "@/lib/utils";
 import type { Generation } from "./lib/types";
 import { CopyTextButton } from "./CopyTextButton";
 import { REFERENCE_DRAG_MIME } from "./lib/reference-input";
+import { NO_CREDIT_CHARGE, TurnCredits } from "./chat/ChatReplyBubbles";
 
 interface GenerationCardProps {
   generation: Generation;
   modelName?: string;
   style?: CSSProperties;
   variant?: "wall" | "conversation";
+  showCredits?: boolean;
   onCancel: (id: string) => void;
   onRetry: (generation: Generation) => void;
   onOpen: (generation: Generation, imageIndex: number) => void;
@@ -67,6 +70,7 @@ export function GenerationCard({
   modelName,
   style,
   variant = "wall",
+  showCredits = true,
   onCancel,
   onRetry,
   onOpen,
@@ -82,18 +86,20 @@ export function GenerationCard({
   return (
     <figure
       className={cn(
-        "group overflow-hidden rounded-lg border border-border bg-surface",
+        "group overflow-hidden rounded-xl border border-border bg-surface shadow-[var(--shadow-xs)]",
         variant === "wall"
           ? "card-lift img-enter mb-4 break-inside-avoid"
-          : "my-3 w-full max-w-[480px]",
+          : "my-4 w-full max-w-[32rem]",
       )}
-      style={
-        variant === "conversation"
-          ? { ...style, maxWidth: Math.min(480, 480 * ratio) }
-          : style
-      }
+      style={style}
     >
-      <div className="relative" style={{ aspectRatio: String(ratio) }}>
+      <div
+        className={cn(
+          "relative",
+          variant === "conversation" && "max-h-[min(26rem,44dvh)] min-h-40",
+        )}
+        style={{ aspectRatio: String(ratio) }}
+      >
         {succeeded && generation.images.length > 0 ? (
           <div
             className={cn(
@@ -108,12 +114,19 @@ export function GenerationCard({
                 type="button"
                 onClick={() => onOpen(generation, index)}
                 className="relative block h-full w-full overflow-hidden bg-surface-2 p-0"
-                aria-label="放大查看"
+                aria-label={`查看第 ${index + 1} 张大图`}
+                title={`查看第 ${index + 1} 张大图`}
               >
                 {/* 私有图床代理 URL，不能用 next/image 优化，保持原生 img。 */}
                 {}
                 <img
-                  src={image.thumbnailUrl || image.url}
+                  src={
+                    variant === "conversation" &&
+                    (image.mimeType === "image/gif" ||
+                      generation.outputFormat === "gif")
+                      ? image.url
+                      : image.thumbnailUrl || image.url
+                  }
                   alt={generation.prompt}
                   loading="lazy"
                   draggable
@@ -146,6 +159,14 @@ export function GenerationCard({
           >
             {active ? (
               <>
+                <div className="generation-progress-stage" aria-hidden="true">
+                  <span className="generation-progress-corner generation-progress-corner-tl" />
+                  <span className="generation-progress-corner generation-progress-corner-tr" />
+                  <span className="generation-progress-corner generation-progress-corner-bl" />
+                  <span className="generation-progress-corner generation-progress-corner-br" />
+                  <span className="generation-progress-scan" />
+                  <Sparkles className="generation-progress-glyph" size={18} />
+                </div>
                 <span className="text-xs font-medium tabular-nums">
                   {STATUS_LABEL[generation.status]} · {generation.progress}%
                 </span>
@@ -204,49 +225,64 @@ export function GenerationCard({
         )}
       </div>
       {succeeded ? (
-        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border bg-surface px-3 py-2">
+        <div className="flex flex-wrap items-center gap-1.5 border-t border-border bg-surface px-3 py-2">
           <Button
             variant="ghost"
             type="button"
-            aria-label="放大"
-            title="放大"
             onClick={() => onOpen(generation, 0)}
-            className="pressable flex h-11 w-11 items-center justify-center rounded-md p-0 text-foreground hover:bg-surface-2 md:h-9 md:w-9"
+            className="pressable flex h-10 items-center gap-2 rounded-md px-2.5 text-xs text-foreground hover:bg-surface-2 sm:h-9 sm:px-3"
           >
-            <Maximize2 size={13} />
+            <Maximize2 size={15} />
+            查看大图
           </Button>
-          <a
-            href={generation.images[0]?.downloadUrl}
-            download
-            aria-label="下载"
-            title="下载"
-            className="pressable flex h-11 w-11 items-center justify-center rounded-md p-0 text-foreground hover:bg-surface-2 md:h-9 md:w-9"
+          <Button
+            asChild
+            variant="ghost"
+            className="pressable flex h-10 items-center gap-2 rounded-md px-2.5 text-xs text-foreground hover:bg-surface-2 sm:h-9 sm:px-3"
           >
-            <Download size={13} />
-          </a>
+            <a
+              href={generation.images[0]?.downloadUrl}
+              download
+              aria-label="下载原图"
+              title="下载原图"
+            >
+              <Download size={15} />
+              下载
+            </a>
+          </Button>
           <Button
             variant="ghost"
             type="button"
-            aria-label="用作参考图"
-            title="用作参考图"
             onClick={() => onUseAsReference(generation)}
-            className="pressable flex h-11 w-11 items-center justify-center rounded-md p-0 text-foreground hover:bg-surface-2 md:h-9 md:w-9"
+            className="pressable flex h-10 items-center gap-2 rounded-md px-2.5 text-xs text-foreground hover:bg-surface-2 sm:h-9 sm:px-3"
           >
-            <ImagePlus size={13} />
+            <ImagePlus size={15} />
+            作为参考图
           </Button>
           {generation.images[0]?.id ? (
-            <a
-              href={`/app/publish?imageId=${encodeURIComponent(generation.images[0].id)}`}
-              aria-label="发布到灵感圈"
-              title="发布到灵感圈"
-              className="pressable flex h-11 w-11 items-center justify-center rounded-md p-0 text-foreground hover:bg-surface-2 md:h-9 md:w-9"
+            <Button
+              asChild
+              variant="ghost"
+              className="pressable flex h-10 items-center gap-2 rounded-md px-2.5 text-xs text-foreground hover:bg-surface-2 sm:h-9 sm:px-3"
             >
-              <Share2 size={13} />
-            </a>
+              <a
+                href={`/app/publish?imageId=${encodeURIComponent(generation.images[0].id)}`}
+                aria-label="发布到灵感圈"
+                title="发布到灵感圈"
+              >
+                <Share2 size={15} />
+                发布
+              </a>
+            </Button>
           ) : null}
         </div>
       ) : null}
 
+      {showCredits ? (
+        <div className="px-3 pb-3">
+          <TurnCredits chat={NO_CREDIT_CHARGE} image={generation.billing} />
+        </div>
+      ) : null}
       {variant === "wall" ? (
         <figcaption className="flex flex-col gap-2 border-t border-border px-3 py-2">
           <div className="flex min-w-0 items-start gap-1">

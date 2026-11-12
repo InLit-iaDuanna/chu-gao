@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { ChatTurnError } from "@/lib/chat-turns";
+import { parseImageCommand } from "@/lib/image-command";
 
 import { fail, ok } from "@/lib/api-response";
 import { checkSession } from "@/lib/auth";
@@ -194,6 +195,21 @@ export async function POST(request: Request) {
       details: parsed.error.flatten(),
     });
   }
+
+  const command = parseImageCommand(parsed.data.userMessage ?? "");
+  if (!parsed.data.prompt.trim() || (command && !command.prompt.trim()))
+    return fail("EMPTY_IMAGE_PROMPT", "请在 /生图 后输入提示词", {
+      status: 400,
+    });
+  if (
+    command &&
+    (command.prompt !== parsed.data.prompt || parsed.data.creative)
+  )
+    return fail(
+      "IMAGE_COMMAND_PROMPT_MISMATCH",
+      "生图指令的提示词必须原样提交",
+      { status: 400 },
+    );
 
   try {
     const creative = parsed.data.creative;
@@ -423,9 +439,13 @@ export async function POST(request: Request) {
         },
       );
 
-      return fail("MODERATION_REJECTED", "提示词包含不允许的内容", {
-        status: 400,
-      });
+      return fail(
+        "MODERATION_REJECTED",
+        "[MODERATION_REJECTED] 提示词或参考图包含不允许的内容，请调整后再试。",
+        {
+          status: 400,
+        },
+      );
     }
 
     if (!operation) {
@@ -453,7 +473,9 @@ export async function POST(request: Request) {
       referenceImageKeys: (() => {
         const order = parsed.data.referenceOrder;
         const uploadKeys = parsed.data.referenceImageKeys ?? [];
-        const sourceStorageKeys = sourceReferenceImages.map((img) => img.storageKey);
+        const sourceStorageKeys = sourceReferenceImages.map(
+          (img) => img.storageKey,
+        );
         if (!order?.length) {
           // Legacy: uploads first, then source images.
           return [...uploadKeys, ...sourceStorageKeys];

@@ -17,10 +17,16 @@ export interface ChatTurnInput {
   clientRequestId: string;
   content: string;
   modelId: string;
+  contextBudgetTokens?: number;
   reasoningEffort?: ReasoningEffort;
   webSearch?: boolean;
   referenceImageKeys: string[];
   sourceImageIds: string[];
+  imageModelId?: string;
+  imageSize?: string;
+  imageQuality?: string;
+  imageOutputFormat?: string;
+  imageN?: number;
   references?: Array<
     | { kind: "upload"; key: string; label?: string }
     | { kind: "generated"; id: string; label?: string }
@@ -50,11 +56,14 @@ export interface ChatTurnView {
   priceCredits: number;
   chargedCredits: number;
   billingState: string;
+  billing?: import("@/lib/turn-credit-types").CreditSettlement;
   lastSeq: number;
   activity?: string;
+  activityHistory?: string[];
   parts?: unknown;
   timings?: unknown;
   createdAt?: string;
   startedAt?: string | null;
   protocolVersion?: number;
+  generationId?: string;
 }

@@ -1,7 +1,15 @@
 import { randomUUID } from "node:crypto";
 import { lookup } from "node:dns/promises";
+import type { LookupAddress, LookupOptions } from "node:dns";
 import { createReadStream } from "node:fs";
-import { mkdir, readFile, readdir, stat, unlink, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  readFile,
+  readdir,
+  stat,
+  unlink,
+  writeFile,
+} from "node:fs/promises";
 import { request as httpsRequest } from "node:https";
 import net from "node:net";
 import path from "node:path";
@@ -38,6 +46,27 @@ const DESIGNER_AVATARS_PREFIX = "designer-avatars";
 const MAX_IMAGE_DIMENSION = Number(process.env.MAX_IMAGE_DIMENSION ?? 16_384);
 const MAX_IMAGE_PIXELS = Number(process.env.MAX_IMAGE_PIXELS ?? 40_000_000);
 const MAX_PROVIDER_IMAGE_REDIRECTS = 3;
+
+type PinnedLookupCallback = (
+  error: NodeJS.ErrnoException | null,
+  address: string | LookupAddress[],
+  family?: number,
+) => void;
+
+export function pinnedProviderImageLookup(address: string, family: 4 | 6) {
+  return (
+    _hostname: string,
+    options: LookupOptions,
+    callback: PinnedLookupCallback,
+  ) => {
+    if (options.all) {
+      callback(null, [{ address, family }]);
+      return;
+    }
+
+    callback(null, address, family);
+  };
+}
 
 function providerImageFetchAllowlist(): string[] {
   return (process.env.PROVIDER_IMAGE_FETCH_ALLOWLIST ?? "")
@@ -172,8 +201,7 @@ async function requestProviderImageOnce(
       {
         method: "GET",
         headers: { Accept: "image/*" },
-        lookup: (_hostname, _options, callback) =>
-          callback(null, target.address, target.family),
+        lookup: pinnedProviderImageLookup(target.address, target.family),
       },
       (response) => {
         const statusCode = response.statusCode ?? 0;
@@ -424,6 +452,7 @@ export function mimeTypeForStorageKey(key: string): string {
     return "image/jpeg";
   }
   if (normalized.endsWith(".webp")) return "image/webp";
+  if (normalized.endsWith(".gif")) return "image/gif";
   return "image/png";
 }
 
@@ -434,6 +463,10 @@ export function extensionForMimeType(mimeType: string): string {
 
   if (mimeType === "image/webp") {
     return "webp";
+  }
+
+  if (mimeType === "image/gif") {
+    return "gif";
   }
 
   return "png";
@@ -556,6 +589,114 @@ function readImageSize(buffer: Buffer): { width: number; height: number } {
   );
 }
 
+function inspectGifContainer(buffer: Buffer): {
+  width: number;
+  height: number;
+  pages: number;
+} {
+  const signature = buffer.toString("ascii", 0, 6);
+  if (
+    buffer.length < 13 ||
+    (signature !== "GIF87a" && signature !== "GIF89a")
+  ) {
+    throw new Error("invalid generated GIF");
+  }
+
+  const width = buffer.readUInt16LE(6);
+  const height = buffer.readUInt16LE(8);
+  if (
+    width <= 0 ||
+    height <= 0 ||
+    width > MAX_IMAGE_DIMENSION ||
+    height > MAX_IMAGE_DIMENSION ||
+    width * height > MAX_IMAGE_PIXELS
+  ) {
+    throw new Error("invalid generated GIF dimensions");
+  }
+
+  let offset = 13;
+  let pages = 0;
+  const skip = (length: number) => {
+    if (offset + length > buffer.length) {
+      throw new Error("invalid generated GIF");
+    }
+    offset += length;
+  };
+  const skipBlocks = () => {
+    while (true) {
+      skip(1);
+      const length = buffer[offset - 1];
+      if (length === 0) return;
+      skip(length);
+    }
+  };
+
+  if (buffer[10] & 0x80) skip(3 * (2 << (buffer[10] & 0x07)));
+
+  // libvips accepts truncated GIFs as shorter animations; require complete blocks.
+  while (offset < buffer.length) {
+    const block = buffer[offset++];
+    if (block === 0x3b && pages > 0) return { width, height, pages };
+    if (block === 0x21) {
+      skip(1);
+      skipBlocks();
+      continue;
+    }
+    if (block !== 0x2c) throw new Error("invalid generated GIF");
+
+    skip(9);
+    const left = buffer.readUInt16LE(offset - 9);
+    const top = buffer.readUInt16LE(offset - 7);
+    const frameWidth = buffer.readUInt16LE(offset - 5);
+    const frameHeight = buffer.readUInt16LE(offset - 3);
+    const flags = buffer[offset - 1];
+    if (
+      frameWidth <= 0 ||
+      frameHeight <= 0 ||
+      left + frameWidth > width ||
+      top + frameHeight > height
+    ) {
+      throw new Error("invalid generated GIF dimensions");
+    }
+    if (flags & 0x80) skip(3 * (2 << (flags & 0x07)));
+    skip(1);
+    const codeSize = buffer[offset - 1];
+    if (codeSize < 2 || codeSize > 8) throw new Error("invalid generated GIF");
+    skipBlocks();
+    pages += 1;
+    if (width * height * pages > MAX_IMAGE_PIXELS) {
+      throw new Error("generated GIF exceeded pixel limit");
+    }
+  }
+
+  throw new Error("invalid generated GIF");
+}
+
+async function inspectGeneratedGif(buffer: Buffer) {
+  const dimensions = inspectGifContainer(buffer);
+  try {
+    const input = sharp(buffer, {
+      animated: true,
+      failOn: "warning",
+      limitInputPixels: MAX_IMAGE_PIXELS,
+    });
+    const metadata = await input.metadata();
+    if (
+      metadata.format !== "gif" ||
+      metadata.width !== dimensions.width ||
+      (metadata.pageHeight ?? metadata.height) !== dimensions.height ||
+      (metadata.pages ?? 1) !== dimensions.pages
+    ) {
+      throw new Error("invalid generated GIF");
+    }
+    // Decode every frame to detect corrupt pixel data, without retaining a raw animation.
+    await input.resize({ width: 1, height: 1, fit: "fill" }).raw().toBuffer();
+    return { width: dimensions.width, height: dimensions.height };
+  } catch {
+    throw new Error("invalid generated GIF");
+  }
+}
+
 function normalizedMimeType(format: string | undefined): string | null {
   if (format === "png") return "image/png";
   if (format === "jpeg") return "image/jpeg";
@@ -621,7 +762,7 @@ async function validateAndNormalizeUploadedImage(
 
 async function createThumbnailBuffer(buffer: Buffer): Promise<Buffer | null> {
   try {
-    return await sharp(buffer, { failOn: "none" })
+    return await sharp(buffer, { failOn: "none", pages: 1 })
       .rotate()
       .resize({
         width: 720,
@@ -642,8 +783,20 @@ async function createThumbnailBuffer(buffer: Buffer): Promise<Buffer | null> {
  */
 export async function materializeGeneratedImage(
   image: GeneratedImageData,
-): Promise<{ buffer: Buffer; mimeType: string; width: number; height: number }> {
+): Promise<{
+  buffer: Buffer;
+  mimeType: string;
+  width: number;
+  height: number;
+}> {
   const buffer = await imageToBuffer(image);
+  if (
+    buffer.toString("ascii", 0, 3) === "GIF" ||
+    image.mimeType?.split(";", 1)[0].trim().toLowerCase() === "image/gif"
+  ) {
+    const dimensions = await inspectGeneratedGif(buffer);
+    return { buffer, mimeType: "image/gif", ...dimensions };
+  }
   const dimensions = readImageSize(buffer);
   return {
     buffer,
@@ -659,9 +812,8 @@ export async function saveGeneratedImage(
   index: number,
   executionToken?: string,
 ): Promise<PersistedGeneratedImage> {
-  const mimeType = image.mimeType || "image/png";
-  const buffer = await imageToBuffer(image);
-  const dimensions = readImageSize(buffer);
+  const { buffer, mimeType, width, height } =
+    await materializeGeneratedImage(image);
   const ext = extensionForMimeType(mimeType);
   const executionSuffix = executionToken
     ? `-${executionToken.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64)}`
@@ -698,8 +850,8 @@ export async function saveGeneratedImage(
   return {
     storageKey,
     thumbnailKey: thumbnailBuffer ? thumbnailKey : null,
-    width: image.width || dimensions.width,
-    height: image.height || dimensions.height,
+    width,
+    height,
     sizeBytes: buffer.byteLength,
     mimeType,
   };
@@ -793,11 +945,7 @@ export async function removeDesignerAvatar(key: string | null | undefined) {
     await unlink(resolvePrivateStorageKey(normalized));
   } catch (error) {
     if (
-      !(
-        error instanceof Error &&
-        "code" in error &&
-        error.code === "ENOENT"
-      )
+      !(error instanceof Error && "code" in error && error.code === "ENOENT")
     ) {
       throw error;
     }
@@ -918,7 +1066,9 @@ export async function removeDesignPostSnapshots(
   media: Array<{ storageKey: string; thumbnailKey?: string | null }>,
 ): Promise<void> {
   const keys = media.flatMap((item) =>
-    item.thumbnailKey ? [item.storageKey, item.thumbnailKey] : [item.storageKey],
+    item.thumbnailKey
+      ? [item.storageKey, item.thumbnailKey]
+      : [item.storageKey],
   );
   await Promise.all(
     keys.map(async (key) => {
@@ -966,7 +1116,11 @@ export async function removeExpiredUploadedReferences({
     try {
       entries = await readdir(directory, { withFileTypes: true });
     } catch (error) {
-      if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+      if (
+        error instanceof Error &&
+        "code" in error &&
+        error.code === "ENOENT"
+      ) {
         return;
       }
       throw error;

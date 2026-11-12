@@ -1,9 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  chartPoints,
-  normalizeDailySeries,
-  normalizeHourlySeries,
-} from "../DashboardView";
 import { adjustAdminUserCredits } from "./api";
 
 describe("administrator credit operation identity", () => {
@@ -73,58 +68,5 @@ describe("administrator credit operation identity", () => {
       adjustAdminUserCredits("synthetic", { amount: 0.2 }),
     ).rejects.toMatchObject({ code: "OPERATION_ID_UNAVAILABLE" });
     expect(fetch).not.toHaveBeenCalled();
-  });
-});
-
-describe("admin dashboard series", () => {
-  it("fills missing calendar days with zero-valued points", () => {
-    const now = new Date(2026, 9, 30, 12);
-    const result = normalizeDailySeries(
-      [
-        {
-          date: "2026-10-29",
-          total: 8,
-          succeeded: 7,
-          failed: 1,
-          credits: 16,
-        },
-      ],
-      3,
-      now,
-    );
-
-    expect(result.map((row) => row.date)).toEqual([
-      "2026-10-28",
-      "2026-10-29",
-      "2026-10-30",
-    ]);
-    expect(result.map((row) => row.total)).toEqual([0, 8, 0]);
-    expect(result[0]).toMatchObject({ succeeded: 0, failed: 0, credits: 0 });
-  });
-
-  it("fills missing hours without moving existing measurements", () => {
-    const now = new Date(2026, 9, 30, 14, 30);
-    const result = normalizeHourlySeries(
-      [
-        {
-          hour: new Date(2026, 9, 30, 13).toISOString(),
-          total: 7,
-          succeeded: 6,
-          failed: 1,
-        },
-      ],
-      3,
-      now,
-    );
-
-    expect(result.map((row) => new Date(row.hour).getHours())).toEqual([
-      12, 13, 14,
-    ]);
-    expect(result.map((row) => row.total)).toEqual([0, 7, 0]);
-  });
-
-  it("uses the supplied shared maximum for every chart series", () => {
-    const point = chartPoints([5], 100, 100, 20)[0];
-    expect(point.y).toBeCloseTo(73);
   });
 });

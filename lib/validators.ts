@@ -65,6 +65,7 @@ export const channelRequestConfigPatchSchema = z.object({
   baseUrl: z.url(),
   sizes: z.array(z.enum(IMAGE_SIZE_OPTIONS)).max(8).optional(),
   responseFormat: z.enum(RESPONSE_FORMAT_OPTIONS).optional(),
+  supportsGif: z.boolean().optional(),
   bodyTemplate: z.string().max(8000).nullable().optional(),
 });
 
@@ -191,41 +192,31 @@ export const redeemCodeSchema = z.object({
   code: z.string().trim().min(4).max(80),
 });
 
+export const storefrontOrderCreateSchema = z.object({
+  credits: z.number().int().min(1).max(1_000_000),
+  browser: z.literal(true),
+});
+
+export const storefrontBrowserCompleteSchema = z.object({
+  trade_no: z.string().trim().regex(/^[A-Za-z0-9_-]{3,160}$/),
+  pay_url: z.string().trim().url(),
+  amount: z.number().finite().positive(),
+  channel_id: z.number().int().positive().max(99).optional(),
+});
+
+export const storefrontBrowserVerifySchema = z.object({
+  trade_no: z.string().trim().regex(/^[A-Za-z0-9_-]{3,160}$/),
+  status: z.number().int(),
+  amount: z.number().finite().nonnegative(),
+  goods_key: z.string().trim().min(1).max(80),
+  cards: z.array(z.string().trim().min(1).max(128)).max(16),
+});
+
 export const integrationsPatchSchema = z
   .object({
-    deepseek: z
-      .object({
-        enabled: z.boolean().optional(),
-        baseUrl: z.url().optional(),
-        model: z.string().trim().min(1).max(100).optional(),
-        systemPrompt: z.string().max(4000).optional(),
-        // 留空字符串 = 清除已存密钥；省略 = 不修改。
-        apiKey: z.string().max(400).optional(),
-      })
-      .optional(),
-    // 对话模型：独立于 DeepSeek 优化与出图渠道。
-    conversation: z
-      .object({
-        enabled: z.boolean().optional(),
-        baseUrl: z.url().optional(),
-        model: z.string().trim().min(1).max(100).optional(),
-        systemPrompt: z.string().max(4000).optional(),
-        // 出图提示词编译指令（compile 端点用）。
-        compileSystemPrompt: z.string().max(4000).optional(),
-        reasoning: z.boolean().optional(),
-        // 留空字符串 = 清除已存密钥；省略 = 不修改。
-        apiKey: z.string().max(400).optional(),
-      })
-      .optional(),
     pptSystemPrompt: z.string().trim().max(4000).optional(),
   })
-  .refine(
-    (value) =>
-      value.deepseek !== undefined ||
-      value.conversation !== undefined ||
-      value.pptSystemPrompt !== undefined,
-    "至少提供一个字段",
-  );
+  .refine((value) => value.pptSystemPrompt !== undefined, "至少提供一个字段");
 
 export const systemConfigPatchSchema = z.discriminatedUnion("key", [
   z.object({

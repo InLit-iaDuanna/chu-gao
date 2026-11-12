@@ -57,8 +57,25 @@ export const IMAGE_SIZE_OPTIONS = [
   "2160x3840",
 ] as const satisfies readonly ImageSize[];
 
+export const GIF_SIZE_OPTIONS = ["512x512", "768x768"] as const;
+export const ALL_IMAGE_SIZE_OPTIONS = [
+  ...IMAGE_SIZE_OPTIONS,
+  ...GIF_SIZE_OPTIONS,
+] as const;
+
+export function imageSizeOptionsForFormat<T extends string>(
+  model: { capabilities: { sizes: readonly T[]; gifSizes?: readonly T[] } },
+  outputFormat: string,
+): T[] {
+  return outputFormat === "gif"
+    ? [...(model.capabilities.gifSizes ?? [])]
+    : [...model.capabilities.sizes];
+}
+
 export const IMAGE_SIZE_LABEL: Record<ImageSize, string> = {
   auto: "自动",
+  "512x512": "512×512 · GIF",
+  "768x768": "768×768 · GIF",
   "1024x1024": "1024×1024 · 方形",
   "1536x1024": "1536×1024 · 横版 3:2",
   "1024x1536": "1024×1536 · 竖版 2:3",

@@ -12,6 +12,7 @@ import styles from "./AssistantContent.module.css";
 const MessageContext = createContext<{
   streaming: boolean;
   messageStatus?: string;
+  onOpenArtifact?: (source: string) => void;
 }>({ streaming: false });
 
 type MarkdownNode = {
@@ -20,6 +21,27 @@ type MarkdownNode = {
   lang?: string | null;
   children?: MarkdownNode[];
 };
+
+function preserveSoftBreaks() {
+  function visit(parent: MarkdownNode) {
+    if (!parent.children) return;
+    const children: MarkdownNode[] = [];
+    for (const child of parent.children) {
+      if (child.type === "text" && child.value?.includes("\n")) {
+        const lines = child.value.split("\n");
+        lines.forEach((line, index) => {
+          if (line) children.push({ ...child, value: line });
+          if (index < lines.length - 1) children.push({ type: "break" });
+        });
+      } else {
+        visit(child);
+        children.push(child);
+      }
+    }
+    parent.children = children;
+  }
+  return visit;
+}
 
 function unwrapMarkdownFence(this: { parse(source: string): unknown }) {
   return (tree: MarkdownNode) => {
@@ -59,7 +81,12 @@ function isolateHtmlBlocks() {
   return visit;
 }
 
-const remarkPlugins = [remarkGfm, unwrapMarkdownFence, isolateHtmlBlocks];
+const remarkPlugins = [
+  remarkGfm,
+  unwrapMarkdownFence,
+  isolateHtmlBlocks,
+  preserveSoftBreaks,
+];
 
 function safeLink(value: string): string | undefined {
   if (!value || /[\u0000-\u0020\u007f\\]/.test(value)) return undefined;
@@ -125,7 +152,8 @@ function CodeBlock({ source, language }: { source: string; language: string }) {
 }
 
 const CodeFence: NonNullable<Components["pre"]> = ({ node, children }) => {
-  const { streaming, messageStatus } = useContext(MessageContext);
+  const { streaming, messageStatus, onOpenArtifact } =
+    useContext(MessageContext);
   const code = node?.children.find(
     (child) => child.type === "element" && child.tagName === "code",
   );
@@ -146,6 +174,7 @@ const CodeFence: NonNullable<Components["pre"]> = ({ node, children }) => {
       source={source}
       streaming={streaming}
       messageStatus={messageStatus}
+      onOpenInPanel={onOpenArtifact ? () => onOpenArtifact(source) : undefined}
     />
   ) : (
     <CodeBlock source={source} language={language} />
@@ -197,6 +226,7 @@ const components: Components = {
   },
   table: ({ children }) => (
     <div
+      data-markdown-table
       className={styles.tableScroll}
       role="region"
       aria-label="表格"
@@ -211,10 +241,12 @@ export const AssistantContent = memo(function AssistantContent({
   content,
   streaming = false,
   messageStatus,
+  onOpenArtifact,
 }: {
   content: string;
   streaming?: boolean;
   messageStatus?: string;
+  onOpenArtifact?: (source: string) => void;
 }) {
   const isDocument =
     /^\s*(?:<!--[\s\S]*?-->\s*)*(?:<!doctype\s+html\b|<html(?:\s|>))/i.test(
@@ -227,10 +259,15 @@ export const AssistantContent = memo(function AssistantContent({
           source={content}
           streaming={streaming}
           messageStatus={messageStatus}
+          onOpenInPanel={
+            onOpenArtifact ? () => onOpenArtifact(content) : undefined
+          }
         />
       ) : (
         <TooltipProvider delayDuration={250}>
-          <MessageContext.Provider value={{ streaming, messageStatus }}>
+          <MessageContext.Provider
+            value={{ streaming, messageStatus, onOpenArtifact }}
+          >
             <Markdown
               remarkPlugins={remarkPlugins}
               components={components}

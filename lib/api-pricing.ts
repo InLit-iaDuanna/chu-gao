@@ -11,7 +11,7 @@
  */
 import { resolvePerImageCredits } from "@/lib/credits";
 import { db } from "@/lib/db";
-import type { PricingSnapshot } from "@/lib/model-pricing";
+import type { PricingSnapshot, SnapshotPrices } from "@/lib/model-pricing";
 import { IMAGE_RESOLUTION_OPTIONS } from "@/lib/models/options";
 import type { ModelDefinition, Resolution } from "@/lib/models/types";
 
@@ -79,24 +79,40 @@ export function applyApiPricing(
   multiplier: number,
   request: { resolution: Resolution; n: number },
 ): PricingSnapshot {
-  const perImageCreditsByResolution = Object.fromEntries(
-    IMAGE_RESOLUTION_OPTIONS.map((tier) => [
-      tier,
-      overrides?.[tier] ??
-        round2(
-          (snapshot.perImageCreditsByResolution?.[tier] ??
-            snapshot.perImageCredits) * multiplier,
-        ),
-    ]),
-  ) as Partial<Record<Resolution, number>>;
-  const perImageCredits =
-    overrides?.[request.resolution] ?? round2(snapshot.perImageCredits * multiplier);
+  const reprice = (prices: SnapshotPrices): SnapshotPrices => ({
+    ...prices,
+    perImageCredits:
+      overrides?.[request.resolution] ??
+      round2(prices.perImageCredits * multiplier),
+    perImageCreditsByResolution: Object.fromEntries(
+      IMAGE_RESOLUTION_OPTIONS.map((tier) => [
+        tier,
+        overrides?.[tier] ??
+          round2(
+            (prices.perImageCreditsByResolution?.[tier] ??
+              prices.perImageCredits) * multiplier,
+          ),
+      ]),
+    ),
+  });
+  const prices = reprice(snapshot);
 
   return {
     ...snapshot,
-    perImageCredits,
-    perImageCreditsByResolution,
-    estimatedCredits: Math.ceil(perImageCredits * request.n),
+    ...prices,
+    ...(snapshot.providerChannelPrices
+      ? {
+          providerChannelPrices: Object.fromEntries(
+            Object.entries(snapshot.providerChannelPrices).map(
+              ([channelId, channelPrices]) => [
+                channelId,
+                reprice(channelPrices),
+              ],
+            ),
+          ),
+        }
+      : {}),
+    estimatedCredits: Math.ceil(prices.perImageCredits * request.n),
     channel: "api",
   };
 }

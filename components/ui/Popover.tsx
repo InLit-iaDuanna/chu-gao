@@ -22,7 +22,7 @@ export function PopoverContent({
         align={align}
         sideOffset={sideOffset}
         className={cn(
-          "z-[70] w-72 rounded-md border border-border bg-surface p-3 text-foreground shadow-[var(--shadow-md)] outline-none",
+          "smooth-surface surface-overlay relative z-[70] w-72 max-w-[calc(100vw-24px)] rounded-xl border border-border bg-surface p-3 text-foreground shadow-[var(--shadow-lg)] outline-none",
           className,
         )}
         {...props}

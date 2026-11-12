@@ -3,17 +3,25 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  Archive,
   MoreHorizontal,
+  PanelRightClose,
   Pencil,
   RotateCcw,
   SquarePen,
   Search,
+  Trash2,
+  X,
 } from "lucide-react";
 import { z } from "zod";
-import type { ReasoningEffort } from "@/lib/chat-model-options";
-import type { ChatContextStatus } from "@/lib/chat-context-types";
+import { type ReasoningEffort } from "@/lib/chat-model-options";
+import {
+  OPUS_CONTEXT_BUDGET_MIN,
+  contextBudgetOptionsForModel,
+  supportsAdjustableChatContext,
+  type ChatContextStatus,
+} from "@/lib/chat-context-types";
 import { chatIsTerminal, type ChatTurnView } from "@/lib/chat-turn-types";
+import { parseImageCommand } from "@/lib/image-command";
 import {
   cancelManagedChat,
   followChatTurn,
@@ -56,7 +64,7 @@ import {
   WorkspaceSidebarToggle,
 } from "./WorkspaceShell";
 import { ConversationTimeline } from "./chat/ConversationTimeline";
-import { ConversationTimelineV8 } from "./chat/ConversationTimelineV8";
+import { HtmlArtifact } from "./chat/HtmlArtifact";
 import { CreativeBriefPanel, type AgentTurn } from "./CreativeBriefPanel";
 import {
   creativeDraftSchema,
@@ -66,8 +74,11 @@ import {
 } from "@/lib/creative-brief";
 import { messageGeneration } from "./chat/message-generation";
 import {
+  estimatedCreditLabel,
+  resolveGenerationOptions,
+} from "./lib/generation-options";
+import {
   cancelGeneration,
-  compileConversationPrompt,
   createConversation,
   createGeneration,
   getConversation,
@@ -100,7 +111,6 @@ import {
 import { cn } from "@/lib/utils";
 import {
   isActiveStatus,
-  type ChatMessageInput,
   type CreateGenerationInput,
   type Conversation,
   type ConversationPricing,
@@ -131,6 +141,15 @@ const chatPricingSchema = z
         reasoningEfforts: z.array(reasoningEffortSchema),
         defaultReasoningEffort: reasoningEffortSchema.optional(),
         credits: z.number().nonnegative(),
+        pricing: z
+          .object({
+            type: z.literal("per_million_tokens"),
+            input: z.number().nonnegative(),
+            output: z.number().nonnegative(),
+            cacheRead: z.number().nonnegative(),
+            cacheCreation: z.number().nonnegative(),
+          })
+          .optional(),
         supportsVision: z.boolean(),
         maxReferenceImages: z.number().int().nonnegative(),
         supportsWebSearch: z.boolean().optional(),
@@ -185,7 +204,6 @@ export function StudioApp({
   initialReferenceKeys = [],
   initialRecipe = EMPTY_RECIPE,
   creativeEnabled = false,
-  initialMode,
 }: {
   initialThreadId?: string | null;
   initialPrompt?: string | null;
@@ -204,6 +222,9 @@ export function StudioApp({
   const [modelError, setModelError] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(initialThreadId);
   const [conversation, setConversation] = useState<Conversation | null>(null);
+  const [artifactPreview, setArtifactPreview] = useState<{
+    source: string;
+  } | null>(null);
   const conversationRef = useRef(conversation);
   conversationRef.current = conversation;
   const [threadLoading, setThreadLoading] = useState(Boolean(initialThreadId));
@@ -212,9 +233,7 @@ export function StudioApp({
     {},
   );
   const [prompt, setPrompt] = useState(initialPrompt ?? "");
-  const [mode, setMode] = useState<"image" | "chat" | "agent">(
-    creativeEnabled && initialMode ? initialMode : "image",
-  );
+  const [mode, setMode] = useState<"image" | "chat" | "agent">("chat");
   const modeRef = useRef(mode);
   modeRef.current = mode;
   const [creative, setCreative] = useState<CreativeDraft>(EMPTY_CREATIVE_DRAFT);
@@ -242,6 +261,9 @@ export function StudioApp({
   const [chatModelId, setChatModelId] = useState<string | null>(null);
   const [chatReasoningEffort, setChatReasoningEffort] =
     useState<ReasoningEffort>();
+  const [chatContextBudget, setChatContextBudget] = useState(
+    OPUS_CONTEXT_BUDGET_MIN,
+  );
   const [chatContext, setChatContext] = useState<ChatContextStatus | null>(
     null,
   );
@@ -261,6 +283,10 @@ export function StudioApp({
   const [archiving, setArchiving] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [usePrevious, setUsePrevious] = useState(true);
+
+  useEffect(() => {
+    setArtifactPreview(null);
+  }, [activeId]);
   const [params, setParams] = useState<DockParams>({
     n: 1,
     negativePrompt: initialRecipe.negativePrompt,
@@ -307,6 +333,16 @@ export function StudioApp({
     models.find((item) => item.available) ??
     models[0] ??
     null;
+  const imageCommand = parseImageCommand(prompt);
+  useEffect(() => {
+    if (!model) return;
+    setParams((current) => {
+      const { size, outputFormat } = resolveGenerationOptions(model, current);
+      return current.size === size && current.outputFormat === outputFormat
+        ? current
+        : { ...current, size, outputFormat };
+    });
+  }, [model, params.size, params.outputFormat]);
   const chatModel =
     chatPricing?.models.find((item) => item.id === chatModelId) ??
     chatPricing?.models.find(
@@ -322,9 +358,16 @@ export function StudioApp({
           chatModel.reasoningEfforts.includes(chatModel.defaultReasoningEffort)
         ? chatModel.defaultReasoningEffort
         : chatModel?.reasoningEfforts[0];
+  useEffect(() => {
+    const options = contextBudgetOptionsForModel(chatModel?.id);
+    if (!options.length) return;
+    setChatContextBudget((current) =>
+      options.includes(current) ? current : options[0],
+    );
+  }, [chatModel?.id]);
   // The shared reference hook expects ModelInfo; chat capabilities never come from image models.
   const inputModel: ModelInfo | null =
-    mode === "chat"
+    mode === "chat" && !imageCommand
       ? chatModel
         ? {
             id: "chat:" + chatModel.id,
@@ -456,6 +499,7 @@ export function StudioApp({
       activeQuestion,
       chatModelId: chatModel?.id ?? chatModelId,
       chatReasoningEffort: chatModel ? reasoningEffort : chatReasoningEffort,
+      chatContextBudgetTokens: chatContextBudget,
     },
     studioDraftSchema,
     (saved) => {
@@ -467,12 +511,11 @@ export function StudioApp({
       if (saved?.modelId) setModelId(saved.modelId);
       setChatModelId(saved?.chatModelId ?? null);
       setChatReasoningEffort(saved?.chatReasoningEffort);
+      setChatContextBudget(
+        saved?.chatContextBudgetTokens ?? OPUS_CONTEXT_BUDGET_MIN,
+      );
       setActiveQuestion(saved?.activeQuestion ?? null);
-      const restoredMode = initialMode ?? saved?.mode;
-      if (restoredMode)
-        setMode(
-          restoredMode === "agent" && !creativeEnabled ? "image" : restoredMode,
-        );
+      setMode("chat");
     },
     externalDraft.current,
   );
@@ -552,7 +595,13 @@ export function StudioApp({
     }
     let current = true;
     setChatContextLoading(true);
-    getChatContext(activeId)
+    getChatContext(
+      activeId,
+      chatModel.id,
+      supportsAdjustableChatContext(chatModel.id)
+        ? chatContextBudget
+        : undefined,
+    )
       .then((data) => {
         if (current) setChatContext(data);
       })
@@ -571,6 +620,7 @@ export function StudioApp({
     conversation?.id,
     conversation?.messages.length,
     chatModel?.id,
+    chatContextBudget,
   ]);
   const track = useCallback(
     (id: string) => {
@@ -723,6 +773,11 @@ export function StudioApp({
             onContext: (value) => {
               if (current()) setChatContext(value);
             },
+            onGeneration: (generationId) => {
+              if (!current()) return;
+              track(generationId);
+              refreshMe();
+            },
             onBilling: () => refreshMe(),
             onDone: () => undefined,
             onError: (value) => {
@@ -784,7 +839,7 @@ export function StudioApp({
         }
       }
     },
-    [refreshMe, refreshThreads, userId, flushDeferredRecovery],
+    [refreshMe, refreshThreads, userId, flushDeferredRecovery, track],
   );
 
   const durableChatEnabled = Boolean(chatPricing?.models.length);
@@ -1009,6 +1064,7 @@ export function StudioApp({
     setActiveId(null);
     activeRef.current = null;
     setConversation(null);
+    setArtifactPreview(null);
     setThreadLoading(false);
     setThreadError(null);
     setSendError(null);
@@ -1046,7 +1102,6 @@ export function StudioApp({
       disabled: locked,
       onSelect: selectThread,
       onNew: newConversation,
-      onUpdate: setConversation,
     });
     return () => setStudioNavigation(null);
   }, [activeId, locked, selectThread, newConversation, setStudioNavigation]);
@@ -1129,15 +1184,17 @@ export function StudioApp({
             ? "正在优化提示词"
             : references.uploading
               ? "参考图上传中"
-              : mode === "image" && !model?.available
-                ? (modelError ?? "模型暂不可用")
-                : mode === "image" && activeGeneration
-                  ? "请等待当前图片生成完成"
-                  : mode === "chat" && chatUnavailableReason
-                    ? chatUnavailableReason
-                    : !prompt.trim()
-                      ? "请输入内容"
-                      : null;
+              : imageCommand && !imageCommand.prompt.trim()
+                ? "请在 /生图 后输入提示词"
+                : imageCommand && !model?.available
+                  ? (modelError ?? "模型暂不可用")
+                  : imageCommand && activeGeneration
+                    ? "请等待当前图片生成完成"
+                    : mode === "chat" && !imageCommand && chatUnavailableReason
+                      ? chatUnavailableReason
+                      : !prompt.trim()
+                        ? "请输入内容"
+                        : null;
 
   const creativeDisabledReason =
     threadLoading || threadError
@@ -1281,7 +1338,13 @@ export function StudioApp({
     setChatCompacting(true);
     setChatContextError(null);
     try {
-      const result = await compactChatContext(activeId, chatModel.id);
+      const result = await compactChatContext(
+        activeId,
+        chatModel.id,
+        supportsAdjustableChatContext(chatModel.id)
+          ? chatContextBudget
+          : undefined,
+      );
       if (mounted.current) setChatContext(result);
     } catch (error) {
       if (mounted.current)
@@ -1295,15 +1358,22 @@ export function StudioApp({
   };
 
   const send = async (confirmed?: CreateGenerationInput): Promise<boolean> => {
-    const content = confirmed?.prompt ?? prompt.trim();
+    const activeMode = modeRef.current;
+    const directImage = !confirmed ? parseImageCommand(prompt) : null;
+    const submittedPrompt = prompt;
+    const content = confirmed?.prompt ?? (directImage ? prompt : prompt.trim());
+    if (directImage && !directImage.prompt.trim()) {
+      setSendError("请在 /生图 后输入提示词");
+      return false;
+    }
     if (
       !content ||
       (confirmed ? creativeDisabledReason : disabledReason) ||
-      (!confirmed && mode === "chat" && !chatModel) ||
+      (!confirmed && !directImage && activeMode === "chat" && !chatModel) ||
       sendLock.current
     )
       return false;
-    if (mode === "chat" && !confirmed && userId && activeId) {
+    if (activeMode === "chat" && !confirmed && userId && activeId) {
       try {
         if (readChatReceipt(userId, activeId)?.pending) {
           await recoverChat();
@@ -1352,15 +1422,7 @@ export function StudioApp({
         void refreshThreads();
       }
       const id = current.id;
-      const messages: ChatMessageInput[] = [
-        ...current.messages.slice(-39).map((message) => ({
-          role: message.role,
-          content: message.content.slice(0, 4000),
-          generationId: message.generationId,
-        })),
-        { role: "user", content },
-      ];
-      if (mode === "chat" && !confirmed) {
+      if (activeMode === "chat" && !confirmed && !directImage) {
         if (!userId) throw new Error("登录信息尚未恢复，暂未提交任务");
         setStatus(null);
         setStreaming("");
@@ -1379,6 +1441,14 @@ export function StudioApp({
           conversationId: id,
           webSearch: Boolean(chatModel?.supportsWebSearch),
           modelId: chatModel!.id,
+          imageModelId: model?.id,
+          imageSize: params.size,
+          imageQuality: params.quality,
+          imageOutputFormat: params.outputFormat,
+          imageN: params.n,
+          contextBudgetTokens: supportsAdjustableChatContext(chatModel!.id)
+            ? chatContextBudget
+            : undefined,
           reasoningEffort,
           ...chatReferenceRequest(submittedReferences),
           references: submittedReferences.map((reference, index) =>
@@ -1432,6 +1502,11 @@ export function StudioApp({
             onContext: (context) => {
               if (currentChat()) setChatContext(context);
             },
+            onGeneration: (generationId) => {
+              if (!currentChat()) return;
+              track(generationId);
+              refreshMe();
+            },
             onDelta: () => undefined,
             onBilling: (event) => {
               if (currentChat())
@@ -1457,26 +1532,12 @@ export function StudioApp({
         if (streamError) setSendError(streamError);
       } else {
         if (!model) return false;
-        let generationPrompt = content;
-        let assistantMessage = confirmed
+        const generationPrompt = directImage?.prompt ?? content;
+        const assistantMessage = confirmed
           ? "按已确认的创作方案生成"
           : "正在生成图片";
-        let shouldGenerate = true;
-        if (current.messages.length && !confirmed) {
-          setStatus("正在整理画面要求…");
-          const compiled = await compileConversationPrompt({
-            modelId: model.id,
-            messages,
-          });
-          generationPrompt = compiled.prompt;
-          assistantMessage = compiled.assistantMessage;
-          shouldGenerate = compiled.shouldGenerate;
-        }
         if (!mounted.current) return false;
-        if (!shouldGenerate) {
-          setSendError(assistantMessage || "请补充画面要求后再生成");
-          return false;
-        } else {
+        {
           setStatus("正在提交生成…");
           const result = await createGeneration({
             modelId: model.id,
@@ -1519,7 +1580,10 @@ export function StudioApp({
             toast({
               title:
                 result.status === "SUCCEEDED" ? "生成已完成" : "已提交生成",
-              description: `本次预计消耗 ${result.estimatedCredits} 积分`,
+              description:
+                (params.size ?? model.defaults.size) === "auto"
+                  ? "按实际尺寸计费"
+                  : `本次预计消耗 ${estimatedCreditLabel(result.estimatedCredits, model, params.size ?? model.defaults.size)}`,
               variant: "success",
             });
           }
@@ -1588,8 +1652,8 @@ export function StudioApp({
           }
         }
       }
-      setPrompt((value) => (value.trim() === content ? "" : value));
-      if (mode === "image" || confirmed) {
+      setPrompt((value) => (value === submittedPrompt ? "" : value));
+      if (directImage || activeMode === "image" || confirmed) {
         setParams((value) => ({
           ...value,
           referenceImages: value.referenceImages.filter(
@@ -1619,7 +1683,7 @@ export function StudioApp({
       return true;
     } catch (error) {
       if (mounted.current && revision === loadVersion.current) {
-        if (mode === "chat" && !confirmed) {
+        if (activeMode === "chat" && !confirmed && !directImage) {
           const cleared = isApiError(error) && error.code === "CONTENT_CLEARED";
           setChatRecoverable(!cleared);
           if (cleared) {
@@ -1670,7 +1734,7 @@ export function StudioApp({
   const addReference = (reference: ReferenceItem) => {
     if (references.add(reference)) {
       setUsePrevious(false);
-      setMode("image");
+      setMode("chat");
       setFocusVersion((value) => value + 1);
     }
   };
@@ -1692,10 +1756,10 @@ export function StudioApp({
         !models.some((item) => item.id === previous.modelId && item.available)
       )
         throw new Error("原模型当前不可用");
-      setMode("image");
+      setMode("chat");
       setUsePrevious(false);
       setModelId(previous.modelId);
-      handleUsePrompt(previous.prompt);
+      handleUsePrompt(`/生图 ${previous.prompt}`);
       setParams({
         n: previous.n,
         size: previous.size ?? undefined,
@@ -1717,12 +1781,7 @@ export function StudioApp({
   const cancel = async (id: string) => {
     try {
       await cancelGeneration(id);
-      setGenerations((items) =>
-        items[id]
-          ? { ...items, [id]: { ...items[id], status: "CANCELED" } }
-          : items,
-      );
-      streams.current.get(id)?.();
+      track(id);
       refreshMe();
     } catch (error) {
       toast({
@@ -1751,13 +1810,18 @@ export function StudioApp({
   };
   const archive = async () => {
     if (!activeId || locked) return;
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm("删除“" + (conversation?.title ?? "当前对话") + "”？")
+    )
+      return;
     setArchiving(true);
     try {
       await updateConversation(activeId, { archived: true });
       newConversation();
       void refreshThreads();
     } catch {
-      toast({ title: "归档失败", variant: "danger" });
+      toast({ title: "删除失败", variant: "danger" });
     } finally {
       setArchiving(false);
     }
@@ -1790,53 +1854,58 @@ export function StudioApp({
           model={model}
           title={conversation?.title ?? "创作工作台"}
           leading={<WorkspaceSidebarToggle />}
-        />
-        {conversation ? (
-          <div className="flex h-11 shrink-0 items-center justify-end gap-3 px-5">
-            <CopyTextButton
-              label="复制整段对话"
-              text={conversation.messages
-                .map(
-                  (message) =>
-                    (message.role === "user" ? "我：\n" : "助手：\n") +
-                    message.content +
-                    (message.generationPrompt
-                      ? "\n提示词：\n" + message.generationPrompt
-                      : ""),
-                )
-                .join("\n\n")}
-            />
-            <DropdownMenu
-              trigger={
-                <IconButton
-                  variant="ghost"
-                  aria-label="对话操作"
-                  title="对话操作"
-                  disabled={locked}
-                  className="h-9 w-9 rounded-full text-text-muted"
+          actions={
+            conversation ? (
+              <>
+                <CopyTextButton
+                  label="复制全文"
+                  text={conversation.messages
+                    .map(
+                      (message) =>
+                        (message.role === "user" ? "我：\n" : "助手：\n") +
+                        message.content +
+                        (message.generationPrompt
+                          ? "\n提示词：\n" + message.generationPrompt
+                          : ""),
+                    )
+                    .join("\n\n")}
+                />
+                <DropdownMenu
+                  trigger={
+                    <IconButton
+                      variant="ghost"
+                      aria-label="对话操作"
+                      title="对话操作"
+                      disabled={locked}
+                      className="h-9 w-9 rounded-full text-text-muted"
+                    >
+                      <MoreHorizontal size={18} />
+                    </IconButton>
+                  }
                 >
-                  <MoreHorizontal size={18} />
-                </IconButton>
-              }
-            >
-              <DropdownMenuItem
-                className="h-11"
-                onClick={() => setRename(conversation.title)}
-              >
-                <Pencil size={16} />
-                重命名对话
-              </DropdownMenuItem>
-              <DropdownMenuItem className="h-11" onClick={() => void archive()}>
-                <Archive size={16} />
-                归档对话
-              </DropdownMenuItem>
-              <DropdownMenuItem className="h-11" onClick={newConversation}>
-                <SquarePen size={16} />
-                新对话
-              </DropdownMenuItem>
-            </DropdownMenu>
-          </div>
-        ) : null}
+                  <DropdownMenuItem
+                    className="h-11"
+                    onClick={() => setRename(conversation.title)}
+                  >
+                    <Pencil size={16} />
+                    重命名对话
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="h-11"
+                    onClick={() => void archive()}
+                  >
+                    <Trash2 size={16} />
+                    删除对话
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="h-11" onClick={newConversation}>
+                    <SquarePen size={16} />
+                    新对话
+                  </DropdownMenuItem>
+                </DropdownMenu>
+              </>
+            ) : undefined
+          }
+        />
         {modelError && mode !== "chat" ? (
           <div
             role="alert"
@@ -1923,7 +1992,7 @@ export function StudioApp({
               </div>
             </>
           ) : (
-            me?.role === "ADMIN" ? <ConversationTimelineV8
+            <ConversationTimeline
               conversation={conversation}
               generations={generations}
               models={models}
@@ -1936,22 +2005,7 @@ export function StudioApp({
               onEdit={handleUsePrompt}
               onReference={handleUseAsReference}
               onOpen={(generation, index) => setLightbox({ generation, index })}
-              onRetry={(generation) => void retry(generation)}
-              onCancel={(id) => void cancel(id)}
-              onRetryChat={(id, attemptId) => void retryChatTurn(id, attemptId)}
-            /> : <ConversationTimeline
-              conversation={conversation}
-              generations={generations}
-              models={models}
-              pending={pending}
-              streaming={streaming}
-              status={status}
-              managedTurnId={managedTurnId}
-              connection={chatConnection}
-              disabled={locked}
-              onEdit={handleUsePrompt}
-              onReference={handleUseAsReference}
-              onOpen={(generation, index) => setLightbox({ generation, index })}
+              onOpenArtifact={(source) => setArtifactPreview({ source })}
               onRetry={(generation) => void retry(generation)}
               onCancel={(id) => void cancel(id)}
               onRetryChat={(id, attemptId) => void retryChatTurn(id, attemptId)}
@@ -1959,17 +2013,12 @@ export function StudioApp({
           )}
           <div
             className={cn(
-              "relative z-10 shrink-0 border-t border-border/70 bg-background px-3 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_-18px_rgb(0_0_0_/_0.55)] md:px-6 lg:px-8",
-              !empty && mode !== "agent" && "max-h-[60%] overflow-y-auto pt-2",
-              mode === "agent" && "max-h-[55%] overflow-y-auto pt-2",
+              "shrink-0 px-3 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-6 lg:px-8",
+              !empty && mode !== "agent" && "pt-2",
+              mode === "agent" && "pt-2",
             )}
           >
-            <div
-              className={cn(
-                "mx-auto w-full",
-                mode === "chat" ? "max-w-[46rem]" : "max-w-[52rem]",
-              )}
-            >
+            <div className={cn("mx-auto w-full", "max-w-[52rem]")}>
               {sendError ? (
                 <p
                   role="alert"
@@ -1992,7 +2041,10 @@ export function StudioApp({
               ) : null}
               <CommandDock
                 prompt={prompt}
-                onPromptChange={setPrompt}
+                onPromptChange={(value) => {
+                  externalDraft.current = true;
+                  setPrompt(value);
+                }}
                 agentQuestion={activeQuestion}
                 onClearAgentQuestion={() => setActiveQuestion(null)}
                 models={models}
@@ -2002,24 +2054,30 @@ export function StudioApp({
                   setModelId(id);
                   setCreative((value) => ({ ...value, operationId: null }));
                   if (next)
-                    setParams((value) => ({
-                      ...value,
-                      size: next.capabilities.sizes.includes(value.size ?? "")
-                        ? value.size
-                        : next.defaults.size,
-                      quality: next.capabilities.qualities?.includes(
-                        value.quality ?? "",
-                      )
-                        ? value.quality
-                        : next.defaults.quality,
-                      n: Math.min(value.n, next.capabilities.maxN),
-                      referenceImages: next.capabilities.supportsReferenceImage
-                        ? value.referenceImages.slice(
-                            0,
-                            next.capabilities.maxReferenceImages,
-                          )
-                        : [],
-                    }));
+                    setParams((value) => {
+                      const { size, outputFormat } = resolveGenerationOptions(
+                        next,
+                        value,
+                      );
+                      return {
+                        ...value,
+                        size,
+                        outputFormat,
+                        quality: next.capabilities.qualities?.some(
+                          (quality) => quality === value.quality,
+                        )
+                          ? value.quality
+                          : next.defaults.quality,
+                        n: Math.min(value.n, next.capabilities.maxN),
+                        referenceImages: next.capabilities
+                          .supportsReferenceImage
+                          ? value.referenceImages.slice(
+                              0,
+                              next.capabilities.maxReferenceImages,
+                            )
+                          : [],
+                      };
+                    });
                 }}
                 params={{
                   ...params,
@@ -2059,31 +2117,13 @@ export function StudioApp({
                   }));
                 }}
                 onSubmit={() => {
-                  if (mode === "agent") {
-                    void plan();
-                  } else if (mode === "image") {
-                    // 在 image 模式下，普通发送切换到 chat 对话，不触发生图
-                    setMode("chat");
-                    void send();
-                  } else {
-                    void send();
-                  }
+                  if (mode === "agent") void plan();
+                  else void send();
                 }}
-                onGenerateImage={
-                  mode === "image" || mode === "chat"
-                    ? () => {
-                        // 强制走 image 生成分支：先更新 ref（send() 读 modeRef），再调用
-                        modeRef.current = "image";
-                        setMode("image");
-                        void send();
-                      }
-                    : undefined
-                }
                 disabledReason={disabledReason}
                 mode={mode}
                 creativeEnabled={creativeEnabled}
                 centered={empty}
-                onModeChange={setMode}
                 chatModels={chatPricing?.models ?? []}
                 chatModel={chatModel}
                 chatReasoningEffort={reasoningEffort}
@@ -2097,8 +2137,40 @@ export function StudioApp({
                         disabled={locked || !activeId || !chatModel}
                         error={chatContextError}
                         onCompact={() => void compactContext()}
+                        modelId={chatModel?.id}
+                        budgetTokens={chatContextBudget}
+                        onBudgetChange={setChatContextBudget}
                       />
-                      {me?.role === "ADMIN" ? <Button variant="ghost" size="sm" asChild><Link href="/app/research" onClick={() => { const refs = referenceRequest(effectiveReferences); sessionStorage.setItem("chugao.research.seed.v1", JSON.stringify({ question: prompt, conversationId: activeId ?? undefined, attachmentKeys: refs.referenceImageKeys ?? [], sourceImageIds: refs.sourceImageIds ?? [], modelId: chatModel?.id, reasoningEffort })); }}><Search size={15} />研究</Link></Button> : null}
+                      {me?.role === "ADMIN" ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 gap-1 px-1.5 text-[11px]"
+                          asChild
+                        >
+                          <Link
+                            href="/app/research"
+                            onClick={() => {
+                              const refs =
+                                referenceRequest(effectiveReferences);
+                              sessionStorage.setItem(
+                                "chugao.research.seed.v1",
+                                JSON.stringify({
+                                  question: prompt,
+                                  conversationId: activeId ?? undefined,
+                                  attachmentKeys: refs.referenceImageKeys ?? [],
+                                  sourceImageIds: refs.sourceImageIds ?? [],
+                                  modelId: chatModel?.id,
+                                  reasoningEffort,
+                                }),
+                              );
+                            }}
+                          >
+                            <Search size={15} />
+                            研究
+                          </Link>
+                        </Button>
+                      ) : null}
                     </>
                   ) : undefined
                 }
@@ -2167,6 +2239,59 @@ export function StudioApp({
           ) : null}
         </div>
       </div>
+      {artifactPreview ? (
+        <>
+          <aside
+            aria-label="HTML 预览"
+            className="hidden h-full min-h-0 w-[clamp(22rem,36vw,36rem)] shrink-0 flex-col border-l border-border bg-surface md:flex"
+          >
+            <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-3">
+              <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                HTML 预览
+              </span>
+              <IconButton
+                variant="ghost"
+                aria-label="关闭右侧预览"
+                title="关闭右侧预览"
+                onClick={() => setArtifactPreview(null)}
+                className="h-9 w-9 text-text-muted"
+              >
+                <PanelRightClose size={17} />
+              </IconButton>
+            </div>
+            <div className="min-h-0 flex-1">
+              <HtmlArtifact
+                source={artifactPreview.source}
+                messageStatus="completed"
+                variant="panel"
+              />
+            </div>
+          </aside>
+          <div className="fixed inset-0 z-50 flex min-h-0 flex-col bg-background md:hidden">
+            <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-3">
+              <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                HTML 预览
+              </span>
+              <IconButton
+                variant="ghost"
+                aria-label="关闭预览"
+                title="关闭预览"
+                onClick={() => setArtifactPreview(null)}
+                className="h-9 w-9 text-text-muted"
+              >
+                <X size={17} />
+              </IconButton>
+            </div>
+            <div className="min-h-0 flex-1">
+              <HtmlArtifact
+                source={artifactPreview.source}
+                messageStatus="completed"
+                variant="panel"
+              />
+            </div>
+          </div>
+        </>
+      ) : null}
       <Dialog
         open={rename !== null}
         onOpenChange={(open) => {
@@ -2200,8 +2325,8 @@ export function StudioApp({
             setLightbox((value) => (value ? { ...value, index } : value))
           }
           onUsePrompt={(text) => {
-            handleUsePrompt(text);
-            setMode("image");
+            handleUsePrompt(`/生图 ${text}`);
+            setMode("chat");
             setLightbox(null);
           }}
           onUseAsReference={(image) => {

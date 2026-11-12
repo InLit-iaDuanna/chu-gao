@@ -5,11 +5,13 @@ import {
 import { ProviderSubmissionUnknownError } from "@/lib/providers/single-submit";
 
 export function userFacingGenerationError(error: unknown): string {
+  if (error instanceof Error && error.name === "ProviderCreditsError")
+    return "积分不足，无法使用备用价格；本次未生成，已退还预扣积分";
   if (error instanceof ProviderSubmissionUnknownError) return error.message;
   const { category } = classifyProviderFailure(error);
 
   if (category === "CONTENT_REJECTED") {
-    return "提示词或参考图包含不允许的内容，请调整后再试。";
+    return "[MODERATION_REJECTED] 提示词或参考图包含不允许的内容，请调整后再试。";
   }
 
   if (category === "BAD_REQUEST") {
@@ -33,6 +35,8 @@ export function userFacingGenerationError(error: unknown): string {
 }
 
 export function generationFailureCode(error: unknown): string {
+  if (error instanceof Error && error.name === "ProviderCreditsError")
+    return "INSUFFICIENT_CREDITS";
   if (error instanceof ProviderSubmissionUnknownError)
     return "UPSTREAM_RESULT_UNKNOWN";
   const { category } = classifyProviderFailure(error);
@@ -49,6 +53,8 @@ export function generationFailureCode(error: unknown): string {
 }
 
 export function usageFailureCategory(error: unknown): string {
+  if (error instanceof Error && error.name === "ProviderCreditsError")
+    return "billing";
   const { category } = classifyProviderFailure(error);
 
   if (category === "CONTENT_REJECTED") {

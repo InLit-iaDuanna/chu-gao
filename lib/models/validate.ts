@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { creativeConfirmationSchema } from "@/lib/creative-brief";
 
-import { isSizeSupported } from "@/lib/models/capabilities";
 import type {
   ImageBackground,
   ImageQuality,
@@ -14,7 +13,8 @@ import type {
 import {
   aspectRatioForSize,
   IMAGE_QUALITY_OPTIONS,
-  IMAGE_SIZE_OPTIONS,
+  ALL_IMAGE_SIZE_OPTIONS,
+  imageSizeOptionsForFormat,
   resolutionTierForSize,
 } from "@/lib/models/options";
 import { getConfiguredModel } from "@/lib/models/runtime-config";
@@ -44,11 +44,11 @@ export const generationRequestSchema = z.object({
   image2Mode: z.enum(["standard", "high"]).optional(),
   prompt: z.string().min(1).max(4000),
   negativePrompt: z.string().max(4000).optional(),
-  size: z.enum(IMAGE_SIZE_OPTIONS).optional(),
+  size: z.enum(ALL_IMAGE_SIZE_OPTIONS).optional(),
   quality: z.enum(IMAGE_QUALITY_OPTIONS).optional(),
   n: z.number().int().min(1),
   seed: z.number().int().optional(),
-  outputFormat: z.enum(["png", "jpeg", "webp"]).optional(),
+  outputFormat: z.enum(["png", "jpeg", "webp", "gif"]).optional(),
   background: z.enum(["auto", "opaque", "transparent"]).optional(),
   outputCompression: z.number().int().min(0).max(100).optional(),
   referenceImageKeys: z.array(z.string().min(1)).max(16).optional(),
@@ -83,7 +83,9 @@ export function validateAgainstModelDefinition(
   const modelId = input.modelId;
   const capabilities = model.capabilities;
 
-  const size = (input.size ?? model.defaults.size) as ImageSize;
+  const size = (input.size ??
+    (input.outputFormat === "gif" ? capabilities.gifSizes?.[0] : undefined) ??
+    model.defaults.size) as ImageSize;
   const quality = (input.quality ??
     model.defaults.quality ??
     "auto") as ImageQuality;
@@ -94,7 +96,7 @@ export function validateAgainstModelDefinition(
     | ImageBackground
     | undefined;
 
-  if (!isSizeSupported(model, size)) {
+  if (!imageSizeOptionsForFormat(model, outputFormat).includes(size)) {
     throw new UnsupportedParamError(`尺寸 ${size} 不被 ${model.id} 支持`);
   }
 

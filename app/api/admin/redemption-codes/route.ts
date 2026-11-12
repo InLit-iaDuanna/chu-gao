@@ -1,5 +1,3 @@
-import { randomBytes } from "node:crypto";
-
 import { fail, ok } from "@/lib/api-response";
 import { readJsonBodySafe } from "@/lib/request-body";
 import { audit } from "@/lib/audit";
@@ -9,11 +7,8 @@ import {
   checkSession,
 } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { createRedemptionCode } from "@/lib/redemption-code";
 import { redemptionCodeBatchSchema } from "@/lib/validators";
-
-function createCode(): string {
-  return `CREDIT-${randomBytes(4).toString("hex").toUpperCase()}`;
-}
 
 export async function GET(request: Request) {
   const sessionResult = await checkSession(request);
@@ -77,7 +72,7 @@ export async function POST(request: Request) {
     Array.from({ length: parsed.data.count }, () =>
       db.creditRedemptionCode.create({
         data: {
-          code: createCode(),
+          code: createRedemptionCode(),
           credits: parsed.data.credits,
           maxUses: parsed.data.maxUses,
           perUserLimit: parsed.data.perUserLimit,

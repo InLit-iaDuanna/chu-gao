@@ -3,7 +3,11 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Loader2, RefreshCw, Save } from "lucide-react";
 import { Button, Input, Switch, Textarea, Tooltip } from "@/components/ui";
-import { LUNA_MODEL_ID, SOL_MODEL_ID } from "@/lib/chat-model-options";
+import {
+  LUNA_MODEL_ID,
+  SOL_MODEL_ID,
+  OPUS_MODEL_ID,
+} from "@/lib/chat-model-options";
 import {
   getAdminChatRuntime,
   patchAdminChatRuntime,
@@ -12,9 +16,9 @@ import {
 import { AdminField, ErrorText } from "./ui";
 
 const profiles = [
-  ["default", "默认对话模型"],
   [LUNA_MODEL_ID, "GPT-5.6 Luna"],
   [SOL_MODEL_ID, "GPT-6.1 Sol"],
+  [OPUS_MODEL_ID, "Opus 5.5"],
 ] as const;
 
 export function ChatRuntimeSection() {

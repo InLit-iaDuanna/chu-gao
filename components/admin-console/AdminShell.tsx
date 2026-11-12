@@ -38,6 +38,7 @@ const NAV_GROUPS: {
     label: "生成与渠道",
     items: [
       { href: "/admin/generations", label: "生成记录" },
+      { href: "/admin/model-calls", label: "模型调用记录" },
       { href: "/admin/providers", label: "渠道" },
       { href: "/admin/pricing", label: "定价" },
       { href: "/admin/api-key-config", label: "API 配置" },

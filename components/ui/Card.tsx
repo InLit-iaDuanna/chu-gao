@@ -12,7 +12,7 @@ export function Card({
   ...props
 }: CardProps): React.ReactElement {
   const classes = cn(
-    "bg-surface border border-border rounded-lg transition-colors duration-[var(--duration-base)]",
+    "ui-card smooth-surface relative bg-surface border border-border rounded-lg transition-colors duration-[var(--duration-base)]",
     hoverable && "hover:border-border-strong hover:bg-surface-2",
     className,
   );
@@ -33,7 +33,7 @@ export function CardTitle({
 }: React.HTMLAttributes<HTMLHeadingElement>): React.ReactElement {
   return (
     <h3
-      className={cn("text-sm font-semibold tracking-[-0.01em]", className)}
+      className={cn("text-sm font-semibold tracking-normal", className)}
       {...props}
     />
   );

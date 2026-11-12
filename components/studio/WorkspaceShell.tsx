@@ -22,20 +22,20 @@ import {
 } from "@/components/ui";
 import { ConversationSidebar } from "./chat/ConversationSidebar";
 import { TopBar } from "./TopBar";
-import { getMe, listConversations, updateConversation } from "./lib/api";
+import { deleteConversation, getMe, listConversations } from "./lib/api";
 import { activeConversationHref } from "./lib/active-conversation";
-import type { Conversation, ConversationSummary, Me } from "./lib/types";
+import type { ConversationSummary, Me } from "./lib/types";
 
 interface StudioNavigation {
   activeId: string | null;
   disabled: boolean;
   onSelect: (id: string) => void;
   onNew: () => void;
-  onUpdate: (conversation: Conversation) => void;
 }
 
 interface WorkspaceContextValue {
   refreshThreads: () => Promise<void>;
+  refreshBalance: () => Promise<void>;
   setStudioNavigation: Dispatch<SetStateAction<StudioNavigation | null>>;
   sidebarOpen: boolean;
   setSidebarOpen: Dispatch<SetStateAction<boolean>>;
@@ -79,19 +79,19 @@ export function WorkspaceSidebarToggle() {
 }
 
 function pageTitle(pathname: string) {
-  if (pathname.startsWith("/app/canvas")) return "设计画布";
-  if (pathname.startsWith("/app/nodes")) return "节点画布";
+  if (pathname.startsWith("/app/nodes") || pathname.startsWith("/app/canvas"))
+    return "节点画布";
   if (pathname === "/app/publish") return "发布灵感";
   if (pathname.startsWith("/app/inspiration")) return "灵感圈";
   if (pathname.startsWith("/app/history")) return "历史图片";
   if (pathname.startsWith("/app/g/")) return "生成详情";
   if (pathname.startsWith("/app/ppt")) return "PPT";
+  if (pathname.startsWith("/app/recharge")) return "充值";
   if (pathname.startsWith("/app/settings")) return "设置";
-  if (pathname.startsWith("/app/research")) return "研究工作台";
   return "Chūgǎo Studio";
 }
 
-export function WorkspaceShell({ children, researchEnabled = false }: { children: ReactNode; researchEnabled?: boolean }) {
+export function WorkspaceShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const isStudio = pathname === "/app" || pathname === "/app/";
@@ -105,7 +105,13 @@ export function WorkspaceShell({ children, researchEnabled = false }: { children
     useState<StudioNavigation | null>(null);
   const mounted = useRef(true);
   const requestVersion = useRef(0);
+  const balanceVersion = useRef(0);
   const closeMobile = useCallback(() => setMobileOpen(false), []);
+  const refreshBalance = useCallback(async () => {
+    const version = ++balanceVersion.current;
+    const data = await getMe();
+    if (mounted.current && version === balanceVersion.current) setMe(data);
+  }, []);
   const refreshThreads = useCallback(async () => {
     const version = ++requestVersion.current;
     try {
@@ -121,35 +127,14 @@ export function WorkspaceShell({ children, researchEnabled = false }: { children
         setLoading(false);
     }
   }, []);
-  const renameThread = useCallback(
-    async (id: string, title: string) => {
-      const updated = await updateConversation(id, { title });
-      if (!mounted.current) return;
-      requestVersion.current += 1;
-      setThreads((items) =>
-        items.map((thread) =>
-          thread.id === id ? { ...thread, title: updated.title } : thread,
-        ),
-      );
-      setError(null);
-      if (isStudio && studioNavigation?.activeId === id) {
-        studioNavigation.onUpdate(updated);
-      }
-    },
-    [isStudio, studioNavigation],
-  );
+
   const deleteThread = useCallback(
     async (id: string) => {
-      await updateConversation(id, { archived: true });
-      if (!mounted.current) return;
-      requestVersion.current += 1;
-      setThreads((items) => items.filter((thread) => thread.id !== id));
-      setError(null);
-      if (isStudio && studioNavigation?.activeId === id) {
-        studioNavigation.onNew();
-      }
+      await deleteConversation(id);
+      if (studioNavigation?.activeId === id) studioNavigation.onNew();
+      await refreshThreads();
     },
-    [isStudio, studioNavigation],
+    [refreshThreads, studioNavigation],
   );
 
   useEffect(() => {
@@ -157,6 +142,7 @@ export function WorkspaceShell({ children, researchEnabled = false }: { children
     return () => {
       mounted.current = false;
       requestVersion.current += 1;
+      balanceVersion.current += 1;
     };
   }, []);
 
@@ -164,33 +150,28 @@ export function WorkspaceShell({ children, researchEnabled = false }: { children
     closeMobile();
     void refreshThreads();
     if (isStudio) return;
-    let ignore = false;
-    void getMe()
-      .then((data) => {
-        if (!ignore) setMe(data);
-      })
-      .catch(() => undefined);
+    void refreshBalance().catch(() => undefined);
     return () => {
-      ignore = true;
+      balanceVersion.current += 1;
     };
-  }, [pathname, isStudio, closeMobile, refreshThreads]);
+  }, [pathname, isStudio, closeMobile, refreshThreads, refreshBalance]);
 
   const context = useMemo(
     () => ({
       refreshThreads,
+      refreshBalance,
       setStudioNavigation,
       sidebarOpen,
       setSidebarOpen,
       setMobileOpen,
       closeMobile,
     }),
-    [refreshThreads, sidebarOpen, closeMobile],
+    [refreshThreads, refreshBalance, sidebarOpen, closeMobile],
   );
 
   const disabled = isStudio && (!studioNavigation || studioNavigation.disabled);
   const sidebar = (
     <ConversationSidebar
-      researchEnabled={researchEnabled}
       pathname={pathname}
       threads={threads}
       activeId={isStudio ? (studioNavigation?.activeId ?? null) : null}
@@ -198,8 +179,6 @@ export function WorkspaceShell({ children, researchEnabled = false }: { children
       loading={loading}
       error={error}
       onReload={() => void refreshThreads()}
-      onRename={renameThread}
-      onDelete={deleteThread}
       onNavigate={closeMobile}
       onSelect={(id) => {
         if (disabled) return;
@@ -207,6 +186,7 @@ export function WorkspaceShell({ children, researchEnabled = false }: { children
         if (isStudio) studioNavigation?.onSelect(id);
         else router.push(activeConversationHref(id));
       }}
+      onDelete={deleteThread}
       onNew={() => {
         if (disabled) return;
         closeMobile();

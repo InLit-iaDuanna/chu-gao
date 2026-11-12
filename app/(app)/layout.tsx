@@ -28,5 +28,5 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     );
   }
 
-  return <WorkspaceShell researchEnabled={sessionResult.user.role === "ADMIN"}>{children}</WorkspaceShell>;
+  return <WorkspaceShell>{children}</WorkspaceShell>;
 }

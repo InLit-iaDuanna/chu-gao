@@ -1,5 +1,5 @@
 import type { ChatMessageInput, Generation } from "./types";
-import type { ReasoningEffort } from "@/lib/chat-model-options";
+import { OPUS_MODEL_ID, type ReasoningEffort } from "@/lib/chat-model-options";
 import type { ChatTurnInput } from "@/lib/chat-turn-types";
 import { streamManagedChat } from "./chat-turn-api";
 
@@ -52,6 +52,7 @@ export function subscribeGeneration(
 
 export interface ChatStreamHandlers {
   onTurn?: (turn: import("@/lib/chat-turn-types").ChatTurnView) => void;
+  onGeneration?: (generationId: string) => void;
   onConnection?: (state: "connected" | "reconnecting" | "disconnected") => void;
   onDelta: (content: string) => void;
   onReplace?: (content: string) => void;
@@ -95,7 +96,7 @@ export async function streamConversationChat(input: {
       userId: input.userId,
       conversationId: input.conversationId,
       content: input.messages.at(-1)?.content ?? "",
-      modelId: input.modelId ?? "default",
+      modelId: input.modelId ?? OPUS_MODEL_ID,
       reasoningEffort: input.reasoningEffort,
       webSearch: input.webSearch,
       referenceImageKeys: input.referenceImageKeys ?? [],

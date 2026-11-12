@@ -3,6 +3,7 @@ import type { Conversation } from "./types";
 
 export type ManagedChatView = ChatTurnView & {
   activity?: string;
+  activityHistory?: string[];
   searched?: boolean;
   createdAt?: string | null;
   startedAt?: string | null;
@@ -61,11 +62,21 @@ export function mergeChatTurn(
     chatLastSeq: turn.lastSeq,
     chatStatus: turn.status,
     chatActivity: turn.activity,
+    chatActivityHistory: turn.activityHistory,
     chatSearched: chatHasSearched(turn),
     chatStartedAt: createdAt,
     chatSources: turn.sources,
     chatUsage: turn.usage,
+    chatBilling: turn.billing ?? {
+      state: turn.billingState,
+      chargedCredits:
+        turn.billingState === "reserved" ? null : turn.chargedCredits,
+      ...(turn.billingState === "reserved"
+        ? { reservedCredits: turn.priceCredits }
+        : {}),
+    },
     chatError: turn.error?.message ?? null,
+    ...(turn.generationId ? { generationId: turn.generationId } : {}),
     createdAt: previous?.createdAt ?? createdAt,
   };
   const messages = [...conversation.messages];

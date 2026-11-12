@@ -2,12 +2,10 @@
 
 import {
   ArrowUp,
-  Sparkles,
   Check,
   ChevronDown,
   ImageIcon,
   Maximize2,
-  MessageSquare,
   Plus,
   Ratio,
   RefreshCw,
@@ -43,8 +41,10 @@ import type { ModelInfo } from "./lib/types";
 import { ReferenceDropZone, ReferenceThumbnails } from "./ReferenceDropZone";
 import { CopyTextButton } from "./CopyTextButton";
 import { QualitySlider, qualityLabel } from "./QualitySlider";
-import { ChatModelControls } from "./ChatModelControls";
+import { ChatModelControls, ChatModelPrice } from "./ChatModelControls";
 import { REFERENCE_ACCEPT } from "./lib/reference-input";
+import { resolveGenerationOptions } from "./lib/generation-options";
+import { parseImageCommand } from "@/lib/image-command";
 
 export interface ReferenceItem {
   kind: "upload" | "source";
@@ -137,13 +137,11 @@ export function CommandDock({
   onUploadFile,
   onRemoveReference,
   onSubmit,
-  onGenerateImage,
   disabledReason,
   uploading = 0,
   onAddReference = () => undefined,
   focusVersion = 0,
   mode,
-  onModeChange,
   onStop,
   chatModels = [],
   chatModel = null,
@@ -152,25 +150,43 @@ export function CommandDock({
   onChatReasoningEffortChange = () => undefined,
   chatUnavailableReason,
   onRetryChatModels,
-  creativeEnabled = false,
   centered = false,
   chatTools,
 }: CommandDockProps) {
   const [expanded, setExpanded] = useState(false);
   const [paramsOpen, setParamsOpen] = useState(false);
+  const [commandsDismissed, setCommandsDismissed] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const isChat = mode === "chat";
   const isAgent = mode === "agent";
+  const isChat = !isAgent;
+  const imageCommand = parseImageCommand(prompt);
+  const showImageCommand =
+    !commandsDismissed &&
+    prompt.startsWith("/") &&
+    ["/生图", "/image"].some((command) =>
+      command.startsWith(prompt.toLowerCase()),
+    );
+  const completeImageCommand = () => {
+    onPromptChange("/生图 ");
+    setCommandsDismissed(true);
+    textareaRef.current?.focus();
+  };
   const maxN = isAgent ? 1 : Math.min(model?.capabilities.maxN ?? 1, 4);
-  const sizes = model?.capabilities.sizes ?? [];
+  const {
+    sizes,
+    size: selectedSize,
+    outputFormat: selectedFormat,
+  } = resolveGenerationOptions(model, params);
   const qualities = model?.capabilities.qualities ?? [];
   const outputFormats = model?.capabilities.outputFormats ?? [];
-  const supportsReference = isChat
-    ? (chatModel?.supportsVision ?? false)
-    : (model?.capabilities.supportsReferenceImage ?? false);
-  const maxReferences = isChat
-    ? (chatModel?.maxReferenceImages ?? 0)
-    : (model?.capabilities.maxReferenceImages ?? 0);
+  const supportsReference =
+    isChat && !imageCommand
+      ? (chatModel?.supportsVision ?? false)
+      : (model?.capabilities.supportsReferenceImage ?? false);
+  const maxReferences =
+    isChat && !imageCommand
+      ? (chatModel?.maxReferenceImages ?? 0)
+      : (model?.capabilities.maxReferenceImages ?? 0);
   const referencesFull = params.referenceImages.length >= maxReferences;
   const chatStatus =
     chatUnavailableReason ??
@@ -179,14 +195,11 @@ export function CommandDock({
     busy ||
     uploading > 0 ||
     Boolean(disabledReason) ||
-    (isChat ? !chatModel || Boolean(chatStatus) : !model) ||
+    (isChat && !imageCommand ? !chatModel || Boolean(chatStatus) : !model) ||
+    Boolean(imageCommand && !imageCommand.prompt.trim()) ||
     !prompt.trim();
-  /* image 模式专用生图按钮：需要模型可用且有提示词，不受 chat 模型限制 */
-  const generateDisabled =
-    busy || uploading > 0 || Boolean(disabledReason) || !model || !prompt.trim();
   const toolClass =
-    "h-11 w-11 shrink-0 rounded-md border-transparent bg-transparent p-0 text-text-muted hover:bg-surface-2 hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40 sm:h-10 sm:w-10 aria-disabled:border-transparent aria-disabled:bg-transparent";
-  const selectedSize = params.size ?? model?.defaults.size ?? "auto";
+    "h-9 w-9 shrink-0 rounded-md border-transparent bg-transparent p-0 text-text-muted hover:bg-surface-2 hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40 aria-disabled:border-transparent aria-disabled:bg-transparent";
   const selectedQuality =
     params.quality ?? model?.defaults.quality ?? qualities[0] ?? "auto";
 
@@ -204,63 +217,8 @@ export function CommandDock({
   }, [prompt, mode, centered]);
 
   return (
-    <div className="space-y-3">
-      {mode && onModeChange ? (
-        <div
-          className={cn(
-            "flex min-h-10 items-center",
-            centered && "justify-center pb-1",
-          )}
-        >
-          <Segmented
-            value={mode}
-            onChange={onModeChange}
-            aria-label="创作模式"
-            className="studio-mode-switch inline-flex max-w-full gap-0.5 rounded-lg border border-border/70 bg-surface-2 p-1 [&_button]:h-10 [&_button]:min-w-0 [&_button]:px-3 [&_button]:text-xs sm:[&_button]:h-8 sm:[&_button]:px-4 sm:[&_button]:text-[13px] [&_svg]:h-3.5 [&_svg]:w-3.5 [&_svg]:shrink-0"
-            options={[
-              {
-                value: "image",
-                ariaLabel: "生成图片",
-                disabled: busy || uploading > 0,
-                label: (
-                  <span className="inline-flex items-center gap-1.5 sm:gap-2">
-                    <ImageIcon size={16} />
-                    生成图片
-                  </span>
-                ),
-              },
-              {
-                value: "chat",
-                ariaLabel: "讨论想法",
-                disabled: busy || uploading > 0,
-                label: (
-                  <span className="inline-flex items-center gap-1.5 sm:gap-2">
-                    <MessageSquare size={16} />
-                    讨论想法
-                  </span>
-                ),
-              },
-              ...(creativeEnabled
-                ? [
-                    {
-                      value: "agent" as const,
-                      ariaLabel: "创作 Agent",
-                      disabled: busy || uploading > 0,
-                      label: (
-                        <span className="inline-flex items-center gap-1.5 sm:gap-2">
-                          <Sparkles size={16} />
-                          创作 Agent
-                        </span>
-                      ),
-                    },
-                  ]
-                : []),
-            ]}
-          />
-        </div>
-      ) : null}
-
-      {isChat && chatStatus ? (
+    <div className="space-y-2">
+      {isChat && !imageCommand && chatStatus ? (
         <div
           role={onRetryChatModels ? "alert" : "status"}
           className="flex min-w-0 items-center justify-between gap-3 px-1 text-xs text-text-muted"
@@ -286,14 +244,14 @@ export function CommandDock({
         onFile={onUploadFile}
         onReference={onAddReference}
         disabled={busy || !supportsReference || referencesFull}
-        className="dock-shell studio-composer rounded-lg"
+        className="smooth-surface dock-shell studio-composer rounded-2xl"
       >
         <ReferenceThumbnails
           references={params.referenceImages}
           uploading={uploading}
           onRemove={onRemoveReference}
         />
-        <div className="space-y-4 p-3.5 sm:p-5 sm:pb-3">
+        <div className="space-y-2 p-3 sm:p-4 sm:pb-3">
           {isAgent && agentQuestion ? (
             <div className="flex min-w-0 items-start gap-2 rounded-md bg-surface-2 px-3 py-2 text-xs leading-5 text-text-muted">
               <span className="shrink-0 font-medium text-foreground">回答</span>
@@ -316,7 +274,7 @@ export function CommandDock({
             <Textarea
               ref={textareaRef}
               value={prompt}
-              rows={isChat && !centered ? 1 : 2}
+              rows={1}
               maxLength={4000}
               disabled={busy}
               placeholder={
@@ -328,8 +286,21 @@ export function CommandDock({
                     ? "聊聊你的想法…"
                     : "描述画面、风格和你想保留的细节…"
               }
-              onChange={(event) => onPromptChange(event.target.value)}
+              onChange={(event) => {
+                setCommandsDismissed(false);
+                onPromptChange(event.target.value);
+              }}
               onKeyDown={(event) => {
+                if (event.key === "Escape") setCommandsDismissed(true);
+                if (
+                  showImageCommand &&
+                  ["Enter", "Tab"].includes(event.key) &&
+                  !event.nativeEvent.isComposing
+                ) {
+                  event.preventDefault();
+                  completeImageCommand();
+                  return;
+                }
                 if (
                   event.key === "Enter" &&
                   !event.shiftKey &&
@@ -340,8 +311,8 @@ export function CommandDock({
                 }
               }}
               className={cn(
-                "block max-h-[180px] w-full min-w-0 resize-none rounded-none border-0 bg-transparent p-0 text-base leading-7 shadow-none outline-none placeholder:text-text-faint hover:border-transparent hover:bg-transparent focus:border-transparent focus:shadow-none focus:ring-0 focus-visible:ring-0 disabled:bg-transparent sm:text-[15px]",
-                isChat && !centered ? "min-h-10" : "min-h-16",
+                "block max-h-[180px] w-full min-w-0 resize-none rounded-none border-0 bg-transparent p-0 text-[15px] leading-6 shadow-none outline-none placeholder:text-text-faint hover:border-transparent hover:bg-transparent focus:border-transparent focus:shadow-none focus:ring-0 focus-visible:ring-0 disabled:bg-transparent sm:min-h-14",
+                "min-h-12",
                 isChat && "pr-10 sm:pr-0",
               )}
               aria-label={isAgent ? "创作需求" : isChat ? "对话输入" : "提示词"}
@@ -360,21 +331,33 @@ export function CommandDock({
               </IconButton>
             ) : null}
           </div>
+          {showImageCommand ? (
+            <div
+              role="listbox"
+              aria-label="命令"
+              className="border-t border-border pt-2"
+            >
+              <button
+                type="button"
+                role="option"
+                aria-selected="true"
+                onClick={completeImageCommand}
+                className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm text-foreground hover:bg-surface-2"
+              >
+                <ImageIcon size={16} /> /生图
+              </button>
+            </div>
+          ) : null}
+          {imageCommand && !imageCommand.prompt.trim() ? (
+            <p role="alert" className="text-xs text-text-muted">
+              请在 /生图 后输入提示词
+            </p>
+          ) : null}
 
-          <div
-            className={cn(
-              "items-center gap-x-1 gap-y-2",
-              isChat
-                ? "grid grid-cols-[auto_minmax(0,1fr)_auto] sm:flex"
-                : "grid grid-cols-[auto_minmax(0,1fr)_auto] sm:grid-cols-[auto_auto_minmax(0,1fr)_auto]",
-            )}
-            aria-label="输入工具栏"
-          >
+          <div className="studio-input-tools" aria-label="输入工具栏">
             <div
               className={cn(
-                "col-start-1 flex shrink-0 items-center gap-0.5",
-                isChat ? "row-start-1" : "row-start-2 sm:row-start-1",
-                isChat && !supportsReference && "hidden",
+                "studio-attachment-tools flex shrink-0 items-center gap-0.5",
               )}
             >
               {supportsReference ? (
@@ -411,7 +394,7 @@ export function CommandDock({
                   </label>
                 </IconButton>
               ) : null}
-              {!isChat ? (
+              {
                 <Popover open={paramsOpen} onOpenChange={setParamsOpen}>
                   <PopoverTrigger asChild>
                     <IconButton
@@ -439,6 +422,22 @@ export function CommandDock({
                   >
                     <div className="space-y-5">
                       <p className="text-sm font-semibold">生成参数</p>
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-text-muted">
+                          图片模型
+                        </p>
+                        <Select
+                          aria-label="图片模型"
+                          value={model?.id ?? ""}
+                          onValueChange={onSelectModel}
+                          options={models.map((item) => ({
+                            value: item.id,
+                            label: item.displayName,
+                            disabled: !item.available,
+                          }))}
+                          controlSize="lg"
+                        />
+                      </div>
                       <div className="space-y-2">
                         <p className="text-xs font-medium text-text-muted">
                           图片尺寸
@@ -500,13 +499,17 @@ export function CommandDock({
                           </p>
                           <Select
                             aria-label="图片格式"
-                            value={
-                              params.outputFormat ??
-                              model?.defaults.outputFormat
-                            }
-                            onValueChange={(outputFormat) =>
-                              onParamsChange({ outputFormat })
-                            }
+                            value={selectedFormat}
+                            onValueChange={(outputFormat) => {
+                              const next = resolveGenerationOptions(model, {
+                                ...params,
+                                outputFormat,
+                              });
+                              onParamsChange({
+                                outputFormat: next.outputFormat,
+                                size: next.size,
+                              });
+                            }}
                             options={outputFormats.map((format) => ({
                               value: format,
                               label: format.toUpperCase(),
@@ -551,7 +554,7 @@ export function CommandDock({
                       ) : null}
                     </div>
                     <div className="mt-5 space-y-1 border-t border-border pt-3">
-                      {!isAgent ? (
+                      {!isChat && !isAgent ? (
                         <Button
                           variant="ghost"
                           type="button"
@@ -582,10 +585,10 @@ export function CommandDock({
                     </div>
                   </PopoverContent>
                 </Popover>
-              ) : null}
+              }
             </div>
 
-            {isChat ? (
+            {isChat && !imageCommand ? (
               <ChatModelControls
                 models={chatModels}
                 model={chatModel}
@@ -597,7 +600,7 @@ export function CommandDock({
             ) : null}
 
             {!isChat ? (
-              <div className="col-span-3 col-start-1 row-start-1 min-w-0 sm:col-span-1 sm:col-start-2">
+              <div className="studio-model-container">
                 <DropdownMenu
                   className="studio-workspace max-h-[50dvh] w-[min(20rem,calc(100vw-2rem))] overflow-y-auto"
                   trigger={
@@ -609,7 +612,7 @@ export function CommandDock({
                       }
                       title={model?.displayName ?? "选择模型"}
                       disabled={uploading > 0 || busy}
-                      className="h-9 w-full min-w-0 justify-between gap-2 border-border bg-surface-2 px-3 text-xs text-foreground hover:bg-surface-3 sm:max-w-56"
+                      className="smooth-surface studio-model-trigger h-9 w-full min-w-0 justify-between gap-2 border-transparent bg-surface-2 px-3 text-[13px] text-foreground hover:bg-surface-3 sm:w-auto sm:max-w-56"
                     >
                       <ImageIcon
                         size={14}
@@ -646,10 +649,8 @@ export function CommandDock({
 
             <div
               className={cn(
-                "flex min-w-0 justify-end text-xs text-text-muted",
-                isChat
-                  ? "hidden"
-                  : "col-start-2 row-start-2 sm:col-start-3 sm:row-start-1",
+                "studio-parameter-summary flex min-w-0 justify-end text-xs text-text-muted",
+                isChat ? "hidden" : "",
               )}
             >
               {!isChat ? (
@@ -676,8 +677,7 @@ export function CommandDock({
             </div>
             <div
               className={cn(
-                "col-start-3 flex shrink-0 items-center gap-1 justify-self-end sm:col-start-4",
-                isChat ? "row-start-1" : "row-start-2 sm:row-start-1",
+                "studio-submit-tools flex shrink-0 items-center gap-1",
               )}
             >
               {isChat ? (
@@ -703,54 +703,10 @@ export function CommandDock({
                   aria-label="停止回复"
                   title="停止回复"
                   onClick={onStop}
-                  className="h-11 w-11 rounded-full border-transparent bg-foreground text-background hover:bg-foreground/85 sm:h-10 sm:w-10"
+                  className="h-9 w-9 rounded-full border-transparent bg-foreground text-background hover:bg-foreground/85"
                 >
                   <Square size={15} fill="currentColor" />
                 </IconButton>
-              ) : !isChat && !isAgent && onGenerateImage ? (
-                /* image 模式：两个按钮并排 — 对话发送 + 专用生图 */
-                <div className="flex items-center gap-1.5">
-                  {/* 对话发送 */}
-                  <IconButton
-                    variant="ghost"
-                    size="lg"
-                    type="button"
-                    onClick={onSubmit}
-                    disabled={submitDisabled}
-                    aria-label="发送对话"
-                    title={disabledReason ?? "发送对话"}
-                    aria-busy={busy || undefined}
-                    className={cn(
-                      "studio-submit h-10 w-10 rounded-full p-0",
-                      submitDisabled
-                        ? "border-transparent bg-surface-2 text-text-faint"
-                        : "border border-border bg-surface text-foreground hover:bg-surface-2",
-                    )}
-                  >
-                    {busy ? (
-                      <Spinner className="h-4 w-4" />
-                    ) : (
-                      <ArrowUp size={18} strokeWidth={2.2} />
-                    )}
-                  </IconButton>
-                  {/* 专用生图按钮 */}
-                  <button
-                    type="button"
-                    onClick={onGenerateImage}
-                    disabled={generateDisabled}
-                    aria-label="生成图片"
-                    title={disabledReason ?? "生成图片"}
-                    className={cn(
-                      "dock-generate-btn inline-flex h-10 items-center gap-1.5 rounded-full px-4 text-[13px] font-medium transition-all",
-                      generateDisabled
-                        ? "cursor-not-allowed bg-surface-2 text-text-faint"
-                        : "bg-[rgb(var(--studio-highlight))] text-[rgb(var(--studio-highlight-ink))] hover:opacity-90 active:scale-95",
-                    )}
-                  >
-                    <Sparkles size={14} />
-                    生图
-                  </button>
-                </div>
               ) : (
                 <IconButton
                   variant="ghost"
@@ -763,12 +719,12 @@ export function CommandDock({
                   }
                   title={
                     disabledReason ??
-                    (isChat ? chatStatus : null) ??
+                    (isChat && !imageCommand ? chatStatus : null) ??
                     (isAgent ? "发送给 Agent" : isChat ? "发送" : "生成")
                   }
                   aria-busy={busy || undefined}
                   className={cn(
-                    "studio-submit h-11 w-11 rounded-md p-0 sm:h-10 sm:w-10",
+                    "studio-submit h-9 w-9 rounded-md p-0",
                     isChat && "rounded-full",
                     submitDisabled
                       ? "border-transparent bg-surface-2 text-text-faint aria-disabled:border-transparent aria-disabled:bg-surface-2"
@@ -788,25 +744,30 @@ export function CommandDock({
           </div>
         </div>
       </ReferenceDropZone>
-      {isChat && chatTools ? (
-        <div className="flex min-h-10 flex-wrap items-center justify-between gap-x-3 px-1 text-[11px] text-text-faint sm:min-h-8">
-          <div className="flex min-w-0 items-center gap-0.5">{chatTools}</div>
-          <span className="ml-auto whitespace-nowrap tabular-nums">
-            {chatModel ? `${chatModel.credits} 积分 / 轮` : ""}
-          </span>
+      {isChat && !imageCommand && chatTools ? (
+        <div className="flex min-h-6 flex-wrap items-center justify-between gap-x-2 px-1 text-[11px] leading-4 text-text-faint">
+          <div className="flex min-w-0 items-center gap-0">{chatTools}</div>
+          <ChatModelPrice model={chatModel} className="ml-auto text-[11px]" />
         </div>
       ) : (
-        <div className="flex h-4 items-center justify-between px-1 text-[11px] text-text-faint">
-          <span>
-            {optimizing
-              ? "正在优化提示词…"
-              : uploading
-                ? "参考图上传中…"
-                : isChat && chatModel
-                  ? `${chatModel.credits} 积分 / 轮`
-                  : ""}
+        <div className="flex min-h-6 items-start justify-between gap-2 px-1 text-[11px] leading-4 text-text-faint">
+          <span className="min-w-0">
+            {optimizing ? (
+              "正在优化提示词…"
+            ) : uploading ? (
+              "参考图上传中…"
+            ) : isChat && !imageCommand && chatModel ? (
+              <ChatModelPrice model={chatModel} />
+            ) : (
+              ""
+            )}
           </span>
-          <span className={cn("tabular-nums", !prompt.length && "invisible")}>
+          <span
+            className={cn(
+              "shrink-0 tabular-nums",
+              !prompt.length && "invisible",
+            )}
+          >
             {prompt.length}/4000
           </span>
         </div>

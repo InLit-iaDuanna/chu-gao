@@ -1,4 +1,4 @@
-// 单页生成 / 重新生成：DeepSeek 优化提示词 → 入队 → 关联 slide。
+// 单页生成 / 重新生成：Opus 5.5 优化提示词 → 入队 → 关联 slide。
 // 状态由关联 Generation 推导（见 lib/ppt-serialize），不再服务端轮询。
 
 import { z } from "zod";

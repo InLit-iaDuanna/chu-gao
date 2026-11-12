@@ -1,7 +1,11 @@
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { LUNA_MODEL_ID, SOL_MODEL_ID } from "@/lib/chat-model-options";
+import {
+  LUNA_MODEL_ID,
+  SOL_MODEL_ID,
+  OPUS_MODEL_ID,
+} from "@/lib/chat-model-options";
 
 export const CHAT_TASK_PROTOCOL_VERSION = 2;
 export const CHAT_RUNTIME_PROTOCOL_VERSION = CHAT_TASK_PROTOCOL_VERSION;
@@ -11,7 +15,9 @@ export const CHAT_RUNTIME_CONFIG_KEY = "chat.runtime";
 const configSchema = z
   .object({
     enabled: z.boolean(),
-    profiles: z.array(z.enum(["default", LUNA_MODEL_ID, SOL_MODEL_ID])).max(3),
+    profiles: z
+      .array(z.enum(["default", LUNA_MODEL_ID, SOL_MODEL_ID, OPUS_MODEL_ID]))
+      .max(4),
     userAllowlist: z.array(z.string().trim().min(1).max(128)).max(10_000),
     queueTimeoutMs: z.number().int().min(1_000).max(86_400_000).nullable(),
   })
@@ -23,12 +29,18 @@ export const chatRuntimeUpdateSchema = configSchema
 export type ChatRuntimeSettings = z.infer<typeof configSchema>;
 const defaults = (): ChatRuntimeSettings => ({
   enabled: true,
-  profiles: ["default", LUNA_MODEL_ID, SOL_MODEL_ID],
+  profiles: [OPUS_MODEL_ID, LUNA_MODEL_ID, SOL_MODEL_ID],
   userAllowlist: [],
   queueTimeoutMs: null,
 });
-const parseSettings = (value: unknown) =>
-  configSchema.parse({ ...defaults(), ...(value as object) });
+const parseSettings = (value: unknown): ChatRuntimeSettings => {
+  const parsed = configSchema.parse({ ...defaults(), ...(value as object) });
+  const profiles = [
+    ...new Set(parsed.profiles.filter((id) => id !== "default")),
+  ];
+  if (!profiles.includes(OPUS_MODEL_ID)) profiles.unshift(OPUS_MODEL_ID);
+  return { ...parsed, profiles: profiles.slice(0, 4) };
+};
 
 export class ChatRuntimeAdmissionError extends Error {
   readonly status = 503;
@@ -70,7 +82,7 @@ export async function setChatRuntimeConfig(
     const row = await tx.systemConfig.findUniqueOrThrow({
       where: { key: CHAT_RUNTIME_CONFIG_KEY },
     });
-    const value = configSchema.parse({ ...parseSettings(row.value), ...patch });
+    const value = parseSettings({ ...parseSettings(row.value), ...patch });
     await tx.systemConfig.update({
       where: { key: CHAT_RUNTIME_CONFIG_KEY },
       data: { value, ...(actorId ? { updatedBy: actorId } : {}) },

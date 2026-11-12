@@ -62,7 +62,7 @@ export async function GET(
 
     const displayNameMap = await getImage2ChannelDisplayNameMap();
 
-    return ok(serializeConversation(conversation, { displayNameMap }));
+    return ok(await serializeConversation(conversation, { displayNameMap }));
   } catch (error) {
     if (isDatabaseUnavailableError(error)) {
       return conversationsUnavailable();
@@ -141,7 +141,7 @@ export async function PATCH(
 
     const displayNameMap = await getImage2ChannelDisplayNameMap();
 
-    return ok(serializeConversation(conversation, { displayNameMap }));
+    return ok(await serializeConversation(conversation, { displayNameMap }));
   } catch (error) {
     if (error instanceof ChatTurnError)
       return fail(error.code, error.message, { status: error.status });

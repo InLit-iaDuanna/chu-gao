@@ -64,7 +64,7 @@ export function Select({
         aria-describedby={ariaDescribedBy}
         aria-invalid={invalid || undefined}
         className={cn(
-          "inline-flex w-full items-center justify-between gap-2 rounded-md border border-border bg-surface text-foreground outline-none transition-colors hover:border-border-strong focus:border-brand data-[disabled]:cursor-not-allowed data-[disabled]:opacity-45 aria-[invalid=true]:border-danger",
+          "ui-select inline-flex w-full items-center justify-between gap-2 rounded-md border border-border bg-surface text-foreground outline-none transition-colors hover:border-border-strong focus:border-brand data-[disabled]:cursor-not-allowed data-[disabled]:opacity-45 aria-[invalid=true]:border-danger",
           sizeClass[controlSize],
           className,
         )}

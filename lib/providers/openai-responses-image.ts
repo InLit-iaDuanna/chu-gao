@@ -66,7 +66,10 @@ function upstreamModelForRequest(): string {
 function imageToolModelForRequest(req: InternalRequest): string | undefined {
   if (
     req.modelId === "gpt-image-2.5-flare" ||
-    req.modelId === "gpt-image-2.5-sunburst"
+    req.modelId === "gpt-image-2.5-sunburst" ||
+    req.modelId === "gpt-image-2.6" ||
+    req.modelId === "gpt-image-2.6-flare" ||
+    req.modelId === "gpt-image-2.6-sunburst"
   ) {
     return req.modelId;
   }

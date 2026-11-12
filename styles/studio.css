@@ -1,63 +1,367 @@
-/* Studio 工作区 — 暖米白主题（v8 设计语言）
-   必须在单独文件中声明，确保 Tailwind v4 不会优化掉 */
+@layer components {
+  /* Workspace surfaces and portalled controls share this neutral palette. */
+  .studio-workspace {
+    --bg: 20 22 24;
+    --surface: 27 29 32;
+    --surface-2: 34 37 40;
+    --surface-3: 44 47 51;
+    --border: 45 48 52;
+    --border-strong: 70 75 80;
+    --text: 244 244 245;
+    --text-muted: 166 173 181;
+    --text-faint: 129 137 145;
+    --studio-sidebar: 16 18 20;
+    --studio-highlight: 244 244 245;
+    --studio-highlight-ink: 20 22 24;
+    --control-bg: var(--surface-2);
+    --control-bg-hover: var(--surface-3);
+    --control-border: var(--border-strong);
+    --control-border-hover: 100 105 110;
+    --control-disabled-bg: var(--surface-2);
+    --control-disabled-border: var(--border-strong);
+    --control-selected-bg: var(--text);
+    --control-selected-border: var(--text);
+    --control-focus: var(--text);
+    --icon: var(--text);
+    --icon-muted: var(--text-muted);
+    --icon-disabled: 129 137 145;
+    --icon-selected: var(--bg);
+    --shadow-focus: 0 0 0 2px rgb(var(--text) / 0.12);
+    /*
+     * 强调色使用中性黑白，语义色继续保留，避免状态信息失去区分度。
+     */
+    --brand-primary: 244 244 245;
+    --on-accent: 20 22 24;
+    --on-brand: 20 22 24;
+    --on-danger: 15 15 17;
+    --success: 63 185 120;
+    --danger: 235 87 87;
+    --warning: 240 177 80;
+    --info: 110 168 254;
+    letter-spacing: 0;
+  }
 
-html .studio-workspace,
-html.dark .studio-workspace,
-html.light .studio-workspace {
-  /* 背景层 */
-  --bg:        245 243 239;   /* #f5f3ef 暖米白主背景 */
-  --surface:   249 247 244;   /* #f9f7f4 卡片 / 助手侧 */
-  --surface-2: 237 234 228;   /* #ede9e4 轻强调背景 */
-  --surface-3: 229 225 218;   /* #e5e1da 最深层悬浮 */
+  html.light .studio-workspace {
+    --bg: 248 249 250;
+    --surface: 255 255 255;
+    --surface-2: 240 243 245;
+    --surface-3: 230 234 237;
+    --border: 226 230 234;
+    --border-strong: 190 199 206;
+    --text: 26 25 22;
+    --text-muted: 80 91 101;
+    --text-faint: 104 114 123;
+    --studio-sidebar: 240 243 245;
+    --studio-highlight: 24 24 27;
+    --studio-highlight-ink: 255 255 255;
+    --control-border-hover: 134 142 150;
+    --control-disabled-bg: var(--surface-2);
+    --control-disabled-border: var(--border-strong);
+    --control-selected-bg: var(--text);
+    --control-selected-border: var(--text);
+    --control-focus: var(--text);
+    --icon: var(--text);
+    --icon-muted: 80 91 101;
+    --icon-selected: var(--bg);
+    --icon-disabled: 140 149 156;
+    /* 浅色主题使用中性黑白，语义色继续保留。 */
+    --brand-primary: 24 24 27;
+    --on-accent: 255 255 255;
+    --on-brand: 255 255 255;
+    --on-danger: 250 250 252;
+    --success: 16 128 72;
+    --danger: 202 52 49;
+    --warning: 176 122 24;
+    --info: 37 99 235;
+  }
 
-  /* 边框 */
-  --border:        219 215 207; /* #dbd7cf 主分割线（发丝） */
-  --border-strong: 202 198 188; /* #cac6bc 强调边框 */
+  .studio-workspace :is(h1, h2, h3, button, a, .eyebrow) {
+    letter-spacing: 0;
+  }
 
-  /* 文字 */
-  --text:       26 25 22;      /* #1a1916 深墨 */
-  --text-muted: 100 98 91;     /* #64625b 辅助灰 */
-  --text-faint: 112 110 103;   /* #706e67 弱提示 */
-  --foreground: var(--text);
+  .studio-sidebar {
+    background: rgb(var(--studio-sidebar));
+  }
 
-  /* 控件 */
-  --control-bg:            249 247 244;
-  --control-bg-hover:      237 234 228;
-  --control-selected-bg:   26 25 22;
-  --control-disabled-bg:   237 234 228;
-  --control-border:        154 152 144;
-  --control-border-hover:  104 103 97;
-  --control-selected-border: 26 25 22;
-  --control-disabled-border: 190 188 182;
-  --control-focus:         26 25 22;
+  .studio-typewriter-caret {
+    display: inline-block;
+    width: 2px;
+    height: 0.9em;
+    margin-left: 3px;
+    vertical-align: -0.04em;
+    background: currentColor;
+    animation: studio-typewriter-blink 1s steps(2, end) infinite;
+  }
 
-  /* 图标 */
-  --icon:          26 25 22;
-  --icon-muted:    100 98 91;
-  --icon-disabled: 160 158 151;
-  --icon-selected: 249 247 244;
+  @keyframes studio-typewriter-blink {
+    50% {
+      opacity: 0;
+    }
+  }
 
-  /* 品牌 / 强调（初稿绿） */
-  --brand-primary: 59 106 79;  /* #3b6a4f 深绿 */
-  --accent:        var(--brand-primary);
-  --on-accent:     249 247 244;
-  --on-brand:      249 247 244;
+  @media (prefers-reduced-motion: reduce) {
+    .studio-typewriter-caret {
+      visibility: hidden;
+      animation: none;
+    }
+  }
 
-  /* 语义色 */
-  --success: 16 128 72;
-  --danger:  202 52 49;
-  --warning: 176 122 24;
-  --info:    37 99 235;
+  .studio-nav-link {
+    --smooth-fill: transparent;
+    --smooth-stroke: transparent;
+    border: 1px solid transparent;
+  }
 
-  /* 阴影 */
-  --shadow-xs: 0 1px 2px rgb(26 25 22 / 0.04);
-  --shadow-sm: 0 1px 2px rgb(26 25 22 / 0.06), 0 1px 1px rgb(26 25 22 / 0.04);
-  --shadow-md: 0 6px 16px -6px rgb(26 25 22 / 0.10);
-  --shadow-lg: 0 12px 32px -12px rgb(26 25 22 / 0.12);
-  --shadow-focus:
-    0 0 0 2px rgb(var(--bg)), 0 0 0 4px rgb(var(--brand-primary) / 0.35);
+  .studio-nav-link:hover {
+    --smooth-fill: rgb(var(--surface-2));
+  }
 
-  /* 应用到元素 */
-  background: rgb(var(--bg));
-  color:      rgb(var(--text));
+  .studio-nav-link[aria-current="page"] {
+    --smooth-fill: rgb(var(--surface-2));
+    border-color: transparent;
+    background: rgb(var(--surface-2));
+    color: rgb(var(--text));
+  }
+
+  .studio-nav-link[aria-current="page"] > svg {
+    color: rgb(var(--studio-highlight));
+  }
+
+  .studio-mode-switch {
+    --smooth-fill: rgb(var(--surface-2));
+    --smooth-stroke: rgb(var(--border) / 0.5);
+  }
+
+  .studio-mode-switch [role="radio"] {
+    border: 1px solid transparent;
+    border-radius: var(--radius-control);
+    font-size: 13px;
+    box-shadow: none;
+  }
+
+  .studio-mode-switch [aria-checked="true"] {
+    border-color: rgb(var(--border) / 0.6);
+    background: rgb(var(--surface));
+    color: rgb(var(--text));
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.04);
+  }
+
+  .studio-mode-switch [aria-checked="true"] svg {
+    color: rgb(var(--studio-highlight));
+  }
+
+  .studio-workspace .studio-composer {
+    --smooth-fill: rgb(var(--surface));
+    --smooth-stroke: rgb(var(--border-strong) / 0.65);
+    border: 1px solid var(--smooth-stroke);
+    border-radius: var(--radius-composer);
+    background: rgb(var(--surface));
+    box-shadow: 0 3px 12px -8px rgb(0 0 0 / 0.18);
+  }
+
+  .studio-workspace .studio-composer:focus-within {
+    --smooth-stroke: rgb(var(--studio-highlight) / 0.45);
+    border-color: var(--smooth-stroke);
+    box-shadow: 0 0 0 2px rgb(var(--studio-highlight) / 0.05);
+  }
+
+  .studio-model-trigger {
+    --smooth-fill: rgb(var(--surface-2));
+    --smooth-stroke: transparent;
+  }
+
+  .studio-model-trigger:hover:not(:disabled) {
+    --smooth-fill: rgb(var(--surface-3));
+  }
+
+  .studio-thread {
+    --smooth-fill: transparent;
+    --smooth-stroke: transparent;
+  }
+
+  .studio-thread:hover {
+    --smooth-fill: rgb(var(--surface));
+  }
+
+  .studio-thread[data-active="true"] {
+    --smooth-fill: rgb(var(--surface-2) / 0.7);
+  }
+
+  .studio-thread-delete {
+    opacity: 0;
+  }
+
+  .studio-thread:hover .studio-thread-delete,
+  .studio-thread:focus-within .studio-thread-delete {
+    opacity: 1;
+  }
+
+  @media (hover: none) {
+    .studio-thread-delete {
+      opacity: 1;
+    }
+  }
+
+  .studio-message {
+    --smooth-fill: rgb(var(--surface-2));
+    --smooth-stroke: transparent;
+  }
+
+  .studio-input-tools {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 4px;
+    min-height: 36px;
+  }
+
+  .studio-attachment-tools {
+    grid-column: 1;
+  }
+  .studio-model-container {
+    grid-column: 2;
+    min-width: 0;
+  }
+  .studio-parameter-summary {
+    grid-column: 3;
+    min-width: 0;
+  }
+  .studio-submit-tools {
+    grid-column: 4;
+    justify-self: end;
+  }
+
+  @media (max-width: 639px) {
+    .studio-input-tools {
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      grid-template-rows: 32px 36px;
+      row-gap: 4px;
+    }
+    .studio-model-container {
+      grid-column: 1 / -1;
+      grid-row: 1;
+    }
+    .studio-attachment-tools {
+      grid-column: 1;
+      grid-row: 2;
+    }
+    .studio-parameter-summary {
+      grid-column: 2;
+      grid-row: 2;
+    }
+    .studio-submit-tools {
+      grid-column: 3;
+      grid-row: 2;
+    }
+    .studio-model-trigger {
+      width: 100%;
+      justify-content: flex-start;
+    }
+    .studio-model-trigger > svg:last-child {
+      margin-left: auto;
+    }
+  }
+
+  .studio-effort-range {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 44px;
+    margin: 0;
+    appearance: none;
+    border-radius: 999px;
+    background: transparent;
+    cursor: pointer;
+    outline: none;
+    touch-action: pan-y;
+  }
+
+  .studio-effort-range:disabled {
+    cursor: not-allowed;
+  }
+
+  .studio-effort-range::-webkit-slider-runnable-track {
+    height: 28px;
+    background: transparent;
+  }
+
+  .studio-effort-range::-webkit-slider-thumb {
+    width: 32px;
+    height: 32px;
+    margin-top: -2px;
+    appearance: none;
+    border: 0;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 4px rgb(0 0 0 / 0.14);
+  }
+
+  .studio-effort-range::-moz-range-track {
+    height: 28px;
+    border: 0;
+    background: transparent;
+  }
+
+  .studio-effort-range::-moz-range-thumb {
+    width: 32px;
+    height: 32px;
+    border: 0;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 4px rgb(0 0 0 / 0.14);
+  }
+
+  .studio-starter {
+    border: 1px solid rgb(var(--border));
+    border-radius: 8px;
+    background: rgb(var(--surface));
+    transition:
+      border-color 160ms ease,
+      background-color 160ms ease;
+  }
+
+  .studio-starter:hover {
+    border-color: rgb(var(--border-strong));
+    background: rgb(var(--surface-2));
+  }
+
+  .studio-starter img {
+    transition: transform 240ms ease;
+  }
+
+  @media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    .studio-starter:hover img {
+      transform: scale(1.035);
+    }
+  }
+}
+
+.studio-workspace .studio-effort-range:focus-visible {
+  outline: none;
+}
+
+.studio-workspace .studio-composer textarea:focus-visible,
+.studio-context-controls:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.studio-workspace .studio-model-trigger:focus-visible,
+.studio-workspace .studio-chat-tool:focus-visible,
+.studio-model-controls button:focus-visible,
+.studio-context-controls button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgb(59 130 246 / 0.12);
+}
+
+.studio-workspace .studio-effort-range:focus-visible::-webkit-slider-thumb {
+  box-shadow:
+    0 1px 4px rgb(0 0 0 / 0.14),
+    0 0 0 3px rgb(59 130 246 / 0.16);
+}
+
+.studio-workspace .studio-effort-range:focus-visible::-moz-range-thumb {
+  box-shadow:
+    0 1px 4px rgb(0 0 0 / 0.14),
+    0 0 0 3px rgb(59 130 246 / 0.16);
 }

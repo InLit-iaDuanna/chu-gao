@@ -15,6 +15,17 @@ import { GenerationCard } from "../GenerationCard";
 import type { Conversation, Generation, ModelInfo } from "../lib/types";
 import { messageGeneration } from "./message-generation";
 import { AssistantContent } from "./AssistantContent";
+import {
+  ActivityTrail,
+  chatUsageBreakdown,
+  ResultBubble,
+  TurnCredits,
+  NO_CREDIT_CHARGE,
+} from "./ChatReplyBubbles";
+import {
+  chatReplyErrorMessage,
+  readCreditSettlement,
+} from "@/lib/turn-credit-types";
 import { chatActivityText } from "../lib/chat-turn-api";
 import type { ConversationMessage } from "../lib/types";
 import { request } from "../lib/api";
@@ -32,6 +43,7 @@ interface Props {
   onEdit: (text: string) => void;
   onReference: (generation: Generation) => void;
   onOpen: (generation: Generation, index: number) => void;
+  onOpenArtifact?: (source: string) => void;
   onRetry: (generation: Generation) => void;
   onCancel: (id: string) => void;
   onRetryChat?: (id: string, expectedPreviousAttemptId: string) => void;
@@ -134,13 +146,9 @@ function ReplyMetadata({ message }: { message: ConversationMessage }) {
     }
   });
   const usage = message.chatUsage;
-  const inputDetails = usage?.input_tokens_details as
-    | Record<string, unknown>
-    | undefined;
-  const tokens = (name: string) =>
-    typeof usage?.[name] === "number"
-      ? (usage[name] as number).toLocaleString()
-      : "未报告";
+  const breakdown = chatUsageBreakdown(usage);
+  const tokens = (value: number | null) =>
+    value === null ? "未报告" : value.toLocaleString();
   return (
     <>
       {sources.length ? (
@@ -166,18 +174,18 @@ function ReplyMetadata({ message }: { message: ConversationMessage }) {
         <details className="mt-2 text-xs leading-5 text-text-muted">
           <summary className="cursor-pointer">用量</summary>
           <p>
-            输入 {tokens("input_tokens")} · 输出 {tokens("output_tokens")}
+            输入 {tokens(breakdown.inputTotal)} · 输出{" "}
+            {tokens(breakdown.output)}
           </p>
           <p>
-            缓存命中{" "}
-            {typeof inputDetails?.cached_tokens === "number"
-              ? inputDetails.cached_tokens.toLocaleString()
-              : "未报告"}
-            {" · "}缓存写入{" "}
-            {typeof inputDetails?.cache_write_tokens === "number"
-              ? inputDetails.cache_write_tokens.toLocaleString()
-              : "未报告"}
+            输入总量 {tokens(breakdown.inputTotal)} · 输出{" "}
+            {tokens(breakdown.output)}
           </p>
+          <p>
+            未缓存输入 {tokens(breakdown.uncachedInput)} · 缓存读取{" "}
+            {tokens(breakdown.cacheRead)}
+          </p>
+          <p>缓存创建 {tokens(breakdown.cacheCreation)}</p>
         </details>
       ) : null}
     </>
@@ -197,6 +205,7 @@ export function ConversationTimeline({
   onEdit,
   onReference,
   onOpen,
+  onOpenArtifact,
   onRetry,
   onCancel,
   onRetryChat,
@@ -230,7 +239,7 @@ export function ConversationTimeline({
   }, [conversation?.messages, pending, streaming, status, generations]);
 
   return (
-    <div className="relative min-h-0 flex-1 overflow-hidden">
+    <div className="relative min-h-0 flex-1">
       <div
         ref={scrollRef}
         role="log"
@@ -244,7 +253,7 @@ export function ConversationTimeline({
           setShowBottom(!following.current);
         }}
       >
-        <div className="mx-auto w-full max-w-[52rem] space-y-9 pb-3">
+        <div className="mx-auto w-full max-w-[52rem] space-y-8 pb-3">
           {(conversation?.messages ?? []).map((message) => {
             const isUser = message.role === "user";
             const active =
@@ -276,7 +285,7 @@ export function ConversationTimeline({
                   className={cn(
                     "min-w-0",
                     isUser
-                      ? "max-w-[90%] rounded-lg border border-border/70 bg-surface px-4 py-3 sm:max-w-[85%]"
+                      ? "smooth-surface studio-message relative max-w-[90%] rounded-xl border border-border/70 bg-surface px-4 py-3 sm:max-w-[85%]"
                       : "w-full",
                   )}
                 >
@@ -290,36 +299,37 @@ export function ConversationTimeline({
                     <p className="select-text whitespace-pre-wrap break-words text-[15px] leading-7 [overflow-wrap:anywhere]">
                       {message.content}
                     </p>
-                  ) : !generation ? (
+                  ) : !generation || Boolean(message.chatTurnId) ? (
                     <>
+                      <ActivityTrail
+                        status={message.chatStatus}
+                        history={message.chatActivityHistory}
+                        current={
+                          message.chatActivity ??
+                          (active ? "waiting_upstream" : undefined)
+                        }
+                        active={active}
+                        statusOverride={
+                          message.chatTurnId === managedTurnId &&
+                          connection !== "connected"
+                            ? connection === "reconnecting"
+                              ? "连接恢复中，任务可能仍在继续…"
+                              : "连接暂未恢复，生成状态待确认"
+                            : message.chatTurnId === managedTurnId
+                              ? (status ??
+                                (message.chatSearched && !message.content
+                                  ? chatActivityText({
+                                      activity: message.chatActivity,
+                                      searched: message.chatSearched,
+                                      status: message.chatStatus!,
+                                      text: message.content,
+                                    })
+                                  : undefined))
+                              : undefined
+                        }
+                      />
                       {active ? (
-                        <div
-                          role="status"
-                          className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs leading-5 text-text-muted"
-                        >
-                          <span className="flex min-w-0 items-center gap-2">
-                            <Loader2
-                              size={14}
-                              className={
-                                connection === "disconnected"
-                                  ? "shrink-0"
-                                  : "shrink-0 animate-spin"
-                              }
-                            />
-                            {message.chatTurnId === managedTurnId &&
-                            connection !== "connected"
-                              ? connection === "reconnecting"
-                                ? "连接恢复中，任务可能仍在继续…"
-                                : "连接暂未恢复，生成状态待确认"
-                              : message.chatTurnId === managedTurnId && status
-                                ? status
-                                : chatActivityText({
-                                    activity: message.chatActivity,
-                                    searched: message.chatSearched,
-                                    status: message.chatStatus!,
-                                    text: message.content,
-                                  })}
-                          </span>
+                        <div className="mb-3 text-xs text-text-muted">
                           <WaitingTime
                             since={message.chatStartedAt ?? message.createdAt}
                             hasText={Boolean(message.content)}
@@ -327,21 +337,28 @@ export function ConversationTimeline({
                         </div>
                       ) : null}
                       {message.content ? (
-                        <AssistantContent
-                          content={message.content}
-                          streaming={active}
-                          messageStatus={message.chatStatus ?? "completed"}
-                        />
-                      ) : null}
-                      <ReplyMetadata message={message} />
+                        <ResultBubble streaming={active}>
+                          <AssistantContent
+                            content={message.content}
+                            streaming={active}
+                            messageStatus={message.chatStatus ?? "completed"}
+                            onOpenArtifact={onOpenArtifact}
+                          />
+                          <ReplyMetadata message={message} />
+                        </ResultBubble>
+                      ) : (
+                        <ReplyMetadata message={message} />
+                      )}
                       <TextRenderReceipt message={message} />
                       {partial ? (
                         <p
                           role="status"
                           className="mt-3 text-xs leading-5 text-text-muted"
                         >
-                          {message.chatError ??
-                            "回复未完成，已保留收到的内容，本轮未收费"}
+                          {chatReplyErrorMessage(
+                            message.chatError ??
+                              "文字回复未完成，已保留收到的内容",
+                          )}
                         </p>
                       ) : null}
                     </>
@@ -353,6 +370,7 @@ export function ConversationTimeline({
                           ?.displayName ?? "图片生成"}
                       </p>
                       <GenerationCard
+                        showCredits={false}
                         generation={generation}
                         variant="conversation"
                         onOpen={onOpen}
@@ -361,6 +379,23 @@ export function ConversationTimeline({
                         onUseAsReference={onReference}
                       />
                     </>
+                  ) : null}
+                  {!isUser ? (
+                    <TurnCredits
+                      chat={
+                        message.chatTurnId
+                          ? (message.chatBilling ??
+                            readCreditSettlement(message.chatUsage?.billing))
+                          : generation
+                            ? NO_CREDIT_CHARGE
+                            : undefined
+                      }
+                      image={
+                        generation
+                          ? (generation.billing ?? message.generationBilling)
+                          : NO_CREDIT_CHARGE
+                      }
+                    />
                   ) : null}
                 </div>
                 <div className="mt-1 flex flex-wrap items-center gap-0.5">
@@ -416,7 +451,7 @@ export function ConversationTimeline({
           })}
           {pending ? (
             <article aria-label="正在发送的消息" className="flex justify-end">
-              <p className="max-w-[90%] select-text whitespace-pre-wrap break-words rounded-lg border border-border/70 bg-surface px-4 py-3 text-[15px] leading-7 [overflow-wrap:anywhere]">
+              <p className="smooth-surface studio-message relative max-w-[90%] select-text whitespace-pre-wrap break-words rounded-xl border border-border/70 bg-surface px-4 py-3 text-[15px] leading-7 [overflow-wrap:anywhere]">
                 {pending}
               </p>
             </article>
@@ -428,14 +463,20 @@ export function ConversationTimeline({
             >
               {streaming ? (
                 <>
-                  <p role="status" className="mb-3 text-xs text-text-muted">
-                    {status ?? "正在生成回复…"}
-                  </p>
-                  <AssistantContent
-                    content={streaming}
-                    streaming
-                    messageStatus="running"
+                  <ActivityTrail
+                    history={[]}
+                    current="answering"
+                    active
+                    statusOverride={status ?? undefined}
                   />
+                  <ResultBubble streaming>
+                    <AssistantContent
+                      content={streaming}
+                      streaming
+                      messageStatus="running"
+                      onOpenArtifact={onOpenArtifact}
+                    />
+                  </ResultBubble>
                 </>
               ) : (
                 <p className="flex items-center gap-2 text-sm text-text-muted">

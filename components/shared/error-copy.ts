@@ -38,7 +38,10 @@ export function friendlyErrorMessage(
   }
 
   if (code === "MODERATION_REJECTED") {
-    return message || "提示词或参考图包含不允许的内容，请调整后再试。";
+    return (
+      message ||
+      "[MODERATION_REJECTED] 提示词或参考图包含不允许的内容，请调整后再试。"
+    );
   }
 
   if (

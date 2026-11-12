@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { sizeLabel, type DockParams } from "../CommandDock";
 import { QualitySlider, qualityLabel } from "../QualitySlider";
 import type { ModelInfo } from "../lib/types";
+import { resolveGenerationOptions } from "../lib/generation-options";
 
 interface ParamsPanelProps {
   models: ModelInfo[];
@@ -71,7 +72,11 @@ export function ParamsPanel({
   onParamsChange,
 }: ParamsPanelProps) {
   const maxN = Math.min(model?.capabilities.maxN ?? 1, 4);
-  const sizes = model?.capabilities.sizes ?? [];
+  const {
+    sizes,
+    size: selectedSize,
+    outputFormat: selectedFormat,
+  } = resolveGenerationOptions(model, params);
   const qualities = model?.capabilities.qualities ?? [];
   const outputFormats = model?.capabilities.outputFormats ?? [];
 
@@ -104,7 +109,7 @@ export function ParamsPanel({
           {sizes.map((size) => (
             <OptionButton
               key={size}
-              active={(params.size ?? model?.defaults.size) === size}
+              active={selectedSize === size}
               onClick={() => onParamsChange({ size })}
             >
               {sizeLabel(size)}
@@ -189,14 +194,20 @@ export function ParamsPanel({
             {outputFormats.map((format) => (
               <OptionButton
                 key={format}
-                active={
-                  (params.outputFormat ?? model?.defaults.outputFormat) ===
-                  format
-                }
-                onClick={() => onParamsChange({ outputFormat: format })}
+                active={selectedFormat === format}
+                onClick={() => {
+                  const next = resolveGenerationOptions(model, {
+                    ...params,
+                    outputFormat: format,
+                  });
+                  onParamsChange({
+                    outputFormat: next.outputFormat,
+                    size: next.size,
+                  });
+                }}
                 className="h-7 px-2.5 uppercase"
               >
-                {format}
+                {format.toUpperCase()}
               </OptionButton>
             ))}
           </div>

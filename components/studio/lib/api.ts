@@ -244,6 +244,9 @@ export const updateConversation = (
     body: JSON.stringify(patch),
   });
 
+export const deleteConversation = (id: string) =>
+  updateConversation(id, { archived: true });
+
 export const archiveAllConversations = () =>
   request<{ archived: number }>("/api/conversations", { method: "DELETE" });
 
@@ -264,18 +267,28 @@ export const clearConversationMessages = (id: string) =>
 export const getConversationPricing = () =>
   request<ConversationPricing>("/api/conversations/chat");
 
-export const getChatContext = (conversationId: string, modelId?: string) =>
-  request<ChatContextStatus>(
-    `/api/conversations/context?${new URLSearchParams({
-      conversationId,
-      ...(modelId ? { modelId } : {}),
-    })}`,
+export const getChatContext = (
+  conversationId: string,
+  modelId?: string,
+  budgetTokens?: number,
+) => {
+  const search = new URLSearchParams({ conversationId });
+  if (modelId) search.set("modelId", modelId);
+  if (budgetTokens !== undefined)
+    search.set("budgetTokens", String(budgetTokens));
+  return request<ChatContextStatus>(
+    `/api/conversations/context?${search.toString()}`,
   );
+};
 
-export const compactChatContext = (conversationId: string, modelId: string) =>
+export const compactChatContext = (
+  conversationId: string,
+  modelId: string,
+  budgetTokens?: number,
+) =>
   request<ChatContextStatus>("/api/conversations/context", {
     method: "POST",
-    body: JSON.stringify({ conversationId, modelId }),
+    body: JSON.stringify({ conversationId, modelId, budgetTokens }),
   });
 
 export const compileConversationPrompt = (input: {

@@ -8,8 +8,30 @@ import type {
 } from "@/lib/conversation";
 import type { Image2ChannelDisplayNameMap } from "@/lib/provider-channels";
 import { privateImageThumbnailUrl, privateImageUrl } from "@/lib/storage";
+import { loadGenerationBilling } from "@/lib/generation-billing";
+import {
+  chatCreditSettlement,
+  chatReplyErrorMessage,
+  readCreditSettlement,
+} from "@/lib/turn-credit-types";
 
 const conversationInclude = {
+  chatTurns: {
+    select: {
+      id: true,
+      activeAttemptId: true,
+      chargedCredits: true,
+      attempts: {
+        select: {
+          id: true,
+          ordinal: true,
+          billingState: true,
+          heldCredits: true,
+          usage: true,
+        },
+      },
+    },
+  },
   messages: {
     include: {
       generation: {
@@ -164,6 +186,7 @@ function generationMessageMeta(
     generationStartedAt: generation.startedAt?.toISOString() ?? null,
     generationFinishedAt: generation.finishedAt?.toISOString() ?? null,
     generationProgress: generation.progress,
+    generationCostCredits: generation.costCredits,
   };
 }
 
@@ -175,10 +198,44 @@ function serializeChatReferences(value: unknown) {
   }
 }
 
-export function serializeConversation(
+export async function serializeConversation(
   row: ConversationWithMessages,
   options: { displayNameMap?: Image2ChannelDisplayNameMap } = {},
-): ConversationView {
+): Promise<ConversationView> {
+  const generationBilling = await loadGenerationBilling(
+    row.userId,
+    row.messages.flatMap((message) =>
+      message.generation ? [message.generation] : [],
+    ),
+  );
+  const chatAttempts = new Map(
+    (row.chatTurns ?? []).flatMap((turn) =>
+      turn.attempts.map(
+        (attempt) =>
+          [
+            attempt.id,
+            {
+              number: attempt.ordinal,
+              billing:
+                readCreditSettlement(
+                  (attempt.usage as Record<string, unknown> | null)?.billing,
+                ) ??
+                (attempt.billingState === "charged" &&
+                turn.activeAttemptId !== attempt.id
+                  ? { state: "unknown", chargedCredits: null }
+                  : chatCreditSettlement({
+                      billingState: attempt.billingState,
+                      heldCredits: attempt.heldCredits,
+                      chargedCredits:
+                        attempt.billingState === "charged"
+                          ? turn.chargedCredits
+                          : 0,
+                    })),
+            },
+          ] as const,
+      ),
+    ),
+  );
   return {
     id: row.id,
     title: row.title,
@@ -192,6 +249,15 @@ export function serializeConversation(
       chatTurnId: message.chatTurnId ?? undefined,
       chatAttemptId: message.chatAttemptId ?? undefined,
       chatStatus: message.chatStatus ?? undefined,
+      chatAttemptNumber: message.chatAttemptId
+        ? chatAttempts.get(message.chatAttemptId)?.number
+        : undefined,
+      chatBilling: message.chatAttemptId
+        ? (chatAttempts.get(message.chatAttemptId)?.billing ??
+          readCreditSettlement(
+            (message.chatUsage as Record<string, unknown> | null)?.billing,
+          ))
+        : undefined,
       chatReferences: serializeChatReferences(message.chatReferences),
       chatSources: Array.isArray(message.chatSources)
         ? (message.chatSources as unknown as import("@/lib/chat-search").ChatSearchSource[])
@@ -202,17 +268,27 @@ export function serializeConversation(
         !Array.isArray(message.chatUsage)
           ? (message.chatUsage as Record<string, unknown>)
           : null,
+      chatActivityHistory:
+        Array.isArray(message.chatActivityHistory) &&
+        message.chatActivityHistory.every((item) => typeof item === "string")
+          ? message.chatActivityHistory
+          : [],
       chatError:
         message.chatError &&
         typeof message.chatError === "object" &&
         !Array.isArray(message.chatError)
-          ? String(
-              (message.chatError as Record<string, unknown>).publicMessage ??
-                "本次回复未完成，内容已保存",
+          ? chatReplyErrorMessage(
+              String(
+                (message.chatError as Record<string, unknown>).publicMessage ??
+                  "本次回复未完成，内容已保存",
+              ),
             )
           : null,
       createdAt: message.createdAt.toISOString(),
       ...(generationMessageMeta(message.generation, options) ?? {}),
+      ...(message.generationId
+        ? { generationBilling: generationBilling.get(message.generationId) }
+        : {}),
     })),
   };
 }

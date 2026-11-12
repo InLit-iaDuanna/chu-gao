@@ -1,5 +1,7 @@
 "use client";
 
+import { formatCallTime } from "@/lib/model-call-types";
+
 import { useCallback, useEffect, useState } from "react";
 import {
   AlertTriangle,
@@ -122,11 +124,11 @@ function ErrorLogPanel({
                   <span className="text-xs font-medium">{p.name}</span>
                   {p.lastErrorAt && (
                     <span className="text-[10px] text-text-faint">
-                      {new Date(p.lastErrorAt).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                      {formatCallTime(p.lastErrorAt)} 北京时间
                     </span>
                   )}
                 </div>
-                <p className="mt-0.5 truncate font-mono text-[11px] text-danger/80">{p.lastErrorMsg}</p>
+                <p className="mt-0.5 whitespace-pre-wrap break-all font-mono text-[11px] text-danger/80">{p.lastErrorMsg}</p>
               </div>
               <button
                 type="button"
@@ -584,10 +586,10 @@ function ProviderCard({
           <div className="flex items-start gap-2">
             {provider.lastErrorAt && (
               <span className="mt-0.5 shrink-0 text-[10px] text-danger/60">
-                {new Date(provider.lastErrorAt).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                {formatCallTime(provider.lastErrorAt)} 北京时间
               </span>
             )}
-            <p className="flex-1 text-[11px] text-danger">{provider.lastErrorMsg}</p>
+            <p className="min-w-0 flex-1 whitespace-pre-wrap break-all text-[11px] text-danger">{provider.lastErrorMsg}</p>
           </div>
         </div>
       )}

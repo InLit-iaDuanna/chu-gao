@@ -60,9 +60,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     ref,
   ): React.ReactElement {
     const classes = cn(
-      "relative inline-flex shrink-0 items-center justify-center gap-2 rounded-md font-medium [&_svg]:shrink-0",
+      "ui-button relative inline-flex shrink-0 items-center justify-center gap-2 rounded-md font-medium [&_svg]:shrink-0",
       "transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] ease-[var(--ease-out)]",
-      "active:translate-y-px motion-reduce:active:translate-y-0",
       "disabled:cursor-not-allowed disabled:opacity-100 disabled:active:translate-y-0",
       variant !== "link" && sizeClass[size],
       variantClass[variant],

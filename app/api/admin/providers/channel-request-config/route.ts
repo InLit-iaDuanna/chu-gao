@@ -8,6 +8,7 @@ import {
 import {
   DEFAULT_CHANNEL_REQUEST_CONFIG,
   getChannelRequestConfigMap,
+  getChannelRequestConfig,
   setChannelRequestConfig,
 } from "@/lib/provider-channel-request-config";
 import { readJsonBodySafe } from "@/lib/request-body";
@@ -70,6 +71,10 @@ export async function PATCH(request: Request) {
     : undefined;
 
   const configs = await setChannelRequestConfig(parsed.data.baseUrl, {
+    supportsGif:
+      parsed.data.supportsGif ??
+      (await getChannelRequestConfig(parsed.data.baseUrl)).supportsGif ??
+      false,
     sizes: parsed.data.sizes ?? [],
     quality: "auto",
     responseFormat:
@@ -86,6 +91,7 @@ export async function PATCH(request: Request) {
       sizeCount: parsed.data.sizes?.length ?? 0,
       responseFormat: parsed.data.responseFormat,
       hasTemplate: Boolean(bodyTemplate),
+      supportsGif: parsed.data.supportsGif,
     },
     request,
   });

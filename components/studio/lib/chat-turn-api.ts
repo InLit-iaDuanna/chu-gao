@@ -9,6 +9,7 @@ import { isApiError, request } from "./api";
 import { prepareChatCreate, resolveChatSubmission } from "./chat-submission";
 import { chatHasSearched, type ManagedChatView } from "./chat-turn-view";
 import type { ChatStreamHandlers } from "./sse";
+import { chatReplyErrorMessage } from "@/lib/turn-credit-types";
 
 export const getActiveChatTurn = (conversationId: string) =>
   request<ChatTurnView | null>(
@@ -33,12 +34,30 @@ export const retryManagedChat = (
 
 const activityText: Record<string, string> = {
   queued: "已接受，正在排队…",
+  context: "正在整理上下文…",
   preparing_context: "正在整理上下文…",
   waiting_upstream: "正在等待模型响应…",
   reasoning: "正在思考…",
   searching: "正在联网检索…",
+  image_tool: "正在准备生图…",
+  image_generating: "正在生成图片…",
   answering: "正在生成回复…",
+  retrying: "连接中断，正在重试…",
 };
+
+export const chatActivityLabel = (activity: string) =>
+  activityText[activity] ?? "正在处理…";
+
+export function appendChatActivity(
+  history: string[] | undefined,
+  activity: string | undefined,
+) {
+  const next = Array.isArray(history)
+    ? history.filter((value): value is string => typeof value === "string")
+    : [];
+  if (activity && next.at(-1) !== activity) next.push(activity);
+  return next;
+}
 export function chatActivityText(
   view: Pick<
     ManagedChatView,
@@ -54,7 +73,7 @@ export function chatActivityText(
     return `${recovery?.continuing ? "连接中断，正在续写" : "连接中断，正在重试"}（${recovery?.used ?? 1}/${recovery?.limit ?? 2}）…`;
   }
   if (chatHasSearched(view) && !view.text) return "检索已完成，正在等待回复…";
-  return activityText[view.activity ?? view.status] ?? "正在等待模型响应…";
+  return chatActivityLabel(view.activity ?? view.status);
 }
 
 function pause(ms: number, signal?: AbortSignal) {
@@ -97,6 +116,7 @@ export async function followChatTurn(
     if (signal?.aborted) return;
     handlers.onTurn?.(view);
     handlers.onReplace?.(view.text);
+    if (view.generationId) handlers.onGeneration?.(view.generationId);
   };
   const finish = () => {
     if (!chatIsTerminal(view.status) || signal?.aborted) return;
@@ -105,7 +125,9 @@ export async function followChatTurn(
     if (view.status === "completed") handlers.onDone();
     else
       handlers.onError(
-        view.error?.message ?? "本次回复未完成，已有内容已保存，本轮未收费",
+        chatReplyErrorMessage(
+          view.error?.message ?? "文字回复未完成，已有内容已保存",
+        ),
       );
   };
   const reconcile = async () => {
@@ -191,6 +213,12 @@ export async function followChatTurn(
                 view = {
                   ...view,
                   activity: String(data.activity),
+                  activityHistory: appendChatActivity(
+                    Array.isArray(data.activityHistory)
+                      ? (data.activityHistory as string[])
+                      : view.activityHistory,
+                    String(data.activity),
+                  ),
                   searched: Boolean(data.searched ?? view.searched),
                   ...(data.recovery && typeof data.recovery === "object"
                     ? {
@@ -230,6 +258,12 @@ export async function followChatTurn(
                     ...view,
                     sources: data.sources as ChatTurnView["sources"],
                   };
+                break;
+              case "generation.created":
+                if (typeof data.generationId === "string") {
+                  view = { ...view, generationId: data.generationId };
+                  handlers.onGeneration?.(data.generationId);
+                }
                 break;
               case "usage.updated":
                 if (data.usage && typeof data.usage === "object")

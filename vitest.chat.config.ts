@@ -12,6 +12,8 @@ export default defineConfig({
       "lib/chat-runtime-*.test.ts",
       "lib/chat-turns.integration.test.ts",
       "lib/chat-ledger-audit.test.ts",
+      "lib/chat-token-*.test.ts",
+      "lib/chat-opus-*.test.ts",
       "components/studio/lib/chat-turn-api.test.ts",
     ],
     setupFiles: [],

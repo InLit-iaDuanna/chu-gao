@@ -5,6 +5,19 @@ import { db } from "@/lib/db";
 import { getChatProfile } from "@/lib/chat-profiles";
 import { debitChatCredits } from "@/lib/chat-billing";
 import {
+  chatInputTokenUpperBound,
+  chatTokenCost,
+  chatTokenReserve,
+  normalizeChatTokenUsage,
+  readChatTokenPricingSnapshot,
+} from "@/lib/chat-token-billing";
+import { prepareChatContext } from "@/lib/chat-context";
+import { normalizeChatContextBudget } from "@/lib/chat-context-types";
+import {
+  chatCompletionsRequestBody,
+  type UpstreamChatMessage,
+} from "@/lib/chat-upstream";
+import {
   closeChatReserve,
   operationHash,
   recordChatReserve,
@@ -21,7 +34,9 @@ import {
 import {
   LUNA_MODEL_ID,
   SOL_MODEL_ID,
+  OPUS_MODEL_ID,
   REASONING_EFFORTS,
+  type ReasoningEffort,
 } from "@/lib/chat-model-options";
 import {
   chatIsTerminal,
@@ -35,17 +50,28 @@ import {
   normalizeChatReferences,
 } from "@/lib/chat-references-types";
 import { resolveChatReferences } from "@/lib/chat-references";
+import { CHAT_IMAGE_TOOL } from "@/lib/chat-image-tool-definition";
+import {
+  chatCreditSettlement,
+  chatReplyErrorMessage,
+} from "@/lib/turn-credit-types";
 
 export const chatTurnSchema = z
   .object({
     conversationId: z.string().min(1).max(128),
     clientRequestId: z.string().min(8).max(128),
     content: z.string().trim().min(1).max(128_000),
-    modelId: z.enum(["default", LUNA_MODEL_ID, SOL_MODEL_ID]),
+    modelId: z.enum(["default", LUNA_MODEL_ID, SOL_MODEL_ID, OPUS_MODEL_ID]),
+    contextBudgetTokens: z.number().int().optional(),
     reasoningEffort: z.enum(REASONING_EFFORTS).optional(),
     webSearch: z.boolean().default(false),
     referenceImageKeys: z.array(z.string().min(1).max(512)).max(8).default([]),
     sourceImageIds: z.array(z.string().min(1).max(128)).max(8).default([]),
+    imageModelId: z.string().min(1).max(128).optional(),
+    imageSize: z.string().min(1).max(32).optional(),
+    imageQuality: z.string().min(1).max(32).optional(),
+    imageOutputFormat: z.string().min(1).max(16).optional(),
+    imageN: z.number().int().min(1).max(4).optional(),
     references: chatReferencesSchema.optional(),
   })
   .strict()
@@ -70,6 +96,13 @@ const object = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
+
+function readActivityHistory(value: unknown): string[] {
+  const history = object(value).activityHistory;
+  return Array.isArray(history)
+    ? history.filter((item): item is string => typeof item === "string")
+    : [];
+}
 
 export async function appendChatEvent(
   tx: Prisma.TransactionClient,
@@ -238,14 +271,20 @@ export async function getChatTurn(
         error: {
           code: queueExpired ? "QUEUE_TIMEOUT" : "EXECUTION_LEASE_LOST",
           publicMessage: queueExpired
-            ? "排队等待超时，本轮未收费；可以稍后重试"
-            : "任务执行已中断，已有内容已保存，本轮未收费；可以重新生成",
+            ? "排队等待超时，文字回复未收费；可以稍后重试"
+            : "文字回复已中断，已有内容已保存，文字回复未收费；可以重新生成回复",
         },
       });
       return getChatTurn(userId, id, false);
     }
   }
   const error = object(attempt.error);
+  const assistant = db.conversationMessage
+    ? await db.conversationMessage.findFirst({
+        where: { chatAttemptId: attempt.id, role: "ASSISTANT" },
+        select: { generationId: true },
+      })
+    : null;
   return {
     id: turn.id,
     conversationId: turn.conversationId,
@@ -262,7 +301,7 @@ export async function getChatTurn(
       ? {
           message:
             typeof error.publicMessage === "string"
-              ? error.publicMessage
+              ? chatReplyErrorMessage(error.publicMessage)
               : "本次回复未完成，已保存收到的内容",
           code: typeof error.code === "string" ? error.code : undefined,
         }
@@ -270,8 +309,14 @@ export async function getChatTurn(
     priceCredits: turn.priceCredits,
     chargedCredits: turn.chargedCredits,
     billingState: attempt.billingState,
+    billing: chatCreditSettlement({
+      billingState: attempt.billingState,
+      chargedCredits: turn.chargedCredits,
+      heldCredits: attempt.heldCredits,
+    }),
     lastSeq: turn.nextSeq,
     activity: attempt.activity,
+    activityHistory: readActivityHistory(attempt.parts),
     parts: attempt.parts,
     timings: {
       ...object(attempt.timings),
@@ -282,6 +327,9 @@ export async function getChatTurn(
     createdAt: attempt.createdAt.toISOString(),
     startedAt: attempt.startedAt?.toISOString() ?? null,
     protocolVersion: attempt.protocolVersion,
+    ...(assistant?.generationId
+      ? { generationId: assistant.generationId }
+      : {}),
   };
 }
 
@@ -384,6 +432,13 @@ export async function createChatTurn(
   if (existing) return existing;
   await assertChatRuntimeAdmission(userId, input.modelId);
   const config = await getChatProfile(input.modelId);
+  const contextBudgetTokens = normalizeChatContextBudget(
+    input.modelId,
+    input.contextBudgetTokens,
+  );
+  const tokenPricing = readChatTokenPricingSnapshot(
+    "tokenPricing" in config ? config.tokenPricing : undefined,
+  );
   const references = normalizeChatReferences(input);
   if (!config.enabled || !config.apiKey)
     throw new ChatTurnError("SERVICE_UNAVAILABLE", "所选对话模型未配置", 503);
@@ -411,7 +466,58 @@ export async function createChatTurn(
     await getConversationSystemPrompt(),
     input.webSearch,
     false,
+    true,
   );
+  const runtimeTime = chatTimeInstruction();
+  const effort = input.reasoningEffort ?? config.efforts[0] ?? null;
+  let contextRevision: number | null = null;
+  let tokenRequestLimits:
+    | { maxInputTokens: number; maxOutputTokens: number; maxRequests: number }
+    | undefined;
+  if (tokenPricing) {
+    const buildRequest = (messages: UpstreamChatMessage[]) =>
+      chatCompletionsRequestBody(config.model, messages, instructions, {
+        effort: effort as ReasoningEffort,
+        maxOutputTokens: tokenPricing.maxOutputTokens,
+        includeUsage: true,
+        tools: [CHAT_IMAGE_TOOL],
+      });
+    const prepared = await prepareChatContext({
+      userId,
+      conversationId: input.conversationId,
+      modelId: input.modelId,
+      latestMessage: {
+        role: "user",
+        content: `${input.content}\n\n[本轮运行时间]\n${runtimeTime}`,
+      },
+      references,
+      instructions,
+      buildRequest,
+      budgetTokens: contextBudgetTokens,
+      skipCompaction: true,
+    });
+    const bound = chatInputTokenUpperBound(buildRequest(prepared.messages));
+    if (bound > tokenPricing.maxInputTokens)
+      throw new ChatTurnError(
+        "CHAT_CONTEXT_TOO_LARGE",
+        "请求超出计费输入上限，请压缩上下文后重试",
+        413,
+      );
+    tokenRequestLimits = {
+      maxInputTokens: tokenPricing.maxInputTokens,
+      maxOutputTokens: tokenPricing.maxOutputTokens,
+      maxRequests: 2,
+    };
+    // One tool round and one final reply. The continuation allowance covers
+    // the validated image arguments and the small submission receipt.
+    tokenPricing.maxInputTokens =
+      bound + Math.min(tokenPricing.maxInputTokens, bound + 32_768);
+    tokenPricing.maxOutputTokens *= tokenRequestLimits.maxRequests;
+    contextRevision = prepared.manifest.revision;
+  }
+  const reserveCredits = tokenPricing
+    ? chatTokenReserve(tokenPricing)
+    : config.credits;
   try {
     const turnId = await db.$transaction(
       async (tx) => {
@@ -421,7 +527,7 @@ export async function createChatTurn(
         );
         const owned = await tx.conversation.findFirst({
           where: { id: input.conversationId, userId, archivedAt: null },
-          select: { id: true },
+          select: { id: true, contextRevision: true },
         });
         if (!owned) throw new ChatTurnError("NOT_FOUND", "对话不存在", 404);
         const replay = await tx.chatRequestReceipt.findUnique({
@@ -449,6 +555,15 @@ export async function createChatTurn(
           return replay.turnId;
         }
         if (
+          contextRevision !== null &&
+          owned.contextRevision !== contextRevision
+        )
+          throw new ChatTurnError(
+            "CHAT_CONTEXT_CHANGED",
+            "历史消息已变化，请重新发送",
+            409,
+          );
+        if (
           await tx.chatTurn.findUnique({
             where: { activeConversationId: input.conversationId },
           })
@@ -466,10 +581,10 @@ export async function createChatTurn(
         const [clock] = await tx.$queryRaw<
           Array<{ now: Date }>
         >`SELECT CURRENT_TIMESTAMP AS "now"`;
-        if (!(await debitChatCredits(tx, userId, config.credits)).count)
+        if (!(await debitChatCredits(tx, userId, reserveCredits)).count)
           throw new ChatTurnError(
             "INSUFFICIENT_CREDITS",
-            `可用余额不足，需要预留 ${config.credits} 积分`,
+            `可用余额不足，需要预留 ${reserveCredits} 积分`,
             402,
           );
         await assertChatConcurrency(tx, userId);
@@ -485,11 +600,12 @@ export async function createChatTurn(
               model: config.model,
               baseUrl: config.baseUrl,
               transport: config.transport,
+              ...(tokenPricing ? { tokenPricing } : {}),
+              ...(tokenRequestLimits ? { tokenRequestLimits } : {}),
+              contextBudgetTokens,
               instructions,
-              runtimeTime: chatTimeInstruction(),
-              effort:
-                input.reasoningEffort ??
-                (config.efforts.length ? config.efforts[0] : null),
+              runtimeTime,
+              effort,
               profileVersion: operationHash({
                 model: config.model,
                 baseUrl: config.baseUrl,
@@ -498,10 +614,11 @@ export async function createChatTurn(
                 efforts: config.efforts,
                 vision: config.vision,
                 webSearch: config.webSearch,
+                ...(tokenPricing ? { tokenPricing } : {}),
               }),
             }),
             modelId: input.modelId,
-            priceCredits: config.credits,
+            priceCredits: reserveCredits,
             activeConversationId: input.conversationId,
             activeAttemptId: attemptId,
           },
@@ -511,7 +628,7 @@ export async function createChatTurn(
             id: attemptId,
             turnId: turn.id,
             ordinal: 1,
-            heldCredits: config.credits,
+            heldCredits: reserveCredits,
             protocolVersion: CHAT_TASK_PROTOCOL_VERSION,
             queueDeadline: admission.queueTimeoutMs
               ? new Date(clock.now.getTime() + admission.queueTimeoutMs)
@@ -526,7 +643,7 @@ export async function createChatTurn(
           userId,
           turnId: turn.id,
           attemptId,
-          amount: config.credits,
+          amount: reserveCredits,
         });
         await tx.chatRequestReceipt.create({
           data: {
@@ -572,7 +689,7 @@ export async function createChatTurn(
             config.transport === "responses_sse"
               ? "native_responses"
               : "chat_completions",
-          reservedCredits: config.credits,
+          reservedCredits: reserveCredits,
         });
         return turn.id;
       },
@@ -657,12 +774,63 @@ export async function finishChatAttempt(input: {
       const text = input.text ?? attempt.rawText;
       if (status === "completed" && !text.trim()) status = "incomplete";
       const success = status === "completed";
+      const tokenPricing = readChatTokenPricingSnapshot(
+        object(turn.configSnapshot).tokenPricing,
+      );
+      if (turn.modelId === OPUS_MODEL_ID && !tokenPricing)
+        throw new Error("MISSING_CHAT_TOKEN_PRICING_SNAPSHOT");
+      const rawUsage = input.usage !== undefined ? input.usage : attempt.usage;
+      const normalized = tokenPricing
+        ? normalizeChatTokenUsage(rawUsage)
+        : null;
+      const usageUnknown = success && normalized?.availability === "unknown";
+      const actualUsageCredits =
+        tokenPricing && normalized?.availability === "reported"
+          ? chatTokenCost(normalized.tokens, tokenPricing.pricing)
+          : null;
+      const usageInvalid =
+        success &&
+        tokenPricing &&
+        normalized?.availability === "reported" &&
+        (normalized.tokens.inputTokens > tokenPricing.maxInputTokens ||
+          normalized.tokens.outputTokens > tokenPricing.maxOutputTokens ||
+          actualUsageCredits! > attempt.heldCredits);
+      const chargedCredits =
+        !success || usageUnknown || usageInvalid
+          ? 0
+          : tokenPricing && normalized?.availability === "reported"
+            ? chatTokenCost(normalized.tokens, tokenPricing.pricing)
+            : attempt.heldCredits;
+      const billingState = usageUnknown
+        ? "usage_unknown"
+        : usageInvalid
+          ? "usage_invalid"
+          : success
+            ? "charged"
+            : "released";
+      const billing = {
+        state: billingState,
+        chargedCredits,
+        ...(tokenPricing
+          ? {
+              tokenPricing,
+              usageAvailability: normalized!.availability,
+              ...(normalized?.availability === "reported"
+                ? { tokens: normalized.tokens, actualUsageCredits }
+                : { reason: normalized!.reason }),
+              ...(usageInvalid
+                ? { reason: "usage_exceeds_reserved_bounds" }
+                : {}),
+            }
+          : {}),
+      };
+      const usage = { ...object(rawUsage), billing };
       const error =
         input.error ??
         (status === "incomplete"
           ? {
               code: "EMPTY_OR_INCOMPLETE_RESPONSE",
-              publicMessage: "回复未完成，本轮未收费",
+              publicMessage: "文字回复未完成，文字回复未收费",
             }
           : undefined);
       // The initial debit is a hold against available balance, not a second charge.
@@ -673,7 +841,9 @@ export async function finishChatAttempt(input: {
           turnId: turn.id,
           attemptId: attempt.id,
           amount: attempt.heldCredits,
-          success,
+          success: success && !usageUnknown && !usageInvalid,
+          actualCredits: chargedCredits,
+          ...(billing ? { result: json(billing) } : {}),
         });
         if (success)
           await tx.usageLog.create({
@@ -682,12 +852,12 @@ export async function finishChatAttempt(input: {
               userId: turn.userId,
               modelId: String(object(turn.configSnapshot).model),
               action: "conversation.chat",
-              creditsDelta: -attempt.heldCredits,
+              creditsDelta: chargedCredits ? -chargedCredits : 0,
               metadata: json({
                 turnId: turn.id,
                 attemptId: attempt.id,
-                chargedCredits: attempt.heldCredits,
-                usage: input.usage ?? attempt.usage ?? null,
+                chargedCredits,
+                usage: usage ?? null,
               }),
             },
           });
@@ -695,14 +865,14 @@ export async function finishChatAttempt(input: {
       const data = {
         status,
         rawText: text,
-        billingState: success ? "charged" : "released",
+        billingState,
         finishedAt: new Date(),
         ...(input.parts !== undefined ? { parts: json(input.parts) } : {}),
         ...(input.sources !== undefined
           ? { sources: json(input.sources) }
           : {}),
-        ...(input.usage !== undefined
-          ? { usage: input.usage === null ? Prisma.DbNull : json(input.usage) }
+        ...(input.usage !== undefined || tokenPricing
+          ? { usage: usage == null ? Prisma.DbNull : json(usage) }
           : {}),
         ...(error !== undefined ? { error: json(error) } : {}),
       };
@@ -716,12 +886,11 @@ export async function finishChatAttempt(input: {
             input.sources !== undefined
               ? json(input.sources)
               : (attempt.sources ?? Prisma.DbNull),
-          chatUsage:
-            input.usage !== undefined
-              ? input.usage === null
-                ? Prisma.DbNull
-                : json(input.usage)
-              : (attempt.usage ?? Prisma.DbNull),
+          chatUsage: usage == null ? Prisma.DbNull : json(usage),
+          chatActivityHistory:
+            input.parts === undefined
+              ? undefined
+              : json(readActivityHistory(input.parts)),
           chatError: error ? json(error) : Prisma.DbNull,
         },
       });
@@ -730,7 +899,7 @@ export async function finishChatAttempt(input: {
         data: {
           status,
           activeConversationId: null,
-          chargedCredits: success ? attempt.heldCredits : turn.chargedCredits,
+          chargedCredits: success ? chargedCredits : turn.chargedCredits,
         },
       });
       const account = await tx.user.findUniqueOrThrow({
@@ -742,9 +911,9 @@ export async function finishChatAttempt(input: {
         partial: !success && Boolean(text),
         text,
         sources: input.sources ?? attempt.sources ?? [],
-        usage: input.usage ?? attempt.usage ?? null,
+        usage: usage ?? null,
         usageAvailability:
-          (input.usage ?? attempt.usage) ? "reported" : "unknown",
+          normalized?.availability ?? (rawUsage ? "reported" : "unknown"),
         error: error
           ? {
               message:
@@ -754,8 +923,8 @@ export async function finishChatAttempt(input: {
             }
           : null,
         billing: {
-          state: success ? "charged" : "released",
-          chargedCredits: success ? attempt.heldCredits : 0,
+          state: billingState,
+          chargedCredits,
           balance: account.credits,
         },
       });
@@ -783,7 +952,7 @@ export async function cancelChatTurn(
     status: "cancelled",
     error: {
       code: "USER_CANCEL",
-      publicMessage: "已停止，收到的内容已保存，本轮未收费",
+      publicMessage: "文字回复已停止，收到的内容已保存，文字回复未收费",
     },
   });
   return getChatTurn(userId, id);
@@ -900,12 +1069,34 @@ export async function retryChatTurn(
     if (!(await debitChatCredits(tx, userId, turn.priceCredits)).count)
       throw new ChatTurnError("INSUFFICIENT_CREDITS", "可用积分不足", 402);
     await assertChatConcurrency(tx, userId);
+    const imageReply = await tx.conversationMessage.findFirst({
+      where: { chatTurnId: id, role: "ASSISTANT", generationId: { not: null } },
+      orderBy: { createdAt: "desc" },
+      select: {
+        generation: {
+          select: { id: true, status: true, modelId: true, prompt: true },
+        },
+      },
+    });
+    const image = imageReply?.generation;
     const attempt = await tx.chatAttempt.create({
       data: {
         turnId: id,
         ordinal: latest.ordinal + 1,
         retryRequestId: `${userId}:${clientRequestId}`,
         heldCredits: turn.priceCredits,
+        ...(image
+          ? {
+              parts: json({
+                imageContinuation: {
+                  generationId: image.id,
+                  status: image.status,
+                  modelId: image.modelId,
+                  prompt: image.prompt,
+                },
+              }),
+            }
+          : {}),
         mode: latest.mode,
         protocolVersion: CHAT_TASK_PROTOCOL_VERSION,
         queueDeadline: admission.queueTimeoutMs

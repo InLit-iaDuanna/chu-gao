@@ -5,7 +5,6 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { useEffect, type ComponentProps, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -13,11 +12,9 @@ const mocks = vi.hoisted(() => ({
   pathname: "/app/history",
   push: vi.fn(),
   list: vi.fn(),
-  update: vi.fn(),
   me: vi.fn(),
   select: vi.fn(),
   newConversation: vi.fn(),
-  updateConversation: vi.fn(),
   redirect: vi.fn((href: string) => {
     throw new Error("redirect:" + href);
   }),
@@ -44,7 +41,6 @@ vi.mock("next/link", () => ({
 vi.mock("./lib/api", () => ({
   getMe: mocks.me,
   listConversations: mocks.list,
-  updateConversation: mocks.update,
 }));
 vi.mock("./TopBar", () => ({
   TopBar: ({ title, leading }: { title: string; leading: ReactNode }) => (
@@ -71,7 +67,6 @@ function StudioControls() {
       disabled: false,
       onSelect: mocks.select,
       onNew: mocks.newConversation,
-      onUpdate: mocks.updateConversation,
     });
     return () => setStudioNavigation(null);
   }, [setStudioNavigation]);
@@ -203,60 +198,8 @@ describe("shared workspace navigation", () => {
     ).toBeVisible();
   });
 
-  it("renames and deletes the active conversation from the sidebar", async () => {
-    const user = userEvent.setup();
-    mocks.pathname = "/app";
-    mocks.update
-      .mockResolvedValueOnce({ id: "thread-1", title: "庭院新方案" })
-      .mockResolvedValueOnce({
-        id: "thread-1",
-        title: "庭院新方案",
-        archived: true,
-      });
-    render(
-      <WorkspaceShell>
-        <StudioControls />
-      </WorkspaceShell>,
-    );
-    const actions = await screen.findByRole("button", {
-      name: "对话操作：庭院方案",
-    });
-    await waitFor(() => expect(actions).toBeEnabled());
-
-    await user.click(actions);
-    await user.click(await screen.findByRole("menuitem", { name: "重命名" }));
-    const input = screen.getByRole("textbox", { name: "对话名称" });
-    await user.clear(input);
-    await user.type(input, "庭院新方案");
-    await user.click(screen.getByRole("button", { name: "保存" }));
-
-    expect(mocks.update).toHaveBeenCalledWith("thread-1", {
-      title: "庭院新方案",
-    });
-    expect(mocks.updateConversation).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "thread-1", title: "庭院新方案" }),
-    );
-    expect(
-      await screen.findByRole("button", { name: "庭院新方案" }),
-    ).toBeInTheDocument();
-
-    await user.click(
-      screen.getByRole("button", { name: "对话操作：庭院新方案" }),
-    );
-    await user.click(await screen.findByRole("menuitem", { name: "删除" }));
-    await user.click(screen.getByRole("button", { name: "删除" }));
-
-    expect(mocks.update).toHaveBeenCalledWith("thread-1", { archived: true });
-    expect(mocks.newConversation).toHaveBeenCalledOnce();
-    await waitFor(() =>
-      expect(
-        screen.queryByRole("button", { name: "庭院新方案" }),
-      ).not.toBeInTheDocument(),
-    );
-  });
-
   it.each([CanvasPage, NodesPage])(
-    "keeps both canvas routes available",
+    "keeps the node canvas available from its legacy URLs",
     (page) => {
       expect(page()).toBeTruthy();
       expect(mocks.redirect).not.toHaveBeenCalled();

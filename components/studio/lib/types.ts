@@ -2,6 +2,7 @@
 // 唯一事实来源是 app/api/* 路由，不依赖任何旧前端代码。
 
 import type { ChatModelOption } from "@/lib/chat-model-options";
+import type { ModelCapabilities } from "@/lib/models/types";
 
 export type GenerationStatus =
   | "PENDING"
@@ -46,6 +47,7 @@ export interface Generation {
   errorMessage: string | null;
   credits: number;
   costCredits: number;
+  billing?: import("@/lib/turn-credit-types").CreditSettlement;
   attempts: number;
   startedAt: string | null;
   finishedAt: string | null;
@@ -165,21 +167,7 @@ export interface ModelInfo {
   vendor: string;
   protocol: string;
   tagline?: string;
-  capabilities: {
-    sizes: string[];
-    qualities?: string[];
-    responseFormats: string[];
-    resolutions: string[];
-    image2Modes?: ("standard" | "high")[];
-    supportsReferenceImage: boolean;
-    maxReferenceImages: number;
-    supportsNegativePrompt: boolean;
-    supportsSeed: boolean;
-    maxN: number;
-    outputFormats: string[];
-    backgrounds: string[];
-    supportsOutputCompression: boolean;
-  };
+  capabilities: ModelCapabilities;
   defaults: {
     size: string;
     quality?: string;
@@ -190,6 +178,7 @@ export interface ModelInfo {
     outputCompression?: number;
   };
   pricingRules?: ModelPricingRule[];
+  fallbackCostMultiplier?: number;
   available: boolean;
   providerChannels?: ProviderChannelInfo[];
 }
@@ -207,7 +196,9 @@ export interface ConversationMessage {
   chatError?: string | null;
   chatSources?: import("@/lib/chat-search").ChatSearchSource[];
   chatUsage?: Record<string, unknown> | null;
+  chatBilling?: import("@/lib/turn-credit-types").CreditSettlement | null;
   chatActivity?: string;
+  chatActivityHistory?: string[];
   chatSearched?: boolean;
   chatStartedAt?: string;
   chatLastSeq?: number;
@@ -225,6 +216,8 @@ export interface ConversationMessage {
   generationErrorMessage?: string | null;
   generationStatus?: GenerationStatus;
   generationProgress?: number;
+  generationCostCredits?: number;
+  generationBilling?: import("@/lib/turn-credit-types").CreditSettlement;
   generationProvider?: string | null;
   generationProviderChannelName?: string | null;
   generationStartedAt?: string | null;

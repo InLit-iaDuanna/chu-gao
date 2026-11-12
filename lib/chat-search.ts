@@ -5,7 +5,7 @@ export interface ChatSearchSource {
 
 export class ChatSearchUnavailableError extends Error {
   constructor() {
-    super("联网检索未能完成，请稍后重试");
+    super("联网检索未能完成，可关闭联网后重试");
     this.name = "ChatSearchUnavailableError";
   }
 }

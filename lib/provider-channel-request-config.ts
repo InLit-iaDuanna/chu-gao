@@ -18,6 +18,7 @@ import { normalizeProviderChannelBaseUrl } from "@/lib/provider-channels";
 export const CHANNEL_REQUEST_CONFIG_KEY = "provider.channelRequestConfig";
 
 export interface ChannelRequestConfig {
+  supportsGif?: boolean;
   // 该渠道允许的出图尺寸（8 个的子集）；空数组 = 全部允许。
   sizes: ImageSize[];
   // 出图质量（当前仅 auto）。
@@ -66,6 +67,7 @@ function parseConfig(value: unknown): ChannelRequestConfig {
 
   return {
     sizes,
+    supportsGif: record.supportsGif === true,
     quality: "auto",
     responseFormat,
     bodyTemplate,
@@ -127,12 +129,18 @@ export async function getChannelRequestConfig(
   return map[normalized] ?? { ...DEFAULT_CHANNEL_REQUEST_CONFIG };
 }
 
+export async function providerSupportsGif(baseUrl: string): Promise<boolean> {
+  return (await getChannelRequestConfig(baseUrl)).supportsGif === true;
+}
+
 export async function setChannelRequestConfig(
   baseUrl: string,
   config: ChannelRequestConfig,
 ): Promise<ChannelRequestConfigMap> {
   if (!process.env.DATABASE_URL) {
-    throw new Error("DATABASE_URL is required to update channel request config.");
+    throw new Error(
+      "DATABASE_URL is required to update channel request config.",
+    );
   }
 
   const normalized = normalizeProviderChannelBaseUrl(baseUrl);
@@ -170,7 +178,9 @@ export function renderBodyTemplate(
   for (const [key, value] of Object.entries(vars)) {
     const token = `{${key}}`;
     const replacement =
-      typeof value === "number" ? String(value) : JSON.stringify(value).slice(1, -1);
+      typeof value === "number"
+        ? String(value)
+        : JSON.stringify(value).slice(1, -1);
     rendered = rendered.split(token).join(replacement);
   }
 

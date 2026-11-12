@@ -4,6 +4,7 @@ import { fail, ok } from "@/lib/api-response";
 import { readJsonBodySafe } from "@/lib/request-body";
 import { authenticatedUser, checkSession } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { normalizeRedemptionCode } from "@/lib/redemption-code";
 import { redeemCodeSchema } from "@/lib/validators";
 
 class RedeemError extends Error {
@@ -49,14 +50,23 @@ export async function POST(request: Request) {
   }
 
   const session = authenticatedUser(sessionResult);
+  const submittedCode = parsed.data.code.trim();
+  const normalizedCode = normalizeRedemptionCode(submittedCode);
 
   try {
     const result = await db.$transaction(
       async (tx) => {
         const now = new Date();
-        const code = await tx.creditRedemptionCode.findUnique({
-          where: { code: parsed.data.code },
+        const exactCode = await tx.creditRedemptionCode.findUnique({
+          where: { code: submittedCode },
         });
+        const code =
+          exactCode ??
+          (normalizedCode !== submittedCode
+            ? await tx.creditRedemptionCode.findUnique({
+                where: { code: normalizedCode },
+              })
+            : null);
 
         if (!code || code.revokedAt) {
           throw new RedeemError("REDEEM_INVALID", "兑换码无效");

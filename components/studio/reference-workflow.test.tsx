@@ -11,7 +11,6 @@ import { useState } from "react";
 import { ReferenceDropZone } from "./ReferenceDropZone";
 import { CopyTextButton } from "./CopyTextButton";
 import {
-  chatReferenceRequest,
   referenceRequest,
   REFERENCE_DRAG_MIME,
   useReferenceInput,
@@ -176,10 +175,6 @@ describe("reference input", () => {
       referenceImageKeys: ["uploads/u/ref.png"],
       referenceOrder: ["source:image-1", "upload:uploads/u/ref.png"],
     });
-    expect(chatReferenceRequest([source])).toEqual({
-      sourceImageIds: ["image-1"],
-      referenceImageKeys: [],
-    });
   });
 });
 
@@ -249,7 +244,7 @@ describe("copy and draft reuse", () => {
   it("does not submit while choosing Chinese characters or uploading", () => {
     const onSubmit = vi.fn();
     const props = {
-      prompt: "街道设计",
+      prompt: "/生图 街道设计",
       onPromptChange: vi.fn(),
       models: [model],
       model,
@@ -265,14 +260,14 @@ describe("copy and draft reuse", () => {
       disabledReason: null,
     };
     const { rerender } = render(<CommandDock {...props} />);
-    fireEvent.keyDown(screen.getByLabelText("提示词"), {
+    fireEvent.keyDown(screen.getByLabelText("对话输入"), {
       key: "Enter",
       isComposing: true,
     });
     expect(onSubmit).not.toHaveBeenCalled();
     rerender(<CommandDock {...props} uploading={1} />);
-    expect(screen.getByLabelText("生成")).toBeDisabled();
-    fireEvent.keyDown(screen.getByLabelText("提示词"), { key: "Enter" });
+    expect(screen.getByLabelText("发送")).toBeDisabled();
+    fireEvent.keyDown(screen.getByLabelText("对话输入"), { key: "Enter" });
     expect(onSubmit).not.toHaveBeenCalled();
   });
 });

@@ -30,6 +30,37 @@ const REASONING_LABELS = {
   max: "Max",
 } as const;
 
+export function ChatModelPrice({
+  model,
+  className,
+}: {
+  model: ChatModelOption | null;
+  className?: string;
+}) {
+  if (!model) return null;
+  const pricing = model.pricing;
+  return (
+    <span
+      className={cn(
+        "inline-flex min-w-0 flex-wrap gap-x-3 gap-y-0.5 tabular-nums",
+        className,
+      )}
+    >
+      {pricing ? (
+        <>
+          <span>积分 / 百万 Token</span>
+          <span>输入 {pricing.input}</span>
+          <span>输出 {pricing.output}</span>
+          <span>缓存读取 {pricing.cacheRead}</span>
+          <span>缓存写入 {pricing.cacheCreation}</span>
+        </>
+      ) : (
+        `${model.credits} 积分 / 轮`
+      )}
+    </span>
+  );
+}
+
 export function ChatModelControls({
   models,
   model,
@@ -82,7 +113,7 @@ export function ChatModelControls({
                 : "聊天模型未就绪"
             }
             title="选择模型与思考强度"
-            className="studio-model-trigger h-11 max-w-full min-w-0 gap-1 rounded-full border-transparent bg-surface-2 px-2.5 text-xs font-normal text-foreground hover:bg-surface-3 sm:h-9 sm:gap-1.5 sm:px-3.5 sm:text-[13px]"
+            className="studio-model-trigger smooth-surface relative h-9 max-w-full min-w-0 gap-1.5 rounded-lg border-transparent bg-surface-2 px-3.5 text-[13px] font-normal text-foreground hover:bg-surface-3"
           >
             <span className="min-w-0 truncate">
               {model?.displayName ?? "选择模型"}
@@ -143,7 +174,7 @@ export function ChatModelControls({
                         {item.displayName}
                       </span>
                       <span className="mt-0.5 block text-xs text-text-faint">
-                        {item.credits} 积分 / 轮
+                        <ChatModelPrice model={item} />
                       </span>
                     </span>
                     {item.id === model?.id ? (

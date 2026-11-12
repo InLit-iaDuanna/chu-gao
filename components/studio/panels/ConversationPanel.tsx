@@ -19,6 +19,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useToast } from "@/components/ui";
 import { cn, formatDate } from "@/lib/utils";
+import { OPUS_MODEL_ID } from "@/lib/chat-model-options";
 
 import {
   compileConversationPrompt,
@@ -242,7 +243,7 @@ export function ConversationPanel({
       await streamConversationChat({
         userId: user.id,
         conversationId: conversation.id,
-        modelId: pricing?.defaultModelId ?? "default",
+        modelId: pricing?.defaultModelId ?? OPUS_MODEL_ID,
         messages: [{ role: "user", content: submitted }],
         ...referenceRequest(references),
         references: references.map((reference, index) =>

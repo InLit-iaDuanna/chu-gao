@@ -40,6 +40,7 @@ type OpenAIImageTaskResponse = {
 };
 
 function mimeTypeForFormat(format: string): string {
+  if (format === "gif") return "image/gif";
   if (format === "jpeg") {
     return "image/jpeg";
   }
@@ -59,10 +60,13 @@ function imageModelForRequest(req: InternalRequest): string {
   return req.modelId;
 }
 
-function isImage25(req: InternalRequest): boolean {
+function isImage25Or26(req: InternalRequest): boolean {
   return (
     req.modelId === "gpt-image-2.5-flare" ||
-    req.modelId === "gpt-image-2.5-sunburst"
+    req.modelId === "gpt-image-2.5-sunburst" ||
+    req.modelId === "gpt-image-2.6" ||
+    req.modelId === "gpt-image-2.6-flare" ||
+    req.modelId === "gpt-image-2.6-sunburst"
   );
 }
 
@@ -172,7 +176,8 @@ function structuredBody(req: InternalRequest): Record<string, unknown> {
     quality: req.quality,
     n: req.n,
     response_format: req.responseFormat,
-    ...(!isImage25(req)
+    ...(req.outputFormat === "gif" ? { output_format: "gif" } : {}),
+    ...(!isImage25Or26(req)
       ? {
           output_format: req.outputFormat,
           background: req.background,
@@ -229,7 +234,10 @@ export class OpenAIImagesAdapter implements ProviderAdapter {
       form.append("quality", effectiveRequest.quality);
       form.append("n", String(effectiveRequest.n));
       form.append("response_format", effectiveRequest.responseFormat);
-      if (!isImage25(effectiveRequest)) {
+      if (effectiveRequest.outputFormat === "gif") {
+        form.append("output_format", "gif");
+      }
+      if (!isImage25Or26(effectiveRequest)) {
         form.append("output_format", effectiveRequest.outputFormat);
         form.append("background", effectiveRequest.background);
       }
@@ -289,6 +297,13 @@ export class OpenAIImagesAdapter implements ProviderAdapter {
         : null) ?? structuredBody(effectiveRequest);
     if (effectiveRequest.executionPolicy === "single-submit") {
       Object.assign(body, { n: 1, prompt: effectiveRequest.prompt });
+    }
+    if (effectiveRequest.outputFormat === "gif") {
+      Object.assign(body, {
+        output_format: "gif",
+        size: effectiveRequest.size,
+        n: 1,
+      });
     }
 
     const endpoint = openAIImagesUrl(

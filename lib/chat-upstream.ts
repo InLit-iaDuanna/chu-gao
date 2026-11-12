@@ -1,6 +1,33 @@
 import { LUNA_MODEL_ID, type ReasoningEffort } from "@/lib/chat-model-options";
 import { readCitedResponse, type ChatSearchSource } from "@/lib/chat-search";
 
+export function chatCompletionsRequestBody(
+  model: string,
+  messages: UpstreamChatMessage[],
+  instructions: string,
+  options: {
+    effort?: ReasoningEffort;
+    maxOutputTokens?: number;
+    includeUsage?: boolean;
+    tools?: readonly unknown[];
+    toolChoice?: "auto";
+  } = {},
+) {
+  return {
+    model,
+    messages: [{ role: "system", content: instructions }, ...messages],
+    stream: true,
+    ...(options.effort ? { reasoning_effort: options.effort } : {}),
+    ...(options.maxOutputTokens ? { max_tokens: options.maxOutputTokens } : {}),
+    ...(options.includeUsage
+      ? { stream_options: { include_usage: true } }
+      : {}),
+    ...(options.tools?.length
+      ? { tools: options.tools, tool_choice: options.toolChoice ?? "auto" }
+      : {}),
+  };
+}
+
 type ContentPart =
   | { type: "text"; text: string }
   | {
@@ -9,8 +36,17 @@ type ContentPart =
     };
 
 export interface UpstreamChatMessage {
-  role: "user" | "assistant" | "system";
+  role: "user" | "assistant" | "system" | "tool";
   content: string | ContentPart[];
+  tool_calls?: UpstreamFunctionToolCall[];
+  tool_call_id?: string;
+  name?: string;
+}
+
+export interface UpstreamFunctionToolCall {
+  id: string;
+  type: "function";
+  function: { name: string; arguments: string };
 }
 
 export function chatEndpoint(baseUrl: string, responses: boolean): string {
@@ -50,39 +86,86 @@ export function responsesRequestBody(
     stream?: boolean;
     promptCacheKey?: string;
     promptCacheOptions?: { mode: "implicit"; ttl: "30m" };
+    tools?: readonly unknown[];
+    toolContinuations?: Array<{
+      callId: string;
+      name: string;
+      arguments: string;
+      output: string;
+    }>;
   } = {},
 ) {
-  return {
-    model,
-    instructions,
-    input: messages.map((message) => ({
-      type: "message",
-      role: message.role,
-      content:
-        typeof message.content === "string"
-          ? [
-              {
-                type:
-                  message.role === "assistant" ? "output_text" : "input_text",
-                text: message.content,
-              },
-            ]
-          : message.content.map((part) =>
-              part.type === "text"
-                ? {
+  const input: Array<Record<string, unknown>> = messages.flatMap(
+    (message): Array<Record<string, unknown>> => {
+      if (message.role === "tool") {
+        return [
+          {
+            type: "function_call_output",
+            call_id: message.tool_call_id ?? "unknown",
+            output:
+              typeof message.content === "string"
+                ? message.content
+                : JSON.stringify(message.content ?? ""),
+          },
+        ];
+      }
+      return [
+        {
+          type: "message",
+          role: message.role,
+          content:
+            typeof message.content === "string"
+              ? [
+                  {
                     type:
                       message.role === "assistant"
                         ? "output_text"
                         : "input_text",
-                    text: part.text,
-                  }
-                : {
-                    type: "input_image",
-                    image_url: part.image_url.url,
-                    detail: part.image_url.detail ?? "auto",
+                    text: message.content,
                   },
-            ),
-    })),
+                ]
+              : (message.content ?? []).map((part) =>
+                  part.type === "text"
+                    ? {
+                        type:
+                          message.role === "assistant"
+                            ? "output_text"
+                            : "input_text",
+                        text: part.text,
+                      }
+                    : {
+                        type: "input_image",
+                        image_url: part.image_url.url,
+                        detail: part.image_url.detail ?? "auto",
+                      },
+                ),
+        },
+      ];
+    },
+  );
+  const toolContinuations = (options.toolContinuations ?? []).flatMap(
+    (tool) => [
+      {
+        type: "function_call",
+        call_id: tool.callId,
+        name: tool.name,
+        arguments: tool.arguments,
+      },
+      {
+        type: "function_call_output",
+        call_id: tool.callId,
+        output: tool.output,
+      },
+    ],
+  );
+  const tools = [
+    ...(options.webSearch ? [{ type: "web_search" }] : []),
+    ...(options.tools ?? []),
+  ];
+  return {
+    model,
+    instructions,
+    input: [...input, ...toolContinuations],
     reasoning: { effort },
     ...(options.promptCacheKey
       ? { prompt_cache_key: options.promptCacheKey }
@@ -90,11 +173,11 @@ export function responsesRequestBody(
     ...(options.promptCacheOptions
       ? { prompt_cache_options: options.promptCacheOptions }
       : {}),
-    ...(options.webSearch
+    ...(tools.length
       ? {
-          tools: [{ type: "web_search" }],
+          tools,
           tool_choice: "auto",
-          include: [],
+          ...(options.webSearch ? { include: [] } : {}),
         }
       : {}),
     ...(options.maxOutputTokens

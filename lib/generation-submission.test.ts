@@ -57,6 +57,7 @@ const input: CreateGenerationInput = {
 function makeTransaction() {
   return {
     $executeRaw: vi.fn(),
+    provider: { findMany: vi.fn().mockResolvedValue([{ id: "normal", costMultiplier: 1 }, { id: "ldai-fallback", costMultiplier: 2 }]) },
     generation: {
       findFirst: vi.fn().mockResolvedValue(null),
       create: vi
@@ -93,6 +94,15 @@ beforeEach(() => {
 });
 
 describe("generation submission and queue compensation", () => {
+  it("freezes provider multipliers in the same transaction as the original unchanged debit", async () => {
+    await createAndEnqueueGeneration({ ...input, pricingSnapshotJson: {
+      modelId: input.request.modelId, perImageCredits: 10, estimatedCredits: 10, ruleId: null,
+    } });
+    const frozen = tx.generation.create.mock.calls[0][0].data.pricingSnapshot;
+    expect(frozen.providerMultipliers).toEqual({ normal: 1, "ldai-fallback": 2 });
+    expect(tx.usageLog.create.mock.calls[0][0].data.metadata.pricingSnapshot).toEqual(frozen);
+    expect(tx.user.updateMany).toHaveBeenCalledWith({ where: { id: "user-1", credits: { gte: 10 } }, data: { credits: { decrement: 10 } } });
+  });
   it("binds a single-task Agent grant in the transaction that creates and charges the job", async () => {
     await createAndEnqueueGeneration({...input, agentAuthorizationId: "grant-1"});
     expect(tx.agentAuthorization.updateMany).toHaveBeenCalledWith({where: {id: "grant-1", mode: "single", boundGenerationId: null}, data: {boundGenerationId: "generation-1"}});

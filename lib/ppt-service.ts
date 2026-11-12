@@ -1,4 +1,4 @@
-// PPT 生成服务：把「不变 + 该页变的」经 DeepSeek 优化为出图 prompt，
+// PPT 生成服务：把「不变 + 该页变的」经 Opus 5.5 优化为出图 prompt，
 // 并复用标准生成队列（createAndEnqueueGeneration）真正出图。
 // 供 /api/ppt/* 路由复用，避免在路由层重复编排，也不再 HTTP 自调用。
 
@@ -8,7 +8,7 @@ import { randomInt } from "node:crypto";
 import { getPptSystemPrompt } from "@/lib/ai-config";
 import { estimateCost } from "@/lib/credits";
 import { db } from "@/lib/db";
-import { optimizeImagePrompt } from "@/lib/deepseek";
+import { optimizeImagePrompt } from "@/lib/prompt-optimizer";
 import { createAndEnqueueGeneration } from "@/lib/generations";
 import {
   createPricingSnapshot,
@@ -108,7 +108,7 @@ export class PptSlideGenerationError extends Error {
   }
 }
 
-// 触发单页生成：DeepSeek 优化 → 建 Generation 入队 → 关联 slide。
+// 触发单页生成：Opus 优化 → 建 Generation 入队 → 关联 slide。
 // 返回新建的 generationId。错误会在 slide 上落 error 字段并抛出。
 export async function runSlideGeneration(params: {
   userId: string;
@@ -142,6 +142,7 @@ export async function runSlideGeneration(params: {
 
   const systemPrompt = await getPptSystemPrompt();
   const finalPrompt = await optimizeImagePrompt({
+    logContext: { source: "web", userId, operation: "ppt.optimize" },
     contextSystemPrompt: systemPrompt,
     fixedPrompt: ppt.fixedPrompt ?? "",
     variablePrompt: slide.originalContent,

@@ -1,3 +1,5 @@
+import type { Prisma } from "@prisma/client";
+
 import { estimateCost, resolvePerImageCredits } from "@/lib/credits";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
@@ -5,11 +7,113 @@ import {
   estimateCostFromSnapshot,
   getModelWithPricing,
   parsePricingSnapshot,
+  pricingSnapshotForProvider,
 } from "@/lib/model-pricing";
 import { resolutionTierForDimensions } from "@/lib/models/options";
 import { getConfiguredModel } from "@/lib/models/runtime-config";
 import type { InternalRequest } from "@/lib/models/types";
 import type { PersistedGeneratedImage } from "@/lib/storage";
+import { isFallbackProvider } from "@/lib/providers/account-pool";
+
+export class ProviderCreditsError extends Error {
+  constructor() {
+    super("点数不足，无法使用备用渠道");
+    this.name = "ProviderCreditsError";
+  }
+}
+
+export async function reserveGenerationProviderCredits({
+  generationId,
+  userId,
+  executionToken,
+  request,
+  selection,
+}: {
+  generationId: string;
+  userId: string;
+  executionToken: string;
+  request: InternalRequest;
+  selection: {
+    providerId: string;
+    providerAccountId: string | null;
+    baseUrl: string;
+  };
+}): Promise<void> {
+  await db.$transaction(async (tx) => {
+    // Lock the execution before inspecting its ledger. Retries, completion,
+    // cancellation and recovery all serialize on this same generation row.
+    const selected = await tx.generation.updateMany({
+      where: {
+        id: generationId,
+        userId,
+        status: "RUNNING",
+        executionToken,
+        deletedAt: null,
+      },
+      data: {
+        providerId: selection.providerId,
+        providerAccountId: selection.providerAccountId,
+        heartbeatAt: new Date(),
+      },
+    });
+    if (selected.count === 0) {
+      throw new Error("generation execution was superseded before dispatch");
+    }
+    const generation = await tx.generation.findUniqueOrThrow({
+      where: { id: generationId },
+      select: { pricingSnapshot: true },
+    });
+    const snapshot = parsePricingSnapshot(generation.pricingSnapshot);
+    if (!snapshot) {
+      if (isFallbackProvider({ id: selection.providerId })) {
+        throw new Error("Provider pricing was not frozen at submission");
+      }
+      return;
+    }
+    const selectedSnapshot = pricingSnapshotForProvider(
+      snapshot,
+      selection,
+      request,
+    );
+    const requiredCredits = selectedSnapshot.selectedProvider!.reservedCredits;
+    const ledger = await tx.usageLog.aggregate({
+      where: { generationId, action: { in: ["generate", "refund"] } },
+      _sum: { creditsDelta: true },
+    });
+    const reservedCredits = Math.max(0, -(ledger._sum.creditsDelta ?? 0));
+    const extraCredits = Math.max(0, requiredCredits - reservedCredits);
+    if (extraCredits > 0) {
+      const debited = await tx.user.updateMany({
+        where: { id: userId, credits: { gte: extraCredits } },
+        data: { credits: { decrement: extraCredits } },
+      });
+      if (debited.count === 0) throw new ProviderCreditsError();
+      await tx.usageLog.create({
+        data: {
+          userId,
+          generationId,
+          providerId: selection.providerId,
+          providerAccountId: selection.providerAccountId,
+          modelId: request.modelId,
+          action: "generate",
+          creditsDelta: -extraCredits,
+          metadata: {
+            reason: "provider_reservation",
+            multiplier: selectedSnapshot.selectedProvider!.multiplier,
+            reservedCredits: requiredCredits,
+          },
+        },
+      });
+    }
+    await tx.generation.update({
+      where: { id: generationId },
+      data: {
+        pricingSnapshot: selectedSnapshot as unknown as Prisma.InputJsonObject,
+        costCredits: Math.max(reservedCredits, requiredCredits),
+      },
+    });
+  });
+}
 
 export interface SettleGenerationSuccessInput {
   generationId: string;
@@ -110,22 +214,21 @@ export async function settleGenerationSuccess({
     request as InternalRequest & { executionPolicy?: "single-submit" }
   ).executionPolicy;
   const actualCredits =
-    executionPolicy === "single-submit"
+    executionPolicy === "single-submit" &&
+    !isFallbackProvider({
+      id: pricingSnapshot?.selectedProvider?.providerId ?? providerId,
+    })
       ? Math.min(calculatedCredits, estimatedCredits)
       : calculatedCredits;
+  if (
+    isFallbackProvider({ id: providerId }) &&
+    (pricingSnapshot?.selectedProvider?.providerId !== providerId ||
+      actualCredits > pricingSnapshot.selectedProvider.reservedCredits)
+  ) {
+    throw new Error("Fallback settlement exceeds its pre-dispatch reservation");
+  }
 
   return db.$transaction(async (tx) => {
-    const chargeLog = await tx.usageLog.aggregate({
-      where: {
-        generationId,
-        action: "generate",
-      },
-      _sum: {
-        creditsDelta: true,
-      },
-    });
-    const alreadyDebited = Math.max(0, -(chargeLog._sum.creditsDelta ?? 0));
-
     const completed = await tx.generation.updateMany({
       where: {
         id: generationId,
@@ -152,7 +255,21 @@ export async function settleGenerationSuccess({
       return false;
     }
 
+    const chargeLog = await tx.usageLog.aggregate({
+      where: {
+        generationId,
+        action: { in: ["generate", "refund"] },
+      },
+      _sum: {
+        creditsDelta: true,
+      },
+    });
+    const alreadyDebited = Math.max(0, -(chargeLog._sum.creditsDelta ?? 0));
+
     const extraCredits = Math.max(0, actualCredits - alreadyDebited);
+    if (extraCredits > 0 && isFallbackProvider({ id: providerId })) {
+      throw new Error("Fallback credits were not reserved before dispatch");
+    }
     const extraChargeUser =
       extraCredits > 0
         ? await tx.user.updateMany({
@@ -176,17 +293,18 @@ export async function settleGenerationSuccess({
       });
     }
 
-    if (savedImages.length > 0) await tx.generatedImage.createMany({
-      data: savedImages.map((image) => ({
-        generationId,
-        storageKey: image.storageKey,
-        thumbnailKey: image.thumbnailKey,
-        width: image.width,
-        height: image.height,
-        sizeBytes: image.sizeBytes,
-        mimeType: image.mimeType,
-      })),
-    });
+    if (savedImages.length > 0)
+      await tx.generatedImage.createMany({
+        data: savedImages.map((image) => ({
+          generationId,
+          storageKey: image.storageKey,
+          thumbnailKey: image.thumbnailKey,
+          width: image.width,
+          height: image.height,
+          sizeBytes: image.sizeBytes,
+          mimeType: image.mimeType,
+        })),
+      });
 
     if (boundedRefundCredits > 0) {
       await tx.user.update({

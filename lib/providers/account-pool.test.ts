@@ -55,6 +55,7 @@ vi.mock("@/lib/providers/protocols", () => ({
 import {
   findEligibleProviderAccounts,
   leaseProviderAccount,
+  isFallbackProvider,
   releaseAccountLease,
 } from "@/lib/providers/account-pool";
 
@@ -199,5 +200,39 @@ describe("provider account leases", () => {
     expect(result).toEqual([account]);
     const query = mocks.db.providerAccount.findMany.mock.calls[0]?.[0];
     expect(query.where).not.toHaveProperty("inFlight");
+  });
+
+  it("keeps the fixed fallback pool last even when its priority is higher", async () => {
+    const fallback = {
+      ...account,
+      id: "fallback",
+      providerId: "ldai-fallback",
+      provider: {
+        ...provider,
+        id: "ldai-fallback",
+        priority: 10000,
+        costMultiplier: 2,
+      },
+    };
+    const markedUpNormal = {
+      ...account,
+      id: "normal-markup",
+      providerId: "normal-markup",
+      provider: {
+        ...provider,
+        id: "normal-markup",
+        priority: 200,
+        costMultiplier: 2,
+      },
+    };
+    mocks.db.providerAccount.findMany.mockResolvedValueOnce([
+      fallback,
+      account,
+      markedUpNormal,
+    ]);
+    expect(
+      (await findEligibleProviderAccounts("gpt-image-2")).map((row) => row.id),
+    ).toEqual([markedUpNormal.id, account.id, fallback.id]);
+    expect(isFallbackProvider({ id: "ldai-fallback-copy" })).toBe(false);
   });
 });

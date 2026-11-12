@@ -1,11 +1,12 @@
 "use client";
 
-import { Button, Input, Select } from "@/components/ui";
+import { Button, IconButton, Input, Select } from "@/components/ui";
 
-import { useCallback, useEffect, useState } from "react";
-import { Loader2, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Eye, Loader2, RefreshCw, Trash2 } from "lucide-react";
 
-import { formatDate } from "@/lib/utils";
+import { CALL_SOURCE_LABELS, formatCallTime } from "@/lib/model-call-types";
+import { GenerationDetails } from "./GenerationDetails";
 
 import {
   clearRecentAdminGenerations,
@@ -51,27 +52,42 @@ function msLabel(value: number | null): string {
   return `${(value / 1000).toFixed(1)}s`;
 }
 
-export function GenerationsView() {
+export function GenerationsView({
+  initialGenerationId = "",
+}: {
+  initialGenerationId?: string;
+}) {
   const [items, setItems] = useState<AdminGenerationItem[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [clearing, setClearing] = useState(false);
 
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(initialGenerationId);
+  const [source, setSource] = useState<"" | "web" | "api" | "agent">("");
+  const [selected, setSelected] = useState<AdminGenerationItem | null>(null);
   const [status, setStatus] = useState("");
   const [modelId, setModelId] = useState("");
   const [activeOnly, setActiveOnly] = useState(false);
+  const loadVersion = useRef(0);
+  const initialOpened = useRef("");
 
   const load = useCallback((query: AdminGenerationQuery) => {
+    const version = ++loadVersion.current;
+    setFailed(false);
     listAdminGenerations({ ...query, limit: 100 })
-      .then((result) => setItems(result.items))
-      .catch(() => setFailed(true));
+      .then((result) => {
+        if (version === loadVersion.current) setItems(result.items);
+      })
+      .catch(() => {
+        if (version === loadVersion.current) setFailed(true);
+      });
   }, []);
 
   useEffect(() => {
     setFailed(false);
     const timer = window.setTimeout(() => {
       load({
+        source: source || undefined,
         q: q.trim() || undefined,
         status: status ? [status] : undefined,
         modelId: modelId.trim() || undefined,
@@ -80,7 +96,21 @@ export function GenerationsView() {
     }, 250);
 
     return () => window.clearTimeout(timer);
-  }, [q, status, modelId, activeOnly, load]);
+  }, [q, status, modelId, activeOnly, source, load]);
+
+  useEffect(() => {
+    if (
+      initialGenerationId &&
+      items &&
+      initialOpened.current !== initialGenerationId
+    ) {
+      const match = items.find((item) => item.id === initialGenerationId);
+      if (match) {
+        setSelected(match);
+        initialOpened.current = initialGenerationId;
+      }
+    }
+  }, [initialGenerationId, items]);
 
   async function handleClearRecent() {
     if (!window.confirm("软删除最近 20 条生成记录？")) return;
@@ -89,6 +119,7 @@ export function GenerationsView() {
     try {
       await clearRecentAdminGenerations(20);
       load({
+        source: source || undefined,
         q: q.trim() || undefined,
         status: status ? [status] : undefined,
         modelId: modelId.trim() || undefined,
@@ -107,23 +138,54 @@ export function GenerationsView() {
         eyebrow="Generations"
         title="生成记录"
         actions={
-          <Button
-            type="button"
-            className="h-9 px-3 text-xs text-danger disabled:opacity-45"
-            disabled={clearing}
-            onClick={() => void handleClearRecent()}
-          >
-            {clearing ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Trash2 className="h-3.5 w-3.5 stroke-[1.5]" />
-            )}
-            清理最近 20 条
-          </Button>
+          <div className="flex gap-2">
+            <IconButton
+              aria-label="刷新生成记录"
+              title="刷新生成记录"
+              onClick={() =>
+                load({
+                  q: q.trim() || undefined,
+                  source: source || undefined,
+                  status: status ? [status] : undefined,
+                  modelId: modelId.trim() || undefined,
+                  active: activeOnly || undefined,
+                })
+              }
+            >
+              <RefreshCw size={15} />
+            </IconButton>
+            <Button
+              type="button"
+              className="h-9 px-3 text-xs text-danger disabled:opacity-45"
+              disabled={clearing}
+              onClick={() => void handleClearRecent()}
+            >
+              {clearing ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Trash2 className="h-3.5 w-3.5 stroke-[1.5]" />
+              )}
+              清理最近 20 条
+            </Button>
+          </div>
         }
       />
 
       <div className="mb-4 flex flex-wrap gap-2">
+        <Select
+          aria-label="任务来源"
+          className="w-36"
+          value={source || "all"}
+          onValueChange={(value) =>
+            setSource(value === "all" ? "" : (value as "web" | "api" | "agent"))
+          }
+          options={[
+            { value: "all", label: "全部来源" },
+            { value: "web", label: "网站生图" },
+            { value: "api", label: "API 生图" },
+            { value: "agent", label: "Agent 生图" },
+          ]}
+        />
         <Input
           className="w-64"
           placeholder="搜索提示词 / ID / 用户邮箱"
@@ -171,6 +233,7 @@ export function GenerationsView() {
         <AdminTable
           head={[
             "时间",
+            "来源",
             "用户",
             "模型",
             "提示词",
@@ -179,6 +242,7 @@ export function GenerationsView() {
             "耗时",
             "点数",
             "图",
+            "详情",
           ]}
         >
           {items.map((item) => (
@@ -187,7 +251,10 @@ export function GenerationsView() {
               className="border-b border-border/60 align-top last:border-0"
             >
               <td className="whitespace-nowrap px-4 py-2.5 text-xs text-text-muted">
-                {formatDate(item.createdAt)}
+                {formatCallTime(item.createdAt)}
+              </td>
+              <td className="whitespace-nowrap px-4 py-2.5 text-xs">
+                {CALL_SOURCE_LABELS[item.source] ?? "网站"}
               </td>
               <td className="max-w-36 truncate px-4 py-2.5 text-xs">
                 {item.user?.email ?? item.userId}
@@ -201,7 +268,10 @@ export function GenerationsView() {
                   {item.prompt}
                 </p>
                 {item.errorMessage ? (
-                  <p className="mt-0.5 line-clamp-1 text-[11px] text-danger">
+                  <p
+                    title={item.errorMessage}
+                    className="mt-0.5 line-clamp-2 break-all text-[11px] text-danger"
+                  >
                     {item.errorCode ? `[${item.errorCode}] ` : ""}
                     {item.errorMessage}
                   </p>
@@ -227,9 +297,21 @@ export function GenerationsView() {
               <td className="px-4 py-2.5 font-mono text-xs text-text-muted">
                 {item.imageCount}
               </td>
+              <td className="px-4 py-2.5">
+                <IconButton
+                  aria-label={`查看任务 ${item.id}`}
+                  title="查看图片与错误详情"
+                  onClick={() => setSelected(item)}
+                >
+                  <Eye size={15} />
+                </IconButton>
+              </td>
             </tr>
           ))}
         </AdminTable>
+      )}
+      {selected && (
+        <GenerationDetails item={selected} onClose={() => setSelected(null)} />
       )}
     </div>
   );

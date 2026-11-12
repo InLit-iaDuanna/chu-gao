@@ -92,7 +92,13 @@ async function downloadAndSaveReferenceImageUrl(
       400,
     );
   }
-  const ct = (await fetch(url, { method: "HEAD", signal: AbortSignal.timeout(5_000) }).catch(() => null))?.headers.get("content-type") ?? "";
+  const ct =
+    (
+      await fetch(url, {
+        method: "HEAD",
+        signal: AbortSignal.timeout(5_000),
+      }).catch(() => null)
+    )?.headers.get("content-type") ?? "";
   const mimeType =
     ct.includes("jpeg") || ct.includes("jpg")
       ? "image/jpeg"
@@ -100,7 +106,11 @@ async function downloadAndSaveReferenceImageUrl(
         ? "image/webp"
         : "image/png";
   try {
-    const saved = await saveUploadedReferenceImage({ buffer: buf, mimeType, userId });
+    const saved = await saveUploadedReferenceImage({
+      buffer: buf,
+      mimeType,
+      userId,
+    });
     return saved.storageKey;
   } catch {
     throw new AgentAuthError(
@@ -139,9 +149,13 @@ function normalizeApiInput(raw: unknown): unknown {
   delete obj.image_url;
   // `images` as array of URL strings or {image_url: string}
   if (Array.isArray(obj.images) && !obj.referenceImageUrls) {
-    obj.referenceImageUrls = (obj.images as unknown[]).map((item) =>
-      typeof item === "string" ? item : (item as Record<string, string>).image_url ?? "",
-    ).filter(Boolean);
+    obj.referenceImageUrls = (obj.images as unknown[])
+      .map((item) =>
+        typeof item === "string"
+          ? item
+          : ((item as Record<string, string>).image_url ?? ""),
+      )
+      .filter(Boolean);
   }
   delete obj.images;
   return obj;
@@ -234,9 +248,7 @@ export async function submitAgentGeneration(
 ) {
   // Normalize both principal shapes to SubmissionPrincipal
   const sp: SubmissionPrincipal =
-    "authorization" in principal
-      ? toSubmissionPrincipal(principal)
-      : principal;
+    "authorization" in principal ? toSubmissionPrincipal(principal) : principal;
   const resolvedAgentAuthId = sp.agentAuthorizationId;
   const resolvedApiKeyId = apiKeyId ?? sp.apiKeyId;
   if (!idempotencyKey || !/^[A-Za-z0-9_-]{8,128}$/.test(idempotencyKey))
@@ -320,7 +332,7 @@ export async function submitAgentGeneration(
     });
     throw new AgentAuthError(
       "MODERATION_REJECTED",
-      "提示词或参考图未通过内容审核，请调整后重试",
+      "[MODERATION_REJECTED] 提示词或参考图包含不允许的内容，请调整后再试。",
       400,
     );
   }
@@ -461,7 +473,7 @@ export async function listAgentGenerations(
 export function publicAgentFailure(code: string | null) {
   if (!code) return null;
   if (/MODERATION|CONTENT|SAFETY|UNSAFE/.test(code))
-    return "提示词或参考图未通过内容审核，请调整后重试";
+    return "[MODERATION_REJECTED] 提示词或参考图包含不允许的内容，请调整后再试。";
   if (/CANCEL/.test(code)) return "任务已取消";
   if (/TIMEOUT|TIMED_OUT|STUCK/.test(code)) return "生成超时，请稍后再试";
   return "生成失败，积分将按实际结果结算，请查看积分流水";

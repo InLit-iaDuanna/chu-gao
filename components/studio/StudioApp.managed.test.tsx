@@ -115,10 +115,11 @@ async function start(
       initialReferenceKeys={initialReferenceKeys}
     />,
   );
-  const chatMode = await screen.findByRole("radio", { name: "讨论想法" });
-  await waitFor(() => expect(chatMode).toBeEnabled());
-  fireEvent.click(chatMode);
-  fireEvent.change(await screen.findByRole("textbox", { name: "对话输入" }), {
+  expect(screen.queryByRole("radio", { name: "聊天" })).not.toBeInTheDocument();
+  const input = await screen.findByRole("textbox", { name: "对话输入" });
+  await waitFor(() => expect(input).toBeEnabled());
+  await screen.findByRole("button", { name: /模型与思考强度：Sol/ });
+  fireEvent.change(input, {
     target: { value: content },
   });
   await waitFor(() =>

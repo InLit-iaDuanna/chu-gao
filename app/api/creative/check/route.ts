@@ -69,6 +69,13 @@ export async function POST(request: Request) {
       await readPrivateStorageKey(image.storageKey),
     );
     const result = await requestStructuredVision({
+      logContext: {
+        source: "web",
+        userId: session.user.id,
+        generationId: parsed.data.generationId,
+        imageId: parsed.data.imageId,
+        operation: "creative.check",
+      },
       images: [part],
       systemPrompt: `你是图像创作 Agent 的结果验收工具。根据用户方案检查这张生成结果。只检查方案中明确的主体、保持不变、本次修改、排除内容和风格；无法从单张图确认的内容标记为 review，不要凭审美臆测。严格输出 JSON：{"status":"pass|review|fail","score":0,"summary":"不超过800字","findings":["具体发现"]}。有明确违反排除内容或本次修改失败时用 fail；信息不足但没有明确错误时用 review；主要要求都满足时用 pass。不要输出 Markdown。`,
       userText: `请验收这张结果图。用户方案如下：\n${JSON.stringify(parsed.data.brief)}`,

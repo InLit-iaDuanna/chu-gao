@@ -2,6 +2,7 @@ import { errorBody } from "@/lib/api-response";
 import { checkSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { serializeGeneration } from "@/lib/generations";
+import { loadGenerationBilling } from "@/lib/generation-billing";
 import { getProviderChannelDisplayNameMap } from "@/lib/provider-channel-config";
 import { isDatabaseUnavailableError } from "@/lib/service-errors";
 
@@ -122,11 +123,14 @@ export async function GET(
             return;
           }
 
+          const billing = (
+            await loadGenerationBilling(session.id, [generation])
+          ).get(generation.id);
           if (
             !safeEnqueue(
               controller,
               encoder.encode(
-                `event: update\ndata: ${JSON.stringify(serializeGeneration(generation, { displayNameMap }))}\n\n`,
+                `event: update\ndata: ${JSON.stringify(serializeGeneration(generation, { displayNameMap, billing }))}\n\n`,
               ),
             )
           ) {

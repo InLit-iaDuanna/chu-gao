@@ -1,4 +1,9 @@
 import { Prisma } from "@prisma/client";
+import {
+  chatTokenCost,
+  normalizeChatTokenUsage,
+  readChatTokenPricingSnapshot,
+} from "@/lib/chat-token-billing";
 
 type Amount = string | number | Prisma.Decimal;
 type Reference = { id: string };
@@ -35,6 +40,7 @@ export interface ChatLedgerAuditInput {
     availableDelta: Amount;
     heldDelta: Amount;
     consumedDelta: Amount;
+    result?: unknown;
   }[];
   receipts: {
     id: string;
@@ -137,6 +143,26 @@ export function auditChatLedger(input: ChatLedgerAuditInput) {
         row,
       ]),
   );
+  // Read-only operational projections may omit CreditEntry.result. The matching
+  // UsageLog retains the same frozen billing receipt after content is cleared.
+  const billingByAttempt = new Map<string, Record<string, unknown>>();
+  for (const usage of input.usages) {
+    const metadata = metadataObject(usage.metadata);
+    const billing = metadataObject(metadataObject(metadata.usage).billing);
+    if (
+      usage.action === "conversation.chat" &&
+      typeof metadata.attemptId === "string" &&
+      billing.tokenPricing
+    )
+      billingByAttempt.set(metadata.attemptId, billing);
+  }
+  const billingResult = (
+    entry: ChatLedgerAuditInput["entries"][number] | undefined,
+  ) =>
+    metadataObject(
+      entry?.result ??
+        (entry?.attemptId ? billingByAttempt.get(entry.attemptId) : undefined),
+    );
   const add = (
     map: Map<string, Prisma.Decimal>,
     key: string,
@@ -213,6 +239,8 @@ export function auditChatLedger(input: ChatLedgerAuditInput) {
         );
     } else if (row.operationKey === `close:${row.attemptId}`) {
       append(closeByAttempt, row.attemptId, row);
+      const result = billingResult(row);
+      const tokenPriced = result.tokenPricing !== undefined;
       if (held.gt(0) || available.lt(0) || consumed.lt(0))
         issue(
           "invalid_close",
@@ -226,15 +254,46 @@ export function auditChatLedger(input: ChatLedgerAuditInput) {
         settlementKeys.add(row.turnSettlementKey);
         if (
           row.kind !== "chat.settle" ||
-          !available.isZero() ||
-          !consumed.eq(held.negated()) ||
+          !(tokenPriced
+            ? available.plus(consumed).eq(held.negated())
+            : available.isZero() && consumed.eq(held.negated())) ||
           row.turnSettlementKey !== `settle:${row.turnId}`
         )
           issue(
             "invalid_settlement",
             ref,
-            "Settlement must consume the hold and have a nonempty turn key.",
+            "Settlement must close the hold, refund or debit the difference, and have a turn key.",
           );
+        if (tokenPriced) {
+          try {
+            const snapshot = readChatTokenPricingSnapshot(result.tokenPricing);
+            const tokens = metadataObject(result.tokens);
+            const normalized = normalizeChatTokenUsage({
+              prompt_tokens: tokens.inputTokens,
+              completion_tokens: tokens.outputTokens,
+              prompt_tokens_details: { cached_tokens: tokens.cacheReadTokens },
+              cache_creation_input_tokens: tokens.cacheCreationTokens,
+            });
+            if (
+              !snapshot ||
+              result.state !== "charged" ||
+              normalized.availability !== "reported" ||
+              !consumed.eq(
+                chatTokenCost(normalized.tokens, snapshot.pricing),
+              ) ||
+              !consumed.eq(amount(result.chargedCredits as Amount, ref))
+            )
+              throw new Error(
+                "Token settlement differs from frozen rates and actual usage.",
+              );
+          } catch {
+            issue(
+              "invalid_token_settlement",
+              ref,
+              "Token settlement must match reported usage and its frozen rates.",
+            );
+          }
+        }
       } else if (
         row.kind !== "chat.release" ||
         !consumed.isZero() ||
@@ -329,7 +388,11 @@ export function auditChatLedger(input: ChatLedgerAuditInput) {
           ref,
           "Reserved attempts must be active, with an open hold.",
         );
-    } else if (["charged", "released"].includes(attempt.billingState)) {
+    } else if (
+      ["charged", "released", "usage_unknown", "usage_invalid"].includes(
+        attempt.billingState,
+      )
+    ) {
       if (closes.length !== 1 || !net.isZero() || !terminal.has(attempt.status))
         issue(
           "closed_state_mismatch",
@@ -337,9 +400,22 @@ export function auditChatLedger(input: ChatLedgerAuditInput) {
           "Terminal attempts require exactly one close and no remaining hold.",
         );
       const settled = closes.some((row) => row.turnSettlementKey !== null);
+      const unbillable = ["usage_unknown", "usage_invalid"].includes(
+        attempt.billingState,
+      );
+      const closeResult = billingResult(closes[0]);
       if (
         (attempt.billingState === "charged") !== settled ||
-        (attempt.status === "completed") !== settled
+        (attempt.status === "completed" && !unbillable) !== settled ||
+        (unbillable &&
+          (attempt.status !== "completed" ||
+            closeResult.state !== attempt.billingState ||
+            !closeResult.tokenPricing ||
+            typeof closeResult.reason !== "string" ||
+            closeResult.usageAvailability !==
+              (attempt.billingState === "usage_unknown"
+                ? "unknown"
+                : "reported")))
       )
         issue(
           "settlement_state_mismatch",
@@ -427,7 +503,13 @@ export function auditChatLedger(input: ChatLedgerAuditInput) {
         "Turn has no matching retained request receipt/hash.",
       );
     const settlements = settlementsByTurn.get(turn.id) ?? [];
-    if (settlements.length !== (turn.status === "completed" ? 1 : 0))
+    if (
+      settlements.length !==
+      (turn.status === "completed" &&
+      !["usage_unknown", "usage_invalid"].includes(attempt?.billingState ?? "")
+        ? 1
+        : 0)
+    )
       issue(
         "turn_settlement_count",
         ref,
@@ -479,7 +561,27 @@ export function auditChatLedger(input: ChatLedgerAuditInput) {
     }
     append(managedUsages, turnId, usage);
     const settlements = settlementsByTurn.get(turnId) ?? [];
-    if (settlements.length !== 1)
+    const billing = metadataObject(metadataObject(metadata.usage).billing);
+    const unknownAttempt =
+      typeof metadata.attemptId === "string"
+        ? attempts.get(metadata.attemptId)
+        : undefined;
+    const unknownClose =
+      typeof metadata.attemptId === "string"
+        ? (closeByAttempt.get(metadata.attemptId) ?? []).find(
+            (row) =>
+              row.userId === usage.userId &&
+              row.turnId === turnId &&
+              row.kind === "chat.release" &&
+              billingResult(row).state === billing.state,
+          )
+        : undefined;
+    const unknown =
+      ["usage_unknown", "usage_invalid"].includes(String(billing.state)) &&
+      unknownClose &&
+      (!unknownAttempt || unknownAttempt.billingState === billing.state) &&
+      amount(usage.creditsDelta, `usage:${usage.id}`).isZero();
+    if (settlements.length !== 1 && !unknown)
       issue("usage_without_settlement", `usage:${usage.id}`, turnId);
     if (
       usage.id !== `chat_settle_${turnId}` ||
@@ -487,6 +589,16 @@ export function auditChatLedger(input: ChatLedgerAuditInput) {
     )
       issue("usage_key_mismatch", `usage:${usage.id}`, turnId);
   }
+  for (const attempt of input.attempts)
+    if (
+      ["usage_unknown", "usage_invalid"].includes(attempt.billingState) &&
+      (managedUsages.get(attempt.turnId) ?? []).length !== 1
+    )
+      issue(
+        "unknown_usage_log_count",
+        `attempt:${attempt.id}`,
+        "Unknown usage requires one explicit zero-charge UsageLog.",
+      );
   for (const [turnId, settlements] of settlementsByTurn) {
     const usages = managedUsages.get(turnId) ?? [];
     if (usages.length !== 1)

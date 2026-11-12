@@ -12,7 +12,11 @@ import {
   compactChatContext,
   getChatContextStatus,
 } from "@/lib/chat-context";
-import { LUNA_MODEL_ID, SOL_MODEL_ID } from "@/lib/chat-model-options";
+import {
+  LUNA_MODEL_ID,
+  SOL_MODEL_ID,
+  OPUS_MODEL_ID,
+} from "@/lib/chat-model-options";
 import { readJsonBodySafe } from "@/lib/request-body";
 import { isDatabaseUnavailableError } from "@/lib/service-errors";
 
@@ -20,11 +24,17 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const conversationIdSchema = z.string().trim().min(1).max(128);
-const modelIdSchema = z.enum(["default", LUNA_MODEL_ID, SOL_MODEL_ID]);
+const modelIdSchema = z.enum([
+  "default",
+  LUNA_MODEL_ID,
+  SOL_MODEL_ID,
+  OPUS_MODEL_ID,
+]);
 const compactSchema = z
   .object({
     conversationId: conversationIdSchema,
     modelId: modelIdSchema,
+    budgetTokens: z.number().int().optional(),
   })
   .strict();
 const privateHeaders = { "Cache-Control": "private, no-store" };
@@ -56,7 +66,8 @@ export async function GET(request: Request) {
   );
   if (!parsed.success)
     return fail("VALIDATION_ERROR", "缺少有效的对话 ID", { status: 400 });
-  const modelId = new URL(request.url).searchParams.get("modelId");
+  const searchParams = new URL(request.url).searchParams;
+  const modelId = searchParams.get("modelId");
   const model = modelIdSchema.optional().safeParse(modelId ?? undefined);
   if (!model.success)
     return fail("VALIDATION_ERROR", "不支持的对话模型", {
@@ -71,14 +82,24 @@ export async function GET(request: Request) {
   );
   if (limited) return limited;
   try {
-    return ok(
-      await (model.data
-        ? getChatContextStatus(userId, parsed.data, model.data)
-        : getChatContextStatus(userId, parsed.data)),
-      {
+    const budgetParam = searchParams.get("budgetTokens");
+    const budget =
+      budgetParam === null
+        ? { success: true as const, data: undefined }
+        : z.coerce.number().int().safeParse(budgetParam);
+    if (!budget.success)
+      return fail("VALIDATION_ERROR", "上下文档位不合法", {
+        status: 400,
         headers: privateHeaders,
-      },
-    );
+      });
+    const status = model.data
+      ? budget.data === undefined
+        ? getChatContextStatus(userId, parsed.data, model.data)
+        : getChatContextStatus(userId, parsed.data, model.data, budget.data)
+      : budget.data === undefined
+        ? getChatContextStatus(userId, parsed.data)
+        : getChatContextStatus(userId, parsed.data, undefined, budget.data);
+    return ok(await status, { headers: privateHeaders });
   } catch (error) {
     return contextFailure(error);
   }

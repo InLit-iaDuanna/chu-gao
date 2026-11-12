@@ -122,7 +122,7 @@ under another account is rejected before any generation POST.
 ```text
 id, displayName, available,
 capabilities: {
-  sizes, qualities, backgrounds, outputFormats, maxN,
+  sizes, gifSizes, qualities, backgrounds, outputFormats, maxN,
   maxReferenceImages, supportsReferenceImage, ...
 },
 defaults: {size, quality, outputFormat, background},
@@ -136,6 +136,11 @@ and validates supported options before uploading. Missing defaults/options are
 omitted rather than invented. If advertised, `maxPromptLength` is checked too.
 An empty prompt, `n` other than 1, unsupported options, or excess/unsupported
 references stop before generation submission. No fallback model is selected.
+
+GIF output is available only when `outputFormats` includes `gif`. For GIF,
+validate `size` against `gifSizes`, not the still-image `sizes` list. Image 2.6
+supports GIF requests at `512x512` or `768x768`; returned frame dimensions can
+differ. Preserve the complete `image/gif` bytes when downloading.
 
 ## Ordered Uploads And Submission
 
@@ -255,130 +260,6 @@ stale keychain entry; a successful keychain write removes that origin's fallback
 Never distribute these files with the skill. Single-use browser grants may be
 consumed by the service; a subsequent `401` or `403` / `SINGLE_TASK_USED` requires
 browser authorization again.
-
----
-
-## API Key Authentication
-
-In addition to the device-authorization (`cg_` prefix) bearer tokens used by the
-CLI, the v1 API also accepts **API keys** (`cgapi_` prefix) created from the
-Settings page.  API keys are suitable for server-side integrations and automated
-pipelines that do not require browser-based authorization.
-
-### Creating a key
-
-Sign in to [chugao.art](https://chugao.art), open **Settings → API 密钥**, and
-click **新建密钥**.  Give the key a human-readable name.  The full key value is
-shown **only once** immediately after creation — copy it and store it securely.
-
-### Using a key
-
-Pass the key as a standard Bearer token:
-
-```http
-Authorization: Bearer cgapi_<your-key>
-```
-
-All endpoints under `/api/v1/` accept both `cg_` and `cgapi_` tokens
-interchangeably.
-
-### Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET`  | `/api/v1/me` | Return caller identity and remaining credits |
-| `POST` | `/api/v1/generations` | Submit an image-generation job |
-| `GET`  | `/api/v1/generations/:id` | Poll job status |
-| `GET`  | `/api/v1/generations/:id/images/:imageId` | Download a completed image (base64) |
-| `POST` | `/api/v1/uploads` | Upload a reference image |
-| `GET`  | `/api/v1/keys` | List your active API keys |
-| `POST` | `/api/v1/keys` | Create a new API key |
-| `DELETE` | `/api/v1/keys/:id` | Revoke an API key |
-
-### `POST /api/v1/generations`
-
-Request body (JSON):
-
-```json
-{
-  "modelId": "nano-banana-2",
-  "prompt": "a futuristic cityscape at sunset",
-  "size": "1024x1024",
-  "n": 1
-}
-```
-
-Successful response (`202 Accepted`):
-
-```json
-{
-  "ok": true,
-  "data": {
-    "id": "gen_xxxxxxxx",
-    "status": "PENDING",
-    "modelId": "nano-banana-2",
-    "createdAt": "2026-10-22T00:00:00.000Z"
-  }
-}
-```
-
-Poll `GET /api/v1/generations/:id` until `status` is `DONE` or `FAILED`.
-
-### `GET /api/v1/generations/:id`
-
-```json
-{
-  "ok": true,
-  "data": {
-    "id": "gen_xxxxxxxx",
-    "status": "DONE",
-    "images": [{ "id": "img_yyyyyyyy" }]
-  }
-}
-```
-
-### `GET /api/v1/generations/:id/images/:imageId`
-
-Returns the rendered image as a base64 payload:
-
-```json
-{
-  "ok": true,
-  "data": {
-    "b64_json": "<base64>",
-    "mimeType": "image/png",
-    "width": 1024,
-    "height": 1024
-  }
-}
-```
-
-### Concurrency
-
-Each account has a configurable `concurrentLimit` (default 10 for API key
-callers).  Submit jobs in parallel up to that limit; additional submissions are
-queued automatically by the BullMQ worker.  There is no client-side throttle
-needed — the server serializes excess requests with a per-user advisory lock.
-
-### Rate limits
-
-API keys share the same Redis sliding-window rate limiter as agent tokens.
-A `429` response includes a `Retry-After` header (seconds).  Back off
-exponentially starting from that value.
-
-### Error codes
-
-| Code | HTTP Status | Meaning |
-|------|-------------|---------|
-| `UNAUTHORIZED` | 401 | Missing or invalid token |
-| `KEY_REVOKED` | 401 | Key has been revoked |
-| `KEY_EXPIRED` | 401 | Key has passed its expiry date |
-| `LIMIT_EXCEEDED` | 400 | Per-user key limit (10) reached |
-| `INSUFFICIENT_CREDITS` | 402 | Account has no remaining credits |
-| `PROVIDER_UNAVAILABLE` | 503 | All upstream image providers are down |
-| `CONTENT_REJECTED` | 422 | Prompt or image rejected by content policy |
-
----
 
 ## Local Verification
 

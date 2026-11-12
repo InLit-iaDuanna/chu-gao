@@ -195,42 +195,43 @@ model User {
   deviceSessions               DeviceSession[]
   agentAuthorizations          AgentAuthorization[]
   apiKeys                      ApiKey[]
+  storefrontOrders             StorefrontOrder[]
 
   @@index([createdAt])
   @@index([status])
 }
 
 model ResearchProject {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   userId         String
   title          String
   conversationId String?
   archivedAt     DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  user      User               @relation(fields: [userId], references: [id])
-  briefs    ResearchBrief[]
-  tasks     ResearchTask[]
-  evidence  ResearchEvidence[]
-  artifacts ResearchArtifact[]
+  user        User                 @relation(fields: [userId], references: [id])
+  briefs      ResearchBrief[]
+  tasks       ResearchTask[]
+  evidence    ResearchEvidence[]
+  artifacts   ResearchArtifact[]
   attachments ResearchAttachment[]
 
   @@index([userId, updatedAt(sort: Desc)])
 }
 
 model ResearchAttachment {
-  id          String    @id @default(cuid())
-  projectId   String
-  sourceKey   String
-  filename    String
-  mimeType    String
-  storageKey  String
-  sizeBytes   Int
-  sha256      String
-  expiresAt   DateTime
-  purgedAt    DateTime?
-  createdAt   DateTime  @default(now())
+  id         String    @id @default(cuid())
+  projectId  String
+  sourceKey  String
+  filename   String
+  mimeType   String
+  storageKey String
+  sizeBytes  Int
+  sha256     String
+  expiresAt  DateTime
+  purgedAt   DateTime?
+  createdAt  DateTime  @default(now())
 
   project ResearchProject @relation(fields: [projectId], references: [id])
 
@@ -251,33 +252,33 @@ model ResearchBrief {
 }
 
 model ResearchTask {
-  id               String    @id @default(cuid())
-  projectId        String
-  briefId          String
-  userId           String
-  clientRequestId  String
-  inputHash        String
-  sourceTaskId     String?
-  preset           String
-  scope            String
-  modelId          String
-  reasoningEffort  String
-  plan             Json
-  configSnapshot   Json
-  status           String    @default("queued")
-  nextSeq          Int       @default(0)
-  llmCalls         Int       @default(0)
-  searchCalls      Int       @default(0)
-  crawlCalls       Int       @default(0)
-  executionToken   String?
-  heartbeatAt      DateTime?
-  deadlineAt       DateTime?
-  startedAt        DateTime?
-  finishedAt       DateTime?
-  expiresAt        DateTime?
-  error            Json?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  id              String    @id @default(cuid())
+  projectId       String
+  briefId         String
+  userId          String
+  clientRequestId String
+  inputHash       String
+  sourceTaskId    String?
+  preset          String
+  scope           String
+  modelId         String
+  reasoningEffort String
+  plan            Json
+  configSnapshot  Json
+  status          String    @default("queued")
+  nextSeq         Int       @default(0)
+  llmCalls        Int       @default(0)
+  searchCalls     Int       @default(0)
+  crawlCalls      Int       @default(0)
+  executionToken  String?
+  heartbeatAt     DateTime?
+  deadlineAt      DateTime?
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  expiresAt       DateTime?
+  error           Json?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   project   ResearchProject    @relation(fields: [projectId], references: [id])
   brief     ResearchBrief      @relation(fields: [briefId], references: [id])
@@ -326,7 +327,7 @@ model ResearchAttempt {
   finishedAt     DateTime?
   createdAt      DateTime  @default(now())
 
-  stage ResearchStage @relation(fields: [stageId], references: [id])
+  stage ResearchStage  @relation(fields: [stageId], references: [id])
   calls ResearchCall[]
 
   @@unique([stageId, ordinal])
@@ -346,25 +347,25 @@ model ResearchEvent {
 }
 
 model ResearchEvidence {
-  id               String    @id @default(cuid())
-  projectId        String
-  taskId           String
-  sourceKey        String
-  canonicalUrl     String
-  originalUrl      String
-  title            String
-  excerpt          String    @default("") @db.Text
-  contentKey       String?
-  screenshotKey    String?
-  media            Json?
-  contentHash      String?
-  originUrl        String?
-  status           String    @default("link_only")
-  claims           Json?
-  fetchedAt        DateTime?
-  expiresAt        DateTime?
-  purgedAt         DateTime?
-  createdAt        DateTime  @default(now())
+  id            String    @id @default(cuid())
+  projectId     String
+  taskId        String
+  sourceKey     String
+  canonicalUrl  String
+  originalUrl   String
+  title         String
+  excerpt       String    @default("") @db.Text
+  contentKey    String?
+  screenshotKey String?
+  media         Json?
+  contentHash   String?
+  originUrl     String?
+  status        String    @default("link_only")
+  claims        Json?
+  fetchedAt     DateTime?
+  expiresAt     DateTime?
+  purgedAt      DateTime?
+  createdAt     DateTime  @default(now())
 
   project ResearchProject @relation(fields: [projectId], references: [id])
   task    ResearchTask    @relation(fields: [taskId], references: [id])
@@ -374,22 +375,22 @@ model ResearchEvidence {
 }
 
 model ResearchArtifact {
-  id           String    @id @default(cuid())
-  projectId    String
-  taskId       String
-  basisTaskId  String
-  briefId      String
-  kind         String
-  title        String
-  filename     String
-  mimeType     String
-  storageKey   String
-  sizeBytes    Int
-  sha256       String
-  evidenceIds  Json
-  expiresAt    DateTime?
-  purgedAt     DateTime?
-  createdAt    DateTime  @default(now())
+  id          String    @id @default(cuid())
+  projectId   String
+  taskId      String
+  basisTaskId String
+  briefId     String
+  kind        String
+  title       String
+  filename    String
+  mimeType    String
+  storageKey  String
+  sizeBytes   Int
+  sha256      String
+  evidenceIds Json
+  expiresAt   DateTime?
+  purgedAt    DateTime?
+  createdAt   DateTime  @default(now())
 
   project ResearchProject @relation(fields: [projectId], references: [id])
   task    ResearchTask    @relation(fields: [taskId], references: [id])
@@ -399,19 +400,19 @@ model ResearchArtifact {
 }
 
 model ResearchCall {
-  id           String    @id @default(cuid())
-  taskId       String
-  attemptId    String
-  kind         String
-  requestHash  String
-  status       String    @default("running")
-  usage        Json?
+  id              String    @id @default(cuid())
+  taskId          String
+  attemptId       String
+  kind            String
+  requestHash     String
+  status          String    @default("running")
+  usage           Json?
   continuationEnc String?
-  costUsd      Decimal?  @db.Decimal(18, 6)
-  costBasis    String    @default("unknown")
-  errorCode    String?
-  startedAt    DateTime  @default(now())
-  finishedAt   DateTime?
+  costUsd         Decimal?  @db.Decimal(18, 6)
+  costBasis       String    @default("unknown")
+  errorCode       String?
+  startedAt       DateTime  @default(now())
+  finishedAt      DateTime?
 
   task    ResearchTask    @relation(fields: [taskId], references: [id])
   attempt ResearchAttempt @relation(fields: [attemptId], references: [id])
@@ -475,19 +476,20 @@ model Conversation {
 }
 
 model ConversationMessage {
-  id             String                  @id @default(cuid())
-  conversationId String
-  role           ConversationMessageRole
-  content        String                  @db.Text
-  generationId   String?
-  chatTurnId     String?
-  chatAttemptId  String?
-  chatStatus     String?
-  chatReferences Json?
-  chatSources    Json?
-  chatUsage      Json?
-  chatError      Json?
-  createdAt      DateTime                @default(now())
+  id                  String                  @id @default(cuid())
+  conversationId      String
+  role                ConversationMessageRole
+  content             String                  @db.Text
+  generationId        String?
+  chatTurnId          String?
+  chatAttemptId       String?
+  chatStatus          String?
+  chatReferences      Json?
+  chatSources         Json?
+  chatUsage           Json?
+  chatActivityHistory Json?
+  chatError           Json?
+  createdAt           DateTime                @default(now())
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   generation   Generation?  @relation(fields: [generationId], references: [id], onDelete: SetNull)
@@ -644,16 +646,16 @@ model ChatEvent {
 }
 
 model AgentDeviceAuthorization {
-  id                String    @id @default(cuid())
-  deviceCodeHash    String    @unique
-  userCodeHash      String    @unique
-  clientName        String
-  status            String    @default("pending")
-  expiresAt         DateTime
-  lastPolledAt      DateTime?
-  pollInterval      Int       @default(5)
-  authorizationId   String?   @unique
-  createdAt         DateTime  @default(now())
+  id              String    @id @default(cuid())
+  deviceCodeHash  String    @unique
+  userCodeHash    String    @unique
+  clientName      String
+  status          String    @default("pending")
+  expiresAt       DateTime
+  lastPolledAt    DateTime?
+  pollInterval    Int       @default(5)
+  authorizationId String?   @unique
+  createdAt       DateTime  @default(now())
 
   authorization AgentAuthorization? @relation(fields: [authorizationId], references: [id], onDelete: Cascade)
 
@@ -681,19 +683,19 @@ model ApiKey {
 }
 
 model AgentAuthorization {
-  id                 String    @id @default(cuid())
-  userId             String
-  clientName         String
-  mode               String
-  tokenHash          String?   @unique
-  sessionVersion     Int
-  expiresAt          DateTime
-  revokedAt          DateTime?
-  lastUsedAt         DateTime?
-  boundGenerationId  String?
-  createdAt          DateTime  @default(now())
+  id                String    @id @default(cuid())
+  userId            String
+  clientName        String
+  mode              String
+  tokenHash         String?   @unique
+  sessionVersion    Int
+  expiresAt         DateTime
+  revokedAt         DateTime?
+  lastUsedAt        DateTime?
+  boundGenerationId String?
+  createdAt         DateTime  @default(now())
 
-  user          User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
   deviceRequest AgentDeviceAuthorization?
   generations   Generation[]
 
@@ -702,48 +704,48 @@ model AgentAuthorization {
 }
 
 model Generation {
-  id                 String           @id @default(cuid())
-  userId             String
-  conversationId     String?
+  id                   String           @id @default(cuid())
+  userId               String
+  conversationId       String?
   agentAuthorizationId String?
-  apiKeyId           String?
-  modelId            String
-  prompt             String           @db.Text
-  negativePrompt     String?          @db.Text
-  aspectRatio        String
-  resolution         String?
-  n                  Int              @default(1)
-  seed               BigInt?
-  outputFormat       String           @default("png")
-  paramsRaw          Json
-  referenceImageKeys String[]
-  status             GenerationStatus @default(PENDING)
-  providerId         String?
-  providerAccountId  String?
-  jobId              String?
-  progress           Int              @default(0)
-  errorCode          String?
-  errorMessage       String?
-  costCredits        Int              @default(0)
-  pricingSnapshot    Json?
-  attempts           Int              @default(0)
-  executionToken     String?
-  heartbeatAt        DateTime?
-  startedAt          DateTime?
-  finishedAt         DateTime?
-  deletedAt          DateTime?
-  createdAt          DateTime         @default(now())
+  apiKeyId             String?
+  modelId              String
+  prompt               String           @db.Text
+  negativePrompt       String?          @db.Text
+  aspectRatio          String
+  resolution           String?
+  n                    Int              @default(1)
+  seed                 BigInt?
+  outputFormat         String           @default("png")
+  paramsRaw            Json
+  referenceImageKeys   String[]
+  status               GenerationStatus @default(PENDING)
+  providerId           String?
+  providerAccountId    String?
+  jobId                String?
+  progress             Int              @default(0)
+  errorCode            String?
+  errorMessage         String?
+  costCredits          Int              @default(0)
+  pricingSnapshot      Json?
+  attempts             Int              @default(0)
+  executionToken       String?
+  heartbeatAt          DateTime?
+  startedAt            DateTime?
+  finishedAt           DateTime?
+  deletedAt            DateTime?
+  createdAt            DateTime         @default(now())
 
-  user            User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  agentAuthorization AgentAuthorization? @relation(fields: [agentAuthorizationId], references: [id], onDelete: SetNull)
-  apiKey          ApiKey?                @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
-  conversation    Conversation?          @relation(fields: [conversationId], references: [id], onDelete: SetNull)
-  provider        Provider?              @relation(fields: [providerId], references: [id])
-  providerAccount ProviderAccount?       @relation(fields: [providerAccountId], references: [id])
-  images          GeneratedImage[]
-  messages        ConversationMessage[]
-  pptSlides       PPTSlide[]
-  providerLeases  ProviderAccountLease[]
+  user               User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agentAuthorization AgentAuthorization?    @relation(fields: [agentAuthorizationId], references: [id], onDelete: SetNull)
+  apiKey             ApiKey?                @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
+  conversation       Conversation?          @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  provider           Provider?              @relation(fields: [providerId], references: [id])
+  providerAccount    ProviderAccount?       @relation(fields: [providerAccountId], references: [id])
+  images             GeneratedImage[]
+  messages           ConversationMessage[]
+  pptSlides          PPTSlide[]
+  providerLeases     ProviderAccountLease[]
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([conversationId, createdAt(sort: Desc)])
@@ -754,6 +756,46 @@ model Generation {
   @@index([agentAuthorizationId])
   @@index([apiKeyId])
   @@index([status, heartbeatAt])
+}
+
+// Audit references deliberately survive deletion of the related user content.
+model ModelCallLog {
+  id                  String    @id @default(cuid())
+  kind                String
+  source              String
+  operation           String
+  status              String    @default("RUNNING")
+  modelId             String
+  userId              String?
+  generationId        String?
+  imageId             String?
+  conversationId      String?
+  chatAttemptId       String?
+  providerId          String?
+  providerAccountId   String?
+  providerName        String?
+  endpoint            String?
+  requestId           String?
+  httpStatus          Int?
+  errorCategory       String?
+  errorMessage        String?   @db.Text
+  requestContent      String?   @db.Text
+  responseContent     String?   @db.Text
+  inputTokens         Int?
+  uncachedInputTokens Int?
+  cacheReadTokens     Int?
+  cacheCreationTokens Int?
+  outputTokens        Int?
+  startedAt           DateTime  @default(now())
+  finishedAt          DateTime?
+  durationMs          Int?
+
+  @@index([kind, startedAt(sort: Desc)])
+  @@index([startedAt(sort: Desc), id(sort: Desc)])
+  @@index([source, status, startedAt(sort: Desc)])
+  @@index([generationId, startedAt])
+  @@index([chatAttemptId])
+  @@index([providerId, startedAt(sort: Desc)])
 }
 
 model GeneratedImage {
@@ -888,10 +930,48 @@ model CreditRedemptionCode {
   createdBy    String?
   createdAt    DateTime  @default(now())
 
-  redemptions CreditRedemption[]
+  redemptions      CreditRedemption[]
+  storefrontOrders StorefrontOrder[]
 
   @@index([code])
   @@index([createdAt])
+}
+
+enum StorefrontOrderStatus {
+  PENDING
+  PAID
+  COMPLETED
+  EXPIRED
+  FAILED
+}
+
+model StorefrontOrder {
+  id                     String                @id @default(cuid())
+  userId                 String
+  productId              String
+  credits                Int
+  amount                 Decimal               @db.Decimal(12, 2)
+  contact                String
+  queryPasswordHash      String
+  queryPasswordEncrypted String
+  payUrl                 String?
+  externalTradeNo        String?               @unique
+  externalProductId      String?
+  externalAmount         Decimal?              @db.Decimal(12, 2)
+  status                 StorefrontOrderStatus @default(PENDING)
+  expiresAt              DateTime
+  paidAt                 DateTime?
+  completedAt            DateTime?
+  redemptionCodeId       String?               @unique
+  lastErrorCode          String?
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+
+  user           User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  redemptionCode CreditRedemptionCode? @relation(fields: [redemptionCodeId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([status, expiresAt])
 }
 
 model CreditRedemption {

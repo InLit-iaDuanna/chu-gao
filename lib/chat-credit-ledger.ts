@@ -41,9 +41,17 @@ export async function closeChatReserve(
     attemptId: string;
     amount: number;
     success: boolean;
+    actualCredits?: number;
+    result?: Prisma.InputJsonValue;
   },
 ) {
   const amount = creditDecimal(input.amount);
+  const actual = creditDecimal(
+    input.success ? (input.actualCredits ?? input.amount) : 0,
+  );
+  if (!amount.isFinite() || amount.lt(0) || !actual.isFinite() || actual.lt(0))
+    throw new Error("INVALID_CHAT_SETTLEMENT_AMOUNT");
+  if (actual.gt(amount)) throw new Error("CHAT_SETTLEMENT_EXCEEDS_RESERVE");
   // Turn and attempt locks are held by the caller. The same close key protects
   // both terminal choices, including callers introduced in future releases.
   const closed = await tx.creditEntry.findUnique({
@@ -52,6 +60,8 @@ export async function closeChatReserve(
   if (closed) throw new Error("CHAT_HOLD_ALREADY_CLOSED");
   if (!input.success && input.amount)
     await refundChatCredits(tx, input.userId, input.amount);
+  else if (input.success && !amount.eq(actual))
+    await refundChatCredits(tx, input.userId, amount.minus(actual).toNumber());
   const account = await tx.user.findUniqueOrThrow({
     where: { id: input.userId },
     select: { credits: true },
@@ -64,9 +74,10 @@ export async function closeChatReserve(
       turnId: input.turnId,
       attemptId: input.attemptId,
       turnSettlementKey: input.success ? `settle:${input.turnId}` : null,
-      availableDelta: input.success ? 0 : amount,
+      availableDelta: amount.minus(actual),
       heldDelta: amount.negated(),
-      consumedDelta: input.success ? amount : 0,
+      consumedDelta: actual,
+      ...(input.result !== undefined ? { result: input.result } : {}),
       balanceAfter: creditDecimal(account.credits),
     },
   });

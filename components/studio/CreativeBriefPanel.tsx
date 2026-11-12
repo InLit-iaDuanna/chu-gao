@@ -37,6 +37,7 @@ import type { DockParams, ReferenceItem } from "./CommandDock";
 import { sizeLabel } from "./CommandDock";
 import { CopyTextButton } from "./CopyTextButton";
 import { quoteCreativeGeneration } from "./lib/api";
+import { estimatedCreditLabel } from "./lib/generation-options";
 import type { CreateGenerationInput, ModelInfo } from "./lib/types";
 import type { Generation } from "./lib/types";
 
@@ -669,7 +670,11 @@ export function CreativeBriefPanel({
             <dd className="text-right">{base ? "已选定" : "无"}</dd>
             <dt className="text-text-muted">本次费用</dt>
             <dd className="text-right font-semibold tabular-nums">
-              {confirmation?.creative?.maxCredits} 积分
+              {estimatedCreditLabel(
+                confirmation?.creative?.maxCredits,
+                model,
+                confirmation?.size,
+              )}
             </dd>
           </dl>
           {base ? (
@@ -696,7 +701,12 @@ export function CreativeBriefPanel({
                 setConfirmation(null);
             }}
           >
-            确认生成 · {confirmation?.creative?.maxCredits} 积分
+            确认生成 ·{" "}
+            {estimatedCreditLabel(
+              confirmation?.creative?.maxCredits,
+              model,
+              confirmation?.size,
+            )}
           </Button>
           {errorMessage ? (
             <p role="alert" className="text-sm leading-6 text-danger">

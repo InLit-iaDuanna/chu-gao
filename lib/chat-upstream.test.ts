@@ -1,10 +1,48 @@
 import { describe, expect, it } from "vitest";
 import {
   chatEndpoint,
+  chatCompletionsRequestBody,
   responsesRequestBody,
   lunaRequestBody,
   readLunaStreamEvent,
 } from "@/lib/chat-upstream";
+import { OPUS_MODEL_ID, REASONING_EFFORTS } from "@/lib/chat-model-options";
+
+describe("Opus Chat Completions adapter", () => {
+  it.each(REASONING_EFFORTS)(
+    "sends %s unchanged with a bounded output and final usage",
+    (effort) => {
+      const body = chatCompletionsRequestBody(
+        OPUS_MODEL_ID,
+        [{ role: "user", content: "hello" }],
+        "instructions",
+        {
+          effort,
+          maxOutputTokens: 16_384,
+          includeUsage: true,
+        },
+      );
+      expect(body).toMatchObject({
+        model: "claude-opus-5-5",
+        reasoning_effort: effort,
+        max_tokens: 16_384,
+        stream: true,
+        stream_options: { include_usage: true },
+      });
+      expect(body).not.toHaveProperty("thinking");
+      expect(chatEndpoint("https://fixture.invalid/v1/", false)).toBe(
+        "https://fixture.invalid/v1/chat/completions",
+      );
+    },
+  );
+  it("keeps the legacy fixed-credit request parameters unchanged", () => {
+    expect(chatCompletionsRequestBody("legacy", [], "instructions")).toEqual({
+      model: "legacy",
+      messages: [{ role: "system", content: "instructions" }],
+      stream: true,
+    });
+  });
+});
 
 describe("Luna Responses adapter", () => {
   it("keeps prompt caching separate from response storage", () => {

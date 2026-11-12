@@ -92,7 +92,11 @@ export async function GET(request: Request) {
         where: { status: "RUNNING" },
       }),
       db.generation.count({
-        where: { status: "FAILED", createdAt: { gte: today } },
+        where: {
+          status: "FAILED",
+          errorCode: { not: "MODERATION_REJECTED" },
+          createdAt: { gte: today },
+        },
       }),
       db.generation.count({
         where: { status: "SUCCEEDED", createdAt: { gte: today } },
@@ -135,7 +139,10 @@ export async function GET(request: Request) {
           date_trunc('day', g."createdAt") AS day,
           count(*) AS total,
           count(*) FILTER (WHERE g."status" = 'SUCCEEDED') AS succeeded,
-          count(*) FILTER (WHERE g."status" = 'FAILED') AS failed,
+          count(*) FILTER (
+            WHERE g."status" = 'FAILED'
+              AND g."errorCode" IS DISTINCT FROM 'MODERATION_REJECTED'
+          ) AS failed,
           COALESCE(sum(g."costCredits") FILTER (WHERE g."status" = 'SUCCEEDED'), 0)::float8 AS credits
         FROM "Generation" g
         WHERE g."createdAt" >= ${since14Days}
@@ -148,7 +155,10 @@ export async function GET(request: Request) {
           date_trunc('hour', g."createdAt") AS hour,
           count(*) AS total,
           count(*) FILTER (WHERE g."status" = 'SUCCEEDED') AS succeeded,
-          count(*) FILTER (WHERE g."status" = 'FAILED') AS failed
+          count(*) FILTER (
+            WHERE g."status" = 'FAILED'
+              AND g."errorCode" IS DISTINCT FROM 'MODERATION_REJECTED'
+          ) AS failed
         FROM "Generation" g
         WHERE g."createdAt" >= ${since24Hours}
           AND g."deletedAt" IS NULL
@@ -169,6 +179,7 @@ export async function GET(request: Request) {
         take: 2000,
         select: {
           status: true,
+          errorCode: true,
           costCredits: true,
           createdAt: true,
           startedAt: true,
@@ -257,7 +268,10 @@ export async function GET(request: Request) {
         current.succeeded += 1;
         current.credits += generation.costCredits;
       }
-      if (generation.status === "FAILED") {
+      if (
+        generation.status === "FAILED" &&
+        generation.errorCode !== "MODERATION_REJECTED"
+      ) {
         current.failed += 1;
       }
       if (generation.startedAt && generation.finishedAt) {

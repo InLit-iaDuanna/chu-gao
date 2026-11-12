@@ -14,12 +14,15 @@ import {
   workerConcurrencyTarget,
 } from "@/lib/generation-capacity";
 import { logger } from "@/lib/logger";
+import { withModelCall, withModelCallContext } from "@/lib/model-call-log";
+import { generationCallSource } from "@/lib/model-call-types";
 import {
   ProviderCapacityError,
   ProviderUnavailableError,
   selectAndGenerate,
 } from "@/lib/providers";
 import {
+  isFallbackProvider,
   reconcileProviderAccountCounters,
   releaseOrphanedProviderLeases,
 } from "@/lib/providers/account-pool";
@@ -47,6 +50,7 @@ import {
 } from "./generation-worker-errors";
 import { recoverStuckGenerations } from "./generation-worker-recovery";
 import {
+  reserveGenerationProviderCredits,
   settleGenerationFailure,
   settleGenerationSuccess,
 } from "./generation-worker-settlement";
@@ -185,14 +189,21 @@ async function main() {
       const savedImages: PersistedGeneratedImage[] = [];
       // API-key jobs return their images to the caller and keep nothing on
       // the server; their bytes are only parked in Redis until picked up.
-      const isApiKeyJob = Boolean(
-        (
-          await db.generation.findUnique({
-            where: { id: generationId },
-            select: { apiKeyId: true },
-          })
-        )?.apiKeyId,
-      );
+      const storedGeneration = await db.generation.findUnique({
+        where: { id: generationId },
+        select: {
+          apiKeyId: true,
+          agentAuthorizationId: true,
+          conversationId: true,
+        },
+      });
+      const isApiKeyJob = Boolean(storedGeneration?.apiKeyId);
+      const logContext = {
+        source: generationCallSource(storedGeneration ?? {}),
+        generationId,
+        userId,
+        conversationId: storedGeneration?.conversationId ?? undefined,
+      };
       let stashedImageCount = 0;
       let imagesCommitted = false;
       let selectedProviderId: string | null = null;
@@ -201,8 +212,14 @@ async function main() {
       try {
         const hydratedRequest = {
           ...request,
-          referenceImages: await hydrateReferenceImages(
-            request.referenceImages,
+          referenceImages: await withModelCall(
+            {
+              ...logContext,
+              kind: "image",
+              operation: "image.prepare",
+              modelId: request.modelId,
+            },
+            () => hydrateReferenceImages(request.referenceImages),
           ),
         };
         const {
@@ -211,47 +228,37 @@ async function main() {
           providerName,
           providerAccountId,
           providerAccountName,
-        } = await selectAndGenerate(hydratedRequest, {
-          leaseContext,
-          onProviderSelected: async (selection) => {
-            selectedProviderId = selection.providerId;
-            selectedProviderAccountId = selection.providerAccountId;
-            const selected = await db.generation.updateMany({
-              where: {
-                id: generationId,
-                userId,
-                status: "RUNNING",
-                executionToken,
-              },
-              data: {
-                providerId: selection.providerId,
-                providerAccountId: selection.providerAccountId,
-                heartbeatAt: new Date(),
-              },
-            });
-            if (selected.count === 0)
-              throw new Error(
-                "generation execution was superseded before dispatch",
-              );
-          },
-          onProgress: async (event) => {
-            const progress = clampProgress(event.progress);
-            await db.generation.updateMany({
-              where: {
-                id: generationId,
-                userId,
-                status: "RUNNING",
-                executionToken,
-              },
-              data: {
-                progress,
-                providerId: selectedProviderId,
-                providerAccountId: selectedProviderAccountId,
-                heartbeatAt: new Date(),
-              },
-            });
-          },
-        });
+        } = await withModelCallContext(logContext, () =>
+          selectAndGenerate(hydratedRequest, {
+            leaseContext,
+            onProviderSelected: async (selection) => {
+              await reserveGenerationProviderCredits({
+                ...leaseContext,
+                request,
+                selection,
+              });
+              selectedProviderId = selection.providerId;
+              selectedProviderAccountId = selection.providerAccountId;
+            },
+            onProgress: async (event) => {
+              const progress = clampProgress(event.progress);
+              await db.generation.updateMany({
+                where: {
+                  id: generationId,
+                  userId,
+                  status: "RUNNING",
+                  executionToken,
+                },
+                data: {
+                  progress,
+                  providerId: selectedProviderId,
+                  providerAccountId: selectedProviderAccountId,
+                  heartbeatAt: new Date(),
+                },
+              });
+            },
+          }),
+        );
 
         if (result.images.length === 0) {
           throw new Error("provider returned no images");
@@ -260,9 +267,22 @@ async function main() {
         const outputImages =
           request.executionPolicy === "single-submit"
             ? result.images.slice(0, 1)
-            : result.images;
+            : isFallbackProvider({ id: providerId })
+              ? result.images.slice(0, request.n)
+              : result.images;
+        const persistContext = {
+          ...logContext,
+          kind: "image" as const,
+          operation: "image.persist",
+          modelId: request.modelId,
+          providerId,
+          providerAccountId: providerAccountId ?? undefined,
+          providerName,
+        };
         const ephemeralImages = isApiKeyJob
-          ? await Promise.all(outputImages.map(materializeGeneratedImage))
+          ? await withModelCall(persistContext, () =>
+              Promise.all(outputImages.map(materializeGeneratedImage)),
+            )
           : [];
         if (isApiKeyJob) {
           await stashApiGenerationImages(generationId, ephemeralImages);
@@ -270,11 +290,8 @@ async function main() {
         } else {
           for (const [index, image] of outputImages.entries()) {
             savedImages.push(
-              await saveGeneratedImage(
-                image,
-                generationId,
-                index,
-                executionToken,
+              await withModelCall(persistContext, () =>
+                saveGeneratedImage(image, generationId, index, executionToken),
               ),
             );
           }

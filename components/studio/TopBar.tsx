@@ -33,6 +33,7 @@ interface TopBarProps {
   model: ModelInfo | null;
   leading?: ReactNode;
   title?: string;
+  actions?: ReactNode;
 }
 
 function ThemeToggle() {
@@ -64,7 +65,7 @@ function ThemeToggle() {
   );
 }
 
-export function TopBar({ me, model, leading, title }: TopBarProps) {
+export function TopBar({ me, model, leading, title, actions }: TopBarProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [workbenchHref, setWorkbenchHref] = useState("/app");
@@ -129,6 +130,7 @@ export function TopBar({ me, model, leading, title }: TopBarProps) {
       )}
 
       <div className="ml-auto flex shrink-0 items-center gap-1.5">
+        {actions}
         <span
           className={`mr-1 flex h-8 min-w-14 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-md border border-border bg-surface px-2.5 text-xs font-medium text-foreground ${me ? "" : "invisible"}`}
           title={

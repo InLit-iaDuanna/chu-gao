@@ -20,7 +20,11 @@ import {
   getChatRuntimeAdmission,
   setChatRuntimeConfig,
 } from "@/lib/chat-runtime-config";
-import { SOL_MODEL_ID, LUNA_MODEL_ID } from "@/lib/chat-model-options";
+import {
+  SOL_MODEL_ID,
+  LUNA_MODEL_ID,
+  OPUS_MODEL_ID,
+} from "@/lib/chat-model-options";
 
 describe("chat runtime admission", () => {
   const tx = {
@@ -37,7 +41,7 @@ describe("chat runtime admission", () => {
   });
 
   it("defaults to locally usable profiles, v2 and no implicit queue expiry", async () => {
-    for (const model of ["default", SOL_MODEL_ID, LUNA_MODEL_ID])
+    for (const model of [OPUS_MODEL_ID, SOL_MODEL_ID, LUNA_MODEL_ID])
       expect(await assertChatRuntimeAdmission("user-a", model)).toMatchObject({
         allowed: true,
         protocolVersion: CHAT_TASK_PROTOCOL_VERSION,
@@ -96,7 +100,7 @@ describe("chat runtime admission", () => {
     });
     expect(await setChatRuntimeConfig({ enabled: false }, "admin-a")).toEqual({
       enabled: false,
-      profiles: [SOL_MODEL_ID],
+      profiles: [OPUS_MODEL_ID, SOL_MODEL_ID],
       userAllowlist: ["user-a"],
       queueTimeoutMs: 5_000,
     });

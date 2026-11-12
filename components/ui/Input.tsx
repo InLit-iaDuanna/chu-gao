@@ -32,7 +32,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
     <input
       ref={ref}
       className={cn(
-        "w-full rounded-md border border-[rgb(var(--control-border))] bg-[rgb(var(--control-bg))] text-foreground outline-none transition-[background-color,border-color,color,box-shadow] duration-[var(--duration-fast)] ease-[var(--ease-out)] placeholder:text-text-muted",
+        "ui-input w-full rounded-md border border-[rgb(var(--control-border))] bg-[rgb(var(--control-bg))] text-foreground outline-none transition-[background-color,border-color,color,box-shadow] duration-[var(--duration-fast)] ease-[var(--ease-out)] placeholder:text-text-muted",
         "hover:border-[rgb(var(--control-border-hover))] hover:bg-[rgb(var(--control-bg-hover))] focus:border-[rgb(var(--control-focus))] focus:shadow-[var(--shadow-focus)] aria-[invalid=true]:border-danger",
         "disabled:cursor-not-allowed disabled:border-[rgb(var(--control-disabled-border))] disabled:bg-[rgb(var(--control-disabled-bg))] disabled:text-[rgb(var(--icon-disabled))] disabled:placeholder:text-[rgb(var(--icon-disabled))]",
         sizeClass[resolvedSize],

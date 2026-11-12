@@ -1,6 +1,7 @@
 import type { ModelDefinition, ProtocolName } from "@/lib/models/types";
 import {
   IMAGE_SIZE_OPTIONS,
+  GIF_SIZE_OPTIONS,
   RESPONSE_FORMAT_OPTIONS,
 } from "@/lib/models/options";
 
@@ -77,6 +78,9 @@ export const MODELS: Record<string, ModelDefinition> = {
 for (const [id, displayName] of [
   ["gpt-image-2.5-flare", "Image 2.5 Flare"],
   ["gpt-image-2.5-sunburst", "Image 2.5 Sunburst"],
+  ["gpt-image-2.6", "Image 2.6"],
+  ["gpt-image-2.6-flare", "Image 2.6 Flare"],
+  ["gpt-image-2.6-sunburst", "Image 2.6 Sunburst"],
 ] as const) {
   const base = MODELS["gpt-image-2"];
   const { image2Modes: _modes, ...capabilities } = base.capabilities;
@@ -89,7 +93,10 @@ for (const [id, displayName] of [
       ...capabilities,
       qualities: ["low", "medium", "high", "xhigh", "max"],
       maxN: 1,
-      outputFormats: ["png"],
+      outputFormats: id.startsWith("gpt-image-2.6") ? ["png", "gif"] : ["png"],
+      ...(id.startsWith("gpt-image-2.6")
+        ? { gifSizes: [...GIF_SIZE_OPTIONS] }
+        : {}),
       backgrounds: ["auto"],
       supportsOutputCompression: false,
     },

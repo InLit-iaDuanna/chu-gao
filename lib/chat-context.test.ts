@@ -51,8 +51,6 @@ import {
 import { chatSystemInstructions } from "@/lib/chat-instructions";
 import type { ChatReference } from "@/lib/chat-references-types";
 import type { UpstreamChatMessage } from "@/lib/chat-upstream";
-import { SOL_MODEL_ID } from "@/lib/chat-model-options";
-import { CHAT_SOL_CONTEXT_BUDGET_TOKENS } from "@/lib/chat-context-types";
 
 const input = {
   userId: "alice",
@@ -259,59 +257,6 @@ afterEach(() => {
 });
 
 describe("durable server-owned context", () => {
-  it("keeps Sol history beyond twenty turns and accepts input above the legacy budget", async () => {
-    histories.set(key(), history(24, 1, "Confirmed short facts. ".repeat(4)));
-    const prepared = await prepareChatContext({
-      ...input,
-      modelId: SOL_MODEL_ID,
-      latestMessage: { role: "user", content: "a".repeat(120_000) },
-    });
-    expect(prepared.status.budgetTokens).toBe(CHAT_SOL_CONTEXT_BUDGET_TOKENS);
-    expect(prepared.manifest.budgetTokens).toBe(CHAT_SOL_CONTEXT_BUDGET_TOKENS);
-    expect(prepared.messages).toHaveLength(49);
-    expect(prepared.compacted).toBe(false);
-    expect(mocks.fetch).not.toHaveBeenCalled();
-    expect(
-      (
-        await getChatContextStatus(
-          input.userId,
-          input.conversationId,
-          SOL_MODEL_ID,
-        )
-      ).budgetTokens,
-    ).toBe(CHAT_SOL_CONTEXT_BUDGET_TOKENS);
-  });
-
-  it("compacts Sol at its usage threshold while retaining its larger budget", async () => {
-    histories.set(key(), history(8, 1, "a".repeat(19_000)));
-    const prepared = await prepareChatContext({
-      ...input,
-      modelId: SOL_MODEL_ID,
-      latestMessage,
-    });
-    expect(prepared.compacted).toBe(true);
-    expect(prepared.status.estimatedTokens).toBeLessThan(
-      CHAT_SOL_CONTEXT_BUDGET_TOKENS * 0.75,
-    );
-    expect(prepared.manifest.budgetTokens).toBe(CHAT_SOL_CONTEXT_BUDGET_TOKENS);
-    expect(prepared.manifest.snapshotId).not.toBeNull();
-  });
-
-  it("still rejects a Sol input above its application budget without sending it", async () => {
-    histories.set(key(), history(0));
-    await expect(
-      prepareChatContext({
-        ...input,
-        modelId: SOL_MODEL_ID,
-        latestMessage: {
-          role: "user",
-          content: "a".repeat(CHAT_SOL_CONTEXT_BUDGET_TOKENS * 4),
-        },
-      }),
-    ).rejects.toMatchObject({ code: "CHAT_CONTEXT_TOO_LARGE" });
-    expect(mocks.fetch).not.toHaveBeenCalled();
-  });
-
   it("prepares short dialogue and reports status with Redis completely unavailable", async () => {
     histories.set(key(), history(1));
     const original = structuredClone(own());

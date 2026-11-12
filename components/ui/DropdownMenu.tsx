@@ -40,7 +40,7 @@ export function DropdownMenu({
           align="end"
           sideOffset={6}
           className={cn(
-            "z-50 min-w-48 rounded-md border border-border bg-surface p-1 shadow-[var(--shadow-md)] outline-none",
+            "smooth-surface surface-overlay relative z-50 min-w-48 max-w-[calc(100vw-24px)] rounded-xl border border-border bg-surface p-1.5 shadow-[var(--shadow-lg)] outline-none",
             className,
           )}
         >
@@ -63,7 +63,7 @@ export function DropdownMenuItem({
     <RadixMenu.Item
       disabled={disabled}
       className={cn(
-        "flex h-8 w-full cursor-pointer items-center justify-between gap-6 rounded-[4px] px-2.5 text-left text-sm text-foreground outline-none transition-colors data-[highlighted]:bg-surface-2 data-[disabled]:cursor-not-allowed data-[disabled]:opacity-45",
+        "smooth-surface surface-inset ui-menu-item relative flex min-h-9 w-full cursor-pointer items-center justify-between gap-6 rounded-[4px] px-2.5 text-left text-sm text-foreground outline-none transition-colors data-[highlighted]:bg-surface-2 data-[disabled]:cursor-not-allowed data-[disabled]:opacity-45",
         className,
       )}
       onSelect={(event) => {

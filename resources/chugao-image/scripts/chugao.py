@@ -475,12 +475,17 @@ def generation_body(args: argparse.Namespace, models: list[dict], reference_coun
         if not isinstance(maximum, int) or isinstance(maximum, bool) or reference_count > maximum:
             raise CliError("Too many reference images for the requested model.")
     body = {"modelId": args.model, "prompt": args.prompt, "n": 1}
+    selected_format = args.output_format or model["defaults"].get("outputFormat")
     for flag, field, capability in (
         ("size", "size", "sizes"), ("quality", "quality", "qualities"),
         ("background", "background", "backgrounds"),
         ("output_format", "outputFormat", "outputFormats"),
     ):
         value = getattr(args, flag)
+        if field == "size" and selected_format == "gif":
+            capability = "gifSizes"
+            if value is None:
+                value = next(iter(capabilities.get("gifSizes", [])), None)
         if value is None:
             value = model["defaults"].get(field)
         if value is None:

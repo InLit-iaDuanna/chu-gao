@@ -77,8 +77,7 @@ export function IconButton({
   const selectedState =
     ariaPressed ?? selected ?? (variant === "selected" ? true : undefined);
   const classes = cn(
-    "inline-flex shrink-0 items-center justify-center rounded-md transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] ease-[var(--ease-out)]",
-    "active:translate-y-px motion-reduce:active:translate-y-0",
+    "ui-icon-button relative inline-flex shrink-0 items-center justify-center rounded-md transition-[background-color,border-color,color,box-shadow,opacity] duration-[var(--duration-fast)] ease-[var(--ease-out)]",
     "disabled:cursor-not-allowed disabled:opacity-100 disabled:active:translate-y-0",
     sizeClass[size],
     variantClass[effectiveVariant],

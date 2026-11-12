@@ -163,7 +163,7 @@ export async function POST(
 
     const displayNameMap = await getImage2ChannelDisplayNameMap();
 
-    return ok(serializeConversation(updated, { displayNameMap }));
+    return ok(await serializeConversation(updated, { displayNameMap }));
   } catch (error) {
     if (error instanceof ChatTurnError)
       return fail(error.code, error.message, { status: error.status });

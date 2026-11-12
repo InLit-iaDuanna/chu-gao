@@ -68,13 +68,14 @@ export const DEFAULT_CONVERSATION_MODEL = "deepseek-chat";
 export const DEFAULT_CONVERSATION_STANDARD_CREDITS = 0.5;
 export const DEFAULT_CONVERSATION_REASONING_CREDITS = 1;
 
-// 对话模型的「系统提示词」：多轮助手，同时能协助用户打磨出图提示词。
+// 对话模型的「系统提示词」：聊天、创意讨论和按需生图统一在同一段对话中。
 // 这是独立于 DeepSeek 优化指令与出图渠道的配置，可在后台修改。
 export const DEFAULT_CONVERSATION_SYSTEM_PROMPT = `你是一个乐于助人的中文 AI 助手，支持多轮自然对话。
-你的能力：
-1. 像通用助手一样回答问题、梳理思路、给出建议，保持简洁、准确、友好。
-2. 当用户希望生成图像时，主动帮助其把模糊想法打磨成清晰、具体的图像生成提示词（明确主体、风格、构图、配色、光影、镜头等）。
-3. 在用户确认要出图之前，先以「图像提示词预览」的形式展示你拟定的提示词，让用户确认或继续调整，再进入生成环节。
+规则：
+1. 直接回答用户的问题，梳理思路并给出可执行建议，保持简洁、准确、友好。
+2. 这是统一对话模式，可以聊天、讨论创意，也可以在用户明确要求时调用生图工具；不要要求用户在聊天和生图之间切换。
+3. 用户要求 SVG、HTML、代码或其他可复制内容时，直接给出完整结果；需要时使用带语言标记的代码块。
+4. 用户明确要求生成、重绘或修改图片时，直接调用可用的生图工具；不要把工具参数原样展示给用户，也不要伪造已经生成的结果。
 始终用中文与用户交流，除非用户另有要求。`;
 
 // 「出图提示词编译指令」：把多轮对话整理成可直接出图的最终 prompt。
@@ -83,7 +84,7 @@ export const DEFAULT_CONVERSATION_COMPILE_SYSTEM_PROMPT = `你是 Chūgǎo Studi
 规则：
 1. 保留用户明确要求延续的主体、风格、构图与限制；新的用户要求优先级最高；助手消息可作为已确认状态参考。
 2. 强化必要的视觉细节（构图、配色、光影、材质、镜头），但不要臆造与对话无关的元素。
-3. 只输出严格的 JSON 对象，不要任何解释或代码块标记，形如：
+3. 只输出严格的 JSON 对象，不要任何解释或代码块标记；字符串中的英文双引号必须转义为 \\"，不要漏逗号，形如：
 {"prompt": "最终出图 prompt，完整自包含，不超过 4000 字", "assistantMessage": "给用户看的简短中文回复，不超过 80 字", "shouldGenerate": true}
 其中 shouldGenerate：信息足够生成则为 true；若仍需向用户追问关键信息则为 false。`;
 
@@ -234,6 +235,12 @@ export async function getDeepSeekSystemPrompt(): Promise<string> {
     rows[KEY_DEEPSEEK_SYSTEM_PROMPT],
     DEFAULT_DEEPSEEK_SYSTEM_PROMPT,
   );
+}
+
+// Prompt enhancement now runs on Opus 5.5. The old stored prompt is reused
+// as a migration fallback so existing admin content is not lost.
+export async function getPromptOptimizerSystemPrompt(): Promise<string> {
+  return getDeepSeekSystemPrompt();
 }
 
 export async function getPptSystemPrompt(): Promise<string> {
