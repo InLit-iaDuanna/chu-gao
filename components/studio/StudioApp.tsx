@@ -65,6 +65,10 @@ import {
 } from "./WorkspaceShell";
 import { ConversationTimeline } from "./chat/ConversationTimeline";
 import { HtmlArtifact } from "./chat/HtmlArtifact";
+import {
+  ImageRoutingDialog,
+  type ImageRoutingSelection,
+} from "./ImageRoutingDialog";
 import { CreativeBriefPanel, type AgentTurn } from "./CreativeBriefPanel";
 import {
   creativeDraftSchema,
@@ -93,6 +97,7 @@ import {
   listModels,
   optimizePrompt,
   planCreativeBrief,
+  preflightImageModels,
   updateConversation,
 } from "./lib/api";
 import { subscribeGeneration } from "./lib/sse";
@@ -109,6 +114,16 @@ import {
   useSessionDraft,
 } from "./lib/use-session-draft";
 import { cn } from "@/lib/utils";
+import type { ImageQuality } from "@/lib/models/types";
+import {
+  AUTO_IMAGE_MODEL_ID,
+  automaticImageModel,
+  imageRouteCandidates,
+  readStoredImagePreferences,
+  updateStoredImagePreferences,
+  type ImageRouteMode,
+  type StoredImagePreferences,
+} from "./lib/image-routing";
 import {
   isActiveStatus,
   type CreateGenerationInput,
@@ -166,6 +181,12 @@ type AgentQualityTarget = {
   imageId: string;
 };
 
+type ImageFallbackPrompt = {
+  requested: ModelInfo;
+  suggested: ModelInfo;
+  confirmed?: CreateGenerationInput;
+};
+
 function referenceInspectionErrorMessage(error: unknown) {
   const detail =
     error instanceof Error && error.message.trim()
@@ -219,6 +240,17 @@ export function StudioApp({
   const userId = me?.id;
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [modelId, setModelId] = useState<string | null>(null);
+  const [imageRouteMode, setImageRouteMode] = useState<ImageRouteMode>("auto");
+  const [imageRoutingOpen, setImageRoutingOpen] = useState(false);
+  const [imageFallbackPrompt, setImageFallbackPrompt] =
+    useState<ImageFallbackPrompt | null>(null);
+  const [imageRoutingContinuation, setImageRoutingContinuation] = useState<{
+    confirmed?: CreateGenerationInput;
+  } | null>(null);
+  const [imageSettingsConfigured, setImageSettingsConfigured] = useState(false);
+  const [imageRoutingChecking, setImageRoutingChecking] = useState(false);
+  const [rememberedImagePreferences, setRememberedImagePreferences] =
+    useState<StoredImagePreferences | null>(null);
   const [modelError, setModelError] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(initialThreadId);
   const [conversation, setConversation] = useState<Conversation | null>(null);
@@ -324,12 +356,16 @@ export function StudioApp({
   const referenceInsightCache = useRef(new Map<string, string>());
   const creativeBriefRef = useRef(creative.brief);
   creativeBriefRef.current = creative.brief;
+  const appliedImagePreferencesUser = useRef<string | null>(null);
   const recipe = useRef(initialRecipe);
   const externalDraft = useRef(
     initialPrompt !== null || initialReferenceKeys.length > 0,
   );
   const model =
-    models.find((item) => item.id === modelId) ??
+    (imageRouteMode === "auto"
+      ? (models.find((item) => item.id === modelId && item.available) ??
+        automaticImageModel(models))
+      : models.find((item) => item.id === modelId)) ??
     models.find((item) => item.available) ??
     models[0] ??
     null;
@@ -338,9 +374,16 @@ export function StudioApp({
     if (!model) return;
     setParams((current) => {
       const { size, outputFormat } = resolveGenerationOptions(model, current);
-      return current.size === size && current.outputFormat === outputFormat
+      const quality = model.capabilities.qualities?.includes(
+        (current.quality ?? "") as ImageQuality,
+      )
+        ? current.quality
+        : model.defaults.quality;
+      return current.size === size &&
+        current.outputFormat === outputFormat &&
+        current.quality === quality
         ? current
-        : { ...current, size, outputFormat };
+        : { ...current, size, outputFormat, quality };
     });
   }, [model, params.size, params.outputFormat]);
   const chatModel =
@@ -494,6 +537,7 @@ export function StudioApp({
     {
       prompt,
       modelId,
+      imageRouteMode,
       params,
       mode,
       activeQuestion,
@@ -508,6 +552,7 @@ export function StudioApp({
       setParams(
         (current) => saved?.params ?? { ...current, referenceImages: [] },
       );
+      setImageRouteMode(saved?.imageRouteMode ?? "auto");
       if (saved?.modelId) setModelId(saved.modelId);
       setChatModelId(saved?.chatModelId ?? null);
       setChatReasoningEffort(saved?.chatReasoningEffort);
@@ -558,7 +603,7 @@ export function StudioApp({
           (item) =>
             item.available && item.displayName === recipe.current.modelName,
         ) ??
-        data.find((item) => item.available) ??
+        automaticImageModel(data) ??
         data[0];
       setModelId((current) =>
         data.some((item) => item.id === current) ? current : preferred.id,
@@ -581,6 +626,40 @@ export function StudioApp({
         setChatModelError("聊天模型加载失败，暂不能发送，请重试");
     }
   }, []);
+  useEffect(() => {
+    if (
+      !userId ||
+      !models.length ||
+      appliedImagePreferencesUser.current === userId
+    )
+      return;
+    const stored = readStoredImagePreferences(userId);
+    appliedImagePreferencesUser.current = userId;
+    setRememberedImagePreferences(stored);
+    if (stored?.modelId === AUTO_IMAGE_MODEL_ID) {
+      setImageRouteMode("auto");
+      const automatic = automaticImageModel(models);
+      if (automatic) setModelId(automatic.id);
+    } else if (
+      stored?.modelId &&
+      models.some((item) => item.id === stored.modelId)
+    ) {
+      setImageRouteMode("fixed");
+      setModelId(stored.modelId);
+    }
+    if (stored?.quality) {
+      const selected =
+        (stored.modelId && stored.modelId !== AUTO_IMAGE_MODEL_ID
+          ? models.find((item) => item.id === stored.modelId)
+          : automaticImageModel(models)) ?? automaticImageModel(models);
+      if (
+        selected?.capabilities.qualities?.includes(
+          stored.quality as ImageQuality,
+        )
+      )
+        setParams((current) => ({ ...current, quality: stored.quality }));
+    }
+  }, [models, userId]);
   useEffect(() => {
     setChatContext(null);
     setChatContextError(null);
@@ -676,6 +755,10 @@ export function StudioApp({
       setAgentQualityTarget(null);
       setAgentQualityError(null);
       setAgentQualityChecking(false);
+      setImageSettingsConfigured(true);
+      setImageRoutingOpen(false);
+      setImageFallbackPrompt(null);
+      setImageRoutingContinuation(null);
       agentGenerationIds.current.clear();
       agentTerminalGenerationIds.current.clear();
       setThreadLoading(true);
@@ -1033,6 +1116,7 @@ export function StudioApp({
 
   const locked =
     busy ||
+    imageRoutingChecking ||
     chatCompacting ||
     planning ||
     quotingCreative ||
@@ -1050,6 +1134,31 @@ export function StudioApp({
     },
     [locked, closeMobile, loadThread],
   );
+  const resetImageSettingsForNewConversation = useCallback(() => {
+    const rememberedModelId = rememberedImagePreferences?.modelId;
+    const rememberedModel =
+      rememberedModelId && rememberedModelId !== AUTO_IMAGE_MODEL_ID
+        ? models.find((item) => item.id === rememberedModelId && item.available)
+        : null;
+    const nextRouteMode: ImageRouteMode =
+      rememberedModelId && rememberedModelId !== AUTO_IMAGE_MODEL_ID
+        ? "fixed"
+        : "auto";
+    const nextModel = rememberedModel ?? automaticImageModel(models);
+    setImageRouteMode(nextRouteMode);
+    if (nextModel) setModelId(nextModel.id);
+    setParams((current) => ({
+      ...current,
+      quality:
+        rememberedImagePreferences?.quality &&
+        nextModel?.capabilities.qualities?.includes(
+          rememberedImagePreferences.quality as ImageQuality,
+        )
+          ? rememberedImagePreferences.quality
+          : undefined,
+      referenceImages: [],
+    }));
+  }, [models, rememberedImagePreferences]);
   const newConversation = useCallback(() => {
     if (locked) return;
     externalDraft.current = false;
@@ -1079,7 +1188,11 @@ export function StudioApp({
     agentGenerationIds.current.clear();
     agentTerminalGenerationIds.current.clear();
     setPendingAgentInstruction(null);
-    setParams((value) => ({ ...value, referenceImages: [] }));
+    resetImageSettingsForNewConversation();
+    setImageSettingsConfigured(false);
+    setImageFallbackPrompt(null);
+    setImageRoutingContinuation(null);
+    setImageRoutingOpen(false);
     setUsePrevious(true);
     closeMobile();
     setFocusVersion((value) => value + 1);
@@ -1095,7 +1208,7 @@ export function StudioApp({
     ])
       url.searchParams.delete(key);
     window.history.replaceState(window.history.state, "", url);
-  }, [locked, closeMobile]);
+  }, [closeMobile, locked, resetImageSettingsForNewConversation]);
   useEffect(() => {
     setStudioNavigation({
       activeId,
@@ -1357,22 +1470,126 @@ export function StudioApp({
     }
   };
 
-  const send = async (confirmed?: CreateGenerationInput): Promise<boolean> => {
+  const applyImageRoutingSelection = (selection: ImageRoutingSelection) => {
+    const selectedModel =
+      selection.routeMode === "auto"
+        ? automaticImageModel(models)
+        : models.find((item) => item.id === selection.modelId);
+    if (!selectedModel) {
+      setSendError("当前没有可用的图片模型");
+      return;
+    }
+    setImageRouteMode(selection.routeMode);
+    setModelId(selectedModel.id);
+    setParams((current) => ({
+      ...current,
+      quality: selectedModel.capabilities.qualities?.includes(
+        selection.quality as ImageQuality,
+      )
+        ? selection.quality
+        : selectedModel.defaults.quality,
+    }));
+    setImageSettingsConfigured(true);
+    if (userId) {
+      const stored = updateStoredImagePreferences(userId, {
+        ...(selection.rememberModel
+          ? {
+              modelId:
+                selection.routeMode === "auto"
+                  ? AUTO_IMAGE_MODEL_ID
+                  : selectedModel.id,
+            }
+          : {}),
+        ...(selection.rememberQuality ? { quality: selection.quality } : {}),
+      });
+      if (stored) setRememberedImagePreferences(stored);
+    }
+    setImageRoutingOpen(false);
+  };
+
+  const send = async (
+    confirmed?: CreateGenerationInput,
+    forcedModel?: ModelInfo,
+  ): Promise<boolean> => {
     const activeMode = modeRef.current;
     const directImage = !confirmed ? parseImageCommand(prompt) : null;
     const submittedPrompt = prompt;
     const content = confirmed?.prompt ?? (directImage ? prompt : prompt.trim());
+    const imageSubmission =
+      Boolean(directImage) || activeMode === "image" || Boolean(confirmed);
+    const routeModel = forcedModel ?? model;
     if (directImage && !directImage.prompt.trim()) {
       setSendError("请在 /生图 后输入提示词");
       return false;
     }
     if (
+      activeMode === "chat" &&
+      directImage &&
+      !imageSettingsConfigured &&
+      !forcedModel
+    ) {
+      setImageRoutingContinuation({ confirmed });
+      setImageRoutingOpen(true);
+      setSendError("请先选择本次对话的图片模型和生成质量");
+      return false;
+    }
+    const blockedReason = confirmed ? creativeDisabledReason : disabledReason;
+    const routeOnlyBlocked =
+      imageSubmission &&
+      routeModel &&
+      !routeModel.available &&
+      blockedReason === (modelError ?? "模型暂不可用");
+    if (
       !content ||
-      (confirmed ? creativeDisabledReason : disabledReason) ||
+      (blockedReason && !routeOnlyBlocked) ||
       (!confirmed && !directImage && activeMode === "chat" && !chatModel) ||
       sendLock.current
     )
       return false;
+
+    let selectedImageModel: ModelInfo | null = routeModel;
+    if (imageSubmission && !forcedModel) {
+      if (!routeModel) {
+        setSendError("当前没有可用的图片模型");
+        return false;
+      }
+      setImageRoutingChecking(true);
+      try {
+        const candidates = imageRouteCandidates(
+          models,
+          imageRouteMode,
+          routeModel.id,
+        ).map((item) => item.id);
+        const preflight = await preflightImageModels(candidates);
+        const availableId = preflight.selectedModelId;
+        if (!availableId) {
+          setSendError("当前没有可用的图片模型，请稍后重试");
+          return false;
+        }
+        selectedImageModel =
+          models.find((item) => item.id === availableId) ?? null;
+        if (!selectedImageModel) {
+          setSendError("图片模型路由已变化，请刷新后重试");
+          return false;
+        }
+        if (selectedImageModel.id !== routeModel.id) {
+          setImageFallbackPrompt({
+            requested: routeModel,
+            suggested: selectedImageModel,
+            confirmed,
+          });
+          setImageRoutingOpen(true);
+          return false;
+        }
+      } catch (error) {
+        setSendError(
+          error instanceof Error ? error.message : "图片模型预检查失败，请重试",
+        );
+        return false;
+      } finally {
+        setImageRoutingChecking(false);
+      }
+    }
     if (activeMode === "chat" && !confirmed && userId && activeId) {
       try {
         if (readChatReceipt(userId, activeId)?.pending) {
@@ -1531,7 +1748,7 @@ export function StudioApp({
         refreshMe();
         if (streamError) setSendError(streamError);
       } else {
-        if (!model) return false;
+        if (!selectedImageModel) return false;
         const generationPrompt = directImage?.prompt ?? content;
         const assistantMessage = confirmed
           ? "按已确认的创作方案生成"
@@ -1540,8 +1757,6 @@ export function StudioApp({
         {
           setStatus("正在提交生成…");
           const result = await createGeneration({
-            modelId: model.id,
-            prompt: generationPrompt,
             conversationId: id,
             userMessage: content,
             assistantMessage: assistantMessage.slice(0, 400),
@@ -1549,12 +1764,16 @@ export function StudioApp({
             size: params.size,
             quality: params.quality,
             outputFormat: params.outputFormat,
-            ...(model.capabilities.supportsNegativePrompt
+            ...(selectedImageModel.capabilities.supportsNegativePrompt
               ? { negativePrompt: params.negativePrompt }
               : {}),
-            ...(model.capabilities.supportsSeed ? { seed: params.seed } : {}),
+            ...(selectedImageModel.capabilities.supportsSeed
+              ? { seed: params.seed }
+              : {}),
             ...referenceRequest(submittedReferences),
             ...confirmed,
+            modelId: selectedImageModel.id,
+            prompt: generationPrompt,
           });
           if (!mounted.current) return false;
           if (confirmed) {
@@ -1581,9 +1800,9 @@ export function StudioApp({
               title:
                 result.status === "SUCCEEDED" ? "生成已完成" : "已提交生成",
               description:
-                (params.size ?? model.defaults.size) === "auto"
+                (params.size ?? selectedImageModel.defaults.size) === "auto"
                   ? "按实际尺寸计费"
-                  : `本次预计消耗 ${estimatedCreditLabel(result.estimatedCredits, model, params.size ?? model.defaults.size)}`,
+                  : `本次预计消耗 ${estimatedCreditLabel(result.estimatedCredits, selectedImageModel, params.size ?? selectedImageModel.defaults.size)}`,
               variant: "success",
             });
           }
@@ -1596,8 +1815,8 @@ export function StudioApp({
             generationPrompt,
             generationStatus: result.status,
             generationProgress: 0,
-            generationModelId: model.id,
-            generationSize: params.size ?? model.defaults.size,
+            generationModelId: selectedImageModel.id,
+            generationSize: params.size ?? selectedImageModel.defaults.size,
             generationCount: confirmed ? 1 : params.n,
             createdAt,
           };
@@ -1724,6 +1943,26 @@ export function StudioApp({
           flushDeferredRecovery();
         }
       }
+    }
+  };
+
+  const handleImageRoutingConfirm = (selection: ImageRoutingSelection) => {
+    const fallback = imageFallbackPrompt;
+    const continuation = imageRoutingContinuation;
+    const selectedModel =
+      selection.routeMode === "auto"
+        ? automaticImageModel(models)
+        : models.find((item) => item.id === selection.modelId);
+    applyImageRoutingSelection(selection);
+    setImageFallbackPrompt(null);
+    setImageRoutingContinuation(null);
+    if (fallback) {
+      const forcedModel = models.find(
+        (item) => item.id === fallback.suggested.id,
+      );
+      if (forcedModel) void send(fallback.confirmed, forcedModel);
+    } else if (continuation && selectedModel) {
+      void send(continuation.confirmed, selectedModel);
     }
   };
 
@@ -2051,6 +2290,8 @@ export function StudioApp({
                 model={model}
                 onSelectModel={(id) => {
                   const next = models.find((item) => item.id === id);
+                  setImageRouteMode("fixed");
+                  setImageSettingsConfigured(true);
                   setModelId(id);
                   setCreative((value) => ({ ...value, operationId: null }));
                   if (next)
@@ -2079,6 +2320,25 @@ export function StudioApp({
                       };
                     });
                 }}
+                imageRouteMode={imageRouteMode}
+                onImageRouteModeChange={(next) => {
+                  setImageRouteMode(next);
+                  setImageSettingsConfigured(true);
+                  if (next === "auto") {
+                    const automatic = automaticImageModel(models);
+                    if (automatic) {
+                      setModelId(automatic.id);
+                      setParams((current) => ({
+                        ...current,
+                        quality: automatic.capabilities.qualities?.includes(
+                          (current.quality ?? "") as ImageQuality,
+                        )
+                          ? current.quality
+                          : automatic.defaults.quality,
+                      }));
+                    }
+                  }
+                }}
                 params={{
                   ...params,
                   n: mode === "agent" ? 1 : params.n,
@@ -2093,6 +2353,7 @@ export function StudioApp({
                 }}
                 busy={
                   busy ||
+                  imageRoutingChecking ||
                   chatCompacting ||
                   planning ||
                   quotingCreative ||
@@ -2292,6 +2553,26 @@ export function StudioApp({
           </div>
         </>
       ) : null}
+      <ImageRoutingDialog
+        open={imageRoutingOpen}
+        onOpenChange={(open) => {
+          setImageRoutingOpen(open);
+          if (!open) {
+            setImageFallbackPrompt(null);
+            setImageRoutingContinuation(null);
+          }
+        }}
+        models={models}
+        routeMode={imageFallbackPrompt ? "fixed" : imageRouteMode}
+        modelId={imageFallbackPrompt?.suggested.id ?? modelId}
+        quality={
+          params.quality ??
+          model?.defaults.quality ??
+          model?.capabilities.qualities?.[0]
+        }
+        fallback={imageFallbackPrompt}
+        onConfirm={handleImageRoutingConfirm}
+      />
       <Dialog
         open={rename !== null}
         onOpenChange={(open) => {

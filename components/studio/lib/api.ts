@@ -208,6 +208,16 @@ export const createGeneration = (input: CreateGenerationInput) =>
     body: JSON.stringify(input),
   });
 
+export const preflightImageModels = (modelIds: string[]) =>
+  request<{
+    selectedModelId: string | null;
+    availableModelIds: string[];
+    unavailableModelIds: string[];
+  }>("/api/generations/preflight", {
+    method: "POST",
+    body: JSON.stringify({ modelIds }),
+  });
+
 export const cancelGeneration = (id: string) =>
   request<{ status: "CANCELED" }>(`/api/generations/${id}/cancel`, {
     method: "POST",

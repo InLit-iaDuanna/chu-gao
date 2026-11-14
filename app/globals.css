@@ -312,68 +312,114 @@ body {
     position: relative;
     display: grid;
     width: min(10rem, 70%);
-    aspect-ratio: 16 / 9;
+    aspect-ratio: 4 / 3;
     place-items: center;
     overflow: hidden;
-    border: 1px solid rgb(var(--border-strong) / 0.7);
-    border-radius: var(--radius-md);
+    border: 1px solid rgb(var(--border-strong) / 0.55);
+    border-radius: calc(var(--radius-md) + 2px);
     background:
-      linear-gradient(
-        rgb(var(--surface-2) / 0.65),
-        rgb(var(--surface-2) / 0.65)
+      radial-gradient(
+        circle at 50% 46%,
+        rgb(var(--accent) / 0.09),
+        transparent 48%
       ),
+      rgb(var(--surface-2) / 0.72),
       repeating-linear-gradient(
         0deg,
         transparent 0,
-        transparent 13px,
-        rgb(var(--border) / 0.35) 14px
+        transparent 15px,
+        rgb(var(--border) / 0.22) 16px
       );
   }
 
-  .generation-progress-corner {
+  .generation-progress-grid {
     position: absolute;
-    width: 12px;
-    height: 12px;
-    border-color: rgb(var(--text-muted) / 0.8);
-    border-style: solid;
+    inset: 0;
+    opacity: 0.6;
+    background:
+      linear-gradient(
+        90deg,
+        transparent 49.5%,
+        rgb(var(--border) / 0.32) 50%,
+        transparent 50.5%
+      ),
+      linear-gradient(
+        0deg,
+        transparent 49.5%,
+        rgb(var(--border) / 0.32) 50%,
+        transparent 50.5%
+      );
+    background-size: 34px 34px;
+    mask-image: radial-gradient(ellipse at center, black 20%, transparent 78%);
+    animation: generationGrid 5s linear infinite;
   }
 
-  .generation-progress-corner-tl {
-    top: 7px;
-    left: 7px;
-    border-width: 1px 0 0 1px;
+  .generation-progress-frame {
+    position: relative;
+    display: block;
+    width: 45%;
+    aspect-ratio: 1.18;
+    border: 1px solid rgb(var(--border-strong) / 0.7);
+    border-radius: calc(var(--radius-md) - 1px);
+    background: rgb(var(--surface) / 0.48);
+    box-shadow: inset 0 0 0 6px rgb(var(--surface) / 0.12);
+    animation: generationFrame 2.8s var(--ease-in-out) infinite;
   }
 
-  .generation-progress-corner-tr {
-    top: 7px;
-    right: 7px;
-    border-width: 1px 1px 0 0;
+  .generation-progress-frame-line {
+    position: absolute;
+    left: 12%;
+    right: 12%;
+    height: 1px;
+    background: rgb(var(--text-muted) / 0.28);
   }
 
-  .generation-progress-corner-bl {
-    bottom: 7px;
-    left: 7px;
-    border-width: 0 0 1px 1px;
+  .generation-progress-frame-line-a {
+    top: 28%;
   }
 
-  .generation-progress-corner-br {
-    right: 7px;
-    bottom: 7px;
-    border-width: 0 1px 1px 0;
+  .generation-progress-frame-line-b {
+    bottom: 28%;
+    right: 28%;
+  }
+
+  .generation-progress-orbit {
+    position: absolute;
+    inset: 25% 32%;
+    border: 1px solid rgb(var(--accent) / 0.5);
+    border-radius: 999px;
+    animation: generationOrbit 2.4s linear infinite;
+  }
+
+  .generation-progress-orbit-dot {
+    position: absolute;
+    top: -3px;
+    left: 50%;
+    width: 5px;
+    height: 5px;
+    border-radius: 999px;
+    background: rgb(var(--accent));
+    box-shadow: 0 0 10px rgb(var(--accent) / 0.75);
   }
 
   .generation-progress-scan {
     position: absolute;
-    inset: 12% 0 auto;
-    height: 1px;
-    background: rgb(var(--accent));
-    box-shadow: 0 0 14px rgb(var(--accent) / 0.55);
-    animation: generationScan 2.1s var(--ease-in-out) infinite;
+    inset: 0 auto 0 0;
+    width: 28%;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgb(var(--accent) / 0.24),
+      transparent
+    );
+    filter: blur(2px);
+    animation: generationSweep 2.6s var(--ease-in-out) infinite;
   }
 
   .generation-progress-glyph {
     color: rgb(var(--accent));
     animation: generationPulse 1.8s var(--ease-in-out) infinite;
+    filter: drop-shadow(0 0 8px rgb(var(--accent) / 0.3));
   }
 
   .dock-shell {
@@ -625,6 +671,48 @@ body {
   50% {
     translate: 0 5.5rem;
     opacity: 0.9;
+  }
+}
+
+@keyframes generationGrid {
+  0% {
+    translate: 0 0;
+  }
+  100% {
+    translate: 17px 17px;
+  }
+}
+
+@keyframes generationFrame {
+  0%,
+  100% {
+    opacity: 0.62;
+    scale: 0.96;
+  }
+  50% {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+@keyframes generationOrbit {
+  to {
+    rotate: 360deg;
+  }
+}
+
+@keyframes generationSweep {
+  0% {
+    translate: -120% 0;
+    opacity: 0;
+  }
+  20%,
+  80% {
+    opacity: 1;
+  }
+  100% {
+    translate: 430% 0;
+    opacity: 0;
   }
 }
 

@@ -46,6 +46,7 @@ import { ChatModelControls, ChatModelPrice } from "./ChatModelControls";
 import { REFERENCE_ACCEPT } from "./lib/reference-input";
 import { resolveGenerationOptions } from "./lib/generation-options";
 import { parseImageCommand } from "@/lib/image-command";
+import { AUTO_IMAGE_MODEL_ID, type ImageRouteMode } from "./lib/image-routing";
 
 export interface ReferenceItem {
   kind: "upload" | "source";
@@ -71,6 +72,8 @@ interface CommandDockProps {
   models: ModelInfo[];
   model: ModelInfo | null;
   onSelectModel: (id: string) => void;
+  imageRouteMode?: ImageRouteMode;
+  onImageRouteModeChange?: (mode: ImageRouteMode) => void;
   params: DockParams;
   onParamsChange: (patch: Partial<DockParams>) => void;
   busy: boolean;
@@ -130,6 +133,8 @@ export function CommandDock({
   models,
   model,
   onSelectModel,
+  imageRouteMode = "auto",
+  onImageRouteModeChange = () => undefined,
   params,
   onParamsChange,
   busy,
@@ -431,17 +436,51 @@ export function CommandDock({
                       <p className="text-sm font-semibold">生成参数</p>
                       <div className="space-y-2">
                         <p className="text-xs font-medium text-text-muted">
+                          图片路由
+                        </p>
+                        <Segmented
+                          aria-label="图片路由"
+                          value={imageRouteMode}
+                          onChange={(value) =>
+                            onImageRouteModeChange(value as ImageRouteMode)
+                          }
+                          options={[
+                            { value: "auto", label: "自动选择" },
+                            { value: "fixed", label: "指定模型" },
+                          ]}
+                          className="flex [&_button]:h-9 [&_button]:flex-1"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-text-muted">
                           图片模型
                         </p>
                         <Select
                           aria-label="图片模型"
-                          value={model?.id ?? ""}
-                          onValueChange={onSelectModel}
-                          options={models.map((item) => ({
-                            value: item.id,
-                            label: item.displayName,
-                            disabled: !item.available,
-                          }))}
+                          value={
+                            imageRouteMode === "auto"
+                              ? AUTO_IMAGE_MODEL_ID
+                              : (model?.id ?? "")
+                          }
+                          onValueChange={(value) => {
+                            if (value === AUTO_IMAGE_MODEL_ID) {
+                              onImageRouteModeChange("auto");
+                            } else {
+                              onImageRouteModeChange("fixed");
+                              onSelectModel(value);
+                            }
+                          }}
+                          options={[
+                            {
+                              value: AUTO_IMAGE_MODEL_ID,
+                              label: "自动选择（推荐）",
+                            },
+                            ...models.map((item) => ({
+                              value: item.id,
+                              label: item.displayName,
+                              disabled: !item.available,
+                            })),
+                          ]}
                           controlSize="lg"
                         />
                       </div>
@@ -626,7 +665,9 @@ export function CommandDock({
                         className="shrink-0 text-text-muted"
                       />
                       <span className="min-w-0 flex-1 truncate text-left">
-                        {model?.displayName ?? "选择模型"}
+                        {imageRouteMode === "auto"
+                          ? `自动选择 · ${model?.displayName ?? "等待可用模型"}`
+                          : (model?.displayName ?? "选择模型")}
                       </span>
                       <ChevronDown
                         size={15}
@@ -635,6 +676,15 @@ export function CommandDock({
                     </Button>
                   }
                 >
+                  <DropdownMenuItem
+                    className="h-11"
+                    onClick={() => onImageRouteModeChange("auto")}
+                  >
+                    <span className="flex w-full items-center justify-between gap-3">
+                      <span>自动选择（推荐）</span>
+                      {imageRouteMode === "auto" ? <Check size={14} /> : null}
+                    </span>
+                  </DropdownMenuItem>
                   {models.map((item) => (
                     <DropdownMenuItem
                       key={item.id}
@@ -646,7 +696,9 @@ export function CommandDock({
                         <span className="min-w-0 break-words">
                           {item.displayName}
                         </span>
-                        {item.id === model?.id ? <Check size={14} /> : null}
+                        {imageRouteMode === "fixed" && item.id === model?.id ? (
+                          <Check size={14} />
+                        ) : null}
                       </span>
                     </DropdownMenuItem>
                   ))}

@@ -160,10 +160,14 @@ export function GenerationCard({
             {active ? (
               <>
                 <div className="generation-progress-stage" aria-hidden="true">
-                  <span className="generation-progress-corner generation-progress-corner-tl" />
-                  <span className="generation-progress-corner generation-progress-corner-tr" />
-                  <span className="generation-progress-corner generation-progress-corner-bl" />
-                  <span className="generation-progress-corner generation-progress-corner-br" />
+                  <span className="generation-progress-grid" />
+                  <span className="generation-progress-frame">
+                    <span className="generation-progress-frame-line generation-progress-frame-line-a" />
+                    <span className="generation-progress-frame-line generation-progress-frame-line-b" />
+                    <span className="generation-progress-orbit">
+                      <span className="generation-progress-orbit-dot" />
+                    </span>
+                  </span>
                   <span className="generation-progress-scan" />
                   <Sparkles className="generation-progress-glyph" size={18} />
                 </div>

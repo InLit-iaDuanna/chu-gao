@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { REASONING_EFFORTS } from "@/lib/chat-model-options";
 import { CHAT_INPUT_MAX_CHARS } from "@/lib/chat-turn-types";
+import { imageRouteModeSchema } from "./image-routing-schema";
 
 export const reasoningEffortSchema = z.enum(REASONING_EFFORTS);
 
@@ -25,6 +26,7 @@ export const referencesSchema = z
 
 export const studioDraftSchema = z.object({
   mode: z.enum(["image", "chat", "agent"]).optional(),
+  imageRouteMode: imageRouteModeSchema.optional().catch(undefined),
   prompt: z.string().max(CHAT_INPUT_MAX_CHARS),
   activeQuestion: z.string().max(200).nullable().optional(),
   modelId: z.string().nullable(),
@@ -41,6 +43,7 @@ export const studioDraftSchema = z.object({
   params: z.object({
     n: z.number().int().min(1).max(4),
     size: z.string().optional(),
+    quality: z.string().optional(),
     negativePrompt: z.string().optional(),
     seed: z.number().optional(),
     outputFormat: z.string().optional(),

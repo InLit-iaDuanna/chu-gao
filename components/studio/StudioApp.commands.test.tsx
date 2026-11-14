@@ -37,6 +37,11 @@ vi.mock("./lib/api", async (original) => ({
   createConversation: async () => structuredClone(history),
   getChatContext: async () => null,
   getConversationPricing: mocks.pricing,
+  preflightImageModels: async (modelIds: string[]) => ({
+    selectedModelId: modelIds[0] ?? null,
+    availableModelIds: modelIds.slice(0, 1),
+    unavailableModelIds: modelIds.slice(1),
+  }),
   createGeneration: mocks.generate,
   compileConversationPrompt: mocks.compile,
 }));
@@ -220,6 +225,12 @@ it("keeps direct image submission available when chat configuration is unavailab
     expect(screen.getByRole("button", { name: "发送" })).toBeEnabled(),
   );
   fireEvent.click(screen.getByRole("button", { name: "发送" }));
+  await waitFor(() =>
+    expect(
+      screen.getByRole("dialog", { name: "设置本对话的生图" }),
+    ).toBeVisible(),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "应用设置" }));
   await waitFor(() => expect(mocks.generate).toHaveBeenCalledTimes(1));
   expect(mocks.chat).not.toHaveBeenCalled();
   expect(mocks.compile).not.toHaveBeenCalled();
