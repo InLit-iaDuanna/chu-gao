@@ -34,6 +34,7 @@ import { streamConversationChat } from "../lib/sse";
 import { mergeChatTurn } from "../lib/chat-turn-view";
 import { readChatReceipt } from "../lib/chat-submission";
 import type { ChatTurnView } from "@/lib/chat-turn-types";
+import { CHAT_INPUT_MAX_CHARS } from "@/lib/chat-turn-types";
 import { readActiveConversationId } from "../lib/active-conversation";
 import type { ReferenceItem } from "../CommandDock";
 import { ReferenceDropZone, ReferenceThumbnails } from "../ReferenceDropZone";
@@ -646,7 +647,7 @@ export function ConversationPanel({
                     streaming !== null || loadingThread || !conversation
                   }
                   rows={2}
-                  maxLength={4000}
+                  maxLength={CHAT_INPUT_MAX_CHARS}
                   placeholder="继续对话…"
                   onChange={(event) => setDraft(event.target.value)}
                   onKeyDown={(event) => {

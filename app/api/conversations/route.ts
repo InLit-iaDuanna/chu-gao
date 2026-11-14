@@ -17,10 +17,11 @@ import {
 import { db } from "@/lib/db";
 import { getImage2ChannelDisplayNameMap } from "@/lib/provider-channel-config";
 import { isDatabaseUnavailableError } from "@/lib/service-errors";
+import { CHAT_INPUT_MAX_CHARS } from "@/lib/chat-turn-types";
 
 const createConversationSchema = z.object({
   title: z.string().trim().min(1).max(80).optional(),
-  firstMessage: z.string().trim().min(1).max(4000).optional(),
+  firstMessage: z.string().trim().min(1).max(CHAT_INPUT_MAX_CHARS).optional(),
 });
 
 function conversationsUnavailable() {

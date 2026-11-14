@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { REASONING_EFFORTS } from "@/lib/chat-model-options";
+import { CHAT_INPUT_MAX_CHARS } from "@/lib/chat-turn-types";
 
 export const reasoningEffortSchema = z.enum(REASONING_EFFORTS);
 
@@ -24,7 +25,7 @@ export const referencesSchema = z
 
 export const studioDraftSchema = z.object({
   mode: z.enum(["image", "chat", "agent"]).optional(),
-  prompt: z.string().max(4000),
+  prompt: z.string().max(CHAT_INPUT_MAX_CHARS),
   activeQuestion: z.string().max(200).nullable().optional(),
   modelId: z.string().nullable(),
   chatModelId: z.string().min(1).nullable().optional().catch(undefined),
@@ -48,7 +49,7 @@ export const studioDraftSchema = z.object({
 });
 
 export const conversationDraftSchema = z.object({
-  draft: z.string().max(4000),
+  draft: z.string().max(CHAT_INPUT_MAX_CHARS),
   references: referencesSchema,
 });
 

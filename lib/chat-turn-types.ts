@@ -1,6 +1,9 @@
 import type { ChatSearchSource } from "@/lib/chat-search";
 import type { ReasoningEffort } from "@/lib/chat-model-options";
 
+/** Maximum user-message size accepted by the chat turn API, in characters. */
+export const CHAT_INPUT_MAX_CHARS = 128_000;
+
 export const CHAT_TERMINAL_STATUSES = [
   "completed",
   "failed",

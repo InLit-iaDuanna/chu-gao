@@ -37,6 +37,7 @@ import type {
   ChatModelOption,
   ReasoningEffort,
 } from "@/lib/chat-model-options";
+import { CHAT_INPUT_MAX_CHARS } from "@/lib/chat-turn-types";
 import type { ModelInfo } from "./lib/types";
 import { ReferenceDropZone, ReferenceThumbnails } from "./ReferenceDropZone";
 import { CopyTextButton } from "./CopyTextButton";
@@ -160,6 +161,12 @@ export function CommandDock({
   const isAgent = mode === "agent";
   const isChat = !isAgent;
   const imageCommand = parseImageCommand(prompt);
+  const promptMaxLength =
+    isAgent || imageCommand ? 4_000 : CHAT_INPUT_MAX_CHARS;
+  const promptLimitLabel =
+    promptMaxLength >= 1_000
+      ? `${promptMaxLength / 1_000}K`
+      : String(promptMaxLength);
   const showImageCommand =
     !commandsDismissed &&
     prompt.startsWith("/") &&
@@ -275,7 +282,7 @@ export function CommandDock({
               ref={textareaRef}
               value={prompt}
               rows={1}
-              maxLength={4000}
+              maxLength={promptMaxLength}
               disabled={busy}
               placeholder={
                 isAgent
@@ -768,7 +775,7 @@ export function CommandDock({
               !prompt.length && "invisible",
             )}
           >
-            {prompt.length}/4000
+            {prompt.length}/{promptLimitLabel}
           </span>
         </div>
       )}
@@ -781,7 +788,7 @@ export function CommandDock({
           <Textarea
             value={prompt}
             onChange={(event) => onPromptChange(event.target.value)}
-            maxLength={4000}
+            maxLength={promptMaxLength}
             aria-label="展开的提示词"
             className="h-[min(50dvh,400px)] resize-none text-sm leading-7"
           />

@@ -15,9 +15,10 @@ import { db } from "@/lib/db";
 import { getImage2ChannelDisplayNameMap } from "@/lib/provider-channel-config";
 import { isDatabaseUnavailableError } from "@/lib/service-errors";
 import { assertChatConversationIdle, ChatTurnError } from "@/lib/chat-turns";
+import { CHAT_INPUT_MAX_CHARS } from "@/lib/chat-turn-types";
 
 const updateMessageSchema = z.object({
-  content: z.string().trim().min(1).max(4000),
+  content: z.string().trim().min(1).max(CHAT_INPUT_MAX_CHARS),
 });
 
 function conversationsUnavailable() {

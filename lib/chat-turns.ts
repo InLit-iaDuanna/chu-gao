@@ -40,6 +40,7 @@ import {
 } from "@/lib/chat-model-options";
 import {
   chatIsTerminal,
+  CHAT_INPUT_MAX_CHARS,
   type ChatTurnView,
   type ChatTurnEvent,
   type ChatTerminalStatus,
@@ -60,7 +61,7 @@ export const chatTurnSchema = z
   .object({
     conversationId: z.string().min(1).max(128),
     clientRequestId: z.string().min(8).max(128),
-    content: z.string().trim().min(1).max(128_000),
+    content: z.string().trim().min(1).max(CHAT_INPUT_MAX_CHARS),
     modelId: z.enum(["default", LUNA_MODEL_ID, SOL_MODEL_ID, OPUS_MODEL_ID]),
     contextBudgetTokens: z.number().int().optional(),
     reasoningEffort: z.enum(REASONING_EFFORTS).optional(),
