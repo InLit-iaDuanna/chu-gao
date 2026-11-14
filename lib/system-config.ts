@@ -44,7 +44,7 @@ export const SYSTEM_CONFIG_DEFAULTS = {
   },
   generation: {
     globalConcurrency: 20,
-    defaultDailyLimit: 50,
+    defaultDailyLimit: 500,
     image2AspectRatios: [...IMAGE_ASPECT_RATIO_OPTIONS],
     image2Resolutions: [...IMAGE_RESOLUTION_OPTIONS],
     image2ResolutionAspectRatios: {
@@ -76,7 +76,7 @@ export const SYSTEM_CONFIG_DEFAULT_ROWS = {
   "registration.inviteOnly": true,
   "registration.defaultCredits": 100,
   "generation.globalConcurrency": 20,
-  "generation.defaultDailyLimit": 50,
+  "generation.defaultDailyLimit": 500,
   "generation.image2AspectRatios": [...IMAGE_ASPECT_RATIO_OPTIONS],
   "generation.image2Resolutions": [...IMAGE_RESOLUTION_OPTIONS],
   "generation.image2ResolutionAspectRatios": {

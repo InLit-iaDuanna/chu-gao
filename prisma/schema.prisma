@@ -163,8 +163,8 @@ model User {
   status            UserStatus   @default(ACTIVE)
   sessionVersion    Int          @default(1)
   credits           Float        @default(100)
-  dailyGenLimit     Int          @default(50)
-  concurrentLimit   Int          @default(2)
+  dailyGenLimit     Int          @default(500)
+  concurrentLimit   Int          @default(5)
   materialInboxBeta Boolean      @default(false)
   inviteCodeId      String?
   bannedAt          DateTime?

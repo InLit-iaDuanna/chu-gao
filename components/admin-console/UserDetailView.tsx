@@ -144,8 +144,8 @@ function ProfileSection({
     name: user.name ?? "",
     role: user.role,
     status: user.status,
-    dailyGenLimit: user.dailyGenLimit ?? 50,
-    concurrentLimit: user.concurrentLimit ?? 2,
+    dailyGenLimit: user.dailyGenLimit ?? 500,
+    concurrentLimit: user.concurrentLimit ?? 5,
     materialInboxBeta: Boolean(user.materialInboxBeta),
     bannedReason: user.bannedReason ?? "",
   });
