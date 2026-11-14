@@ -136,7 +136,8 @@ describe("private Opus configuration and public catalog", () => {
         id: OPUS_MODEL_ID,
         pricing: { ...OPUS_DEFAULT_PRICING, input: 120 },
         reasoningEfforts: [...REASONING_EFFORTS],
-        supportsWebSearch: false,
+        // The application runs search for Opus; the relay has none.
+        supportsWebSearch: true,
       }),
     ]);
     expect(JSON.stringify(catalog)).not.toMatch(

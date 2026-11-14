@@ -207,8 +207,8 @@ it("completes the slash command, rejects an empty prompt, and keeps image settin
   fireEvent.keyDown(input, { key: "Enter" });
   expect(mocks.generate).not.toHaveBeenCalled();
   expect(mocks.chat).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole("button", { name: "生成参数" }));
-  const settings = await screen.findByRole("dialog", { name: "生成参数" });
+  fireEvent.click(screen.getByRole("button", { name: "生图设置" }));
+  const settings = await screen.findByRole("dialog", { name: "生图设置" });
   expect(
     within(settings).getByRole("combobox", { name: "图片模型" }),
   ).toBeVisible();

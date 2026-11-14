@@ -1,38 +1,54 @@
 @layer components {
-  /* Workspace surfaces and portalled controls share this neutral palette. */
+  /*
+   * Modelled on the Claude chat page, in black and white: a near-white
+   * reading surface, a slightly darker sidebar, hairline borders, an 8px
+   * control radius, a 20px composer with a soft shadow, and grey bubbles for
+   * your own messages. There is no colour accent; ink marks what is live.
+   */
   .studio-workspace {
-    --bg: 20 22 24;
-    --surface: 27 29 32;
-    --surface-2: 34 37 40;
-    --surface-3: 44 47 51;
-    --border: 45 48 52;
-    --border-strong: 70 75 80;
-    --text: 244 244 245;
-    --text-muted: 166 173 181;
-    --text-faint: 129 137 145;
-    --studio-sidebar: 16 18 20;
-    --studio-highlight: 244 244 245;
-    --studio-highlight-ink: 20 22 24;
+    --bg: 38 38 37;
+    --surface: 48 48 46;
+    --surface-2: 52 52 50;
+    --surface-3: 61 61 58;
+    --border: 62 62 59;
+    --border-strong: 82 82 78;
+    --text: 242 241 238;
+    --text-muted: 168 167 162;
+    --text-faint: 128 127 122;
+    --studio-sidebar: 31 31 30;
+    --studio-bubble: 22 22 21;
+    --studio-highlight: 242 241 238;
+    --studio-highlight-ink: 31 31 30;
+    --studio-accent: 242 241 238;
+    --studio-accent-ink: 31 31 30;
+    --studio-shadow: 0 0.25rem 1.25rem rgb(0 0 0 / 0.18);
+    --studio-shadow-focus: 0 0.25rem 1.25rem rgb(0 0 0 / 0.28);
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 8px;
+    --radius-xl: 12px;
+    --radius-2xl: 16px;
+    --radius-control: 8px;
+    --radius-card: 12px;
+    --radius-overlay: 12px;
+    --radius-composer: 20px;
     --control-bg: var(--surface-2);
     --control-bg-hover: var(--surface-3);
     --control-border: var(--border-strong);
-    --control-border-hover: 100 105 110;
+    --control-border-hover: 110 110 105;
     --control-disabled-bg: var(--surface-2);
     --control-disabled-border: var(--border-strong);
     --control-selected-bg: var(--text);
     --control-selected-border: var(--text);
-    --control-focus: var(--text);
+    --control-focus: var(--studio-accent);
     --icon: var(--text);
     --icon-muted: var(--text-muted);
-    --icon-disabled: 129 137 145;
+    --icon-disabled: 128 127 122;
     --icon-selected: var(--bg);
-    --shadow-focus: 0 0 0 2px rgb(var(--text) / 0.12);
-    /*
-     * 强调色使用中性黑白，语义色继续保留，避免状态信息失去区分度。
-     */
-    --brand-primary: 244 244 245;
-    --on-accent: 20 22 24;
-    --on-brand: 20 22 24;
+    --shadow-focus: 0 0 0 2px rgb(var(--text) / 0.35);
+    --brand-primary: 242 241 238;
+    --on-accent: 31 31 30;
+    --on-brand: 31 31 30;
     --on-danger: 15 15 17;
     --success: 63 185 120;
     --danger: 235 87 87;
@@ -41,31 +57,47 @@
     letter-spacing: 0;
   }
 
+  /* A disabled ghost control stays a ghost; only the send button keeps its
+     (faded) block so the composer still has an obvious end. */
+  .studio-workspace
+    .smooth-surface:is(:disabled, [aria-disabled="true"]):not(.studio-submit) {
+    --smooth-fill: transparent;
+    --smooth-stroke: transparent;
+  }
+
+  .studio-workspace ::selection {
+    background: rgb(var(--text) / 0.16);
+  }
+
   html.light .studio-workspace {
-    --bg: 248 249 250;
+    --bg: 255 255 255;
     --surface: 255 255 255;
-    --surface-2: 240 243 245;
-    --surface-3: 230 234 237;
-    --border: 226 230 234;
-    --border-strong: 190 199 206;
-    --text: 26 25 22;
-    --text-muted: 80 91 101;
-    --text-faint: 104 114 123;
-    --studio-sidebar: 240 243 245;
-    --studio-highlight: 24 24 27;
+    --surface-2: 244 244 242;
+    --surface-3: 236 236 233;
+    --border: 229 229 226;
+    --border-strong: 212 212 208;
+    --text: 20 20 19;
+    --text-muted: 94 94 90;
+    --text-faint: 140 140 135;
+    --studio-sidebar: 248 248 247;
+    --studio-bubble: 240 240 238;
+    --studio-highlight: 20 20 19;
     --studio-highlight-ink: 255 255 255;
-    --control-border-hover: 134 142 150;
+    --studio-accent: 20 20 19;
+    --studio-accent-ink: 255 255 255;
+    --studio-shadow: 0 0.25rem 1.25rem rgb(0 0 0 / 0.035);
+    --studio-shadow-focus: 0 0.25rem 1.25rem rgb(0 0 0 / 0.075);
+    --control-border-hover: 170 170 165;
     --control-disabled-bg: var(--surface-2);
     --control-disabled-border: var(--border-strong);
     --control-selected-bg: var(--text);
     --control-selected-border: var(--text);
-    --control-focus: var(--text);
+    --control-focus: var(--studio-accent);
     --icon: var(--text);
-    --icon-muted: 80 91 101;
+    --icon-muted: 94 94 90;
     --icon-selected: var(--bg);
-    --icon-disabled: 140 149 156;
-    /* 浅色主题使用中性黑白，语义色继续保留。 */
-    --brand-primary: 24 24 27;
+    --icon-disabled: 170 170 165;
+    --brand-primary: 20 20 19;
     --on-accent: 255 255 255;
     --on-brand: 255 255 255;
     --on-danger: 250 250 252;
@@ -83,48 +115,49 @@
     background: rgb(var(--studio-sidebar));
   }
 
-  .studio-typewriter-caret {
-    display: inline-block;
-    width: 2px;
-    height: 0.9em;
-    margin-left: 3px;
-    vertical-align: -0.04em;
-    background: currentColor;
-    animation: studio-typewriter-blink 1s steps(2, end) infinite;
+  /* Small caption above a group of rows ("最近对话"). */
+  .studio-label {
+    font-size: 12px;
+    line-height: 16px;
+    color: rgb(var(--text-faint));
   }
 
-  @keyframes studio-typewriter-blink {
-    50% {
-      opacity: 0;
-    }
+  .studio-nav-link:hover,
+  .studio-thread:hover {
+    background: rgb(var(--text) / 0.05);
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .studio-typewriter-caret {
-      visibility: hidden;
-      animation: none;
-    }
-  }
-
-  .studio-nav-link {
-    --smooth-fill: transparent;
-    --smooth-stroke: transparent;
-    border: 1px solid transparent;
-  }
-
-  .studio-nav-link:hover {
-    --smooth-fill: rgb(var(--surface-2));
-  }
-
-  .studio-nav-link[aria-current="page"] {
-    --smooth-fill: rgb(var(--surface-2));
-    border-color: transparent;
-    background: rgb(var(--surface-2));
+  .studio-nav-link[aria-current="page"],
+  .studio-thread[data-active="true"] {
+    background: rgb(var(--text) / 0.08);
     color: rgb(var(--text));
   }
 
-  .studio-nav-link[aria-current="page"] > svg {
-    color: rgb(var(--studio-highlight));
+  .studio-workspace .studio-new-thread {
+    border: 0;
+    background: transparent;
+  }
+
+  .studio-workspace .studio-new-thread:hover:not(:disabled) {
+    background: rgb(var(--text) / 0.05);
+  }
+
+  /* "New chat": a filled ink circle with a plus, as on Claude. */
+  .studio-new-thread-mark {
+    display: flex;
+    width: 24px;
+    height: 24px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: rgb(var(--text));
+    color: rgb(var(--bg));
+    transition: transform 160ms ease;
+  }
+
+  .studio-new-thread:hover:not(:disabled) .studio-new-thread-mark {
+    transform: scale(1.06);
   }
 
   .studio-mode-switch {
@@ -152,39 +185,67 @@
 
   .studio-workspace .studio-composer {
     --smooth-fill: rgb(var(--surface));
-    --smooth-stroke: rgb(var(--border-strong) / 0.65);
+    --smooth-stroke: rgb(var(--border-strong) / 0.85);
     border: 1px solid var(--smooth-stroke);
     border-radius: var(--radius-composer);
     background: rgb(var(--surface));
-    box-shadow: 0 3px 12px -8px rgb(0 0 0 / 0.18);
+    box-shadow: var(--studio-shadow);
+    transition: box-shadow 200ms ease;
   }
 
+  .studio-workspace .studio-composer:hover,
   .studio-workspace .studio-composer:focus-within {
-    --smooth-stroke: rgb(var(--studio-highlight) / 0.45);
-    border-color: var(--smooth-stroke);
-    box-shadow: 0 0 0 2px rgb(var(--studio-highlight) / 0.05);
+    --smooth-stroke: rgb(var(--control-border-hover) / 0.9);
+    box-shadow: var(--studio-shadow-focus);
   }
 
   .studio-model-trigger {
-    --smooth-fill: rgb(var(--surface-2));
-    --smooth-stroke: transparent;
-  }
-
-  .studio-model-trigger:hover:not(:disabled) {
-    --smooth-fill: rgb(var(--surface-3));
-  }
-
-  .studio-thread {
     --smooth-fill: transparent;
     --smooth-stroke: transparent;
   }
 
-  .studio-thread:hover {
-    --smooth-fill: rgb(var(--surface));
+  .studio-workspace .studio-model-trigger:disabled {
+    --smooth-fill: transparent;
   }
 
-  .studio-thread[data-active="true"] {
-    --smooth-fill: rgb(var(--surface-2) / 0.7);
+  .studio-model-trigger:hover:not(:disabled),
+  .studio-model-trigger[data-state="open"] {
+    --smooth-fill: rgb(var(--text) / 0.06);
+  }
+
+  /* Blinking caret after the typed greeting. */
+  .studio-typewriter-caret {
+    display: inline-block;
+    width: 2px;
+    height: 0.9em;
+    margin-left: 0.12em;
+    vertical-align: -0.08em;
+    background: rgb(var(--text));
+    animation: studio-caret 1.05s steps(2, end) infinite;
+  }
+
+  @keyframes studio-caret {
+    50% {
+      opacity: 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .studio-typewriter-caret {
+      animation: none;
+    }
+  }
+
+  /* Starter chips under the empty composer. */
+  .studio-chip {
+    border: 1px solid rgb(var(--border));
+    border-radius: var(--radius-control);
+    background: rgb(var(--bg));
+  }
+
+  .studio-chip:hover:not(:disabled) {
+    border-color: rgb(var(--border-strong));
+    background: rgb(var(--text) / 0.03);
   }
 
   .studio-thread-delete {
@@ -202,9 +263,24 @@
     }
   }
 
+  /* Your own message: a grey bubble on the right. */
   .studio-message {
-    --smooth-fill: rgb(var(--surface-2));
-    --smooth-stroke: transparent;
+    border-radius: 12px;
+    background: rgb(var(--studio-bubble));
+  }
+
+  /* Message actions appear when the pointer is over the message. */
+  @media (hover: hover) {
+    .studio-turn-actions {
+      opacity: 0;
+      transition: opacity 160ms ease;
+    }
+
+    .studio-turn:hover .studio-turn-actions,
+    .studio-turn:focus-within .studio-turn-actions,
+    .studio-turn:last-child .studio-turn-actions {
+      opacity: 1;
+    }
   }
 
   .studio-input-tools {
@@ -218,8 +294,10 @@
   .studio-attachment-tools {
     grid-column: 1;
   }
+  /* Like Claude, the model picker sits on the right, next to send. */
   .studio-model-container {
     grid-column: 2;
+    justify-self: end;
     min-width: 0;
   }
   .studio-parameter-summary {
@@ -234,31 +312,24 @@
   @media (max-width: 639px) {
     .studio-input-tools {
       grid-template-columns: auto minmax(0, 1fr) auto;
-      grid-template-rows: 32px 36px;
       row-gap: 4px;
-    }
-    .studio-model-container {
-      grid-column: 1 / -1;
-      grid-row: 1;
     }
     .studio-attachment-tools {
       grid-column: 1;
-      grid-row: 2;
+      grid-row: 1;
     }
-    .studio-parameter-summary {
+    .studio-model-container {
       grid-column: 2;
-      grid-row: 2;
+      grid-row: 1;
     }
     .studio-submit-tools {
       grid-column: 3;
+      grid-row: 1;
+    }
+    .studio-parameter-summary {
+      grid-column: 1 / -1;
       grid-row: 2;
-    }
-    .studio-model-trigger {
-      width: 100%;
       justify-content: flex-start;
-    }
-    .studio-model-trigger > svg:last-child {
-      margin-left: auto;
     }
   }
 
@@ -286,14 +357,14 @@
   }
 
   .studio-effort-range::-webkit-slider-thumb {
-    width: 32px;
-    height: 32px;
-    margin-top: -2px;
+    width: 16px;
+    height: 16px;
+    margin-top: 6px;
     appearance: none;
     border: 0;
     border-radius: 50%;
-    background: #fff;
-    box-shadow: 0 1px 4px rgb(0 0 0 / 0.14);
+    background: rgb(var(--text));
+    box-shadow: 0 0 0 3px rgb(var(--surface));
   }
 
   .studio-effort-range::-moz-range-track {
@@ -303,25 +374,22 @@
   }
 
   .studio-effort-range::-moz-range-thumb {
-    width: 32px;
-    height: 32px;
+    width: 16px;
+    height: 16px;
     border: 0;
     border-radius: 50%;
-    background: #fff;
-    box-shadow: 0 1px 4px rgb(0 0 0 / 0.14);
+    background: rgb(var(--text));
+    box-shadow: 0 0 0 3px rgb(var(--surface));
   }
 
   .studio-starter {
-    border: 1px solid rgb(var(--border));
-    border-radius: 8px;
-    background: rgb(var(--surface));
-    transition:
-      border-color 160ms ease,
-      background-color 160ms ease;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    transition: background-color 160ms ease;
   }
 
   .studio-starter:hover {
-    border-color: rgb(var(--border-strong));
     background: rgb(var(--surface-2));
   }
 
@@ -340,6 +408,22 @@
   outline: none;
 }
 
+/* Unlayered so it beats IconButton's disabled utilities: while a request is
+   loading, ghost icon buttons must not turn into grey boxes. */
+.studio-workspace
+  .ui-icon-button:is(:disabled, [aria-disabled="true"]):not(.studio-submit) {
+  border-color: transparent;
+  background-color: transparent;
+}
+
+/* IconButton forces disabled:opacity-100; a disabled delete must still hide
+   behind the thread age instead of printing over it. */
+@media (hover: hover) {
+  .studio-thread:not(:hover) .studio-thread-delete:disabled {
+    opacity: 0;
+  }
+}
+
 .studio-workspace .studio-composer textarea:focus-visible,
 .studio-context-controls:focus-visible {
   outline: none;
@@ -351,17 +435,17 @@
 .studio-model-controls button:focus-visible,
 .studio-context-controls button:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px rgb(59 130 246 / 0.12);
+  box-shadow: 0 0 0 1px rgb(var(--text) / 0.5);
 }
 
 .studio-workspace .studio-effort-range:focus-visible::-webkit-slider-thumb {
   box-shadow:
-    0 1px 4px rgb(0 0 0 / 0.14),
-    0 0 0 3px rgb(59 130 246 / 0.16);
+    0 0 0 3px rgb(var(--surface)),
+    0 0 0 4px rgb(var(--text) / 0.5);
 }
 
 .studio-workspace .studio-effort-range:focus-visible::-moz-range-thumb {
   box-shadow:
-    0 1px 4px rgb(0 0 0 / 0.14),
-    0 0 0 3px rgb(59 130 246 / 0.16);
+    0 0 0 3px rgb(var(--surface)),
+    0 0 0 4px rgb(var(--text) / 0.5);
 }

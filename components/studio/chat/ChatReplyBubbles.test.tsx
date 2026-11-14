@@ -34,7 +34,9 @@ it("distinguishes holds, unknown usage, image refunds, and missing records", () 
   expect(screen.getByLabelText("本轮积分")).toHaveTextContent(
     "待结算（已预留 12）",
   );
-  expect(screen.getByLabelText("本轮积分")).toHaveTextContent("合计：待结算");
+  // Without an image job there is one number, so no image line and no total.
+  expect(screen.getByLabelText("本轮积分")).not.toHaveTextContent("合计");
+  expect(screen.getByLabelText("本轮积分")).not.toHaveTextContent("生图");
   view.rerender(
     <TurnCredits
       chat={{ state: "usage_unknown", chargedCredits: 0 }}

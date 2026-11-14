@@ -28,7 +28,8 @@ export async function getChatCatalog() {
       pricing: { ...opus.pricing },
       supportsVision: true,
       maxReferenceImages: 8,
-      supportsWebSearch: false,
+      // Search here is the application's own web_search tool, not the provider's.
+      supportsWebSearch: true,
       supportsDurableTurns: true,
     });
   if (sol.enabled && sol.apiKey)
@@ -36,7 +37,10 @@ export async function getChatCatalog() {
       id: SOL_MODEL_ID,
       displayName: "GPT-6.1 Sol",
       reasoningEfforts: [...REASONING_EFFORTS],
-      defaultReasoningEffort: "low",
+      // Production data (2026-11): at "low" Sol averages 34 reasoning tokens,
+      // i.e. it does not reason at all. Sol is billed per turn, so "medium"
+      // costs latency, not credits.
+      defaultReasoningEffort: "medium",
       credits: sol.credits,
       supportsVision: true,
       maxReferenceImages: 8,

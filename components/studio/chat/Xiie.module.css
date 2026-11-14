@@ -1,0 +1,426 @@
+/* Xiie's inks, and the motion of each bone of the puppet in Xiie.tsx. */
+.xiie {
+  --xiie-skin: #70ac62;
+  --xiie-shade: #5f9a53;
+  --xiie-patch: #cbd060;
+  --xiie-belly: #fbe9c0;
+  --xiie-ink: #5b4037;
+  --xiie-thing: #6f5146;
+  --xiie-prop: #e6dccb;
+  --xiie-bulb: #f3da69;
+  --xiie-heart: #ee8a8f;
+  display: block;
+  flex: none;
+  overflow: visible;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  /* A poke is a click, not a drag, a double-tap zoom or a long-press menu. */
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  transform-origin: 50% 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:global(html.light) .xiie {
+  --xiie-ink: #442e28;
+  --xiie-thing: #442e28;
+  --xiie-prop: #442e28;
+  --xiie-heart: #e0646b;
+}
+
+.frozen {
+  cursor: default;
+}
+
+.g { fill: var(--xiie-skin); }
+.s { fill: var(--xiie-shade); }
+.y { fill: var(--xiie-patch); }
+.c { fill: var(--xiie-belly); }
+.d { fill: var(--xiie-ink); }
+.b { fill: var(--xiie-bulb); }
+.h { fill: var(--xiie-heart); }
+/* Solid things (laptop, book, screen) stay brown on any page. */
+.k { fill: var(--xiie-thing); }
+/* Loose marks (question mark, sparks, z z z) flip to a light ink on a dark page. */
+.p { fill: var(--xiie-prop); }
+
+/*
+ * Every bone loops forever. --lead starts a bone part-way into its loop, which
+ * is how a swing travels down the tail; --xiie-at (set on a frozen Xiie) moves
+ * the whole puppet to one moment in time.
+ */
+.bone {
+  animation-delay: calc(var(--xiie-at, 0s) - var(--lead, 0s));
+  animation-iteration-count: infinite;
+  animation-timing-function: ease-in-out;
+}
+
+.frozen .bone {
+  animation-play-state: paused;
+}
+
+.eye {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* A new pose pops up from the floor. */
+.enter {
+  transform-origin: 50% 100%;
+  animation: xiie-enter 0.34s cubic-bezier(0.3, 1.5, 0.5, 1) backwards;
+}
+
+.frozen .enter {
+  animation: none;
+}
+
+@keyframes xiie-enter {
+  from { opacity: 0; transform: scale(0.82, 0.7); }
+  45% { opacity: 1; }
+}
+
+/* What a poke lets go: it drifts up and fades, then Xiie.tsx removes it. */
+.puff {
+  animation: xiie-puff 0.9s ease-out forwards;
+}
+
+@keyframes xiie-puff {
+  from { opacity: 0; transform: translateY(2px) scale(0.4); }
+  22% { opacity: 1; transform: translateY(-1px) scale(1.15); }
+  40% { opacity: 1; transform: translateY(-2.5px) scale(1); }
+  to { opacity: 0; transform: translateY(-7px) scale(1); }
+}
+
+@keyframes xiie-puff-still {
+  from, 70% { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* The slot a turn keeps for Xiie in the timeline; it sinks away when done. */
+.slot {
+  display: flex;
+  align-items: flex-end;
+  height: 68px;
+  margin-top: 12px;
+  user-select: none;
+  -webkit-user-select: none;
+  transition:
+    height 0.32s ease,
+    margin-top 0.32s ease,
+    opacity 0.26s ease;
+}
+
+.leaving {
+  height: 0;
+  margin-top: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* ── shared moves ── */
+@keyframes xiie-swing {
+  from { transform: rotate(calc(var(--swing) * -1)); }
+  to { transform: rotate(var(--swing)); }
+}
+
+@keyframes xiie-breathe {
+  from { transform: scale(1, 1); }
+  to { transform: scale(1.02, 0.965); }
+}
+
+@keyframes xiie-blink {
+  0%, 91%, 100% { transform: scaleY(1); }
+  95% { transform: scaleY(0.1); }
+}
+
+@keyframes xiie-nod {
+  from { transform: rotate(-2.5deg) translateY(0.3px); }
+  to { transform: rotate(3deg) translateY(-0.3px); }
+}
+
+@keyframes xiie-float {
+  from { transform: translateY(0.5px); }
+  to { transform: translateY(-0.7px); }
+}
+
+/* Eyes run along a line of text, then jump back to the start of the next. */
+@keyframes xiie-readline {
+  0% { transform: translate(-0.6px, 0.3px); animation-timing-function: linear; }
+  82% { transform: translate(0.7px, 0.3px); }
+  90%, 100% { transform: translate(-0.6px, 0.3px); }
+}
+
+@keyframes xiie-type {
+  from { transform: translateY(0) rotate(0deg); }
+  to { transform: translateY(-0.9px) rotate(-5deg); }
+}
+
+@keyframes xiie-cursor {
+  0%, 55% { opacity: 1; }
+  60%, 95% { opacity: 0.35; }
+  100% { opacity: 1; }
+}
+
+@keyframes xiie-spark {
+  0%, 100% { opacity: 0.15; transform: scale(0.7); }
+  30%, 55% { opacity: 1; transform: scale(1.1); }
+}
+
+/* ── thinking: head tips one way, then up toward the question mark ── */
+.thinking .tail0 { animation-name: xiie-swing; animation-duration: 1.6s; animation-direction: alternate; --swing: 1.5deg; }
+.thinking .tail1 { animation-name: xiie-swing; animation-duration: 1.6s; animation-direction: alternate; --swing: 4deg; --lead: 2.9s; }
+.thinking .tail2 { animation-name: xiie-swing; animation-duration: 1.6s; animation-direction: alternate; --swing: 8deg; --lead: 2.6s; }
+.thinking .body { animation-name: xiie-breathe; animation-duration: 1.6s; animation-direction: alternate; }
+.thinking .head { animation-name: xiie-ponder; animation-duration: 6.4s; }
+.thinking .eyes { animation-name: xiie-glance; animation-duration: 6.4s; }
+.thinking .eye { animation-name: xiie-blink; animation-duration: 3.2s; }
+.thinking .arm { animation-name: xiie-tap; animation-duration: 6.4s; }
+.thinking .prop { animation-name: xiie-wonder; animation-duration: 1.6s; animation-direction: alternate; }
+
+@keyframes xiie-ponder {
+  0%, 34% { transform: rotate(-3.5deg) translateY(0); }
+  50%, 84% { transform: rotate(3.5deg) translateY(-0.5px); }
+  100% { transform: rotate(-3.5deg) translateY(0); }
+}
+
+@keyframes xiie-glance {
+  0%, 34% { transform: translate(-0.3px, 0.2px); }
+  50%, 84% { transform: translate(0.5px, -0.5px); }
+  100% { transform: translate(-0.3px, 0.2px); }
+}
+
+@keyframes xiie-tap {
+  0%, 8%, 16%, 24%, 100% { transform: translateY(0) rotate(0deg); }
+  4%, 12%, 20% { transform: translateY(-0.9px) rotate(-3deg); }
+}
+
+@keyframes xiie-wonder {
+  from { transform: translateY(0.4px) rotate(-8deg); }
+  to { transform: translateY(-0.9px) rotate(8deg); }
+}
+
+/* ── idea: a happy wag, a wave, and now and then a hop as the bulb flares ── */
+.idea .root { animation-name: xiie-hop; animation-duration: 4.8s; }
+.idea .tail0 { animation-name: xiie-swing; animation-duration: 0.8s; animation-direction: alternate; --swing: 2.5deg; }
+.idea .tail1 { animation-name: xiie-swing; animation-duration: 0.8s; animation-direction: alternate; --swing: 6deg; --lead: 1.45s; }
+.idea .tail2 { animation-name: xiie-swing; animation-duration: 0.8s; animation-direction: alternate; --swing: 11deg; --lead: 1.3s; }
+.idea .body { animation-name: xiie-breathe; animation-duration: 1.2s; animation-direction: alternate; }
+.idea .head { animation-name: xiie-nod; animation-duration: 2.4s; animation-direction: alternate; }
+.idea .eye { animation-name: xiie-blink; animation-duration: 4.8s; --lead: 1s; }
+.idea .arm { animation-name: xiie-wave; animation-duration: 0.6s; animation-direction: alternate; }
+.idea .prop { animation-name: xiie-float; animation-duration: 2.4s; animation-direction: alternate; }
+.idea .glow { animation-name: xiie-glow; animation-duration: 4.8s; }
+.idea .rays { animation-name: xiie-flare; animation-duration: 4.8s; }
+
+@keyframes xiie-hop {
+  0%, 62%, 100% { transform: translateY(0) scale(1, 1); }
+  69% { transform: translateY(0) scale(1.05, 0.92); animation-timing-function: ease-out; }
+  78% { transform: translateY(-2.4px) scale(0.97, 1.04); animation-timing-function: ease-in; }
+  87% { transform: translateY(0) scale(1.05, 0.93); animation-timing-function: ease-out; }
+  94% { transform: translateY(0) scale(1, 1); }
+}
+
+@keyframes xiie-wave {
+  from { transform: rotate(5deg); }
+  to { transform: rotate(-9deg); }
+}
+
+@keyframes xiie-glow {
+  0%, 62%, 100% { opacity: 0.82; }
+  78%, 86% { opacity: 1; }
+}
+
+@keyframes xiie-flare {
+  0%, 62%, 100% { opacity: 0.5; transform: scale(0.9); }
+  78% { opacity: 1; transform: scale(1.22); }
+  90% { opacity: 1; transform: scale(1.05); }
+}
+
+/* ── reading: eyes follow the lines, and now and then a page turns ── */
+.reading .tail0 { animation-name: xiie-swing; animation-duration: 2.4s; animation-direction: alternate; --swing: 1.5deg; }
+.reading .tail1 { animation-name: xiie-swing; animation-duration: 2.4s; animation-direction: alternate; --swing: 3.5deg; --lead: 4.4s; }
+.reading .tail2 { animation-name: xiie-swing; animation-duration: 2.4s; animation-direction: alternate; --swing: 6.5deg; --lead: 4s; }
+.reading .body { animation-name: xiie-breathe; animation-duration: 2.4s; animation-direction: alternate; }
+.reading .head { animation-name: xiie-nod; animation-duration: 2.4s; animation-direction: alternate; }
+.reading .eyes { animation-name: xiie-readline; animation-duration: 2.4s; }
+.reading .eye { animation-name: xiie-blink; animation-duration: 4.8s; --lead: 2s; }
+.reading .book { animation-name: xiie-swing; animation-duration: 2.4s; animation-direction: alternate; --swing: 1.2deg; }
+.reading .leaf { animation-name: xiie-leaf; animation-duration: 4.8s; }
+
+@keyframes xiie-leaf {
+  0%, 76% { opacity: 0; transform: translateX(0); }
+  79% { opacity: 1; transform: translateX(0); }
+  93% { opacity: 1; transform: translateX(-4px); }
+  100% { opacity: 0; transform: translateX(-5px); }
+}
+
+/* ── focus: head bobbing to whatever is in the headphones ── */
+.focus .tail0 { animation-name: xiie-swing; animation-duration: 0.6s; animation-direction: alternate; --swing: 2deg; }
+.focus .tail1 { animation-name: xiie-swing; animation-duration: 0.6s; animation-direction: alternate; --swing: 5deg; --lead: 1.05s; }
+.focus .tail2 { animation-name: xiie-swing; animation-duration: 0.6s; animation-direction: alternate; --swing: 9deg; --lead: 0.9s; }
+.focus .body { animation-name: xiie-breathe; animation-duration: 1.2s; animation-direction: alternate; }
+.focus .head { animation-name: xiie-bop; animation-duration: 0.6s; animation-direction: alternate; }
+.focus .eye { animation-name: xiie-blink; animation-duration: 3.6s; }
+.focus .arm { animation-name: xiie-type; animation-duration: 0.6s; animation-direction: alternate; }
+.focus .glyph { animation-name: xiie-cursor; animation-duration: 1.2s; }
+
+@keyframes xiie-bop {
+  from { transform: rotate(-2.5deg) translateY(0); }
+  to { transform: rotate(2.5deg) translateY(0.6px); }
+}
+
+/* ── coding: paws going, eyes on the screen, sparks flying ── */
+.coding .tail0 { animation-name: xiie-swing; animation-duration: 2.4s; animation-direction: alternate; --swing: 1.5deg; }
+.coding .tail1 { animation-name: xiie-swing; animation-duration: 2.4s; animation-direction: alternate; --swing: 3.5deg; --lead: 4.4s; }
+.coding .tail2 { animation-name: xiie-swing; animation-duration: 2.4s; animation-direction: alternate; --swing: 7deg; --lead: 4s; }
+.coding .body { animation-name: xiie-breathe; animation-duration: 1.6s; animation-direction: alternate; }
+.coding .head { animation-name: xiie-nod; animation-duration: 2.4s; animation-direction: alternate; }
+.coding .eyes { animation-name: xiie-readline; animation-duration: 2.4s; }
+.coding .eye { animation-name: xiie-blink; animation-duration: 4.8s; --lead: 1s; }
+.coding .arm { animation-name: xiie-type; animation-duration: 0.22s; animation-direction: alternate; }
+.coding .glyph { animation-name: xiie-cursor; animation-duration: 1.2s; }
+.coding .spark0 { animation-name: xiie-spark; animation-duration: 1.8s; }
+.coding .spark1 { animation-name: xiie-spark; animation-duration: 1.8s; --lead: 1.5s; }
+.coding .spark2 { animation-name: xiie-spark; animation-duration: 1.8s; --lead: 1.2s; }
+
+/* ── building: two turns of the spanner, a rattle of the hat ── */
+.building .tail0 { animation-name: xiie-swing; animation-duration: 1.2s; animation-direction: alternate; --swing: 1.5deg; }
+.building .tail1 { animation-name: xiie-swing; animation-duration: 1.2s; animation-direction: alternate; --swing: 4deg; --lead: 2.1s; }
+.building .tail2 { animation-name: xiie-swing; animation-duration: 1.2s; animation-direction: alternate; --swing: 7deg; --lead: 1.8s; }
+.building .body { animation-name: xiie-breathe; animation-duration: 1.2s; animation-direction: alternate; }
+.building .head { animation-name: xiie-nod; animation-duration: 1.2s; animation-direction: alternate; }
+.building .eye { animation-name: xiie-blink; animation-duration: 3.6s; }
+.building .hat { animation-name: xiie-rattle; animation-duration: 1.2s; }
+.building .arm { animation-name: xiie-crank; animation-duration: 1.2s; }
+
+@keyframes xiie-crank {
+  0%, 36%, 76%, 100% { transform: rotate(7deg); }
+  18%, 58% { transform: rotate(-12deg); }
+}
+
+@keyframes xiie-rattle {
+  0%, 12%, 34%, 52%, 74%, 100% { transform: translateY(0) rotate(0deg); }
+  22%, 62% { transform: translateY(-0.7px) rotate(-2deg); }
+}
+
+/* ── running: legs scissor, the body rocks, dust streams off behind ── */
+.running .root { animation-name: xiie-gallop; animation-duration: 0.36s; animation-direction: alternate; }
+.running .tail0 { animation-name: xiie-swing; animation-duration: 0.36s; animation-direction: alternate; --swing: 3deg; }
+.running .tail1 { animation-name: xiie-swing; animation-duration: 0.36s; animation-direction: alternate; --swing: 5deg; --lead: 0.62s; }
+.running .tail2 { animation-name: xiie-swing; animation-duration: 0.36s; animation-direction: alternate; --swing: 9deg; --lead: 0.52s; }
+.running .body { animation-name: xiie-swing; animation-duration: 0.36s; animation-direction: alternate; --swing: 2deg; }
+/* The head turns against the body, so it stays level. */
+.running .head { animation-name: xiie-swing; animation-duration: 0.36s; animation-direction: alternate-reverse; --swing: 2deg; }
+.running .eye { animation-name: xiie-blink; animation-duration: 2.88s; }
+.running .hindleg { animation-name: xiie-swing; animation-duration: 0.36s; animation-direction: alternate; --swing: 15deg; }
+.running .foreleg { animation-name: xiie-swing; animation-duration: 0.36s; animation-direction: alternate-reverse; --swing: 15deg; }
+.running .dash0 { animation-name: xiie-dash; animation-duration: 0.72s; animation-timing-function: linear; }
+.running .dash1 { animation-name: xiie-dash; animation-duration: 0.72s; animation-timing-function: linear; --lead: 0.54s; }
+.running .dash2 { animation-name: xiie-dash; animation-duration: 0.72s; animation-timing-function: linear; --lead: 0.36s; }
+.running .dash3 { animation-name: xiie-dash; animation-duration: 0.72s; animation-timing-function: linear; --lead: 0.18s; }
+
+@keyframes xiie-gallop {
+  from { transform: translateY(0.4px); }
+  to { transform: translateY(-1px); }
+}
+
+@keyframes xiie-dash {
+  0% { opacity: 0; transform: translateX(3px); }
+  25%, 70% { opacity: 1; }
+  100% { opacity: 0; transform: translateX(-3px); }
+}
+
+/* ── debugging: peeking over the screen, then ducking back behind it ── */
+.debugging .tail0 { animation-name: xiie-swing; animation-duration: 0.45s; animation-direction: alternate; --swing: 1deg; }
+.debugging .tail1 { animation-name: xiie-swing; animation-duration: 0.45s; animation-direction: alternate; --swing: 3deg; --lead: 0.75s; }
+.debugging .tail2 { animation-name: xiie-swing; animation-duration: 0.45s; animation-direction: alternate; --swing: 7deg; --lead: 0.6s; }
+.debugging .peek { animation-name: xiie-peek; animation-duration: 4.8s; }
+.debugging .head { animation-name: xiie-swing; animation-duration: 0.45s; animation-direction: alternate; --swing: 1.2deg; }
+.debugging .eyes { animation-name: xiie-dart; animation-duration: 2.4s; }
+.debugging .eye { animation-name: xiie-blink; animation-duration: 2.4s; --lead: 0.4s; }
+.debugging .alert { animation-name: xiie-alarm; animation-duration: 0.9s; }
+.debugging .spark0 { animation-name: xiie-spark; animation-duration: 0.9s; }
+.debugging .spark1 { animation-name: xiie-spark; animation-duration: 0.9s; --lead: 0.6s; }
+.debugging .spark2 { animation-name: xiie-spark; animation-duration: 0.9s; --lead: 0.3s; }
+
+@keyframes xiie-peek {
+  0%, 34%, 70%, 100% { transform: translateY(0); }
+  42%, 60% { transform: translateY(2.6px); }
+}
+
+@keyframes xiie-dart {
+  0%, 40%, 100% { transform: translateX(-0.7px); }
+  50%, 90% { transform: translateX(0.7px); }
+}
+
+@keyframes xiie-alarm {
+  0%, 46%, 100% { opacity: 1; }
+  54%, 92% { opacity: 0.3; }
+}
+
+/* ── done: two hops, arms pumping, sparkles going off in turn ── */
+.done .root { animation-name: xiie-cheer; animation-duration: 1.2s; }
+.done .tail0 { animation-name: xiie-swing; animation-duration: 0.3s; animation-direction: alternate; --swing: 3deg; }
+.done .tail1 { animation-name: xiie-swing; animation-duration: 0.3s; animation-direction: alternate; --swing: 7deg; --lead: 0.5s; }
+.done .tail2 { animation-name: xiie-swing; animation-duration: 0.3s; animation-direction: alternate; --swing: 12deg; --lead: 0.4s; }
+.done .head { animation-name: xiie-nod; animation-duration: 0.6s; animation-direction: alternate; }
+.done .eye { animation-name: xiie-joy; animation-duration: 1.2s; }
+.done .arm { animation-name: xiie-swing; animation-duration: 0.3s; animation-direction: alternate; --swing: 8deg; }
+.done .arm2 { animation-name: xiie-swing; animation-duration: 0.3s; animation-direction: alternate-reverse; --swing: 8deg; }
+.done .star0 { animation-name: xiie-twinkle; animation-duration: 1.2s; }
+.done .star1 { animation-name: xiie-twinkle; animation-duration: 1.2s; --lead: 0.9s; }
+.done .star2 { animation-name: xiie-twinkle; animation-duration: 1.2s; --lead: 0.6s; }
+.done .star3 { animation-name: xiie-twinkle; animation-duration: 1.2s; --lead: 0.3s; }
+
+@keyframes xiie-cheer {
+  0%, 50%, 100% { transform: translateY(0) scale(1, 1); }
+  8%, 58% { transform: translateY(0) scale(1.05, 0.93); animation-timing-function: ease-out; }
+  22%, 72% { transform: translateY(-2.6px) scale(0.97, 1.04); animation-timing-function: ease-in; }
+  36%, 86% { transform: translateY(0) scale(1.05, 0.94); animation-timing-function: ease-out; }
+}
+
+/* Eyes narrow to a smile at the top of each hop. */
+@keyframes xiie-joy {
+  0%, 10%, 40%, 60%, 90%, 100% { transform: scaleY(1); }
+  20%, 30%, 70%, 80% { transform: scaleY(0.4); }
+}
+
+@keyframes xiie-twinkle {
+  0%, 100% { opacity: 0.25; transform: scale(0.6); }
+  45%, 60% { opacity: 1; transform: scale(1.3); }
+}
+
+/* ── sleeping: long slow breaths, and z after z drifting off ── */
+.sleeping .body { animation-name: xiie-snooze; animation-duration: 3.2s; animation-direction: alternate; }
+.sleeping .z0 { animation-name: xiie-zzz; animation-duration: 3.2s; }
+.sleeping .z1 { animation-name: xiie-zzz; animation-duration: 3.2s; --lead: 2.5s; }
+.sleeping .z2 { animation-name: xiie-zzz; animation-duration: 3.2s; --lead: 1.8s; }
+
+@keyframes xiie-snooze {
+  from { transform: scale(1, 1); }
+  to { transform: scale(1.03, 0.945); }
+}
+
+@keyframes xiie-zzz {
+  0% { opacity: 0; transform: translate(-1px, 1.5px) scale(0.6); }
+  18% { opacity: 1; transform: translate(0, 0) scale(1); }
+  62% { opacity: 1; transform: translate(0.4px, -0.8px) scale(1); }
+  100% { opacity: 0; transform: translate(1.2px, -2.5px) scale(1.05); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bone,
+  .enter {
+    animation: none;
+  }
+
+  .puff {
+    animation-name: xiie-puff-still;
+  }
+
+  .slot {
+    transition: none;
+  }
+}

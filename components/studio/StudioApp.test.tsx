@@ -585,7 +585,7 @@ it("submits GIF request sizes, corrects model changes, and shows the credit rang
     screen.getByRole("button", { name: "选择模型，当前 Image2.5" }),
   );
   await user.click(screen.getByRole("menuitem", { name: "Image 2.6" }));
-  await user.click(screen.getByRole("button", { name: "生成参数" }));
+  await user.click(screen.getByRole("button", { name: "生图设置" }));
   await user.click(screen.getByRole("combobox", { name: "图片格式" }));
   await user.click(screen.getByRole("option", { name: "GIF" }));
   expect(screen.getByRole("combobox", { name: "图片尺寸" })).toHaveTextContent(
@@ -597,7 +597,7 @@ it("submits GIF request sizes, corrects model changes, and shows the credit rang
     screen.getByRole("button", { name: "选择模型，当前 Image 2.6" }),
   );
   await user.click(screen.getByRole("menuitem", { name: "Image2.5" }));
-  await user.click(screen.getByRole("button", { name: "生成参数" }));
+  await user.click(screen.getByRole("button", { name: "生图设置" }));
   expect(
     screen.queryByRole("combobox", { name: "图片格式" }),
   ).not.toBeInTheDocument();
@@ -610,7 +610,7 @@ it("submits GIF request sizes, corrects model changes, and shows the credit rang
     screen.getByRole("button", { name: "选择模型，当前 Image2.5" }),
   );
   await user.click(screen.getByRole("menuitem", { name: "Image 2.6" }));
-  await user.click(screen.getByRole("button", { name: "生成参数" }));
+  await user.click(screen.getByRole("button", { name: "生图设置" }));
   expect(screen.getByRole("combobox", { name: "图片格式" })).toHaveTextContent(
     "PNG",
   );
@@ -1076,7 +1076,7 @@ it("keeps a text-only model selectable and omits unsupported reasoning effort", 
   );
 });
 
-it("retains Opus token pricing, displays all four rates, and submits its selected effort", async () => {
+it("keeps Opus effort selectable without a token rate row, and submits its selected effort", async () => {
   const opus = {
     id: "claude-opus-5-5",
     displayName: "Opus 5.5",
@@ -1107,10 +1107,9 @@ it("retains Opus token pricing, displays all four rates, and submits its selecte
   await openChat();
   await selectChatModel("Opus 5.5");
   expect(chatModelTrigger()).toHaveTextContent("Opus 5.5Low");
-  expect(screen.getByText("积分 / 百万 Token")).toBeVisible();
-  for (const rate of ["输入 100", "输出 500", "缓存读取 5", "缓存写入 60"]) {
-    expect(screen.getByText(rate)).toBeVisible();
-  }
+  // Rates live in the model menu only; the composer shows no price row.
+  expect(screen.queryByText("积分 / 百万 Token")).not.toBeInTheDocument();
+  expect(screen.queryByText("输入 100")).not.toBeInTheDocument();
   expect(screen.queryByText("0 积分 / 轮")).not.toBeInTheDocument();
   expect(screen.queryByText(/预扣|冻结|免费/)).not.toBeInTheDocument();
   expect(screen.queryByLabelText("选择参考图文件")).not.toBeInTheDocument();

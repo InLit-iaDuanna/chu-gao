@@ -15,6 +15,7 @@ import { GenerationCard } from "../GenerationCard";
 import type { Conversation, Generation, ModelInfo } from "../lib/types";
 import { messageGeneration } from "./message-generation";
 import { AssistantContent } from "./AssistantContent";
+import { TurnXiie, XiieSlot } from "./TurnXiie";
 import {
   ActivityTrail,
   chatUsageBreakdown,
@@ -154,7 +155,7 @@ function ReplyMetadata({ message }: { message: ConversationMessage }) {
       {sources.length ? (
         <nav
           aria-label="回复来源"
-          className="mt-3 flex min-w-0 flex-wrap gap-x-4 gap-y-1 text-xs leading-5 text-text-muted"
+          className="mt-4 flex min-w-0 flex-col gap-1 text-xs leading-5 text-text-muted"
         >
           {sources.map((source, index) => (
             <a
@@ -163,7 +164,7 @@ function ReplyMetadata({ message }: { message: ConversationMessage }) {
               target="_blank"
               rel="noopener noreferrer nofollow"
               referrerPolicy="no-referrer"
-              className="max-w-full break-words underline underline-offset-2 [overflow-wrap:anywhere]"
+              className="max-w-full break-words underline decoration-[rgb(var(--border-strong))] underline-offset-[3px] [overflow-wrap:anywhere] hover:text-foreground hover:decoration-current"
             >
               {index + 1}. {source.title}
             </a>
@@ -171,12 +172,10 @@ function ReplyMetadata({ message }: { message: ConversationMessage }) {
         </nav>
       ) : null}
       {usage ? (
-        <details className="mt-2 text-xs leading-5 text-text-muted">
-          <summary className="cursor-pointer">用量</summary>
-          <p>
-            输入 {tokens(breakdown.inputTotal)} · 输出{" "}
-            {tokens(breakdown.output)}
-          </p>
+        <details className="mt-3 font-mono text-[11px] leading-5 text-text-faint">
+          <summary className="cursor-pointer hover:text-text-muted">
+            用量
+          </summary>
           <p>
             输入总量 {tokens(breakdown.inputTotal)} · 输出{" "}
             {tokens(breakdown.output)}
@@ -245,7 +244,7 @@ export function ConversationTimeline({
         role="log"
         aria-label="创作对话"
         aria-live="polite"
-        className="h-full overflow-y-auto overscroll-contain px-3 py-6 md:px-6 lg:px-8"
+        className="h-full overflow-y-auto overscroll-contain px-3 py-6 [scrollbar-gutter:stable_both-edges] md:px-6 lg:px-8"
         onScroll={(event) => {
           const el = event.currentTarget;
           following.current =
@@ -253,7 +252,7 @@ export function ConversationTimeline({
           setShowBottom(!following.current);
         }}
       >
-        <div className="mx-auto w-full max-w-[52rem] space-y-8 pb-3">
+        <div className="mx-auto w-full max-w-[46rem] space-y-9 pb-3">
           {(conversation?.messages ?? []).map((message) => {
             const isUser = message.role === "user";
             const active =
@@ -277,7 +276,7 @@ export function ConversationTimeline({
                 }
                 aria-label={isUser ? "你的消息" : "助手回复"}
                 className={cn(
-                  "flex min-w-0 flex-col",
+                  "studio-turn flex min-w-0 flex-col",
                   isUser ? "items-end" : "items-start",
                 )}
               >
@@ -285,18 +284,12 @@ export function ConversationTimeline({
                   className={cn(
                     "min-w-0",
                     isUser
-                      ? "smooth-surface studio-message relative max-w-[90%] rounded-xl border border-border/70 bg-surface px-4 py-3 sm:max-w-[85%]"
+                      ? "studio-message max-w-[90%] px-4 py-2.5 sm:max-w-[75%]"
                       : "w-full",
                   )}
                 >
-                  {!isUser ? (
-                    <div className="mb-3 flex items-center gap-2 text-xs font-medium text-text-muted">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[rgb(var(--studio-highlight))]" />
-                      Chūgǎo
-                    </div>
-                  ) : null}
                   {isUser ? (
-                    <p className="select-text whitespace-pre-wrap break-words text-[15px] leading-7 [overflow-wrap:anywhere]">
+                    <p className="select-text whitespace-pre-wrap break-words text-base leading-7 [overflow-wrap:anywhere]">
                       {message.content}
                     </p>
                   ) : !generation || Boolean(message.chatTurnId) ? (
@@ -349,6 +342,20 @@ export function ConversationTimeline({
                       ) : (
                         <ReplyMetadata message={message} />
                       )}
+                      {message.chatTurnId ? (
+                        <TurnXiie
+                          active={active}
+                          status={message.chatStatus}
+                          activity={message.chatActivity}
+                          hasText={Boolean(message.content)}
+                          connection={
+                            message.chatTurnId === managedTurnId
+                              ? connection
+                              : undefined
+                          }
+                          latest={message.id === latestChatMessageId}
+                        />
+                      ) : null}
                       <TextRenderReceipt message={message} />
                       {partial ? (
                         <p
@@ -365,7 +372,7 @@ export function ConversationTimeline({
                   ) : null}
                   {generation ? (
                     <>
-                      <p className="text-xs font-medium text-text-muted">
+                      <p className="mb-2 mt-4 text-xs text-text-faint">
                         {models.find((model) => model.id === generation.modelId)
                           ?.displayName ?? "图片生成"}
                       </p>
@@ -379,6 +386,59 @@ export function ConversationTimeline({
                         onUseAsReference={onReference}
                       />
                     </>
+                  ) : null}
+                </div>
+                <div
+                  className={cn(
+                    "studio-turn-actions mt-1 flex flex-wrap items-center gap-0.5",
+                    !isUser && "-ml-2 w-full",
+                  )}
+                >
+                  {partial &&
+                  message.chatTurnId === latestUserTurnId &&
+                  message.id === latestChatMessageId &&
+                  message.chatAttemptId &&
+                  onRetryChat ? (
+                    <IconButton
+                      variant="ghost"
+                      aria-label="重新生成回复"
+                      title="重新生成回复"
+                      disabled={disabled}
+                      onClick={() =>
+                        onRetryChat(message.chatTurnId!, message.chatAttemptId!)
+                      }
+                      className="h-8 w-8 text-text-muted"
+                    >
+                      <RotateCcw size={15} />
+                    </IconButton>
+                  ) : null}
+                  <CopyTextButton
+                    text={generation?.prompt ?? message.content}
+                    label={generation ? "复制提示词" : "复制消息"}
+                  />
+                  <IconButton
+                    variant="ghost"
+                    aria-label={isUser ? "重新编辑消息" : "使用提示词"}
+                    title={isUser ? "重新编辑消息" : "使用提示词"}
+                    disabled={disabled}
+                    onClick={() =>
+                      onEdit(generation?.prompt ?? message.content)
+                    }
+                    className="h-8 w-8 text-text-muted"
+                  >
+                    <SquarePen size={15} />
+                  </IconButton>
+                  {generation?.images.length ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={disabled}
+                      onClick={() => onReference(generation)}
+                      className="gap-1.5 text-xs text-text-muted"
+                    >
+                      <ImagePlus size={15} />
+                      继续修改
+                    </Button>
                   ) : null}
                   {!isUser ? (
                     <TurnCredits
@@ -398,60 +458,12 @@ export function ConversationTimeline({
                     />
                   ) : null}
                 </div>
-                <div className="mt-1 flex flex-wrap items-center gap-0.5">
-                  {partial &&
-                  message.chatTurnId === latestUserTurnId &&
-                  message.id === latestChatMessageId &&
-                  message.chatAttemptId &&
-                  onRetryChat ? (
-                    <IconButton
-                      variant="ghost"
-                      aria-label="重新生成回复"
-                      title="重新生成回复"
-                      disabled={disabled}
-                      onClick={() =>
-                        onRetryChat(message.chatTurnId!, message.chatAttemptId!)
-                      }
-                      className="h-9 w-9 text-text-muted"
-                    >
-                      <RotateCcw size={15} />
-                    </IconButton>
-                  ) : null}
-                  <CopyTextButton
-                    text={generation?.prompt ?? message.content}
-                    label={generation ? "复制提示词" : "复制消息"}
-                  />
-                  <IconButton
-                    variant="ghost"
-                    aria-label={isUser ? "重新编辑消息" : "使用提示词"}
-                    title={isUser ? "重新编辑消息" : "使用提示词"}
-                    disabled={disabled}
-                    onClick={() =>
-                      onEdit(generation?.prompt ?? message.content)
-                    }
-                    className="h-9 w-9 text-text-muted"
-                  >
-                    <SquarePen size={15} />
-                  </IconButton>
-                  {generation?.images.length ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={disabled}
-                      onClick={() => onReference(generation)}
-                      className="gap-1.5 text-xs text-text-muted"
-                    >
-                      <ImagePlus size={15} />
-                      继续修改
-                    </Button>
-                  ) : null}
-                </div>
               </article>
             );
           })}
           {pending ? (
             <article aria-label="正在发送的消息" className="flex justify-end">
-              <p className="smooth-surface studio-message relative max-w-[90%] select-text whitespace-pre-wrap break-words rounded-xl border border-border/70 bg-surface px-4 py-3 text-[15px] leading-7 [overflow-wrap:anywhere]">
+              <p className="studio-message max-w-[90%] select-text whitespace-pre-wrap break-words px-4 py-2.5 text-base leading-7 [overflow-wrap:anywhere] sm:max-w-[75%]">
                 {pending}
               </p>
             </article>
@@ -459,7 +471,7 @@ export function ConversationTimeline({
           {!managedTurnId && (streaming !== null || status) ? (
             <article
               aria-label="正在回复"
-              className="min-w-0 text-[15px] leading-7"
+              className="min-w-0 text-base leading-7"
             >
               {streaming ? (
                 <>
@@ -484,6 +496,7 @@ export function ConversationTimeline({
                   {status ?? "正在等待模型响应…"}
                 </p>
               )}
+              <XiieSlot pose={streaming ? "coding" : "thinking"} />
             </article>
           ) : null}
         </div>
@@ -494,7 +507,7 @@ export function ConversationTimeline({
           aria-label="回到最新消息"
           title="回到最新消息"
           onClick={scrollToBottom}
-          className="absolute bottom-3 left-1/2 h-10 w-10 -translate-x-1/2 rounded-full border border-border bg-surface shadow-sm"
+          className="absolute bottom-3 left-1/2 h-8 w-8 -translate-x-1/2 rounded-full border border-border bg-surface shadow-[0_2px_8px_rgb(0_0_0/0.08)]"
         >
           <ArrowDown size={17} />
         </IconButton>

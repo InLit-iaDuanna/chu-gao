@@ -6,12 +6,10 @@ import {
   Compass,
   History,
   Network,
-  MessageSquare,
+  Plus,
   Presentation,
   Search,
   Settings,
-  SquarePen,
-  ArrowUpRight,
   Trash2,
   Wallet,
 } from "lucide-react";
@@ -61,40 +59,35 @@ export function ConversationSidebar({
   const historyActive = isActive("/app/history") || isActive("/app/g");
   const linkClass = (active: boolean) =>
     cn(
-      "smooth-surface studio-nav-link relative flex h-10 items-center gap-3 rounded-md px-3 text-[13px] transition-colors",
-      active
-        ? "font-medium text-foreground"
-        : "text-text-muted hover:bg-surface-2 hover:text-foreground",
+      "studio-nav-link relative flex h-8 items-center gap-3 rounded-lg px-2 text-sm transition-colors",
+      active ? "text-foreground" : "text-text-muted hover:text-foreground",
     );
   return (
     <div className="studio-sidebar flex h-full min-h-0 flex-col overflow-y-auto">
-      <div className="flex h-20 shrink-0 items-center gap-2 px-5">
+      <div className="flex h-12 shrink-0 items-center gap-2 px-4">
         <Logo />
-        <span className="mt-0.5 text-[11px] text-text-faint">Studio</span>
       </div>
-      <div className="px-4 pb-5">
+      <div className="px-2 pb-1 pt-1">
         <Button
-          variant="primary"
+          variant="ghost"
           onClick={onNew}
           disabled={disabled}
-          className="h-10 w-full justify-start gap-3 px-3 text-[13px] shadow-[var(--shadow-xs)]"
+          className="studio-new-thread h-9 w-full justify-start gap-2.5 rounded-lg px-1.5 text-sm font-medium text-foreground"
         >
-          <SquarePen size={16} />
+          <span className="studio-new-thread-mark">
+            <Plus size={14} strokeWidth={2.4} />
+          </span>
           <span className="flex-1 text-left">新对话</span>
-          <ArrowUpRight size={14} className="opacity-60" />
         </Button>
       </div>
-      <nav aria-label="创作导航" className="space-y-1 px-3 pb-5">
-        <p className="px-3 pb-2 text-[11px] font-medium text-text-faint">
-          工作区
-        </p>
+      <nav aria-label="创作导航" className="space-y-px px-2 pb-4">
         <Link
           href="/app/inspiration"
           aria-current={inspirationActive ? "page" : undefined}
           onClick={onNavigate}
           className={linkClass(inspirationActive)}
         >
-          <Compass size={17} /> 灵感圈
+          <Compass size={16} strokeWidth={1.75} /> 灵感圈
         </Link>
         <Link
           href="/app/nodes"
@@ -108,7 +101,7 @@ export function ConversationSidebar({
             isActive("/app/nodes") || isActive("/app/canvas"),
           )}
         >
-          <Network size={17} /> 节点画布
+          <Network size={16} strokeWidth={1.75} /> 节点画布
         </Link>
         <Link
           href="/app/ppt"
@@ -116,7 +109,7 @@ export function ConversationSidebar({
           onClick={onNavigate}
           className={linkClass(isActive("/app/ppt"))}
         >
-          <Presentation size={17} /> PPT
+          <Presentation size={16} strokeWidth={1.75} /> PPT
         </Link>
         <Link
           href="/app/history"
@@ -124,7 +117,7 @@ export function ConversationSidebar({
           onClick={onNavigate}
           className={linkClass(historyActive)}
         >
-          <History size={17} /> 历史图片
+          <History size={16} strokeWidth={1.75} /> 历史图片
         </Link>
         <Link
           href="/app/recharge"
@@ -132,30 +125,24 @@ export function ConversationSidebar({
           onClick={onNavigate}
           className={linkClass(isActive("/app/recharge"))}
         >
-          <Wallet size={17} /> 充值
+          <Wallet size={16} strokeWidth={1.75} /> 充值
         </Link>
       </nav>
-      <div className="mx-5 mb-4 border-t border-border" />
-      <div className="relative mx-4 mb-4">
+      <div className="studio-label px-4 pb-1.5 pt-2">最近对话</div>
+      <div className="relative mx-2 mb-1">
         <Search
-          size={15}
-          className="pointer-events-none absolute left-2.5 top-2.5 text-text-faint"
+          size={14}
+          className="pointer-events-none absolute left-2.5 top-[9px] text-text-faint"
         />
         <Input
           aria-label="搜索最近对话"
           placeholder="搜索对话"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          className="h-9 border-transparent bg-surface pl-8 text-xs placeholder:text-text-faint hover:border-border focus:border-border-strong"
+          className="h-8 rounded-lg border-transparent bg-transparent pl-8 text-sm placeholder:text-text-faint hover:bg-[rgb(var(--text)/0.05)] focus:border-transparent focus:bg-[rgb(var(--text)/0.05)]"
         />
       </div>
-      <div className="flex items-center justify-between px-6 pb-2 text-[11px] font-medium text-text-faint">
-        最近对话
-        {threads.length > 0 ? (
-          <span className="tabular-nums">{threads.length}</span>
-        ) : null}
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4 overscroll-contain">
+      <div className="min-h-0 flex-1 space-y-px overflow-y-auto px-2 pb-4 overscroll-contain">
         {loading ? (
           <p role="status" className="px-2 py-4 text-sm text-text-muted">
             加载中…
@@ -172,7 +159,7 @@ export function ConversationSidebar({
             <div
               key={thread.id}
               className={cn(
-                "smooth-surface studio-thread group relative mb-0.5 flex min-h-10 min-w-0 items-center rounded-md transition-colors",
+                "studio-thread group relative flex h-8 min-w-0 items-center rounded-lg transition-colors",
                 activeId === thread.id
                   ? "text-foreground"
                   : "text-text-muted hover:text-foreground",
@@ -185,9 +172,8 @@ export function ConversationSidebar({
                 onClick={() => onSelect(thread.id)}
                 aria-current={activeId === thread.id ? "page" : undefined}
                 title={thread.title}
-                className="flex min-h-10 min-w-0 flex-1 items-center gap-2.5 px-3 py-2 text-left text-[13px] focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-brand/35 disabled:opacity-50"
+                className="flex h-8 min-w-0 flex-1 items-center rounded-lg px-2 text-left text-sm focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[rgb(var(--text)/0.4)] disabled:opacity-50"
               >
-                <MessageSquare size={14} className="shrink-0 text-text-faint" />
                 <span className="min-w-0 truncate">{thread.title}</span>
               </button>
               {onDelete ? (
@@ -213,7 +199,7 @@ export function ConversationSidebar({
                       setDeletingId(null);
                     }
                   }}
-                  className="studio-thread-delete mr-1 h-8 w-8 shrink-0 text-text-muted hover:text-danger focus-visible:text-foreground"
+                  className="studio-thread-delete mr-0.5 h-7 w-7 shrink-0 rounded-md text-text-muted hover:text-danger focus-visible:text-foreground"
                 >
                   <Trash2 size={14} />
                 </IconButton>
@@ -228,15 +214,15 @@ export function ConversationSidebar({
       </div>
       <nav
         aria-label="设置导航"
-        className="mx-3 shrink-0 border-t border-border py-3"
+        className="shrink-0 border-t border-border px-2 py-2"
       >
         <Link
           href="/app/settings"
           aria-current={isActive("/app/settings") ? "page" : undefined}
           onClick={onNavigate}
-          className={cn(linkClass(isActive("/app/settings")), "h-11")}
+          className={linkClass(isActive("/app/settings"))}
         >
-          <Settings size={17} /> 设置
+          <Settings size={16} strokeWidth={1.75} /> 设置
         </Link>
       </nav>
     </div>

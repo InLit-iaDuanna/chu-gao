@@ -35,7 +35,7 @@ import {
   type ChatContextManifest,
   type ChatContextStatus,
 } from "@/lib/chat-context-types";
-import { chatSystemInstructions } from "@/lib/chat-instructions";
+import { chatTurnInstructions } from "@/lib/chat-instructions";
 import {
   LUNA_MODEL_ID,
   SOL_MODEL_ID,
@@ -252,7 +252,12 @@ async function loadState(
             estimateMessageTokens([
               {
                 role: "system",
-                content: chatSystemInstructions(systemPrompt, search),
+                // Budget against what a turn really sends: the longer of the
+                // two search contracts, so neither variant overflows.
+                content: [
+                  chatTurnInstructions(systemPrompt, search),
+                  chatTurnInstructions(systemPrompt, search, true),
+                ].sort((a, b) => b.length - a.length)[0],
               },
             ]),
           ),

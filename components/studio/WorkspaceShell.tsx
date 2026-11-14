@@ -91,10 +91,17 @@ function pageTitle(pathname: string) {
   return "Chūgǎo Studio";
 }
 
-export function WorkspaceShell({ children }: { children: ReactNode }) {
+export function WorkspaceShell({
+  children,
+  studio,
+}: {
+  children: ReactNode;
+  /** Treat this route as the chat workspace (the dev preview mounts it elsewhere). */
+  studio?: boolean;
+}) {
   const pathname = usePathname();
   const router = useRouter();
-  const isStudio = pathname === "/app" || pathname === "/app/";
+  const isStudio = studio ?? (pathname === "/app" || pathname === "/app/");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [threads, setThreads] = useState<ConversationSummary[]>([]);
@@ -202,7 +209,7 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
         {sidebarOpen ? (
           <aside
             aria-label="对话侧栏"
-            className="hidden h-full w-56 shrink-0 border-r border-border md:block lg:w-60 xl:w-64"
+            className="hidden h-full w-60 shrink-0 border-r border-border md:block lg:w-64 xl:w-72"
           >
             {sidebar}
           </aside>

@@ -102,12 +102,12 @@ export function ReferenceThumbnails({
       {references.map((item, index) => (
         <div
           key={`${item.kind}:${item.key}`}
-          className="relative h-16 w-16 shrink-0 rounded-md border border-border-strong bg-surface-2"
+          className="relative h-16 w-16 shrink-0 rounded-lg bg-surface-2"
         >
           <img
             src={item.previewUrl}
             alt={`参考图 ${index + 1}`}
-            className="h-full w-full rounded-md object-contain"
+            className="h-full w-full rounded-lg object-cover"
           />
           <span
             aria-hidden="true"
@@ -121,9 +121,9 @@ export function ReferenceThumbnails({
             aria-label={`移除参考图 ${index + 1}`}
             title="移除参考图"
             onClick={() => onRemove(item.key)}
-            className="absolute -right-1 -top-1 h-7 w-7 border border-border-strong bg-surface p-0 text-foreground"
+            className="absolute -right-1.5 -top-1.5 h-5 w-5 rounded-full border border-border bg-surface p-0 text-foreground shadow-sm"
           >
-            <X size={14} />
+            <X size={11} />
           </IconButton>
         </div>
       ))}

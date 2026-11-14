@@ -44,16 +44,24 @@ export function TurnCredits({
     image?.chargedCredits !== undefined
       ? Number((chat.chargedCredits + image.chargedCredits).toFixed(6))
       : null;
+  // A turn without an image job has one number; do not spell out a zero
+  // image line and a total that repeats the chat line.
+  const imageApplies = image?.state !== "not_applicable";
   return (
     <p
       aria-label="本轮积分"
-      className="mt-3 flex min-w-0 flex-wrap gap-x-3 gap-y-1 text-xs leading-5 text-text-muted"
+      className="ml-auto flex min-w-0 flex-wrap justify-end gap-x-3 pl-3 text-[11px] leading-5 text-text-faint"
     >
       <span>聊天实际积分：{settlementLabel(chat)}</span>
-      <span>生图实际积分：{settlementLabel(image)}</span>
-      <span>
-        合计：{total === null ? "待结算" : `${creditNumber(total)} 积分`}
-      </span>
+      {imageApplies ? (
+        <>
+          <span>生图实际积分：{settlementLabel(image)}</span>
+          <span>
+            合计：
+            {total === null ? "待结算" : `${creditNumber(total)} 积分`}
+          </span>
+        </>
+      ) : null}
     </p>
   );
 }
@@ -120,54 +128,38 @@ export function ActivityTrail({
       : `已完成 · ${entries.length} 个步骤`;
 
   return (
-    <details aria-label="过程" className="group mb-4 min-w-0" open={active}>
+    <details aria-label="过程" className="group mb-3 min-w-0" open={active}>
       <summary
-        className="flex cursor-pointer list-none items-center gap-2 text-sm text-text-muted [&::-webkit-details-marker]:hidden"
-        aria-live={active ? "polite" : undefined}
+        className={cn(
+          "-mx-1.5 inline-flex max-w-full cursor-pointer list-none items-center gap-1.5 rounded-md px-1.5 py-0.5 text-sm leading-5 hover:bg-[rgb(var(--text)/0.05)] hover:text-foreground [&::-webkit-details-marker]:hidden",
+          active ? "text-foreground" : "text-text-muted",
+        )}
       >
-        <span
-          className={cn(
-            "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border",
-            active
-              ? "border-[rgb(var(--studio-highlight)/0.35)] text-[rgb(var(--studio-highlight))]"
-              : "border-border text-text-faint",
-          )}
-        >
-          {active ? (
-            <Loader2 size={12} className="animate-spin" />
-          ) : interrupted ? (
-            <CircleAlert size={12} />
-          ) : (
-            <Check size={12} />
-          )}
-        </span>
+        {interrupted ? <CircleAlert size={13} className="shrink-0" /> : null}
         <span className="min-w-0 truncate">{summary}</span>
         <ChevronDown
-          size={15}
+          size={14}
           className="shrink-0 transition-transform group-open:rotate-180"
           aria-hidden
         />
       </summary>
-      <ol className="mt-3 ml-2 min-w-0 space-y-2 border-l border-border pl-4">
+      <ol className="mt-2 min-w-0 space-y-1.5 rounded-lg border border-border px-3.5 py-3">
         {entries.map((activity, index) => {
           const isCurrent = active && index === lastIndex;
           return (
             <li
               key={`${activity}-${index}`}
               className={cn(
-                "flex min-w-0 items-center gap-2 text-xs leading-5",
-                isCurrent ? "text-text" : "text-text-muted",
+                "flex min-w-0 items-center gap-2.5 text-[13px] leading-5",
+                isCurrent ? "text-foreground" : "text-text-muted",
               )}
             >
               {isCurrent ? (
-                <Loader2 size={13} className="shrink-0 animate-spin" />
+                <Loader2 size={12} className="shrink-0 animate-spin" />
               ) : interrupted && index === lastIndex ? (
-                <CircleAlert size={13} className="shrink-0" />
+                <CircleAlert size={12} className="shrink-0" />
               ) : (
-                <Check
-                  size={13}
-                  className="shrink-0 text-[rgb(var(--studio-highlight))]"
-                />
+                <Check size={12} className="shrink-0" />
               )}
               <span className="min-w-0 break-words">
                 {isCurrent && statusOverride

@@ -57,20 +57,76 @@ const chatImageToolArgsSchema = z
 
 export type ChatImageToolArgs = z.infer<typeof chatImageToolArgsSchema>;
 
+const OPTIONAL_TOOL_ARGS = [
+  "modelId",
+  "size",
+  "quality",
+  "outputFormat",
+  "background",
+  "n",
+] as const;
+
+/**
+ * Parses the model's tool arguments.
+ *
+ * Only `prompt` can fail the call. The tool runs once per turn, so a bad
+ * optional value must not cost the user the whole image: models routinely
+ * send `null` for parameters they do not want to set, numbers as strings,
+ * or a size outside the enum. Those are dropped and reported in `ignored`;
+ * the user's current image settings apply instead. Failure messages name
+ * the cause so it is visible in the stored tool result.
+ */
 export function parseChatImageToolArgs(
   raw: string,
-): { ok: true; value: ChatImageToolArgs } | { ok: false; message: string } {
+):
+  | { ok: true; value: ChatImageToolArgs; ignored: string[] }
+  | { ok: false; message: string } {
+  let data: unknown;
   try {
-    const parsed = chatImageToolArgsSchema.safeParse(JSON.parse(raw));
-    return parsed.success
-      ? { ok: true, value: parsed.data }
-      : { ok: false, message: "生图工具参数不完整，请重新描述想生成的画面" };
+    data = JSON.parse(raw);
   } catch {
     return {
       ok: false,
       message: "生图工具参数格式异常，请重新描述想生成的画面",
     };
   }
+  if (!data || typeof data !== "object" || Array.isArray(data))
+    return {
+      ok: false,
+      message: "生图工具参数格式异常，请重新描述想生成的画面",
+    };
+  const record = data as Record<string, unknown>;
+  const prompt = typeof record.prompt === "string" ? record.prompt.trim() : "";
+  if (!prompt)
+    return {
+      ok: false,
+      message: "生图工具缺少画面描述，请重新描述想生成的画面",
+    };
+  if (prompt.length > 4_000)
+    return {
+      ok: false,
+      message: "画面描述超过 4000 字，请精简后重试",
+    };
+
+  const value: Record<string, unknown> = { prompt };
+  const ignored: string[] = [];
+  for (const key of OPTIONAL_TOOL_ARGS) {
+    let candidate = record[key];
+    if (candidate === undefined || candidate === null || candidate === "")
+      continue;
+    if (key === "n" && typeof candidate === "string" && /^\d+$/.test(candidate))
+      candidate = Number(candidate);
+    const field = chatImageToolArgsSchema.shape[key].safeParse(candidate);
+    if (field.success && field.data !== undefined) value[key] = field.data;
+    else ignored.push(key);
+  }
+  for (const key of Object.keys(record))
+    if (
+      key !== "prompt" &&
+      !(OPTIONAL_TOOL_ARGS as readonly string[]).includes(key)
+    )
+      ignored.push(key);
+  return { ok: true, value: value as ChatImageToolArgs, ignored };
 }
 
 export interface ChatImageToolContext {
@@ -301,6 +357,7 @@ export async function submitChatImageTool(
       status: result.status,
       estimatedCredits: result.estimatedCredits,
       modelId: parsed.value.modelId ?? context.imageModelId ?? "gpt-image-2",
+      ...(parsed.ignored.length ? { ignored: parsed.ignored } : {}),
     };
   } catch (error) {
     const publicError = publicSubmissionError(error);

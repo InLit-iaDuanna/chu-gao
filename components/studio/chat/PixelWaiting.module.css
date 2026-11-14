@@ -1,0 +1,329 @@
+/*
+ * Timing: every scene is an 8s loop and the stage shows one scene per loop,
+ * so a scene always starts from its first frame when it becomes visible.
+ */
+.stage {
+  --start: 0s;
+  position: relative;
+  width: 208px;
+  max-width: 100%;
+  height: 36px;
+  margin-bottom: 10px;
+  overflow: hidden;
+  color: rgb(var(--text-muted));
+  /* The ground: one row of pixels, every third one filled. */
+  background: repeating-linear-gradient(
+      to right,
+      rgb(var(--text-faint) / 0.45) 0 2px,
+      transparent 2px 6px
+    )
+    left bottom / 100% 2px no-repeat;
+}
+
+.stage[data-start="1"] {
+  --start: -8s;
+}
+
+.stage[data-start="2"] {
+  --start: -16s;
+}
+
+.scene {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  animation: scene 24s steps(1, end) infinite;
+}
+
+.chase {
+  animation-delay: var(--start);
+}
+
+.sneak {
+  animation-delay: calc(var(--start) + 8s);
+}
+
+.type {
+  animation-delay: calc(var(--start) + 16s);
+}
+
+@keyframes scene {
+  0% {
+    opacity: 1;
+  }
+  33.333% {
+    opacity: 0;
+  }
+}
+
+.actor {
+  position: absolute;
+  bottom: 2px;
+  left: 0;
+  display: block;
+}
+
+/* Frames are stacked; each one is visible for its slice of the cycle. */
+.sprite {
+  --cycle: 0.44s;
+  position: relative;
+  display: block;
+}
+
+.sprite svg {
+  display: block;
+  opacity: 0;
+  animation-duration: var(--cycle);
+  animation-timing-function: steps(1, end);
+  animation-iteration-count: infinite;
+  /* Negative delay: frame n owns the n-th slice of the cycle. */
+  animation-delay: calc(var(--cycle) * var(--slot, -1));
+}
+
+/* The first frame gives the sprite its size; the rest sit on top of it. */
+.sprite svg + svg {
+  position: absolute;
+  inset: 0;
+}
+
+.frame2:nth-child(2) {
+  --slot: -0.5;
+}
+
+.frame4:nth-child(2) {
+  --slot: -0.75;
+}
+
+.frame4:nth-child(3) {
+  --slot: -0.5;
+}
+
+.frame4:nth-child(4) {
+  --slot: -0.25;
+}
+
+.frame2 {
+  animation-name: frame-half;
+}
+
+.frame4 {
+  animation-name: frame-quarter;
+}
+
+@keyframes frame-half {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes frame-quarter {
+  0% {
+    opacity: 1;
+  }
+  25% {
+    opacity: 0;
+  }
+}
+
+/* Scene 1: chase right, chase back, meet, run off together. */
+.turn,
+.glance {
+  display: block;
+}
+
+.leader {
+  animation: leader 8s linear infinite;
+}
+
+.chaser {
+  animation: chaser 8s linear infinite;
+}
+
+.turn {
+  animation: turn 8s steps(1, end) infinite;
+}
+
+@keyframes leader {
+  0% {
+    transform: translateX(44px);
+  }
+  22% {
+    transform: translateX(176px);
+  }
+  44% {
+    transform: translateX(44px);
+  }
+  56% {
+    transform: translateX(60px);
+  }
+  100% {
+    transform: translateX(236px);
+  }
+}
+
+@keyframes chaser {
+  0% {
+    transform: translateX(2px);
+  }
+  22% {
+    transform: translateX(134px);
+  }
+  44% {
+    transform: translateX(2px);
+  }
+  47% {
+    transform: translateX(2px);
+  }
+  /* Catches up until the two hands can touch. */
+  56% {
+    transform: translateX(34px);
+  }
+  100% {
+    transform: translateX(210px);
+  }
+}
+
+@keyframes turn {
+  0% {
+    transform: scaleX(1);
+  }
+  22% {
+    transform: scaleX(-1);
+  }
+  44% {
+    transform: scaleX(1);
+  }
+}
+
+.link {
+  position: absolute;
+  bottom: 14px;
+  left: 18px;
+  width: 14px;
+  height: 2px;
+  background: currentColor;
+  opacity: 0;
+  animation: link 8s steps(1, end) infinite;
+}
+
+@keyframes link {
+  56% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* Scene 2: tiptoe across and back, stopping to look over the shoulder. */
+.sneak .sprite {
+  --cycle: 1.2s;
+}
+
+.sneaker {
+  animation: sneaker 8s linear infinite;
+}
+
+.glance {
+  animation: glance 8s steps(1, end) infinite;
+}
+
+@keyframes sneaker {
+  0% {
+    transform: translateX(14px);
+  }
+  18% {
+    transform: translateX(66px);
+  }
+  25% {
+    transform: translateX(66px);
+  }
+  43% {
+    transform: translateX(150px);
+  }
+  50% {
+    transform: translateX(150px);
+  }
+  68% {
+    transform: translateX(84px);
+  }
+  75% {
+    transform: translateX(84px);
+  }
+  94% {
+    transform: translateX(14px);
+  }
+  100% {
+    transform: translateX(14px);
+  }
+}
+
+@keyframes glance {
+  0% {
+    transform: scaleX(1);
+  }
+  19% {
+    transform: scaleX(-1);
+  }
+  24% {
+    transform: scaleX(1);
+  }
+  46% {
+    transform: scaleX(-1);
+  }
+  69% {
+    transform: scaleX(1);
+  }
+  74% {
+    transform: scaleX(-1);
+  }
+  96% {
+    transform: scaleX(1);
+  }
+}
+
+/* Scene 3: typing, with words coming out of the screen one at a time. */
+.type .sprite {
+  --cycle: 0.24s;
+}
+
+.typist {
+  transform: translateX(6px);
+}
+
+.words {
+  position: absolute;
+  bottom: 22px;
+  left: 58px;
+  display: flex;
+  gap: 4px;
+  color: rgb(var(--text));
+  animation: words 8s steps(10, end) infinite;
+}
+
+@keyframes words {
+  0% {
+    clip-path: inset(0 100% 0 0);
+  }
+  80% {
+    clip-path: inset(0 0 0 0);
+  }
+  100% {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene,
+  .scene * {
+    animation: none !important;
+  }
+
+  .type,
+  .type .sprite svg:first-child {
+    opacity: 1;
+  }
+}

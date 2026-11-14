@@ -1,8 +1,9 @@
 @import "tailwindcss";
 @import "../styles/tokens.css";
 @import "../styles/typography.css";
-@import "../styles/studio.css";
+/* studio.css overrides the surface defaults, so it has to come after them. */
 @import "../styles/surfaces.css";
+@import "../styles/studio.css";
 
 @source not "../.claude";
 @source not "../.codebuddy";

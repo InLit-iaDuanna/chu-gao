@@ -3,15 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
-import {
-  Coins,
-  LogOut,
-  Moon,
-  Shield,
-  Sun,
-  UserRound,
-  ChevronRight,
-} from "lucide-react";
+import { LogOut, Moon, Shield, Sun, UserRound } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 
 import {
@@ -54,7 +46,7 @@ function ThemeToggle() {
       aria-label={`切换到${nextTheme}主题`}
       title={`切换到${nextTheme}主题`}
       onClick={() => setTheme(isDark ? "light" : "dark")}
-      className="h-9 w-9 rounded-md border-transparent bg-transparent text-text-muted hover:bg-surface-2 hover:text-foreground focus-visible:ring-2 focus-visible:ring-foreground/40"
+      className="h-8 w-8 rounded-lg border-transparent bg-transparent text-text-muted hover:bg-surface-2 hover:text-foreground focus-visible:ring-2 focus-visible:ring-foreground/40"
     >
       {mounted && !isDark ? (
         <Sun size={16} strokeWidth={2.2} />
@@ -89,18 +81,11 @@ export function TopBar({ me, model, leading, title, actions }: TopBarProps) {
   };
 
   return (
-    <header className="flex h-16 shrink-0 items-center gap-2 border-b border-border/70 bg-background px-3 md:gap-3 md:px-6">
+    <header className="flex h-12 shrink-0 items-center gap-2 bg-background px-2 md:gap-2 md:px-3">
       {leading}
       {title !== undefined ? (
-        <div className="flex min-w-0 flex-1 items-center gap-2.5 text-[13px]">
-          <span className="hidden shrink-0 text-text-faint lg:block">
-            工作区
-          </span>
-          <ChevronRight
-            size={13}
-            className="hidden shrink-0 text-text-faint lg:block"
-          />
-          <span className="min-w-0 truncate font-medium" title={title}>
+        <div className="flex min-w-0 flex-1 items-center text-sm">
+          <span className="min-w-0 truncate px-1 text-text-muted" title={title}>
             {title}
           </span>
         </div>
@@ -132,7 +117,7 @@ export function TopBar({ me, model, leading, title, actions }: TopBarProps) {
       <div className="ml-auto flex shrink-0 items-center gap-1.5">
         {actions}
         <span
-          className={`mr-1 flex h-8 min-w-14 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-md border border-border bg-surface px-2.5 text-xs font-medium text-foreground ${me ? "" : "invisible"}`}
+          className={`mr-1 flex h-8 min-w-14 shrink-0 items-center justify-center gap-2 whitespace-nowrap px-2 text-xs text-foreground ${me ? "" : "invisible"}`}
           title={
             me ? `今日已用 ${me.dailyUsed}/${me.dailyLimit} 次` : undefined
           }
@@ -140,10 +125,9 @@ export function TopBar({ me, model, leading, title, actions }: TopBarProps) {
         >
           {me ? (
             <>
-              <Coins size={13} className="shrink-0 text-warning" />
               <span
                 key={me.credits}
-                className="pulse-once inline-block shrink-0 tabular-nums"
+                className="pulse-once inline-block shrink-0 text-[13px] tabular-nums"
               >
                 {me.credits}
               </span>
@@ -164,7 +148,7 @@ export function TopBar({ me, model, leading, title, actions }: TopBarProps) {
               type="button"
               aria-label="账户菜单"
               title="账户菜单"
-              className="ml-1 h-8 w-8 rounded-full border-border bg-surface-2 text-foreground hover:bg-surface-3 focus-visible:ring-2 focus-visible:ring-foreground/40"
+              className="ml-1 h-8 w-8 rounded-full border-transparent bg-foreground text-background hover:bg-foreground/85 focus-visible:ring-2 focus-visible:ring-foreground/40"
             >
               {me ? (
                 <span className="text-xs font-semibold">

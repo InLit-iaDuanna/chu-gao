@@ -28,9 +28,10 @@ import {
 } from "@/lib/chat-runtime-config";
 import { getConversationSystemPrompt } from "@/lib/ai-config";
 import {
-  chatSystemInstructions,
   chatTimeInstruction,
+  chatTurnInstructions,
 } from "@/lib/chat-instructions";
+import { CHAT_SEARCH_TOOL } from "@/lib/chat-search-tool";
 import {
   LUNA_MODEL_ID,
   SOL_MODEL_ID,
@@ -463,11 +464,10 @@ export async function createChatTurn(
       );
     }
   }
-  const instructions = chatSystemInstructions(
+  const instructions = chatTurnInstructions(
     await getConversationSystemPrompt(),
     input.webSearch,
-    false,
-    true,
+    config.searchTool,
   );
   const runtimeTime = chatTimeInstruction();
   const effort = input.reasoningEffort ?? config.efforts[0] ?? null;
@@ -481,7 +481,10 @@ export async function createChatTurn(
         effort: effort as ReasoningEffort,
         maxOutputTokens: tokenPricing.maxOutputTokens,
         includeUsage: true,
-        tools: [CHAT_IMAGE_TOOL],
+        tools:
+          config.searchTool && input.webSearch
+            ? [CHAT_IMAGE_TOOL, CHAT_SEARCH_TOOL]
+            : [CHAT_IMAGE_TOOL],
       });
     const prepared = await prepareChatContext({
       userId,

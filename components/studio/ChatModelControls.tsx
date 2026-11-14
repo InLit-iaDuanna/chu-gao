@@ -94,7 +94,7 @@ export function ChatModelControls({
 
   return (
     <div
-      className="col-start-2 row-start-1 min-w-0 flex-1"
+      className="studio-model-container min-w-0 flex-1"
       aria-label="聊天模型设置"
     >
       <Popover
@@ -113,7 +113,7 @@ export function ChatModelControls({
                 : "聊天模型未就绪"
             }
             title="选择模型与思考强度"
-            className="studio-model-trigger smooth-surface relative h-9 max-w-full min-w-0 gap-1.5 rounded-lg border-transparent bg-surface-2 px-3.5 text-[13px] font-normal text-foreground hover:bg-surface-3"
+            className="studio-model-trigger smooth-surface relative h-9 max-w-full min-w-0 gap-1.5 rounded-lg border-transparent bg-transparent px-2 text-[13px] font-normal text-foreground hover:bg-surface-3"
           >
             <span className="min-w-0 truncate">
               {model?.displayName ?? "选择模型"}
@@ -132,7 +132,7 @@ export function ChatModelControls({
           sideOffset={12}
           collisionPadding={12}
           aria-label="模型与思考强度"
-          className="studio-workspace studio-model-controls w-[min(288px,calc(100vw-24px))] max-w-[calc(100vw-24px)] overflow-hidden rounded-2xl border-border-strong/60 bg-surface p-3 shadow-[0_8px_32px_-12px_rgb(0_0_0/0.25)]"
+          className="studio-workspace studio-model-controls w-[min(288px,calc(100vw-24px))] max-w-[calc(100vw-24px)] overflow-hidden rounded-xl border-border bg-surface p-4 shadow-[0_12px_32px_-24px_rgb(0_0_0/0.3)]"
         >
           {showModels ? (
             <div className="space-y-2">
@@ -144,7 +144,7 @@ export function ChatModelControls({
                     aria-label="返回思考强度"
                     title="返回思考强度"
                     onClick={() => setChoosingModel(false)}
-                    className="h-9 w-9 rounded-full"
+                    className="h-9 w-9"
                   >
                     <ArrowLeft size={16} />
                   </IconButton>
@@ -195,7 +195,7 @@ export function ChatModelControls({
                 </span>
                 <div className="min-w-0 text-center">
                   <p
-                    className="text-base font-medium leading-6 text-[#3b82f6]"
+                    className="text-base font-light leading-6 tracking-[0.04em] text-foreground"
                     aria-live="polite"
                   >
                     {REASONING_LABELS[selectedEffort]}
@@ -221,32 +221,32 @@ export function ChatModelControls({
                   onClick={() => {
                     if (defaultEffort) onReasoningEffortChange(defaultEffort);
                   }}
-                  className="h-9 w-9 rounded-full border-transparent bg-transparent text-text-faint hover:bg-surface-2 hover:text-foreground"
+                  className="h-9 w-9 border-transparent bg-transparent text-text-faint hover:bg-surface-2 hover:text-foreground"
                 >
                   <RotateCcw size={16} strokeWidth={1.7} />
                 </IconButton>
               </div>
               <div className={cn("relative h-11", disabled && "opacity-50")}>
-                <div className="pointer-events-none absolute inset-x-0 top-2 h-7 overflow-hidden rounded-full border border-border-strong/50 bg-surface-3">
+                <div className="pointer-events-none absolute inset-x-0 top-[21px] h-[2px] bg-border">
                   <div
-                    className="h-full rounded-l-full bg-[#3b82f6]"
+                    className="h-full bg-foreground"
                     style={{
-                      width: `calc(${progress * 100}% + ${16 - progress * 32}px)`,
+                      width: `calc(${progress * 100}% + ${8 - progress * 16}px)`,
                     }}
                   />
                 </div>
                 <div
-                  className="pointer-events-none absolute inset-x-4 inset-y-0 flex items-center justify-between"
+                  className="pointer-events-none absolute inset-x-[6px] inset-y-0 flex items-center justify-between"
                   aria-hidden="true"
                 >
                   {efforts.map((effort, index) => (
                     <span
                       key={effort}
                       className={cn(
-                        "h-1.5 w-1.5 rounded-full",
+                        "h-1 w-1",
                         index <= selectedIndex
-                          ? "bg-white/50"
-                          : "bg-text-faint/70",
+                          ? "bg-foreground"
+                          : "bg-border-strong",
                       )}
                     />
                   ))}

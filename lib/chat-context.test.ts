@@ -48,7 +48,7 @@ import {
   MAX_SUMMARY_INPUT_TOKENS,
   summaryInputTokens,
 } from "@/lib/chat-context-summary";
-import { chatSystemInstructions } from "@/lib/chat-instructions";
+import { chatTurnInstructions } from "@/lib/chat-instructions";
 import type { ChatReference } from "@/lib/chat-references-types";
 import type { UpstreamChatMessage } from "@/lib/chat-upstream";
 
@@ -278,16 +278,19 @@ describe("durable server-owned context", () => {
   it("includes assembled instructions in the estimate and rejects an oversized current message before summary", async () => {
     histories.set(key(), history(0));
     const systemTokens = Math.max(
-      ...[false, true].map((search) =>
-        estimateMessageTokens([
-          {
-            role: "system",
-            content: chatSystemInstructions(
-              "Server-owned system prompt",
-              search,
-            ),
-          },
-        ]),
+      ...[false, true].flatMap((search) =>
+        [false, true].map((asTool) =>
+          estimateMessageTokens([
+            {
+              role: "system",
+              content: chatTurnInstructions(
+                "Server-owned system prompt",
+                search,
+                asTool,
+              ),
+            },
+          ]),
+        ),
       ),
     );
     expect(

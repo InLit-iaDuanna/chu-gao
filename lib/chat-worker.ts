@@ -42,8 +42,15 @@ import {
   CHAT_IMAGE_TOOL,
   CHAT_IMAGE_RESPONSES_TOOL,
   CHAT_IMAGE_TOOL_NAME,
+  chatImageToolOutput,
 } from "@/lib/chat-image-tool-definition";
 import { submitChatImageTool } from "@/lib/chat-image-tool";
+import {
+  CHAT_SEARCH_LIMIT,
+  CHAT_SEARCH_TOOL,
+  CHAT_SEARCH_TOOL_NAME,
+  runChatSearchTool,
+} from "@/lib/chat-search-tool";
 import {
   chatInputTokenUpperBound,
   chatModelCallUsage,
@@ -173,6 +180,8 @@ export async function executeChatAttempt(
   }> = [];
   const handledToolCalls = new Set<string>();
   let imageToolCalls = 0;
+  // Web search for models whose provider has no search of its own (Opus).
+  let searchToolCalls = 0;
   let requestedInputTokens = 0;
   let requestCount = 0;
   const startedAt = Date.now();
@@ -399,6 +408,46 @@ export async function executeChatAttempt(
     const promptCacheKey = createHash("sha256")
       .update(JSON.stringify(["chat-cache-v1", turn.userId, snapshot.model]))
       .digest("hex");
+    // The image tool is spent after one call; search keeps its own budget so
+    // the model can look a second thing up before it answers.
+    const chatTools = () => {
+      const tools: unknown[] = [];
+      if (!handledToolCalls.size) tools.push(CHAT_IMAGE_TOOL);
+      if (config.searchTool && input.webSearch && searchToolCalls < CHAT_SEARCH_LIMIT)
+        tools.push(CHAT_SEARCH_TOOL);
+      return tools;
+    };
+    // Search is our own tool: the relay has no usable search of its own, so we
+    // run it here and hand the model a digest plus its sources.
+    const runSearch = async (argumentsJson: string) => {
+      let query = "";
+      try {
+        const parsed: unknown = JSON.parse(argumentsJson);
+        const value =
+          typeof parsed === "object" && parsed !== null
+            ? (parsed as Record<string, unknown>).query
+            : undefined;
+        if (typeof value === "string") query = value;
+      } catch {
+        /* an unreadable call is reported below */
+      }
+      if (searchToolCalls >= CHAT_SEARCH_LIMIT)
+        return `[联网检索结果] 本轮已经检索了 ${CHAT_SEARCH_LIMIT} 次，不再检索。用已有资料回答，或说明还缺什么。`;
+      searchToolCalls += 1;
+      state.activity = "searching";
+      await flush(true);
+      const outcome = await runChatSearchTool(query, {
+        baseUrl: String(snapshot.baseUrl),
+        apiKey,
+        model: String(snapshot.model),
+        signal: abort.signal,
+      });
+      for (const source of outcome.sources)
+        if (!state.sources.some((known) => known.url === source.url))
+          state.sources.push(source);
+      if (outcome.ok) state.searched = true;
+      return outcome.output;
+    };
     const buildRequest = (messages: UpstreamChatMessage[]) =>
       responses
         ? responsesRequestBody(
@@ -437,9 +486,9 @@ export async function executeChatAttempt(
                   effort: snapshot.effort as ReasoningEffort,
                   maxOutputTokens: requestOutputTokens,
                   includeUsage: true,
-                  tools: handledToolCalls.size ? [] : [CHAT_IMAGE_TOOL],
+                  tools: chatTools(),
                 }
-              : { tools: handledToolCalls.size ? [] : [CHAT_IMAGE_TOOL] },
+              : { tools: chatTools() },
           );
     type PreparedContext = Awaited<ReturnType<typeof prepareChatContext>> & {
       manifest?: unknown;
@@ -653,6 +702,17 @@ export async function executeChatAttempt(
                 Array.isArray(value.choices) ? value.choices[0] : null,
               );
               const delta = record(choice.delta);
+              // Chat Completions relays stream thinking as `reasoning_content`
+              // (some use `reasoning`). The text is not stored, but the user
+              // should see "thinking" instead of an unexplained wait.
+              if (
+                (typeof delta.reasoning_content === "string" &&
+                  delta.reasoning_content) ||
+                (typeof delta.reasoning === "string" && delta.reasoning)
+              ) {
+                if (state.activity !== "answering")
+                  state.activity = "reasoning";
+              }
               if (typeof delta.content === "string")
                 state.consume({
                   type: "response.output_text.delta",
@@ -766,41 +826,49 @@ export async function executeChatAttempt(
           })),
           ...chatToolCalls,
         ];
-        if (handledToolCalls.size)
+        // A search round is allowed to continue; anything else is one-shot.
+        const searchOnly = calls.every(
+          (toolCall) => toolCall.name === CHAT_SEARCH_TOOL_NAME,
+        );
+        if (
+          handledToolCalls.size &&
+          !(searchOnly && searchToolCalls < CHAT_SEARCH_LIMIT)
+        )
           throw new Error("unexpected_tool_call_after_continuation");
         for (const toolCall of calls) {
-          let toolResult:
-            | Awaited<ReturnType<typeof submitChatImageTool>>
-            | {
-                ok: false;
-                code: string;
-                message: string;
-              };
+          const name = toolCall?.name || CHAT_IMAGE_TOOL_NAME;
+          const callId =
+            toolCall?.id || `tool-${attemptId}-${handledToolCalls.size + 1}`;
+          let output: string;
           if (!toolCall.id || !toolCall.name || !toolCall.arguments) {
-            toolResult = {
+            output =
+              "[工具调用不完整] 这次调用缺少参数，没有执行。要生图就重新完整描述画面，要联网就重新给出检索词。";
+            state.recordToolResult(callId, name, {
               ok: false,
-              code: "INVALID_TOOL_CALL",
-              message: "生图工具调用不完整，请重新描述图片需求",
-            };
+              message: "工具调用不完整",
+            });
+          } else if (toolCall.name === CHAT_SEARCH_TOOL_NAME) {
+            output = await runSearch(toolCall.arguments);
           } else if (
             imageToolCalls >= 1 ||
             toolCall.name !== CHAT_IMAGE_TOOL_NAME
           ) {
-            toolResult = {
+            output =
+              "[工具未执行] 本轮只支持一次生图调用，请把多个要求合并后再试。";
+            state.recordToolResult(callId, name, {
               ok: false,
-              code: "UNSUPPORTED_TOOL_CALL",
-              message: "本轮只支持一次生图调用，请把多个要求合并后再试",
-            };
+              message: "本轮只支持一次生图调用",
+            });
           } else {
             imageToolCalls++;
             state.activity = "image_generating";
             await flush(true);
-            toolResult = await submitChatImageTool(toolCall.arguments, {
+            const toolResult = await submitChatImageTool(toolCall.arguments, {
               userId: turn.userId,
               conversationId: turn.conversationId,
               turnId: turn.id,
               attemptId,
-              callId: toolCall.id || `image-${attemptId}-${imageToolCalls}`,
+              callId,
               imageModelId: input.imageModelId,
               imageSize: input.imageSize,
               imageQuality: input.imageQuality,
@@ -810,39 +878,39 @@ export async function executeChatAttempt(
               sourceImageIds: input.sourceImageIds,
               references: input.references,
             });
+            if (toolResult.ok) {
+              const linked = await db.$transaction(async (tx) => {
+                const updated = await tx.conversationMessage.updateMany({
+                  where: {
+                    chatAttemptId: attemptId,
+                    role: "ASSISTANT",
+                  },
+                  data: { generationId: toolResult.generationId },
+                });
+                if (!updated.count) return false;
+                return appendActiveChatEvent(tx, {
+                  turnId: turn.id,
+                  attemptId,
+                  executionToken,
+                  type: "generation.created",
+                  payload: {
+                    generationId: toolResult.generationId,
+                    status: toolResult.status,
+                    modelId: toolResult.modelId,
+                  },
+                });
+              });
+              if (!linked) throw new Error("attempt_no_longer_active");
+            }
+            state.recordToolResult(callId, CHAT_IMAGE_TOOL_NAME, toolResult);
+            // The model gets a receipt with a next step, not the raw result.
+            output = chatImageToolOutput(toolResult);
           }
-          const callId = toolCall?.id || `image-${attemptId}-${imageToolCalls}`;
           handledToolCalls.add(callId);
-          if (toolResult.ok) {
-            const linked = await db.$transaction(async (tx) => {
-              const updated = await tx.conversationMessage.updateMany({
-                where: {
-                  chatAttemptId: attemptId,
-                  role: "ASSISTANT",
-                },
-                data: { generationId: toolResult.generationId },
-              });
-              if (!updated.count) return false;
-              return appendActiveChatEvent(tx, {
-                turnId: turn.id,
-                attemptId,
-                executionToken,
-                type: "generation.created",
-                payload: {
-                  generationId: toolResult.generationId,
-                  status: toolResult.status,
-                  modelId: toolResult.modelId,
-                },
-              });
-            });
-            if (!linked) throw new Error("attempt_no_longer_active");
-          }
-          state.recordToolResult(callId, CHAT_IMAGE_TOOL_NAME, toolResult);
-          const output = JSON.stringify(toolResult);
           if (responses) {
             responseToolContinuations.push({
               callId,
-              name: toolCall?.name || CHAT_IMAGE_TOOL_NAME,
+              name,
               arguments: toolCall?.arguments || "{}",
               output,
             });
@@ -855,7 +923,7 @@ export async function executeChatAttempt(
                   id: callId,
                   type: "function",
                   function: {
-                    name: toolCall?.name || CHAT_IMAGE_TOOL_NAME,
+                    name,
                     arguments: toolCall?.arguments || "{}",
                   },
                 },
@@ -864,7 +932,7 @@ export async function executeChatAttempt(
             toolMessages.push({
               role: "tool",
               tool_call_id: callId,
-              name: CHAT_IMAGE_TOOL_NAME,
+              name,
               content: output,
             });
           }

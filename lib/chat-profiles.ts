@@ -27,7 +27,9 @@ async function getOpusProfile() {
     transport: "chat_completions_sse" as const,
     efforts: REASONING_EFFORTS as readonly string[],
     vision: true,
-    webSearch: false,
+    // The relay has no search of its own; the application runs web_search.
+    webSearch: true,
+    searchTool: true,
   };
 }
 
@@ -44,6 +46,7 @@ export async function getChatProfile(modelId: string) {
       efforts: REASONING_EFFORTS as readonly string[],
       vision: true,
       webSearch: true,
+      searchTool: false,
     };
   if (modelId === LUNA_MODEL_ID)
     return {
@@ -52,6 +55,7 @@ export async function getChatProfile(modelId: string) {
       efforts: REASONING_EFFORTS as readonly string[],
       vision: true,
       webSearch: true,
+      searchTool: false,
     };
   throw new Error("Unknown conversation model");
 }

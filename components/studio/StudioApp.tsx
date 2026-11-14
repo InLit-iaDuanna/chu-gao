@@ -58,7 +58,7 @@ import { Lightbox, type LightboxState } from "./Lightbox";
 import { TopBar } from "./TopBar";
 import { CreationStarters } from "./CreationStarters";
 import { ChatContextControl } from "./ChatContextControl";
-import { StudioGreeting } from "./StudioGreeting";
+import { StudioGreeting, StudioStarters } from "./StudioGreeting";
 import {
   useWorkspaceNavigation,
   WorkspaceSidebarToggle,
@@ -2116,7 +2116,7 @@ export function StudioApp({
                       aria-label="对话操作"
                       title="对话操作"
                       disabled={locked}
-                      className="h-9 w-9 rounded-full text-text-muted"
+                      className="h-9 w-9 text-text-muted"
                     >
                       <MoreHorizontal size={18} />
                     </IconButton>
@@ -2217,9 +2217,9 @@ export function StudioApp({
             </div>
           ) : empty ? (
             <>
-              <div aria-hidden className="min-h-5 flex-[0.6] sm:min-h-6" />
-              <div className="shrink-0 px-4 pb-7 md:px-6 lg:px-8">
-                <div className="mx-auto w-full max-w-[52rem]">
+              <div aria-hidden className="min-h-5 flex-[0.75] sm:min-h-6" />
+              <div className="shrink-0 px-4 pb-8 md:px-6 lg:px-8">
+                <div className="mx-auto w-full max-w-[46rem]">
                   {mode === "chat" ? (
                     <StudioGreeting />
                   ) : (
@@ -2257,7 +2257,7 @@ export function StudioApp({
               mode === "agent" && "pt-2",
             )}
           >
-            <div className={cn("mx-auto w-full", "max-w-[52rem]")}>
+            <div className={cn("mx-auto w-full", "max-w-[46rem]")}>
               {sendError ? (
                 <p
                   role="alert"
@@ -2477,6 +2477,16 @@ export function StudioApp({
                     : undefined
                 }
               />
+              {empty && mode === "chat" ? (
+                <StudioStarters
+                  disabled={locked}
+                  onPick={(text) => {
+                    externalDraft.current = true;
+                    setPrompt(text);
+                    setFocusVersion((value) => value + 1);
+                  }}
+                />
+              ) : null}
             </div>
           </div>
           {empty && mode === "image" ? (

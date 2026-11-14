@@ -288,6 +288,45 @@ describe("chat worker boundaries", () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
+  it("shows Chat Completions thinking as the reasoning activity without storing it", async () => {
+    await opus();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        sseResponse(
+          event({
+            choices: [
+              {
+                delta: { reasoning_content: "secret plan" },
+                finish_reason: null,
+              },
+            ],
+          }) +
+            event({
+              choices: [{ delta: { content: "answer" }, finish_reason: null }],
+            }) +
+            event({
+              // A late thinking chunk must not pull the status back.
+              choices: [
+                { delta: { reasoning_content: "more" }, finish_reason: "stop" },
+              ],
+            }) +
+            "data: [DONE]\n\n",
+        ),
+      ),
+    );
+    await executeChatAttempt("attempt-a", new AbortController());
+    const finished = mocks.finish.mock.calls[0][0];
+    expect(finished).toMatchObject({ status: "completed", text: "answer" });
+    const history = finished.parts.activityHistory as string[];
+    expect(history).toContain("reasoning");
+    expect(history.indexOf("reasoning")).toBeLessThan(
+      history.indexOf("answering"),
+    );
+    expect(history.at(-1)).toBe("answering");
+    expect(JSON.stringify(finished)).not.toContain("secret plan");
+  });
+
   it("executes one image tool call and resumes the same chat turn with its result", async () => {
     vi.stubGlobal(
       "fetch",
@@ -514,6 +553,130 @@ describe("chat worker boundaries", () => {
         ],
       },
     });
+  });
+
+  it("runs the model's web_search and keeps the sources on the reply", async () => {
+    await imageOpus();
+    const attempt = await mocks.findAttempt();
+    attempt.turn.input = { ...attempt.turn.input, webSearch: true } as never;
+    mocks.findAttempt.mockResolvedValue(attempt);
+    mocks.profile.mockResolvedValue({
+      enabled: true,
+      apiKey: "fixture-key",
+      baseUrl: "https://upstream.invalid",
+      model: OPUS_MODEL_ID,
+      webSearch: true,
+      searchTool: true,
+    } as never);
+    const searchDelta = {
+      choices: [
+        {
+          delta: {
+            tool_calls: [
+              {
+                index: 0,
+                id: "search-call",
+                type: "function",
+                function: {
+                  name: "web_search",
+                  arguments: '{"query":"openai devday"}',
+                },
+              },
+            ],
+          },
+          finish_reason: "tool_calls",
+        },
+      ],
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          sseResponse(
+            event(searchDelta) +
+              event({
+                choices: [],
+                usage: { prompt_tokens: 200, completion_tokens: 9 },
+              }) +
+              "data: [DONE]\n\n",
+          ),
+        )
+        // the relay's /v1/messages answer
+        .mockResolvedValueOnce(
+          Response.json({
+            content: [
+              {
+                type: "web_search_tool_result",
+                content: [
+                  {
+                    type: "web_search_result",
+                    title: "DevDay 2026 recap",
+                    url: "https://openai.com/index/devday-2026-recap/",
+                  },
+                ],
+              },
+              { type: "text", text: "Announced dots and Agents API." },
+            ],
+          }),
+        )
+        .mockResolvedValueOnce(
+          sseResponse(
+            event({
+              choices: [
+                {
+                  delta: { content: "他们发布了 dots 和 Agents API。" },
+                  finish_reason: "stop",
+                },
+              ],
+            }) +
+              event({
+                choices: [],
+                usage: { prompt_tokens: 260, completion_tokens: 12 },
+              }) +
+              "data: [DONE]\n\n",
+          ),
+        ),
+    );
+    await executeChatAttempt("attempt-a", new AbortController());
+    expect(fetch).toHaveBeenCalledTimes(3);
+    // The search went to the relay's Messages API, with the model's own query.
+    const [searchUrl, searchInit] = vi.mocked(fetch).mock.calls[1];
+    expect(String(searchUrl)).toBe("https://upstream.invalid/v1/messages");
+    expect(JSON.parse(String(searchInit?.body)).messages[0].content).toBe(
+      "openai devday",
+    );
+    // Search stays available for a second look, unlike the one-shot image tool.
+    const resumed = JSON.parse(
+      vi.mocked(fetch).mock.calls[2][1]!.body as string,
+    );
+    expect(
+      resumed.tools.map((tool: { function: { name: string } }) => tool.function.name),
+    ).toEqual(["web_search"]);
+    expect(resumed.messages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          role: "tool",
+          name: "web_search",
+          content: expect.stringContaining(
+            "https://openai.com/index/devday-2026-recap/",
+          ),
+        }),
+      ]),
+    );
+    const finished = mocks.finish.mock.calls.at(-1)?.[0];
+    expect(finished).toMatchObject({
+      status: "completed",
+      text: "他们发布了 dots 和 Agents API。",
+      sources: [
+        {
+          url: "https://openai.com/index/devday-2026-recap/",
+          title: "DevDay 2026 recap",
+        },
+      ],
+    });
+    const history = finished.parts.activityHistory as string[];
+    expect(history).toContain("searching");
   });
 
   it("never submits an image from a truncated tool call without its completion marker", async () => {
