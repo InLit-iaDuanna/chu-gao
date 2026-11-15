@@ -498,7 +498,11 @@ def generation_body(args: argparse.Namespace, models: list[dict], reference_coun
 
 
 def local_references(paths: list[str]) -> list[tuple[bytes, str, str]]:
-    references = []
+    return [reference_content(spec) for spec in reference_specs(paths)]
+
+
+def reference_specs(paths: list[str]) -> list[dict[str, str | int]]:
+    specs = []
     for index, name in enumerate(paths, start=1):
         path = Path(name).expanduser()
         if not path.is_file():
@@ -506,14 +510,46 @@ def local_references(paths: list[str]) -> list[tuple[bytes, str, str]]:
         mime, _ = mimetypes.guess_type(path.name)
         if mime is None or not mime.startswith("image/"):
             raise CliError(f"Reference {index} needs a recognized image file extension.")
-        content = path.read_bytes()
-        if not content:
+        size = path.stat().st_size
+        if not size:
             raise CliError(f"Reference {index} is empty.")
         extension = path.suffix.lower()
         if re.fullmatch(r"\.[a-z0-9]{1,10}", extension) is None:
             extension = ".img"
-        references.append((content, mime, f"reference-{index}{extension}"))
-    return references
+        specs.append({
+            "path": str(path.resolve()),
+            "mime": mime,
+            "filename": f"reference-{index}{extension}",
+            "sizeBytes": size,
+        })
+    return specs
+
+
+def reference_content(spec: dict[str, Any]) -> tuple[bytes, str, str]:
+    path = Path(spec["path"])
+    try:
+        content = path.read_bytes()
+    except OSError:
+        raise CliError("A saved reference file is no longer readable.") from None
+    if not content:
+        raise CliError("A saved reference file is empty.")
+    digest = hashlib.sha256(content).hexdigest()
+    expected = spec.get("sha256")
+    if expected and digest != expected:
+        raise CliError("A saved reference file changed; start a new generation.")
+    return content, str(spec["mime"]), str(spec["filename"])
+
+
+def freeze_reference_specs(specs: list[dict[str, str | int]]) -> list[dict[str, str | int]]:
+    frozen = []
+    for spec in specs:
+        content, _, _ = reference_content(spec)
+        frozen.append({
+            **spec,
+            "sizeBytes": len(content),
+            "sha256": hashlib.sha256(content).hexdigest(),
+        })
+    return frozen
 
 
 def upload_reference(session: Session, reference: tuple[bytes, str, str], account_id: str) -> str:
@@ -600,11 +636,26 @@ def read_operation(path: Path, origin: str) -> dict:
             or type(body.get("n")) is not int or body["n"] != 1
             or not nonempty_string(state.get("accountId"))
             or not isinstance(state.get("outputDir"), str) or not Path(state["outputDir"]).is_absolute()
-            or state.get("status") not in STATUSES | {"PREPARED"}
+            or state.get("status") not in STATUSES | {"PREPARED", "UPLOADING"}
             or not isinstance(state.get("images"), list)
             or (state.get("generationId") is not None and not nonempty_string(state["generationId"]))
             or not isinstance(body.get("referenceImageKeys", []), list)
             or any(not nonempty_string(key) for key in body.get("referenceImageKeys", []))
+            or not isinstance(state.get("referenceFiles", []), list)
+            or not isinstance(state.get("uploadedReferenceKeys", []), list)
+            or any(
+                not isinstance(item, dict)
+                or not nonempty_string(item.get("path"))
+                or not nonempty_string(item.get("mime"))
+                or not nonempty_string(item.get("filename"))
+                or not nonempty_string(item.get("sha256"))
+                for item in state.get("referenceFiles", [])
+            )
+            or any(
+                not nonempty_string(key)
+                for key in state.get("uploadedReferenceKeys", [])
+            )
+            or len(state.get("uploadedReferenceKeys", [])) > len(state.get("referenceFiles", []))
             or any(not isinstance(body[key], str) for key in ("size", "quality", "background", "outputFormat") if key in body)
             or hashlib.sha256(canonical_json(body)).hexdigest() != state.get("requestSha256")
         ):
@@ -612,6 +663,33 @@ def read_operation(path: Path, origin: str) -> dict:
     except (KeyError, ValueError, TypeError, AttributeError):
         raise CliError("The saved operation is invalid or its frozen request was changed.") from None
     return state
+
+
+def prepare_references(session: Session, path: Path, state: dict) -> None:
+    reference_files = state.get("referenceFiles", [])
+    uploaded = list(state.get("uploadedReferenceKeys", []))
+    if not reference_files:
+        state["requestSha256"] = hashlib.sha256(
+            canonical_json(state["requestBody"])
+        ).hexdigest()
+        state["status"] = "PREPARED"
+        atomic_json(path, state)
+        return
+
+    state["status"] = "UPLOADING"
+    atomic_json(path, state)
+    for index in range(len(uploaded), len(reference_files)):
+        reference = reference_content(reference_files[index])
+        uploaded.append(upload_reference(session, reference, state["accountId"]))
+        state["uploadedReferenceKeys"] = uploaded
+        atomic_json(path, state)
+
+    state["requestBody"]["referenceImageKeys"] = uploaded
+    state["requestSha256"] = hashlib.sha256(
+        canonical_json(state["requestBody"])
+    ).hexdigest()
+    state["status"] = "PREPARED"
+    atomic_json(path, state)
 
 
 def numeric_field(target: dict, source: dict, key: str) -> None:
@@ -731,6 +809,7 @@ def run_operation(session: Session, path: Path, args: argparse.Namespace) -> dic
         with OperationLock(path):
             state = read_operation(path, session.client.origin)
             if state["generationId"] is None:
+                prepare_references(session, path, state)
                 submit_operation(session, path, state)
             if args.no_wait:
                 return operation_summary(path, state)
@@ -772,13 +851,11 @@ def generate(session: Session, args: argparse.Namespace) -> dict:
         raise CliError("The prompt must not be empty.")
     if args.n != 1:
         raise CliError("This CLI supports n=1 only.")
-    references = local_references(args.reference)
+    references = freeze_reference_specs(reference_specs(args.reference))
     account = session.me()
     body = generation_body(args, live_models(session, account["id"]), len(references))
     output = Path(args.output_dir).expanduser().resolve()
     output.mkdir(parents=True, exist_ok=True)
-    if references:
-        body["referenceImageKeys"] = [upload_reference(session, item, account["id"]) for item in references]
     operation_id = str(uuid.uuid4())
     path = session.store.directory / "operations" / f"{operation_id}.json"
     state = {
@@ -786,6 +863,7 @@ def generate(session: Session, args: argparse.Namespace) -> dict:
         "accountId": account["id"], "requestBody": body,
         "requestSha256": hashlib.sha256(canonical_json(body)).hexdigest(),
         "generationId": None, "status": "PREPARED", "outputDir": str(output), "images": [],
+        "referenceFiles": references, "uploadedReferenceKeys": [],
     }
     # This durable, private record is the only source for every submission/replay.
     atomic_json(path, state)

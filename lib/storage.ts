@@ -102,18 +102,26 @@ function hostMatchesAllowlist(hostname: string, entry: string): boolean {
 
 function isPrivateIpv4(value: string): boolean {
   const parts = value.split(".").map((part) => Number(part));
-  const [first, second] = parts;
+  const [first, second, third] = parts;
 
   if (parts.length !== 4 || first === undefined || second === undefined) {
     return false;
   }
 
   return (
+    first === 0 ||
     first === 10 ||
     first === 127 ||
     (first === 169 && second === 254) ||
     (first === 172 && second >= 16 && second <= 31) ||
-    (first === 192 && second === 168)
+    (first === 192 && second === 0 && third === 0) ||
+    (first === 192 && second === 0 && third === 2) ||
+    (first === 192 && second === 168) ||
+    (first === 198 && (second === 18 || second === 19)) ||
+    (first === 198 && second === 51 && third === 100) ||
+    (first === 203 && second === 0 && third === 113) ||
+    (first === 100 && second >= 64 && second <= 127) ||
+    first >= 224
   );
 }
 
@@ -130,7 +138,9 @@ function isPrivateIpv6(value: string): boolean {
     normalized === "::" ||
     normalized.startsWith("fc") ||
     normalized.startsWith("fd") ||
-    normalized.startsWith("fe80:")
+    normalized.startsWith("fe80:") ||
+    normalized.startsWith("fec") ||
+    normalized.startsWith("ff")
   );
 }
 
@@ -148,28 +158,31 @@ function isPrivateAddress(value: string): boolean {
   return false;
 }
 
-async function resolveAllowedProviderImageUrl(value: string): Promise<{
+async function resolveSafeRemoteImageUrl(
+  value: string,
+  allowlist = providerImageFetchAllowlist(),
+): Promise<{
   url: URL;
   address: string;
   family: 4 | 6;
 }> {
   const url = new URL(value);
-  const allowlist = providerImageFetchAllowlist();
+  const hostname = url.hostname.replace(/^\[|\]$/g, "").toLowerCase();
 
-  if (url.protocol !== "https:") {
-    throw new Error("provider image download requires https");
+  if (url.protocol !== "https:" || url.username || url.password) {
+    throw new Error("remote image download requires https without credentials");
   }
 
   if (
     allowlist.length > 0 &&
     !allowlist.some((entry) =>
-      hostMatchesAllowlist(url.hostname.toLowerCase(), entry),
+      hostMatchesAllowlist(hostname, entry),
     )
   ) {
     throw new Error("provider image host is not allowlisted");
   }
 
-  const addresses = await lookup(url.hostname, { all: true });
+  const addresses = await lookup(hostname, { all: true });
 
   if (
     addresses.length === 0 ||
@@ -191,9 +204,15 @@ async function resolveAllowedProviderImageUrl(value: string): Promise<{
 }
 
 async function requestProviderImageOnce(
-  target: Awaited<ReturnType<typeof resolveAllowedProviderImageUrl>>,
-): Promise<{ statusCode: number; location: string | null; buffer: Buffer }> {
-  const maxBytes = providerImageDownloadLimitBytes();
+  target: Awaited<ReturnType<typeof resolveSafeRemoteImageUrl>>,
+  options: { maxBytes: number; timeoutMs: number },
+): Promise<{
+  statusCode: number;
+  location: string | null;
+  contentType: string;
+  buffer: Buffer;
+}> {
+  const { maxBytes, timeoutMs } = options;
 
   return new Promise((resolve, reject) => {
     const request = httpsRequest(
@@ -209,7 +228,12 @@ async function requestProviderImageOnce(
 
         if (statusCode >= 300 && statusCode < 400) {
           response.resume();
-          resolve({ statusCode, location, buffer: Buffer.alloc(0) });
+          resolve({
+            statusCode,
+            location,
+            contentType: "",
+            buffer: Buffer.alloc(0),
+          });
           return;
         }
 
@@ -226,6 +250,8 @@ async function requestProviderImageOnce(
           return;
         }
 
+        const contentType = response.headers["content-type"] ?? "";
+
         const chunks: Buffer[] = [];
         let totalBytes = 0;
         response.on("data", (chunk: Buffer) => {
@@ -239,13 +265,18 @@ async function requestProviderImageOnce(
           chunks.push(chunk);
         });
         response.on("end", () => {
-          resolve({ statusCode, location, buffer: Buffer.concat(chunks) });
+          resolve({
+            statusCode,
+            location,
+            contentType,
+            buffer: Buffer.concat(chunks),
+          });
         });
         response.on("error", reject);
       },
     );
 
-    request.setTimeout(providerImageDownloadTimeoutMs(), () => {
+    request.setTimeout(timeoutMs, () => {
       request.destroy(new Error("provider image download timed out"));
     });
     request.on("error", reject);
@@ -253,7 +284,10 @@ async function requestProviderImageOnce(
   });
 }
 
-async function fetchProviderImage(urlValue: string): Promise<Buffer> {
+async function fetchRemoteImage(
+  urlValue: string,
+  options: { allowlist: string[]; maxBytes: number; timeoutMs: number },
+): Promise<{ buffer: Buffer; contentType: string }> {
   let currentUrl = urlValue;
 
   for (
@@ -261,11 +295,14 @@ async function fetchProviderImage(urlValue: string): Promise<Buffer> {
     redirects <= MAX_PROVIDER_IMAGE_REDIRECTS;
     redirects += 1
   ) {
-    const target = await resolveAllowedProviderImageUrl(currentUrl);
-    const response = await requestProviderImageOnce(target);
+    const target = await resolveSafeRemoteImageUrl(
+      currentUrl,
+      options.allowlist,
+    );
+    const response = await requestProviderImageOnce(target, options);
 
     if (response.statusCode < 300 || response.statusCode >= 400) {
-      return response.buffer;
+      return { buffer: response.buffer, contentType: response.contentType };
     }
 
     const location = response.location;
@@ -277,6 +314,31 @@ async function fetchProviderImage(urlValue: string): Promise<Buffer> {
   }
 
   throw new Error("provider image redirect limit exceeded");
+}
+
+async function fetchProviderImage(urlValue: string): Promise<Buffer> {
+  return (
+    await fetchRemoteImage(urlValue, {
+      allowlist: providerImageFetchAllowlist(),
+      maxBytes: providerImageDownloadLimitBytes(),
+      timeoutMs: providerImageDownloadTimeoutMs(),
+    })
+  ).buffer;
+}
+
+export async function fetchSafeRemoteImage(
+  urlValue: string,
+): Promise<{ buffer: Buffer; contentType: string }> {
+  const configured = Number(process.env.MAX_UPLOAD_SIZE_MB ?? 10);
+  const maxBytes =
+    Number.isFinite(configured) && configured > 0
+      ? configured * 1024 * 1024
+      : 10 * 1024 * 1024;
+  return fetchRemoteImage(urlValue, {
+    allowlist: [],
+    maxBytes,
+    timeoutMs: 30_000,
+  });
 }
 
 export function publicUrlForStorageKey(key: string): string {

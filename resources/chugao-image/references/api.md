@@ -181,25 +181,30 @@ A `202` response has envelope data:
 {"generationId":"GENERATION_ID","status":"PENDING","estimatedCredits":10}
 ```
 
-After all uploads and before the first generation POST, the CLI durably saves
+Before the first upload, the CLI durably saves
 `~/.config/chugao/operations/<operation-uuid>.json` with these fields:
 
 ```text
 version, origin, operationId, accountId,
 requestBody, requestSha256,
-generationId: null, status: PREPARED, outputDir, images: []
+generationId: null, status: PREPARED, outputDir, images: [],
+referenceFiles, uploadedReferenceKeys
 ```
 
-The operation UUID is the idempotency key. The finalized request body includes
-the ordered upload keys and resolved defaults. A request hash detects accidental
-edits. Credentials are never stored in operation records. After acceptance, the
-generation ID, status, and estimated cost are saved before polling.
+The operation UUID is the idempotency key. Each reference file is recorded with
+its local path and SHA-256 before upload; returned upload keys are persisted after
+each successful upload. The finalized request body includes the ordered upload
+keys and resolved defaults. A request hash detects accidental edits. Credentials
+are never stored in operation records. After acceptance, the generation ID,
+status, and estimated cost are saved before polling.
 
 On a connection failure, lost/malformed submit response, or ambiguous `5xx`/`408`,
 the CLI reports an unknown submission outcome and the state path. It does not
 retry with a new key. Use `resume <operation-uuid-or-state-path>` to replay the
 same canonical JSON bytes and UUID; the server returns the original operation.
-Resume does not depend on the original local reference files or re-upload them.
+After all reference uploads are recorded, resume does not depend on the original
+local reference files or re-upload them. If an upload was interrupted, resume
+requires the unchanged local file to continue that upload.
 If a generation ID is already saved, resume never submits again. It also does not
 refetch defaults or change an existing request when the model list changes.
 

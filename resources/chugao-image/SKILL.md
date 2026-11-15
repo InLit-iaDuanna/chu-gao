@@ -58,20 +58,22 @@ local image files. Stdout contains a JSON summary with saved paths, never image
 base64 or credentials. `--no-wait` returns after submission; `--wait-timeout`
 (default 600 seconds) and `--poll-interval` (default 3 seconds) control task polling.
 
-Before submitting, the CLI writes a private operation record under
+Before uploading or submitting, the CLI writes a private operation record under
 `~/.config/chugao/operations/` and prints its path. It saves the UUID idempotency
-key, account, exact final request including upload keys, and then the returned
-generation ID. On interruption, timeout, failed download, or an unknown submit
-outcome, use that operation instead of calling `generate` again:
+key, account, reference-file hashes, and each returned upload key as progress is
+made. Once uploads finish it freezes the exact request, then records the returned
+generation ID. On interruption, timeout, failed upload/download, or an unknown
+submit outcome, use that operation instead of calling `generate` again:
 
 ```bash
 python3 "$SKILL_DIR/scripts/chugao.py" resume OPERATION_UUID_OR_STATE_PATH
 ```
 
-Resume polls the saved generation ID or replays the identical saved request and
-idempotency key if the response was lost. It does not upload references again,
-replace failed/canceled tasks, or issue a replacement generation. Keep the state
-unchanged, retain the same origin, and authorize the original account if asked.
+Resume continues any incomplete reference uploads, then polls the saved generation
+ID or replays the identical saved request and idempotency key if the response was
+lost. Once an upload is recorded, it is not uploaded again. It does not replace
+failed/canceled tasks or issue a replacement generation. Keep the state unchanged,
+retain the same origin, and authorize the original account if asked.
 Already saved images are verified by hash; unrelated output files are not
 overwritten.
 

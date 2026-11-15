@@ -66,4 +66,15 @@ describe("uploaded reference retention", () => {
     await expect(exists(recent)).resolves.toBe(true);
     await expect(exists(publicSnapshot)).resolves.toBe(true);
   });
+
+  it("rejects insecure and private remote reference URLs", async () => {
+    const { fetchSafeRemoteImage } = await import("@/lib/storage");
+
+    await expect(fetchSafeRemoteImage("http://example.com/image.png")).rejects.toThrow(
+      "requires https",
+    );
+    await expect(fetchSafeRemoteImage("https://127.0.0.1/image.png")).rejects.toThrow(
+      "private address",
+    );
+  });
 });

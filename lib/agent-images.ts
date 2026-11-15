@@ -65,6 +65,7 @@ import {
   ModerationRejectionLimitError,
 } from "@/lib/rate-limit";
 import {
+  fetchSafeRemoteImage,
   normalizeUploadedReferenceKey,
   saveUploadedReferenceImage,
   statPrivateStorageKey,
@@ -80,11 +81,11 @@ async function downloadAndSaveReferenceImageUrl(
   userId: string,
 ): Promise<string> {
   let buf: Buffer;
+  let contentType = "";
   try {
-    const resp = await fetch(url, { signal: AbortSignal.timeout(30_000) });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const ab = await resp.arrayBuffer();
-    buf = Buffer.from(ab);
+    const downloaded = await fetchSafeRemoteImage(url);
+    buf = downloaded.buffer;
+    contentType = downloaded.contentType;
   } catch (err) {
     throw new AgentAuthError(
       "REFERENCE_IMAGE_FETCH_FAILED",
@@ -92,13 +93,7 @@ async function downloadAndSaveReferenceImageUrl(
       400,
     );
   }
-  const ct =
-    (
-      await fetch(url, {
-        method: "HEAD",
-        signal: AbortSignal.timeout(5_000),
-      }).catch(() => null)
-    )?.headers.get("content-type") ?? "";
+  const ct = contentType.toLowerCase();
   const mimeType =
     ct.includes("jpeg") || ct.includes("jpg")
       ? "image/jpeg"
@@ -122,7 +117,6 @@ async function downloadAndSaveReferenceImageUrl(
 }
 
 import { z } from "zod";
-import { IMAGE_QUALITY_OPTIONS } from "@/lib/models/options";
 
 // Accepted effort labels that map to quality values.
 const EFFORT_TO_QUALITY: Record<string, string> = {
@@ -370,23 +364,29 @@ export async function ownedAgentGeneration(
   principal: AgentPrincipal | SubmissionPrincipal,
   id: string,
 ) {
-  const userId =
-    "authorization" in principal ? principal.user.id : principal.user.id;
+  const userId = principal.user.id;
+  const scope =
+    "authorization" in principal || !principal.apiKeyId
+      ? {
+          OR: [
+            { agentAuthorizationId: { not: null } },
+            { apiKeyId: { not: null } },
+          ],
+        }
+      : { apiKeyId: principal.apiKeyId };
   const row = await db.generation.findFirst({
     where: {
       id,
       userId,
-      OR: [
-        { agentAuthorizationId: { not: null } },
-        { apiKeyId: { not: null } },
-      ],
+      ...scope,
       deletedAt: null,
     },
     include: { images: { orderBy: { createdAt: "asc" } } },
   });
   if (!row) throw new AgentAuthError("NOT_FOUND", "任务不存在或已过期", 404);
-  // Only run single-use grant binding when request came via agent auth
-  if ("authorization" in principal) {
+  // A single-use Agent grant may recover Agent-created jobs, but reading an
+  // API-key job must not consume that grant.
+  if ("authorization" in principal && row.agentAuthorizationId) {
     await bindAgentRead(principal, row.id);
   }
   return row;

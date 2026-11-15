@@ -73,6 +73,7 @@ class MockApi:
         self.verification_override = None
         self.statuses = ["RUNNING", "SUCCEEDED"]
         self.drop_submit_responses = 0
+        self.drop_upload_responses = 0
         self.before_submit = None
         self.redirect = None
         self.errors = {}
@@ -180,6 +181,11 @@ class MockApi:
                 "field": parts[0].get_param("name", header="content-disposition"),
                 "mime": parts[0].get_content_type(), "content": parts[0].get_payload(decode=True),
             })
+            if self.drop_upload_responses:
+                self.drop_upload_responses -= 1
+                handler.connection.shutdown(socket.SHUT_RDWR)
+                handler.connection.close()
+                return
             self.send(handler, {"key": f"upload-{len(self.uploads)}", "mimeType": "image/png", "width": 1, "height": 1, "sizeBytes": len(data)})
         elif path == "/api/v1/generations" and handler.command == "POST":
             if self.before_submit:
@@ -368,6 +374,22 @@ class CliTests(unittest.TestCase):
         self.assertEqual(snapshots[0]["accountId"], "account-1")
         self.assertIsNone(snapshots[0]["generationId"])
         self.assertEqual(result["status"], "PENDING")
+
+    def test_interrupted_reference_upload_can_resume_before_submission(self):
+        reference = self.image("reference.png")
+        self.api.drop_upload_responses = 1
+        with self.assertRaises(chugao.CliError):
+            chugao.generate(self.session(), self.args("--reference", str(reference)))
+        path = self.state_path()
+        state = chugao.private_json(path)
+        self.assertEqual(state["status"], "UPLOADING")
+        self.assertIsNone(state["generationId"])
+        self.assertEqual(len(self.api.matching("POST", "/api/v1/generations")), 0)
+
+        result = chugao.run_operation(self.session(), path, self.resume_args(path))
+        self.assertEqual(result["status"], "SUCCEEDED")
+        self.assertEqual(len(self.api.matching("POST", "/api/v1/generations")), 1)
+        self.assertEqual(len(self.api.uploads), 2)
 
     def test_lost_submit_response_replays_identical_body_key_without_uploading(self):
         reference = self.image("reference.png")
