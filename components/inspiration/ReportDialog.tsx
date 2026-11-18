@@ -100,9 +100,11 @@ export function ReportDialog({
           <Flag size={15} aria-hidden="true" /> 举报
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[min(720px,calc(100vh-32px))] overflow-y-auto">
+      <DialogContent className="max-h-[min(720px,calc(100dvh-32px))] overflow-y-auto rounded-lg text-sm tracking-normal">
         <DialogHeader>
-          <DialogTitle>{commentId ? "举报这条评论" : "举报这条内容"}</DialogTitle>
+          <DialogTitle className="pr-8 text-xl tracking-normal">
+            {commentId ? "举报这条评论" : "举报这条内容"}
+          </DialogTitle>
           <DialogDescription>
             请选择最符合的原因。举报会交由管理员复核，不会直接通知作者。
           </DialogDescription>
@@ -128,7 +130,7 @@ export function ReportDialog({
           </div>
 
           <div>
-            <div className="mb-2 flex items-center justify-between gap-3">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
               <label htmlFor="report-note" className="text-sm font-medium">
                 补充说明{" "}
                 <span className="font-normal text-text-faint">（可选）</span>
@@ -162,7 +164,7 @@ export function ReportDialog({
           ) : null}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="flex-wrap">
           <Button
             variant="ghost"
             onClick={() => handleOpenChange(false)}

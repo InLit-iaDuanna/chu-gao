@@ -1,5 +1,7 @@
 import { headers } from "next/headers";
 import Link from "next/link";
+import { CircleAlert } from "lucide-react";
+import { Button, EmptyState } from "@/components/ui";
 
 import { SettingsView } from "@/components/studio/SettingsView";
 import { StudioPageShell } from "@/components/studio/StudioPageShell";
@@ -66,17 +68,20 @@ export default async function SettingsPage() {
   ]);
 
   return (
-    <StudioPageShell eyebrow="Settings" title="设置">
+    <StudioPageShell title="设置">
       {!user ? (
-        <div className="surface-panel flex min-h-72 flex-col items-center justify-center gap-3 px-6 py-10 text-center">
-          <h2 className="text-xl font-medium">账户资料暂时无法读取</h2>
-          <p className="max-w-md text-sm leading-6 text-text-muted">
-            请稍后刷新页面，或返回工作台继续查看当前状态。
-          </p>
-          <Link href="/app" className="tool-button mt-2 h-9 text-text-muted">
-            返回工作台
-          </Link>
-        </div>
+        <EmptyState
+          role="status"
+          icon={CircleAlert}
+          className="min-h-72 border-t border-border"
+          title="账户资料暂时无法读取"
+          description="请稍后刷新页面，或返回工作台继续查看当前状态。"
+          action={
+            <Button asChild>
+              <Link href="/app">返回工作台</Link>
+            </Button>
+          }
+        />
       ) : (
         <SettingsView user={user} models={models} />
       )}

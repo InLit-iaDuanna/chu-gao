@@ -72,7 +72,10 @@ export function SystemView() {
   }
 
   if (failed) return <EmptyPanel text="系统配置暂时不可用" />;
-  if (!entries) return <div className="surface-panel h-64 animate-pulse" />;
+  if (!entries)
+    return (
+      <div className="h-64 animate-pulse rounded-lg border border-border bg-surface-2" />
+    );
 
   return (
     <div>
@@ -85,7 +88,7 @@ export function SystemView() {
       <ErrorText message={error} />
       {notice ? <p className="mb-3 text-sm text-success">{notice}</p> : null}
 
-      <div className="grid gap-3">
+      <div className="divide-y divide-border border-y border-border">
         {entries.map((entry) => (
           <ConfigRow key={entry.key} entry={entry} onSave={save} />
         ))}
@@ -119,6 +122,7 @@ function ConfigRow({
     editor = (
       <label className="flex items-center gap-2 text-sm text-text-muted">
         <Input
+          className="h-4 w-4 shrink-0 accent-brand"
           type="checkbox"
           checked={boolValue}
           onChange={(event) => {
@@ -134,7 +138,7 @@ function ConfigRow({
       <div className="flex items-center gap-2">
         <Input
           type="number"
-          className="w-32"
+          className="w-32 h-9 text-sm"
           value={text}
           onChange={(event) => setText(event.target.value)}
         />
@@ -145,7 +149,7 @@ function ConfigRow({
     editor = (
       <div className="flex items-center gap-2">
         <Input
-          className="flex-1"
+          className="flex-1 h-9 text-sm"
           value={text}
           onChange={(event) => setText(event.target.value)}
         />
@@ -157,7 +161,7 @@ function ConfigRow({
       <div className="flex items-center gap-2">
         <Select
           aria-label={KEY_LABEL[entry.key] ?? entry.key}
-          className="w-40"
+          className="w-40 h-9 text-sm"
           value={enumValue}
           onValueChange={(value) => {
             setEnumValue(value);
@@ -174,7 +178,7 @@ function ConfigRow({
     editor = (
       <div className="flex items-center gap-2">
         <Input
-          className="flex-1"
+          className="flex-1 h-9 text-sm"
           placeholder="逗号分隔"
           value={text}
           onChange={(event) => setText(event.target.value)}
@@ -197,7 +201,7 @@ function ConfigRow({
     editor = (
       <div className="space-y-2">
         <Textarea
-          className="surface-panel-soft min-h-20 w-full resize-y px-3 py-2 font-mono text-xs leading-5 outline-none"
+          className="min-h-20 w-full resize-y px-3 py-2 font-mono text-xs leading-5 outline-none"
           value={text}
           onChange={(event) => setText(event.target.value)}
         />
@@ -216,10 +220,10 @@ function ConfigRow({
   }
 
   return (
-    <div className="surface-panel flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-      <div className="min-w-40">
+    <div className="flex flex-wrap items-center justify-between gap-3 py-4">
+      <div className="min-w-0 basis-full break-words sm:basis-64">
         <p className="text-sm">{label}</p>
-        <p className="font-mono text-[10px] text-text-faint">{entry.key}</p>
+        <p className="font-mono text-xs text-text-faint">{entry.key}</p>
       </div>
       <div className="min-w-0 flex-1 sm:max-w-md">{editor}</div>
     </div>

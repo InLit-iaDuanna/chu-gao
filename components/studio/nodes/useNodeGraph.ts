@@ -107,6 +107,7 @@ function loadGraph(key: string): NodeGraphState | null {
 export interface NodeGraphApi {
   graph: NodeGraphState;
   hydrated: boolean;
+  saveState: "saved" | "saving" | "error";
   contentRevision: number;
   addNode: (
     kind: NodeKind,
@@ -127,7 +128,7 @@ export interface NodeGraphApi {
   disconnect: (edgeId: string) => void;
   setViewport: (viewport: Viewport) => void;
   clearGraph: () => void;
-  autoArrange: () => void;
+  autoArrange: (heights?: ReadonlyMap<string, number>) => void;
   undo: () => void;
   redo: () => void;
   canUndo: boolean;
@@ -138,6 +139,9 @@ export function useNodeGraph(storageKey: string): NodeGraphApi {
   const [graph, setGraph] = useState<NodeGraphState>(defaultGraph);
   const graphRef = useRef(graph);
   const [hydrated, setHydrated] = useState(false);
+  const [saveState, setSaveState] = useState<"saved" | "saving" | "error">(
+    "saved",
+  );
   const skipPersist = useRef(true);
   const pastRef = useRef<NodeGraphState[]>([]);
   const futureRef = useRef<NodeGraphState[]>([]);
@@ -160,8 +164,9 @@ export function useNodeGraph(storageKey: string): NodeGraphApi {
     if (!pending) return;
     try {
       window.localStorage.setItem(pending.key, JSON.stringify(pending.graph));
+      setSaveState("saved");
     } catch {
-      // 存储失败时退化为会话内状态。
+      setSaveState("error");
     }
   }, []);
 
@@ -185,6 +190,7 @@ export function useNodeGraph(storageKey: string): NodeGraphApi {
       return;
     }
     pendingPersistRef.current = { key, graph };
+    setSaveState("saving");
     if (persistTimerRef.current !== null) {
       window.clearTimeout(persistTimerRef.current);
     }
@@ -192,9 +198,14 @@ export function useNodeGraph(storageKey: string): NodeGraphApi {
   }, [flushPersist, hydrated, graph, key]);
 
   useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") flushPersist();
+    };
     window.addEventListener("pagehide", flushPersist);
+    document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       window.removeEventListener("pagehide", flushPersist);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       flushPersist();
     };
   }, [flushPersist, key]);
@@ -503,21 +514,18 @@ export function useNodeGraph(storageKey: string): NodeGraphApi {
     [updateGraph],
   );
 
-  const setViewport = useCallback(
-    (viewport: Viewport) => {
-      updateGraph(
-        (current) =>
-          current.viewport.x === viewport.x &&
-          current.viewport.y === viewport.y &&
-          current.viewport.zoom === viewport.zoom
-            ? current
-            : { ...current, viewport },
-        "viewport",
-        false,
-      );
-    },
-    [updateGraph],
-  );
+  const setViewport = useCallback((viewport: Viewport) => {
+    const current = graphRef.current;
+    if (
+      current.viewport.x === viewport.x &&
+      current.viewport.y === viewport.y &&
+      current.viewport.zoom === viewport.zoom
+    )
+      return;
+    const next = { ...current, viewport };
+    graphRef.current = next;
+    setGraph(next);
+  }, []);
 
   const clearGraph = useCallback(() => {
     updateGraph((current) => ({
@@ -527,67 +535,74 @@ export function useNodeGraph(storageKey: string): NodeGraphApi {
     }));
   }, [updateGraph]);
 
-  const autoArrange = useCallback(() => {
-    updateGraph(
-      (current) => {
-        const sourceKinds: NodeKind[] = [
-          "prompt",
-          "style",
-          "reference",
-          "model",
-          "quality",
-        ];
-        const sourceNodes = sourceKinds.flatMap((kind) =>
-          current.nodes.filter((node) => node.kind === kind),
-        );
-        const generateNodes = current.nodes.filter(
-          (node) => node.kind === "generate",
-        );
-        const noteNodes = current.nodes.filter((node) => node.kind === "note");
-        const layerNodes = current.nodes.filter((node) =>
-          ["text", "shape", "design-image"].includes(node.kind),
-        );
-        const frameNodes = current.nodes.filter(
-          (node) => node.kind === "frame",
-        );
-        const position = new Map<string, { x: number; y: number }>();
-        let sourceY = 40;
-        sourceNodes.forEach((node) => {
-          position.set(node.id, { x: 40, y: sourceY });
-          sourceY += estimatedNodeHeight(node) + 32;
-        });
-        let generateY = 90;
-        generateNodes.forEach((node) => {
-          position.set(node.id, { x: 390, y: generateY });
-          generateY += estimatedNodeHeight(node) + 44;
-        });
-        let layerY = 40;
-        layerNodes.forEach((node) => {
-          position.set(node.id, { x: 740, y: layerY });
-          layerY += estimatedNodeHeight(node) + 32;
-        });
-        let frameY = 40;
-        frameNodes.forEach((node) => {
-          position.set(node.id, { x: 1090, y: frameY });
-          frameY += estimatedNodeHeight(node) + 32;
-        });
-        let noteY = 40;
-        noteNodes.forEach((node) => {
-          position.set(node.id, { x: 1440, y: noteY });
-          noteY += estimatedNodeHeight(node) + 32;
-        });
-        return {
-          ...current,
-          nodes: current.nodes.map((node) => ({
-            ...node,
-            ...(position.get(node.id) ?? {}),
-          })),
-        };
-      },
-      undefined,
-      false,
-    );
-  }, [updateGraph]);
+  const autoArrange = useCallback(
+    (heights?: ReadonlyMap<string, number>) => {
+      updateGraph(
+        (current) => {
+          const sourceKinds: NodeKind[] = [
+            "prompt",
+            "style",
+            "reference",
+            "model",
+            "quality",
+          ];
+          const sourceNodes = sourceKinds.flatMap((kind) =>
+            current.nodes.filter((node) => node.kind === kind),
+          );
+          const generateNodes = current.nodes.filter(
+            (node) => node.kind === "generate",
+          );
+          const noteNodes = current.nodes.filter(
+            (node) => node.kind === "note",
+          );
+          const layerNodes = current.nodes.filter((node) =>
+            ["text", "shape", "design-image"].includes(node.kind),
+          );
+          const frameNodes = current.nodes.filter(
+            (node) => node.kind === "frame",
+          );
+          const position = new Map<string, { x: number; y: number }>();
+          let sourceY = 40;
+          sourceNodes.forEach((node) => {
+            position.set(node.id, { x: 40, y: sourceY });
+            sourceY +=
+              (heights?.get(node.id) ?? estimatedNodeHeight(node)) + 32;
+          });
+          let generateY = 90;
+          generateNodes.forEach((node) => {
+            position.set(node.id, { x: 390, y: generateY });
+            generateY +=
+              (heights?.get(node.id) ?? estimatedNodeHeight(node)) + 44;
+          });
+          let layerY = 40;
+          layerNodes.forEach((node) => {
+            position.set(node.id, { x: 740, y: layerY });
+            layerY += (heights?.get(node.id) ?? estimatedNodeHeight(node)) + 32;
+          });
+          let frameY = 40;
+          frameNodes.forEach((node) => {
+            position.set(node.id, { x: 1090, y: frameY });
+            frameY += (heights?.get(node.id) ?? estimatedNodeHeight(node)) + 32;
+          });
+          let noteY = 40;
+          noteNodes.forEach((node) => {
+            position.set(node.id, { x: 1440, y: noteY });
+            noteY += (heights?.get(node.id) ?? estimatedNodeHeight(node)) + 32;
+          });
+          return {
+            ...current,
+            nodes: current.nodes.map((node) => ({
+              ...node,
+              ...(position.get(node.id) ?? {}),
+            })),
+          };
+        },
+        undefined,
+        false,
+      );
+    },
+    [updateGraph],
+  );
 
   const undo = useCallback(() => {
     const previous = pastRef.current.at(-1);
@@ -595,9 +610,10 @@ export function useNodeGraph(storageKey: string): NodeGraphApi {
     pastRef.current = pastRef.current.slice(0, -1);
     futureRef.current = [graphRef.current, ...futureRef.current.slice(0, 49)];
     lastGroupRef.current = null;
-    graphRef.current = previous;
+    const next = { ...previous, viewport: graphRef.current.viewport };
+    graphRef.current = next;
     contentRevisionRef.current += 1;
-    setGraph(previous);
+    setGraph(next);
   }, []);
 
   const redo = useCallback(() => {
@@ -606,14 +622,16 @@ export function useNodeGraph(storageKey: string): NodeGraphApi {
     futureRef.current = futureRef.current.slice(1);
     pastRef.current = [...pastRef.current.slice(-49), graphRef.current];
     lastGroupRef.current = null;
-    graphRef.current = next;
+    const restored = { ...next, viewport: graphRef.current.viewport };
+    graphRef.current = restored;
     contentRevisionRef.current += 1;
-    setGraph(next);
+    setGraph(restored);
   }, []);
 
   return {
     graph,
     hydrated,
+    saveState,
     contentRevision: contentRevisionRef.current,
     addNode,
     moveNode,

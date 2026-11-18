@@ -5,6 +5,7 @@ import {
   DropdownMenu,
   DropdownMenuItem,
   IconButton,
+  Skeleton,
 } from "@/components/ui";
 
 import type { CSSProperties } from "react";
@@ -58,11 +59,15 @@ export function GenerationWall({
 
   if (loading) {
     return (
-      <div className="columns-[280px] gap-4">
+      <div
+        role="status"
+        aria-label="正在加载生成记录"
+        className="min-w-0 columns-1 gap-4 sm:columns-[280px]"
+      >
         {SKELETON_RATIOS.map((ratio, index) => (
-          <div
+          <Skeleton
             key={index}
-            className="skeleton-shimmer mb-4 break-inside-avoid rounded-lg border border-border"
+            className="mb-4 w-full break-inside-avoid rounded-lg border border-border"
             style={{ aspectRatio: String(ratio) }}
           />
         ))}
@@ -72,24 +77,25 @@ export function GenerationWall({
 
   if (generations.length === 0) {
     return (
-      <div className="flex min-h-full flex-col items-center justify-center px-2 py-8 text-center">
-        <span className="flex h-12 w-12 items-center justify-center rounded-lg border border-border-strong bg-surface-2 text-foreground md:h-14 md:w-14">
-          <Sparkles size={22} strokeWidth={1.8} />
-        </span>
+      <div className="flex min-h-64 min-w-0 flex-col items-center justify-center px-2 py-10 text-center tracking-normal">
+        <Sparkles
+          size={24}
+          strokeWidth={1.5}
+          className="text-text-muted"
+          aria-hidden="true"
+        />
 
-        <h2 className="mt-4 text-lg font-semibold leading-6 md:mt-5">
-          还没有生成图片
-        </h2>
+        <h2 className="mt-3 text-xl font-semibold leading-7">还没有生成图片</h2>
 
         {onPickSuggestion ? (
           <div className="mt-5 flex w-full max-w-xl flex-wrap items-center justify-center gap-2 md:mt-6">
             {SUGGESTIONS.map((text) => (
               <Button
-                variant="ghost"
+                variant="secondary"
                 key={text}
                 type="button"
                 onClick={() => onPickSuggestion(text)}
-                className="pressable h-auto min-h-11 max-w-full whitespace-normal break-words rounded-md border border-border bg-surface px-3 py-2 text-center text-sm leading-5 text-text-muted hover:border-accent/50 hover:text-foreground"
+                className="h-auto min-h-11 max-w-full whitespace-normal break-words px-3 py-2 text-center text-sm leading-6"
               >
                 {text}
               </Button>
@@ -101,8 +107,8 @@ export function GenerationWall({
   }
 
   return (
-    <div>
-      <div className="mb-4 flex items-center justify-between">
+    <div className="min-w-0 text-sm tracking-normal">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
         <p className="text-xs text-text-muted">
           {generations.length} 条生成记录
         </p>
@@ -113,6 +119,7 @@ export function GenerationWall({
               variant="ghost"
               aria-label="生成记录操作"
               title="生成记录操作"
+              className="h-9 w-9"
             >
               <MoreHorizontal size={16} />
             </IconButton>
@@ -124,7 +131,7 @@ export function GenerationWall({
           </DropdownMenuItem>
         </DropdownMenu>
       </div>
-      <div className="columns-[280px] gap-4">
+      <div className="min-w-0 columns-1 gap-4 sm:columns-[280px]">
         {generations.map((generation, index) => (
           <GenerationCard
             key={generation.id}
@@ -140,15 +147,14 @@ export function GenerationWall({
       </div>
 
       {hasMore ? (
-        <div className="flex justify-center py-4">
+        <div className="flex justify-center border-t border-border py-4">
           <Button
-            variant="ghost"
+            variant="secondary"
             type="button"
             onClick={onLoadMore}
-            disabled={loadingMore}
-            className="pressable flex items-center gap-1.5 rounded-md border border-border bg-surface px-4 py-2 text-xs font-medium text-text-muted hover:border-border-strong hover:text-foreground disabled:opacity-50"
+            loading={loadingMore}
           >
-            <ArrowDown size={12} />
+            <ArrowDown size={16} />
             {loadingMore ? "加载中…" : "加载更多"}
           </Button>
         </div>

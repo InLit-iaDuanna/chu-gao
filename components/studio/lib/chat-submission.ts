@@ -194,6 +194,14 @@ export async function resolveChatSubmission(
         });
       throw error;
     }
+    if (isApiError(error) && error.code === "WORKER_UNAVAILABLE") {
+      throw new ApiError(
+        error.code,
+        "对话执行器暂时不可用，发送凭据已保留；请稍后点击“恢复连接”，不会创建重复回复",
+        error.status,
+        error.details,
+      );
+    }
     throw new Error(
       "提交结果尚未确认，发送凭据已保留。恢复连接会查询或复用原请求，不会创建第二轮回复",
     );

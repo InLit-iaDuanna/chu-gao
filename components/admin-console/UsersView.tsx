@@ -50,7 +50,7 @@ export function UsersView() {
         <div className="relative w-64">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-faint" />
           <Input
-            className="pl-8"
+            className="pl-8 h-9 text-sm"
             placeholder="搜索邮箱 / 昵称"
             value={q}
             onChange={(event) => setQ(event.target.value)}
@@ -58,7 +58,7 @@ export function UsersView() {
         </div>
         <Select
           aria-label="用户状态"
-          className="w-36"
+          className="w-36 h-9 text-sm"
           value={status || "all"}
           onValueChange={(value) => setStatus(value === "all" ? "" : value)}
           options={[
@@ -72,7 +72,7 @@ export function UsersView() {
       {failed ? (
         <EmptyPanel text="用户列表暂时不可用，请稍后刷新" />
       ) : !users ? (
-        <div className="surface-panel h-64 animate-pulse" />
+        <div className="h-64 animate-pulse rounded-lg border border-border bg-surface-2" />
       ) : users.length === 0 ? (
         <EmptyPanel text="没有匹配的用户" />
       ) : (

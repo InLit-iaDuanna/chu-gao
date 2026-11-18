@@ -132,7 +132,7 @@ export function AnnouncementBanner({
               aria-hidden
             />
             {bannerItem.title ? (
-              <span className="shrink-0 text-xs font-semibold tracking-tight">
+              <span className="shrink-0 text-xs font-semibold tracking-normal">
                 {bannerItem.title}
               </span>
             ) : null}
@@ -185,7 +185,7 @@ export function AnnouncementBanner({
                   )}
                   aria-hidden
                 />
-                <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-text-faint">
+                <span className="text-xs tracking-normal text-text-muted">
                   公告
                   {popupQueue.length > 1 ? ` · 1/${popupQueue.length}` : ""}
                 </span>

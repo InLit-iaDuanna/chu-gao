@@ -7,10 +7,15 @@ import { Loader2 } from "lucide-react";
 import { ChatRuntimeSection } from "./ChatRuntimeSection";
 import { LunaSection } from "./LunaSection";
 import { OpusSection } from "./OpusSection";
+import { TokenProviderSection } from "./TokenProviderSection";
 import {
   getAdminIntegrations,
+  getAdminGemini,
+  getAdminPremiumAnthropic,
   isAdminApiError,
   patchAdminIntegrations,
+  patchAdminGemini,
+  patchAdminPremiumAnthropic,
 } from "./lib/api";
 import type { AdminIntegrations } from "./lib/types";
 import { AdminPageHeader, EmptyPanel, ErrorText } from "./ui";
@@ -55,6 +60,30 @@ export function IntegrationsView() {
       <div className="grid gap-4">
         <ChatRuntimeSection />
         <OpusSection />
+        <TokenProviderSection
+          id="premium-anthropic"
+          title="Opus 5.5 高价 / Fable 5.2"
+          description="高价 Anthropic 通道；Fable 5.2 按 Opus 基准价格的 2 倍计费。"
+          modelLabels={["claude-opus-5-5", "claude-fable-5-2"]}
+          load={getAdminPremiumAnthropic}
+          save={patchAdminPremiumAnthropic}
+          loadingLabel="正在加载高价 Claude 配置"
+          savedLabel="高价 Claude 配置已保存"
+        />
+        <TokenProviderSection
+          id="gemini"
+          title="Gemini 4"
+          description="Argon、Carbon 共用此通道；Hydrogen 按 Argon 的 50% 计费；默认价格为高价 Opus 的 7 折。"
+          modelLabels={[
+            "gemini-4-argon",
+            "gemini-4-carbon",
+            "gemini-4-hydrogen",
+          ]}
+          load={getAdminGemini}
+          save={patchAdminGemini}
+          loadingLabel="正在加载 Gemini 4 配置"
+          savedLabel="Gemini 4 配置已保存"
+        />
         <LunaSection variant="sol" />
         <LunaSection />
         {failed ? (

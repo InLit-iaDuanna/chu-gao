@@ -61,6 +61,10 @@ const STUCK_MAX_ATTEMPTS = Number(process.env.STUCK_MAX_ATTEMPTS ?? 3);
 const STUCK_RECOVERY_INTERVAL_MS = Number(
   process.env.STUCK_RECOVERY_INTERVAL_MS ?? 60_000,
 );
+/** A row still marked RUNNING with no heartbeat for this long is a corpse. */
+const ABANDONED_RUNNING_MS = Number(
+  process.env.ABANDONED_RUNNING_MS ?? 90_000,
+);
 const WORKER_HEARTBEAT_INTERVAL_MS = Number(
   process.env.WORKER_HEARTBEAT_INTERVAL_MS ?? 15_000,
 );
@@ -161,11 +165,55 @@ async function main() {
       });
 
       if (claimed.count === 0) {
-        logger.info(
+        // A restarted worker re-receives jobs whose row the dead process left
+        // RUNNING. Waiting for the periodic reaper leaves the user staring at a
+        // spinner for minutes, so an abandoned row is reset and taken over here.
+        const abandonedBefore = new Date(Date.now() - ABANDONED_RUNNING_MS);
+        const reset = await db.generation.updateMany({
+          where: {
+            id: generationId,
+            userId,
+            status: "RUNNING",
+            deletedAt: null,
+            OR: [
+              { heartbeatAt: { lt: abandonedBefore } },
+              { heartbeatAt: null, startedAt: { lt: abandonedBefore } },
+            ],
+          },
+          data: {
+            status: "PENDING",
+            heartbeatAt: null,
+            executionToken: null,
+          },
+        });
+        if (reset.count === 0) {
+          logger.info(
+            { generationId },
+            "Generation job skipped because it is no longer pending.",
+          );
+          return;
+        }
+        logger.warn(
           { generationId },
-          "Generation job skipped because it is no longer pending.",
+          "Took over a generation abandoned by a restarted worker.",
         );
-        return;
+        const retaken = await db.generation.updateMany({
+          where: {
+            id: generationId,
+            userId,
+            status: "PENDING",
+            deletedAt: null,
+          },
+          data: {
+            status: "RUNNING",
+            progress: 0,
+            startedAt: new Date(),
+            heartbeatAt: new Date(),
+            executionToken,
+            attempts: { increment: 1 },
+          },
+        });
+        if (retaken.count === 0) return;
       }
 
       const executionHeartbeat = setInterval(() => {

@@ -19,10 +19,12 @@ export default async function AdminLayout({
 
   if (sessionResult.status === "unavailable") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background text-foreground">
-        <div className="surface-panel max-w-sm p-6">
-          <p className="eyebrow">管理端</p>
-          <h1 className="mt-2 text-xl font-semibold">认证服务暂不可用</h1>
+      <div className="flex min-h-screen items-center justify-center bg-background p-6 text-foreground">
+        <div className="w-full max-w-sm">
+          <p className="text-xs text-text-faint">管理端</p>
+          <h1 className="mt-2 text-xl font-semibold leading-7 tracking-normal">
+            认证服务暂不可用
+          </h1>
           <p className="mt-4 text-sm leading-6 text-text-muted">
             请稍后刷新，或确认数据库服务已启动。
           </p>

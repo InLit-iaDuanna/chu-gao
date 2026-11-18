@@ -67,10 +67,10 @@ export function AgentAccessSection() {
       ref={sectionRef}
       id="agent"
       aria-labelledby="agent-heading"
-      className="min-w-0 scroll-mt-6 border-t border-border pt-6"
+      className="min-w-0 scroll-mt-6 border-t border-border pt-6 text-sm tracking-normal"
     >
       <header className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="agent-heading" className="text-lg font-semibold">
+        <h2 id="agent-heading" className="app-section-title">
           Agent 接入
         </h2>
         <Button asChild variant="secondary">
@@ -232,7 +232,6 @@ function RevokeAuthorization({
       <DialogTrigger>
         <Button
           variant="ghost"
-          size="sm"
           className="justify-self-start sm:justify-self-end"
           aria-label={`撤销 ${authorization.clientName} 的授权`}
         >
@@ -240,9 +239,11 @@ function RevokeAuthorization({
           撤销
         </Button>
       </DialogTrigger>
-      <DialogContent hideClose={busy}>
+      <DialogContent hideClose={busy} className="rounded-lg tracking-normal">
         <DialogHeader>
-          <DialogTitle className="tracking-normal">撤销授权</DialogTitle>
+          <DialogTitle className="text-xl tracking-normal">
+            撤销授权
+          </DialogTitle>
           <DialogDescription className="break-words [overflow-wrap:anywhere]">
             撤销后，{authorization.clientName} 将无法继续使用此授权。
           </DialogDescription>
@@ -252,7 +253,7 @@ function RevokeAuthorization({
             {error}
           </p>
         ) : null}
-        <DialogFooter className="flex-wrap">
+        <DialogFooter className="flex-wrap [&>button]:flex-1 sm:[&>button]:flex-none">
           <Button disabled={busy} onClick={() => setOpen(false)}>
             取消
           </Button>

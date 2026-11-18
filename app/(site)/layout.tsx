@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 
-import { Compass, Sparkles } from "lucide-react";
+import { ArrowRight, Plus } from "lucide-react";
+import { Logo } from "@/components/shared/Logo";
 import { IconRail } from "@/components/studio/IconRail";
+import { Button } from "@/components/ui";
 import { checkSessionFromHeaders } from "@/lib/auth";
 
 export default async function SiteLayout({
@@ -15,61 +17,70 @@ export default async function SiteLayout({
 
   return (
     <div
-      className={`min-h-screen bg-background text-foreground ${isAuthenticated ? "pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0" : ""}`}
+      className={`min-h-svh bg-background text-sm tracking-normal text-foreground ${isAuthenticated ? "pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0" : ""}`}
     >
-      <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur-xl">
-        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
-          <Link href="/inspiration" className="flex items-center gap-2.5">
-            <span className="flex h-7 w-7 items-center justify-center rounded-md bg-brand text-on-accent">
-              <Compass size={15} />
-            </span>
-            <span className="text-sm font-semibold">
-              Chūgǎo{" "}
-              <span className="font-normal text-text-muted">/ 灵感圈</span>
+      <header className="sticky top-0 z-30 border-b border-border bg-surface">
+        <div className="mx-auto flex min-h-12 max-w-7xl flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 py-1.5 sm:px-6">
+          <Link
+            href="/inspiration"
+            aria-label="初稿灵感圈"
+            className="flex min-w-0 shrink-0 items-center gap-3"
+          >
+            <Logo />
+            <span className="border-l border-border pl-3 text-sm font-medium">
+              灵感圈
             </span>
           </Link>
-          <nav className="hidden items-center gap-1 sm:flex">
+          <nav
+            aria-label="灵感圈导航"
+            className="order-last flex w-full flex-wrap items-center gap-1 border-t border-border pt-1 sm:order-none sm:w-auto sm:flex-1 sm:border-0 sm:pt-0"
+          >
             <Link
               href="/inspiration"
-              className="rounded-md px-3 py-2 text-xs text-text-muted hover:bg-surface-2 hover:text-foreground"
+              className="inline-flex h-9 items-center rounded-md px-3 text-sm text-text-muted transition-colors hover:bg-surface-2 hover:text-foreground"
             >
               广场
             </Link>
             <Link
               href="/inspiration/daily"
-              className="rounded-md px-3 py-2 text-xs text-text-muted hover:bg-surface-2 hover:text-foreground"
+              className="inline-flex h-9 items-center rounded-md px-3 text-sm text-text-muted transition-colors hover:bg-surface-2 hover:text-foreground"
             >
               每日命题
             </Link>
-          </nav>
-          <div className="flex items-center gap-2">
             {isAuthenticated ? (
               <Link
                 href="/app/inspiration?view=mine"
-                className="hidden rounded-md px-3 py-2 text-xs text-text-muted hover:text-foreground sm:inline-flex"
+                className="inline-flex h-9 items-center rounded-md px-3 text-sm text-text-muted transition-colors hover:bg-surface-2 hover:text-foreground"
               >
                 我的灵感
               </Link>
-            ) : (
+            ) : null}
+          </nav>
+          <div className="flex shrink-0 items-center gap-1">
+            {!isAuthenticated ? (
               <Link
                 href="/login?next=/app/publish"
-                className="hidden rounded-md px-3 py-2 text-xs text-text-muted hover:text-foreground sm:inline-flex"
+                className="inline-flex h-9 items-center rounded-md px-2 text-sm text-text-muted transition-colors hover:bg-surface-2 hover:text-foreground sm:px-3"
               >
                 登录
               </Link>
-            )}
-            <Link
-              href={isAuthenticated ? "/app/publish" : "/app"}
-              className="tool-button h-9 px-3 text-xs text-text-muted"
-            >
-              <Sparkles size={14} /> {isAuthenticated ? "发布灵感" : "开始创作"}
-            </Link>
+            ) : null}
+            <Button asChild variant="primary" className="px-3">
+              <Link href={isAuthenticated ? "/app/publish" : "/app"}>
+                {isAuthenticated ? (
+                  <Plus size={16} aria-hidden />
+                ) : (
+                  <ArrowRight size={16} aria-hidden />
+                )}
+                {isAuthenticated ? "发布灵感" : "开始创作"}
+              </Link>
+            </Button>
           </div>
         </div>
       </header>
       {children}
-      <footer className="border-t border-border py-8 text-center text-xs text-text-faint">
-        Chūgǎo 灵感圈 · 让设计问题继续生长
+      <footer className="border-t border-border px-4 py-6 text-center text-xs text-text-muted">
+        © 2026 Chūgǎo Studio · 灵感圈
       </footer>
       {isAuthenticated ? (
         <div className="fixed inset-x-0 bottom-0 z-40 md:hidden">

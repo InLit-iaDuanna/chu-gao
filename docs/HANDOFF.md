@@ -4,7 +4,9 @@
 
   ## 项目
   - 项目名：Chugao Studio
-  - 本地目录：`/Users/isduanna/Documents/New project 2`
+  - 本地正式目录：`/Users/isduanna/Documents/ChatGPT/chugao/chugao_v2.2`
+  - 测试与临时目录：`/Users/isduanna/Documents/ChatGPT/chugao/test`
+  - 旧项目目录：`/Users/isduanna/Documents/New project 2`（迁移期间保留）
   - 技术栈：Next.js App Router + React + Prisma + Redis + BullMQ + Docker Compose
   - 线上地址：`https://chugao.art/`
   - 健康检查：`https://chugao.art/api/health`

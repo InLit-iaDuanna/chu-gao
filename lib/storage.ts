@@ -766,6 +766,49 @@ function normalizedMimeType(format: string | undefined): string | null {
   return null;
 }
 
+/** Uploads that carry a format the reference pipeline cannot store as-is. */
+export class UnsupportedImageFormatError extends Error {
+  constructor(readonly detected: string) {
+    super("unsupported uploaded image format");
+    this.name = "UnsupportedImageFormatError";
+  }
+}
+
+/**
+ * Magic bytes decide what a file really is. Phone pickers often send an empty
+ * or wrong MIME type (Android reports "" for some gallery picks), so the
+ * declared type alone must not reject a valid photo.
+ */
+export function sniffImageFormat(
+  buffer: Buffer,
+): "png" | "jpeg" | "webp" | "gif" | "heic" | "avif" | "tiff" | null {
+  if (buffer.length >= 8) {
+    if (buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])))
+      return "png";
+    if (buffer.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff]))) return "jpeg";
+  }
+  if (
+    buffer.length >= 12 &&
+    buffer.subarray(0, 4).toString("ascii") === "RIFF" &&
+    buffer.subarray(8, 12).toString("ascii") === "WEBP"
+  )
+    return "webp";
+  if (buffer.length >= 6 && buffer.subarray(0, 4).toString("ascii") === "GIF8")
+    return "gif";
+  if (
+    buffer.length >= 12 &&
+    ["II*\u0000", "MM\u0000*"].includes(buffer.subarray(0, 4).toString("binary"))
+  )
+    return "tiff";
+  if (buffer.length >= 12 && buffer.subarray(4, 8).toString("ascii") === "ftyp") {
+    const brand = buffer.subarray(8, 12).toString("ascii");
+    if (["heic", "heix", "hevc", "heim", "heis", "hevm", "mif1", "msf1"].includes(brand))
+      return "heic";
+    if (["avif", "avis"].includes(brand)) return "avif";
+  }
+  return null;
+}
+
 async function validateAndNormalizeUploadedImage(
   buffer: Buffer,
   declaredMimeType: string,
@@ -782,13 +825,17 @@ async function validateAndNormalizeUploadedImage(
       pages: 1,
     });
     const metadata = await input.metadata();
-    const mimeType = normalizedMimeType(metadata.format);
     const width = metadata.width ?? 0;
     const height = metadata.height ?? 0;
+    // Phone photos arrive HEIC/HEIF; store them as JPEG instead of rejecting.
+    const phoneFormat =
+      metadata.format === "heif" || metadata.format === "avif"
+        ? "image/jpeg"
+        : null;
+    const mimeType = normalizedMimeType(metadata.format) ?? phoneFormat;
 
     if (
       !mimeType ||
-      mimeType !== declaredMimeType ||
       width <= 0 ||
       height <= 0 ||
       width > MAX_IMAGE_DIMENSION ||
@@ -796,6 +843,7 @@ async function validateAndNormalizeUploadedImage(
       width * height > MAX_IMAGE_PIXELS ||
       (metadata.pages ?? 1) !== 1
     ) {
+      if (!mimeType) throw new UnsupportedImageFormatError(metadata.format ?? declaredMimeType);
       throw new Error("invalid uploaded image");
     }
 
@@ -817,8 +865,14 @@ async function validateAndNormalizeUploadedImage(
       height: output.info.height,
       mimeType,
     };
-  } catch {
-    throw new Error("invalid uploaded image");
+  } catch (error) {
+    if (error instanceof UnsupportedImageFormatError) throw error;
+    // A truncated or corrupt PNG/JPEG is not a format problem; only files that
+    // really are another format deserve the "use another format" advice.
+    const sniffed = sniffImageFormat(buffer);
+    if (sniffed === "png" || sniffed === "jpeg" || sniffed === "webp")
+      throw new Error("invalid uploaded image");
+    throw new UnsupportedImageFormatError(sniffed ?? declaredMimeType ?? "unknown");
   }
 }
 

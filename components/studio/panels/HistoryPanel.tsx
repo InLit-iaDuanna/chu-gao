@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@/components/ui";
+import { Button, IconButton } from "@/components/ui";
 
 import { History, ImagePlus, Loader2, RotateCcw } from "lucide-react";
 
@@ -50,7 +50,7 @@ export function HistoryPanel({
       <div className="flex h-full flex-col gap-2 overflow-hidden p-2">
         {Array.from({ length: 6 }, (_, i) => (
           <div key={i} className="flex gap-2.5 px-1 py-1">
-            <div className="h-11 w-11 shrink-0 animate-pulse rounded border border-border bg-surface-2" />
+            <div className="h-12 w-12 shrink-0 animate-pulse rounded-md border border-border bg-surface-2" />
             <div className="min-w-0 flex-1 space-y-2 py-1">
               <div className="h-3 w-full animate-pulse rounded bg-surface-2" />
               <div className="h-2.5 w-2/3 animate-pulse rounded bg-surface-2" />
@@ -63,9 +63,9 @@ export function HistoryPanel({
 
   if (generations.length === 0) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
+      <div className="flex h-full min-w-0 flex-col items-center justify-center gap-3 p-6 text-center tracking-normal">
         <History size={18} className="text-text-faint" />
-        <p className="text-xs text-text-muted">
+        <p className="text-sm leading-6 text-text-muted">
           还没有生成记录，从下方输入框开始第一张图
         </p>
       </div>
@@ -73,7 +73,7 @@ export function HistoryPanel({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex h-full min-h-0 min-w-0 flex-col text-sm tracking-normal">
       <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
         {generations.map((generation) => {
           const image = generation.images[0];
@@ -82,14 +82,14 @@ export function HistoryPanel({
           return (
             <div
               key={generation.id}
-              className="group relative flex flex-col gap-1 rounded-md border-b border-border px-2 py-2 transition-colors hover:bg-surface-2"
+              className="group relative flex min-w-0 flex-col gap-2 border-b border-border px-2 py-3 transition-colors hover:bg-surface-2"
             >
               <Button
                 variant="ghost"
                 type="button"
                 onClick={() => onOpen(generation)}
                 disabled={!image}
-                className="flex h-auto min-w-0 w-full flex-1 items-start gap-2.5 whitespace-normal p-0 text-left"
+                className="h-auto min-h-11 w-full min-w-0 flex-1 items-start gap-3 whitespace-normal rounded-md p-0 text-left font-normal"
               >
                 {image ? (
                   <img
@@ -107,12 +107,12 @@ export function HistoryPanel({
                         }),
                       );
                     }}
-                    className="h-11 w-11 shrink-0 rounded border border-border object-cover"
+                    className="h-12 w-12 shrink-0 rounded-md border border-border object-cover"
                   />
                 ) : (
                   <span
                     className={cn(
-                      "flex h-11 w-11 shrink-0 items-center justify-center rounded border border-border bg-surface-2 text-[9px]",
+                      "flex h-12 w-12 shrink-0 items-center justify-center rounded-md border border-border bg-surface-2 text-xs",
                       active ? "text-brand" : "text-text-faint",
                     )}
                   >
@@ -124,22 +124,24 @@ export function HistoryPanel({
                   </span>
                 )}
                 <span className="min-w-0 flex-1">
-                  <span className="line-clamp-2 text-xs leading-4 text-foreground">
+                  <span className="line-clamp-2 text-sm leading-6 text-foreground [overflow-wrap:anywhere]">
                     {generation.prompt}
                   </span>
-                  <span className="mt-1 flex items-center gap-1.5 text-[10px] text-text-faint">
+                  <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs leading-5 text-text-muted">
                     <span className="max-w-24 truncate">
                       {modelName(generation.modelId)}
                     </span>
                     <span aria-hidden>·</span>
-                    {generation.source === "agent" ? <span className="shrink-0 text-text-muted">Agent ·</span> : null}
+                    {generation.source === "agent" ? (
+                      <span className="shrink-0 text-text-muted">Agent ·</span>
+                    ) : null}
                     <span className="shrink-0">
                       {formatDate(generation.createdAt)}
                     </span>
                     {generation.status !== "SUCCEEDED" ? (
                       <span
                         className={cn(
-                          "shrink-0 rounded px-1 py-px",
+                          "shrink-0 rounded-md px-2 py-0.5",
                           generation.status === "FAILED"
                             ? "bg-danger/12 text-danger"
                             : "bg-surface-3 text-text-muted",
@@ -155,30 +157,30 @@ export function HistoryPanel({
                 </span>
               </Button>
 
-              <span className="flex w-full items-center justify-end gap-1">
+              <span className="flex w-full flex-wrap items-center justify-end gap-1">
                 <CopyTextButton text={generation.prompt} />
                 {image ? (
-                  <Button
+                  <IconButton
                     variant="ghost"
                     type="button"
                     onClick={() => onUseAsReference(generation)}
                     aria-label="用作参考图"
                     title="用作参考图"
-                    className="flex h-11 w-11 items-center justify-center rounded border border-border bg-surface p-0 text-text-muted transition-colors hover:text-foreground sm:h-8 sm:w-8"
+                    className="h-11 w-11 rounded-md sm:h-9 sm:w-9"
                   >
-                    <ImagePlus size={12} />
-                  </Button>
+                    <ImagePlus size={16} />
+                  </IconButton>
                 ) : null}
-                <Button
+                <IconButton
                   variant="ghost"
                   type="button"
                   onClick={() => onRetry(generation)}
                   aria-label="还原提示词与模型"
                   title="还原提示词与模型"
-                  className="flex h-11 w-11 items-center justify-center rounded border border-border bg-surface p-0 text-text-muted transition-colors hover:text-foreground sm:h-8 sm:w-8"
+                  className="h-11 w-11 rounded-md sm:h-9 sm:w-9"
                 >
-                  <RotateCcw size={12} />
-                </Button>
+                  <RotateCcw size={16} />
+                </IconButton>
               </span>
             </div>
           );
@@ -188,11 +190,11 @@ export function HistoryPanel({
       {hasMore ? (
         <div className="shrink-0 border-t border-border p-2">
           <Button
-            variant="ghost"
+            variant="secondary"
             type="button"
             onClick={onLoadMore}
             disabled={loadingMore}
-            className="flex h-7 w-full items-center justify-center gap-1.5 rounded-md border border-border text-xs text-text-muted transition-colors hover:border-border-strong hover:text-foreground disabled:opacity-50"
+            className="h-11 w-full gap-2 rounded-md text-sm sm:h-9"
           >
             {loadingMore ? (
               <Loader2 size={12} className="animate-spin" />

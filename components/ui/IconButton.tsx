@@ -43,15 +43,15 @@ const disabledClass =
   "aria-disabled:border-[rgb(var(--control-disabled-border))] aria-disabled:bg-[rgb(var(--control-disabled-bg))] aria-disabled:text-[rgb(var(--icon-disabled))]";
 
 const sizeClass: Record<IconButtonSize, string> = {
-  sm: "h-7 w-7",
-  md: "h-8 w-8",
-  lg: "h-10 w-10",
+  sm: "h-8 w-8",
+  md: "h-9 w-9",
+  lg: "h-11 w-11",
 };
 
 const iconSize: Record<IconButtonSize, number> = {
-  sm: 12,
-  md: 14,
-  lg: 16,
+  sm: 14,
+  md: 16,
+  lg: 18,
 };
 
 const spinnerSize: Record<IconButtonSize, "sm" | "md"> = {

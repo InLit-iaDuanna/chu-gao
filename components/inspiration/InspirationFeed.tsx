@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, Compass, Plus, Search, Sparkles, X } from "lucide-react";
 
-import { Button, Input } from "@/components/ui";
+import { Button, EmptyState, Input, Segmented, Select } from "@/components/ui";
 import { inspirationRequest } from "./api";
 import { InspirationCard } from "./InspirationCard";
 import type {
@@ -130,13 +130,13 @@ export function InspirationFeed({
         filters.disciplines.find((item) => item.value === discipline)?.label ??
         "灵感圈"
       );
-    return "把一个设计问题，聊清楚。";
+    return "灵感圈";
   }, [discipline, filters.disciplines, tag]);
 
   const searchForm = (
     <form
       className={
-        embedded ? "flex w-full max-w-2xl gap-2" : "mt-8 flex max-w-xl gap-2"
+        embedded ? "flex w-full max-w-2xl gap-2" : "mt-5 flex max-w-xl gap-2"
       }
       onSubmit={(event) => {
         event.preventDefault();
@@ -153,54 +153,51 @@ export function InspirationFeed({
           value={searchValue}
           onChange={(event) => setSearchValue(event.target.value)}
           placeholder="搜索设计问题、标签或作品"
-          className="h-10 pl-9"
+          className="h-9 pl-9"
         />
       </label>
-      <Button type="submit" variant="secondary" className="h-10 px-4">
+      <Button type="submit" variant="secondary">
         搜索
       </Button>
     </form>
   );
 
   return (
-    <main>
+    <main className="min-w-0 break-words text-sm tracking-normal">
       {embedded ? (
         <section className="border-b border-border">
           <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
             {searchForm}
             {tag || discipline ? (
-              <p className="text-xs text-text-muted">当前筛选：{title}</p>
+              <p className="min-w-0 max-w-full break-words text-xs text-text-muted">
+                当前筛选：{title}
+              </p>
             ) : null}
           </div>
         </section>
       ) : (
         <section className="border-b border-border">
-          <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-14">
-            <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
-              <div className="max-w-3xl">
-                <p className="font-mono text-xs uppercase tracking-[0.18em] text-brand">
-                  Cross-disciplinary design conversations
-                </p>
-                <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-5xl">
+          <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+            <div className="app-page-header flex flex-wrap items-start justify-between gap-4 border-0 pb-0">
+              <div className="min-w-0 max-w-3xl">
+                <h1 className="app-page-title break-words text-xl font-semibold tracking-normal sm:text-2xl">
                   {title}
                 </h1>
-                <p className="mt-4 max-w-2xl text-sm leading-7 text-text-muted">
-                  看作品只是开始。这里讨论洞察、过程、模式与问题，让一个想法能够被理解、回应，并继续生长。
+                <p className="app-page-description mt-2 max-w-2xl text-sm leading-6 text-text-muted">
+                  作品、过程、模式与设计问题。
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Link
-                  href={`${basePath}/daily`}
-                  className="tool-button h-10 px-4 text-sm text-text-muted"
-                >
-                  <Sparkles size={15} /> 每日命题
-                </Link>
-                <Link
-                  href="/app/publish"
-                  className="tool-button h-10 border-brand bg-brand px-4 text-sm text-on-accent hover:bg-brand-hover"
-                >
-                  <Plus size={15} /> 发布灵感
-                </Link>
+                <Button asChild>
+                  <Link href={`${basePath}/daily`}>
+                    <Sparkles size={16} /> 每日命题
+                  </Link>
+                </Button>
+                <Button asChild variant="primary">
+                  <Link href="/app/publish">
+                    <Plus size={16} /> 发布灵感
+                  </Link>
+                </Button>
               </div>
             </div>
 
@@ -210,66 +207,41 @@ export function InspirationFeed({
       )}
 
       <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
-        <div className="flex flex-col gap-3 border-b border-border pb-5">
-          <div className="flex flex-wrap gap-1">
-            {[
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
+          <Segmented
+            aria-label="灵感排序"
+            value={tab}
+            onChange={(value) => updateFilter("tab", value)}
+            className="max-w-full [&_button]:h-9 [&_button]:rounded-md [&_button]:text-sm"
+            options={[
               ["recommended", "推荐"],
               ["hot", "热门"],
               ["latest", "最新"],
               ["following", "关注"],
-            ].map(([value, label]) => (
-              <Button
-                key={value}
-                variant="ghost"
-                onClick={() => updateFilter("tab", value)}
-                aria-pressed={tab === value}
-                className={`h-8 px-3 text-xs ${tab === value ? "bg-surface-2 text-foreground" : "text-text-muted"}`}
-              >
-                {label}
-              </Button>
-            ))}
-          </div>
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            <button
-              type="button"
-              onClick={() => updateFilter("discipline", "")}
-              aria-pressed={!discipline}
-              className={`shrink-0 rounded-full border px-3 py-1 text-xs ${!discipline ? "border-brand bg-brand/10 text-brand" : "border-border text-text-muted"}`}
-            >
-              全部学科
-            </button>
-            {filters.disciplines.map((item) => (
-              <button
-                key={item.value}
-                type="button"
-                onClick={() => updateFilter("discipline", item.value)}
-                aria-pressed={discipline === item.value}
-                className={`shrink-0 rounded-full border px-3 py-1 text-xs ${discipline === item.value ? "border-brand bg-brand/10 text-brand" : "border-border text-text-muted hover:border-border-strong"}`}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            <button
-              type="button"
-              onClick={() => updateFilter("shape", "")}
-              aria-pressed={!shape}
-              className={`shrink-0 rounded-md px-2 py-1 text-xs ${!shape ? "bg-surface-2 text-foreground" : "text-text-muted"}`}
-            >
-              全部类型
-            </button>
-            {filters.shapes.map((item) => (
-              <button
-                key={item.value}
-                type="button"
-                onClick={() => updateFilter("shape", item.value)}
-                aria-pressed={shape === item.value}
-                className={`shrink-0 rounded-md px-2 py-1 text-xs ${shape === item.value ? "bg-surface-2 text-foreground" : "text-text-muted hover:text-foreground"}`}
-              >
-                {item.label}
-              </button>
-            ))}
+            ].map(([value, label]) => ({ value, label }))}
+          />
+          <div className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:min-w-80">
+            <Select
+              aria-label="筛选学科"
+              value={discipline || "all"}
+              onValueChange={(value) =>
+                updateFilter("discipline", value === "all" ? "" : value)
+              }
+              options={[
+                { value: "all", label: "全部学科" },
+                ...filters.disciplines,
+              ]}
+              className="h-9 min-w-0"
+            />
+            <Select
+              aria-label="筛选内容类型"
+              value={shape || "all"}
+              onValueChange={(value) =>
+                updateFilter("shape", value === "all" ? "" : value)
+              }
+              options={[{ value: "all", label: "全部类型" }, ...filters.shapes]}
+              className="h-9 min-w-0"
+            />
           </div>
         </div>
 
@@ -295,13 +267,14 @@ export function InspirationFeed({
             ))}
           </div>
         ) : error ? (
-          <div className="surface-panel mt-6 flex min-h-64 flex-col items-center justify-center gap-3 px-5 text-center">
-            <Compass size={24} className="text-text-faint" />
-            <p className="text-sm text-text-muted">{error}</p>
-            <Button variant="secondary" onClick={() => void load()}>
-              重新加载
-            </Button>
-          </div>
+          <EmptyState
+            className="mt-6 min-h-64"
+            role="alert"
+            icon={Compass}
+            title="灵感暂时无法读取"
+            description={error}
+            action={<Button onClick={() => void load()}>重新加载</Button>}
+          />
         ) : items.length ? (
           <>
             <div className="columns-1 gap-4 pt-6 sm:columns-2 lg:columns-3 xl:columns-4">
@@ -336,23 +309,23 @@ export function InspirationFeed({
             ) : null}
           </>
         ) : (
-          <div className="surface-panel mt-6 flex min-h-72 flex-col items-center justify-center gap-3 px-5 text-center">
-            <Compass size={26} className="text-text-faint" />
-            <h2 className="text-lg font-medium">
-              {hasFilters ? "没有找到匹配的灵感" : "还没有灵感内容"}
-            </h2>
-            <p className="max-w-sm text-sm leading-6 text-text-muted">
-              {hasFilters
+          <EmptyState
+            className="mt-6 min-h-64"
+            icon={Compass}
+            title={hasFilters ? "没有找到匹配的灵感" : "还没有灵感内容"}
+            description={
+              hasFilters
                 ? "试试其他关键词，或清空筛选。"
-                : "成为第一个提出问题、拆解模式或分享过程的人。"}
-            </p>
-            <Link
-              href="/app/publish"
-              className="tool-button mt-2 h-9 px-4 text-sm text-text-muted"
-            >
-              发布第一条灵感
-            </Link>
-          </div>
+                : "分享你的作品、过程或设计问题。"
+            }
+            action={
+              <Button asChild variant="primary">
+                <Link href="/app/publish">
+                  <Plus size={16} /> 发布第一条灵感
+                </Link>
+              </Button>
+            }
+          />
         )}
       </section>
     </main>

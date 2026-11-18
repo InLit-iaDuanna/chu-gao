@@ -42,7 +42,7 @@ import type { ModelInfo } from "./lib/types";
 import { ReferenceDropZone, ReferenceThumbnails } from "./ReferenceDropZone";
 import { CopyTextButton } from "./CopyTextButton";
 import { QualitySlider, qualityLabel } from "./QualitySlider";
-import { ChatModelControls } from "./ChatModelControls";
+import { ChatModelControls, ChatModelPrice } from "./ChatModelControls";
 import { REFERENCE_ACCEPT } from "./lib/reference-input";
 import { resolveGenerationOptions } from "./lib/generation-options";
 import { parseImageCommand } from "@/lib/image-command";
@@ -211,7 +211,7 @@ export function CommandDock({
     Boolean(imageCommand && !imageCommand.prompt.trim()) ||
     !prompt.trim();
   const toolClass =
-    "h-8 w-8 shrink-0 rounded-lg border-border bg-transparent p-0 text-text-muted hover:bg-surface-2 hover:text-foreground focus-visible:ring-2 focus-visible:ring-foreground/30 aria-disabled:border-transparent aria-disabled:bg-transparent";
+    "h-9 w-9 shrink-0 rounded-md border-transparent bg-transparent p-0 text-text-muted hover:bg-surface-2 hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40 aria-disabled:border-transparent aria-disabled:bg-transparent";
   const selectedQuality =
     params.quality ?? model?.defaults.quality ?? qualities[0] ?? "auto";
 
@@ -256,7 +256,7 @@ export function CommandDock({
         onFile={onUploadFile}
         onReference={onAddReference}
         disabled={busy || !supportsReference || referencesFull}
-        className="smooth-surface dock-shell studio-composer"
+        className="dock-shell studio-composer"
       >
         <ReferenceThumbnails
           references={params.referenceImages}
@@ -265,7 +265,7 @@ export function CommandDock({
         />
         <div className="space-y-2 p-3 sm:p-4 sm:pb-3">
           {isAgent && agentQuestion ? (
-            <div className="flex min-w-0 items-start gap-2 border-l border-border-strong px-3 py-1 text-xs leading-5 text-text-muted">
+            <div className="flex min-w-0 items-start gap-2 rounded-md bg-surface-2 px-3 py-2 text-xs leading-5 text-text-muted">
               <span className="shrink-0 font-medium text-foreground">回答</span>
               <span className="min-w-0 flex-1 break-words">
                 {agentQuestion}
@@ -413,8 +413,8 @@ export function CommandDock({
                       variant="ghost"
                       size="lg"
                       type="button"
-                      aria-label="生图设置"
-                      title="生图设置"
+                      aria-label="生成参数"
+                      title="生成参数与工具"
                       aria-pressed={paramsOpen}
                       disabled={busy}
                       className={cn(
@@ -429,11 +429,11 @@ export function CommandDock({
                     side="top"
                     align="start"
                     collisionPadding={12}
-                    aria-label="生图设置"
-                    className="studio-workspace max-h-[min(65dvh,var(--radix-popover-content-available-height))] w-[min(320px,calc(100vw-24px))] overflow-y-auto overflow-x-hidden p-5 shadow-[0_12px_32px_-24px_rgb(0_0_0/0.3)]"
+                    aria-label="生成参数"
+                    className="studio-workspace max-h-[min(65dvh,var(--radix-popover-content-available-height))] w-[min(320px,calc(100vw-24px))] overflow-y-auto p-4"
                   >
                     <div className="space-y-5">
-                      <p className="text-sm font-normal tracking-[0.04em]">生图设置</p>
+                      <p className="text-sm font-semibold">生成参数</p>
                       <div className="space-y-2">
                         <p className="text-xs font-medium text-text-muted">
                           图片路由
@@ -749,7 +749,7 @@ export function CommandDock({
                   onClick={() => setExpanded(true)}
                   className={cn(
                     toolClass,
-                    "hidden border-transparent sm:inline-flex",
+                    "hidden sm:inline-flex sm:h-9 sm:w-9",
                   )}
                 >
                   <Maximize2 size={16} />
@@ -762,9 +762,9 @@ export function CommandDock({
                   aria-label="停止回复"
                   title="停止回复"
                   onClick={onStop}
-                  className="h-8 w-8 rounded-lg border-transparent bg-foreground text-background hover:bg-foreground/85"
+                  className="h-9 w-9 rounded-full border-transparent bg-foreground text-background hover:bg-foreground/85"
                 >
-                  <Square size={12} fill="currentColor" />
+                  <Square size={15} fill="currentColor" />
                 </IconButton>
               ) : (
                 <IconButton
@@ -783,18 +783,19 @@ export function CommandDock({
                   }
                   aria-busy={busy || undefined}
                   className={cn(
-                    "studio-submit h-8 w-8 rounded-lg p-0",
+                    "studio-submit h-9 w-9 rounded-md p-0",
+                    isChat && "rounded-full",
                     submitDisabled
-                      ? "border-transparent bg-foreground/25 text-background aria-disabled:border-transparent aria-disabled:bg-foreground/25"
+                      ? "border-transparent bg-surface-2 text-text-faint aria-disabled:border-transparent aria-disabled:bg-surface-2"
                       : isChat
-                        ? "border-transparent bg-[rgb(var(--studio-accent))] text-[rgb(var(--studio-accent-ink))] hover:bg-[rgb(var(--studio-accent))]/85 hover:text-[rgb(var(--studio-accent-ink))]"
+                        ? "border-transparent bg-foreground text-background hover:bg-foreground/85 hover:text-background"
                         : "border-transparent bg-[rgb(var(--studio-highlight,var(--brand-primary)))] text-[rgb(var(--studio-highlight-ink,var(--on-accent)))] hover:bg-[rgb(var(--studio-highlight,var(--brand-primary)))]/85 hover:text-[rgb(var(--studio-highlight-ink,var(--on-accent)))]",
                   )}
                 >
                   {busy ? (
                     <Spinner className="h-4 w-4" />
                   ) : (
-                    <ArrowUp size={17} strokeWidth={2.2} />
+                    <ArrowUp size={20} strokeWidth={2.2} />
                   )}
                 </IconButton>
               )}
@@ -805,15 +806,20 @@ export function CommandDock({
       {isChat && !imageCommand && chatTools ? (
         <div className="flex min-h-6 flex-wrap items-center justify-between gap-x-2 px-1 text-[11px] leading-4 text-text-faint">
           <div className="flex min-w-0 items-center gap-0">{chatTools}</div>
+          <ChatModelPrice model={chatModel} className="ml-auto text-[11px]" />
         </div>
       ) : (
         <div className="flex min-h-6 items-start justify-between gap-2 px-1 text-[11px] leading-4 text-text-faint">
           <span className="min-w-0">
-            {optimizing
-              ? "正在优化提示词…"
-              : uploading
-                ? "参考图上传中…"
-                : ""}
+            {optimizing ? (
+              "正在优化提示词…"
+            ) : uploading ? (
+              "参考图上传中…"
+            ) : isChat && !imageCommand && chatModel ? (
+              <ChatModelPrice model={chatModel} />
+            ) : (
+              ""
+            )}
           </span>
           <span
             className={cn(

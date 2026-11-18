@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ArrowLeft, CalendarDays, Plus, Sparkles } from "lucide-react";
 
-import { Button } from "@/components/ui";
+import { Button, EmptyState } from "@/components/ui";
 import {
   inspirationRequest,
   InspirationApiError,
@@ -90,61 +90,61 @@ export function DailyPromptPage({
     return (
       <main className="mx-auto flex min-h-[65vh] max-w-4xl flex-col items-center justify-center gap-4 px-6 text-center">
         <Sparkles size={30} className="text-text-faint" />
-        <h1 className="text-3xl font-semibold">今天的命题正在策展</h1>
+        <h1 className="app-page-title text-xl font-semibold sm:text-2xl">
+          今天的命题正在策展
+        </h1>
         <p className="max-w-lg text-sm leading-7 text-text-muted">
           管理员发布命题后会出现在这里。现在可以先去广场看看大家正在讨论的问题。
         </p>
-        <Link
-          href={basePath}
-          className="tool-button h-9 px-4 text-sm text-text-muted"
-        >
-          <ArrowLeft size={14} /> 返回广场
-        </Link>
+        <Button asChild>
+          <Link href={basePath}>
+            <ArrowLeft size={16} /> 返回广场
+          </Link>
+        </Button>
       </main>
     );
   }
 
   const prompt = data.prompt;
   return (
-    <main>
-      <section className="border-b border-border bg-gradient-to-b from-brand/8 to-transparent">
-        <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16">
-          <Link
-            href={basePath}
-            className="inline-flex items-center gap-1.5 text-xs text-text-muted hover:text-foreground"
-          >
-            <ArrowLeft size={14} /> 灵感广场
-          </Link>
-          <div className="mt-8 max-w-4xl">
-            <div className="flex flex-wrap items-center gap-2 font-mono text-xs uppercase tracking-[0.16em] text-brand">
+    <main className="min-w-0 text-sm tracking-normal">
+      <section className="border-b border-border">
+        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+          <Button asChild variant="ghost" className="px-2">
+            <Link href={basePath}>
+              <ArrowLeft size={16} /> 灵感广场
+            </Link>
+          </Button>
+          <div className="app-page-header mt-5 block max-w-4xl border-0 pb-0">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-text-muted">
               <CalendarDays size={14} /> {prompt.day} · 每日命题
             </div>
-            <h1 className="mt-4 text-4xl font-semibold tracking-tight sm:text-6xl">
+            <h1 className="app-page-title mt-3 break-words text-xl font-semibold tracking-normal sm:text-2xl">
               {prompt.title}
             </h1>
-            <p className="mt-6 max-w-3xl whitespace-pre-wrap text-base leading-8 text-text-muted">
+            <p className="app-page-description mt-3 max-w-3xl whitespace-pre-wrap break-words text-sm leading-7 text-text-muted">
               {prompt.prompt}
             </p>
-            <div className="mt-6 flex flex-wrap gap-2">
+            <div className="mt-4 flex flex-wrap gap-2">
               {prompt.keywords.map((keyword) => (
                 <span
                   key={keyword}
-                  className="rounded-full border border-border px-3 py-1 text-xs text-text-muted"
+                  className="max-w-full break-words rounded-md bg-surface-2 px-2.5 py-1 text-xs text-text-muted"
                 >
                   #{keyword}
                 </span>
               ))}
             </div>
-            <div className="mt-8 flex flex-wrap gap-2">
-              <Link
-                href={`/app/publish?dailyPrompt=${prompt.id}&shape=QUESTION&discipline=${prompt.discipline}`}
-                className="tool-button h-10 border-brand bg-brand px-4 text-sm text-on-accent hover:bg-brand-hover"
-              >
-                <Plus size={15} /> 回应今日命题
-              </Link>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Button asChild variant="primary">
+                <Link
+                  href={`/app/publish?dailyPrompt=${prompt.id}&shape=QUESTION&discipline=${prompt.discipline}`}
+                >
+                  <Plus size={16} /> 回应今日命题
+                </Link>
+              </Button>
               <Button
                 variant="secondary"
-                className="h-10"
                 disabled={followPending}
                 aria-pressed={following}
                 onClick={() => void followDiscipline()}
@@ -160,11 +160,12 @@ export function DailyPromptPage({
         </div>
       </section>
 
-      <div className="mx-auto max-w-7xl space-y-12 px-4 py-10 sm:px-6">
+      <div className="mx-auto max-w-7xl space-y-8 px-4 py-6 sm:px-6">
         {prompt.features.length ? (
           <section>
-            <p className="eyebrow">Curated references</p>
-            <h2 className="mt-2 text-2xl font-semibold">今日策展</h2>
+            <h2 className="app-section-title text-xl font-semibold">
+              今日策展
+            </h2>
             <div className="mt-5 columns-1 gap-4 sm:columns-2 lg:columns-3 xl:columns-4">
               {prompt.features.map((post) => (
                 <InspirationCard
@@ -177,10 +178,11 @@ export function DailyPromptPage({
           </section>
         ) : null}
         <section>
-          <div className="flex items-end justify-between gap-4">
+          <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
-              <p className="eyebrow">Community responses</p>
-              <h2 className="mt-2 text-2xl font-semibold">大家的回应</h2>
+              <h2 className="app-section-title text-xl font-semibold">
+                大家的回应
+              </h2>
             </div>
             <span className="text-xs text-text-muted">
               {prompt.responses.length} 条
@@ -197,18 +199,20 @@ export function DailyPromptPage({
               ))}
             </div>
           ) : (
-            <div className="surface-panel mt-5 flex min-h-48 flex-col items-center justify-center gap-3 px-5 text-center">
-              <Sparkles size={22} className="text-text-faint" />
-              <p className="text-sm text-text-muted">
-                还没有人回应今天的命题。
-              </p>
-              <Link
-                href={`/app/publish?dailyPrompt=${prompt.id}&shape=QUESTION&discipline=${prompt.discipline}`}
-                className="tool-button h-9 px-4 text-sm text-text-muted"
-              >
-                成为第一个回应者
-              </Link>
-            </div>
+            <EmptyState
+              className="mt-5 min-h-48"
+              icon={Sparkles}
+              title="还没有人回应今天的命题。"
+              action={
+                <Button asChild>
+                  <Link
+                    href={`/app/publish?dailyPrompt=${prompt.id}&shape=QUESTION&discipline=${prompt.discipline}`}
+                  >
+                    <Plus size={16} /> 成为第一个回应者
+                  </Link>
+                </Button>
+              }
+            />
           )}
         </section>
       </div>

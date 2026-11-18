@@ -1,6 +1,8 @@
 import { getLunaConfig } from "@/lib/luna-config";
 import { getSolConfig } from "@/lib/sol-config";
 import { getOpusConfig } from "@/lib/opus-config";
+import { getPremiumAnthropicConfig } from "@/lib/premium-anthropic-config";
+import { getGeminiConfig } from "@/lib/gemini-config";
 import {
   OPUS_MAX_INPUT_TOKENS,
   OPUS_MAX_OUTPUT_TOKENS,
@@ -10,11 +12,54 @@ import {
   LUNA_MODEL_ID,
   SOL_MODEL_ID,
   OPUS_MODEL_ID,
+  FABLE_MODEL_ID,
+  GEMINI_MODEL_IDS,
+  PREMIUM_OPUS_MODEL_ID,
   REASONING_EFFORTS,
+  GEMINI_REASONING_EFFORTS,
 } from "@/lib/chat-model-options";
 
+function tokenProfile(
+  config: Awaited<ReturnType<typeof getOpusConfig>>,
+  maxInputTokens = OPUS_MAX_INPUT_TOKENS,
+  transport:
+    | "chat_completions_sse"
+    | "anthropic_messages_sse" = "chat_completions_sse",
+) {
+  return {
+    ...config,
+    credits: 0,
+    tokenPricing: {
+      version: 1,
+      pricing: config.pricing,
+      maxInputTokens,
+      maxOutputTokens: OPUS_MAX_OUTPUT_TOKENS,
+    } satisfies ChatTokenPricingSnapshot,
+    transport,
+    efforts: REASONING_EFFORTS as readonly string[],
+    vision: true,
+    webSearch: transport === "anthropic_messages_sse",
+  };
+}
+
 async function getOpusProfile() {
-  const config = await getOpusConfig();
+  return tokenProfile(
+    await getOpusConfig(),
+    OPUS_MAX_INPUT_TOKENS,
+    "anthropic_messages_sse",
+  );
+}
+
+async function getPremiumProfile(modelId: string) {
+  return tokenProfile(
+    await getPremiumAnthropicConfig(modelId),
+    OPUS_MAX_INPUT_TOKENS,
+    "anthropic_messages_sse",
+  );
+}
+
+async function getGeminiProfile(modelId: string) {
+  const config = await getGeminiConfig(modelId);
   return {
     ...config,
     credits: 0,
@@ -24,12 +69,10 @@ async function getOpusProfile() {
       maxInputTokens: OPUS_MAX_INPUT_TOKENS,
       maxOutputTokens: OPUS_MAX_OUTPUT_TOKENS,
     } satisfies ChatTokenPricingSnapshot,
-    transport: "chat_completions_sse" as const,
-    efforts: REASONING_EFFORTS as readonly string[],
+    transport: "responses_sse" as const,
+    efforts: GEMINI_REASONING_EFFORTS as readonly string[],
     vision: true,
-    // The relay has no search of its own; the application runs web_search.
-    webSearch: true,
-    searchTool: true,
+    webSearch: false,
   };
 }
 
@@ -39,6 +82,12 @@ export async function getChatProfile(modelId: string) {
   if (modelId === OPUS_MODEL_ID || modelId === "default") {
     return getOpusProfile();
   }
+  if (modelId === PREMIUM_OPUS_MODEL_ID || modelId === FABLE_MODEL_ID) {
+    return getPremiumProfile(modelId);
+  }
+  if ((GEMINI_MODEL_IDS as readonly string[]).includes(modelId)) {
+    return getGeminiProfile(modelId);
+  }
   if (modelId === SOL_MODEL_ID)
     return {
       ...(await getSolConfig()),
@@ -46,7 +95,6 @@ export async function getChatProfile(modelId: string) {
       efforts: REASONING_EFFORTS as readonly string[],
       vision: true,
       webSearch: true,
-      searchTool: false,
     };
   if (modelId === LUNA_MODEL_ID)
     return {
@@ -55,7 +103,6 @@ export async function getChatProfile(modelId: string) {
       efforts: REASONING_EFFORTS as readonly string[],
       vision: true,
       webSearch: true,
-      searchTool: false,
     };
   throw new Error("Unknown conversation model");
 }

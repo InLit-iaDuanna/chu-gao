@@ -4,6 +4,8 @@ import { OPUS_MODEL_ID, SOL_MODEL_ID } from "@/lib/chat-model-options";
 
 export const CHAT_CONTEXT_BUDGET_TOKENS = 24_000;
 export const CHAT_CONTEXT_AUTO_COMPACT_RATIO = 0.85;
+/** After a finished turn, compact in the background from this ratio on. */
+export const CHAT_CONTEXT_PRECOMPACT_RATIO = 0.7;
 export const OPUS_CONTEXT_BUDGET_MIN = 100_000;
 export const OPUS_CONTEXT_BUDGET_MAX = 1_000_000;
 export const OPUS_CONTEXT_BUDGET_STEP = 100_000;
@@ -19,6 +21,14 @@ export const SOL_CONTEXT_BUDGET_OPTIONS = Array.from(
   (_, index) => (index + 1) * SOL_CONTEXT_BUDGET_STEP,
 );
 export const CHAT_CONTEXT_ESTIMATOR_VERSION = "chat-budget-v2";
+
+/** Compaction failures after which a turn is sent uncompacted if it still fits. */
+export const COMPACTION_FALLBACK_CODES: ReadonlySet<string> = new Set([
+  "CHAT_CONTEXT_SUMMARY_FAILED",
+  "CHAT_CONTEXT_TIMEOUT",
+  "CHAT_CONTEXT_BUSY",
+  "CHAT_CONTEXT_MESSAGE_TOO_LARGE",
+]);
 
 export function contextBudgetOptionsForModel(modelId?: string) {
   if (modelId === OPUS_MODEL_ID) return OPUS_CONTEXT_BUDGET_OPTIONS;

@@ -11,7 +11,7 @@ export default async function AgentAuthorizePage({
     (Array.isArray(userCodeParam) ? userCodeParam[0] : userCodeParam) ?? "";
 
   return (
-    <StudioPageShell eyebrow="Agent" title="授权 Agent">
+    <StudioPageShell title="授权 Agent">
       <AgentAuthorizeView key={userCode} initialUserCode={userCode} />
     </StudioPageShell>
   );

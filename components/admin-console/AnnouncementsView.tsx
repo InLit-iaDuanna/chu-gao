@@ -187,7 +187,7 @@ export function AnnouncementsView() {
       {notice ? <p className="mb-3 text-sm text-success">{notice}</p> : null}
 
       {!items ? (
-        <div className="surface-panel h-64 animate-pulse" />
+        <div className="h-64 animate-pulse rounded-lg border border-border bg-surface-2" />
       ) : items.length === 0 ? (
         <EmptyPanel text="暂无公告，点击右上角「新建公告」发布第一条" />
       ) : (
@@ -202,7 +202,7 @@ export function AnnouncementsView() {
                 className="border-b border-border/60 last:border-0"
               >
                 <td className="max-w-72 px-4 py-2.5">
-                  <p className="truncate text-[13px] font-medium">
+                  <p className="truncate text-sm font-medium">
                     {item.title || "（无标题）"}
                   </p>
                   <p className="mt-0.5 truncate text-xs text-text-faint">
@@ -240,7 +240,7 @@ export function AnnouncementsView() {
                     {schedule}
                   </span>
                   {item.startsAt || item.endsAt ? (
-                    <p className="mt-0.5 text-[10px] text-text-faint">
+                    <p className="mt-0.5 text-xs text-text-faint">
                       {item.startsAt ? formatDate(item.startsAt) : "即刻"}
                       {" → "}
                       {item.endsAt ? formatDate(item.endsAt) : "长期"}
@@ -270,7 +270,7 @@ export function AnnouncementsView() {
                       onClick={() => openEdit(item)}
                       aria-label="编辑公告"
                       title="编辑"
-                      className="flex h-7 w-7 items-center justify-center rounded-md p-0 text-text-muted transition-colors hover:bg-surface-2 hover:text-foreground"
+                      className="flex h-9 w-9 items-center justify-center rounded-md p-0 text-text-muted transition-colors hover:bg-surface-2 hover:text-foreground"
                     >
                       <Pencil size={13} />
                     </Button>
@@ -286,7 +286,7 @@ export function AnnouncementsView() {
                       }}
                       aria-label="删除公告"
                       title="删除"
-                      className="flex h-7 w-7 items-center justify-center rounded-md p-0 text-text-muted transition-colors hover:bg-danger/10 hover:text-danger"
+                      className="flex h-9 w-9 items-center justify-center rounded-md p-0 text-text-muted transition-colors hover:bg-danger/10 hover:text-danger"
                     >
                       <Trash2 size={13} />
                     </Button>
@@ -305,18 +305,20 @@ export function AnnouncementsView() {
           </DialogHeader>
 
           <div className="grid max-h-[62vh] gap-3 overflow-y-auto px-5 pb-4">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               <AdminField label="标题（可空）">
                 <Input
+                  className="h-9 text-sm"
                   value={form.title}
                   maxLength={80}
                   placeholder="例：新版本上线"
                   onChange={(event) => patch({ title: event.target.value })}
                 />
               </AdminField>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-3 sm:grid-cols-2">
                 <AdminField label="色调">
                   <Select
+                    className="h-9 text-sm"
                     aria-label="色调"
                     value={form.tone}
                     onValueChange={(value) =>
@@ -331,6 +333,7 @@ export function AnnouncementsView() {
                 </AdminField>
                 <AdminField label="展示方式">
                   <Select
+                    className="h-9 text-sm"
                     aria-label="展示方式"
                     value={form.displayMode}
                     onValueChange={(value) =>
@@ -356,9 +359,10 @@ export function AnnouncementsView() {
               />
             </AdminField>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               <AdminField label="链接文字（可空）">
                 <Input
+                  className="h-9 text-sm"
                   value={form.linkLabel ?? ""}
                   maxLength={24}
                   placeholder="查看详情"
@@ -369,6 +373,7 @@ export function AnnouncementsView() {
               </AdminField>
               <AdminField label="链接地址（可空）">
                 <Input
+                  className="h-9 text-sm"
                   value={form.linkUrl ?? ""}
                   maxLength={500}
                   placeholder="https://… 或 /app/history"
@@ -379,9 +384,10 @@ export function AnnouncementsView() {
               </AdminField>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               <AdminField label="开始时间（可空）">
                 <Input
+                  className="h-9 text-sm"
                   type="datetime-local"
                   value={isoToLocalInput(form.startsAt ?? null)}
                   onChange={(event) =>
@@ -391,6 +397,7 @@ export function AnnouncementsView() {
               </AdminField>
               <AdminField label="结束时间（可空）">
                 <Input
+                  className="h-9 text-sm"
                   type="datetime-local"
                   value={isoToLocalInput(form.endsAt ?? null)}
                   onChange={(event) =>
@@ -410,7 +417,7 @@ export function AnnouncementsView() {
 
             {/* 实时预览：与前台 AnnouncementBanner 同一套扁平样式 */}
             <div className="rounded-md border border-border">
-              <p className="border-b border-border px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-text-faint">
+              <p className="border-b border-border px-3 py-1.5 font-mono text-xs uppercase tracking-normal text-text-faint">
                 预览
               </p>
               {form.displayMode !== "popup" ? (
@@ -449,7 +456,7 @@ export function AnnouncementsView() {
                           TONE_DOT[form.tone],
                         )}
                       />
-                      <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-text-faint">
+                      <span className="font-mono text-xs uppercase tracking-normal text-text-faint">
                         公告
                       </span>
                     </div>
@@ -460,11 +467,11 @@ export function AnnouncementsView() {
                       {form.body || "公告内容…"}
                     </p>
                     <div className="mt-3 flex items-center justify-between border-t border-border pt-2.5">
-                      <span className="flex items-center gap-1.5 text-[10px] text-text-faint">
+                      <span className="flex items-center gap-1.5 text-xs text-text-faint">
                         <Megaphone size={10} />
                         Chūgǎo Studio
                       </span>
-                      <span className="rounded-md bg-brand px-2.5 py-1 text-[10px] font-medium text-on-accent">
+                      <span className="rounded-md bg-brand px-2.5 py-1 text-xs font-medium text-on-accent">
                         我知道了
                       </span>
                     </div>

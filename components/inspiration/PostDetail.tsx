@@ -12,7 +12,7 @@ import {
   UserPlus,
 } from "lucide-react";
 
-import { Button, useToast } from "@/components/ui";
+import { Button, EmptyState, useToast } from "@/components/ui";
 import {
   inspirationRequest,
   InspirationApiError,
@@ -152,39 +152,40 @@ export function PostDetail({
     );
   if (!post || error)
     return (
-      <div className="mx-auto flex min-h-[60vh] max-w-4xl flex-col items-center justify-center gap-3 px-6 text-center">
-        <h1 className="text-2xl">帖子无法打开</h1>
-        <p className="text-sm text-text-muted">{error}</p>
-        <Link
-          href={basePath}
-          className="tool-button h-9 px-4 text-sm text-text-muted"
-        >
-          <ArrowLeft size={14} /> 返回广场
-        </Link>
-      </div>
+      <EmptyState
+        className="mx-auto min-h-[60vh] max-w-4xl"
+        role="alert"
+        title="帖子无法打开"
+        description={error}
+        action={
+          <Button asChild>
+            <Link href={basePath}>
+              <ArrowLeft size={16} /> 返回广场
+            </Link>
+          </Button>
+        }
+      />
     );
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
-      <Link
-        href={basePath}
-        className="inline-flex items-center gap-1.5 text-xs text-text-muted hover:text-foreground"
-      >
-        <ArrowLeft size={14} /> 返回灵感广场
-      </Link>
-      <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="space-y-6">
+    <main className="mx-auto min-w-0 max-w-6xl break-words px-4 py-6 text-sm tracking-normal sm:px-6">
+      <Button asChild variant="ghost" className="px-2">
+        <Link href={basePath}>
+          <ArrowLeft size={16} /> 返回灵感广场
+        </Link>
+      </Button>
+      <div className="mt-6 grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="min-w-0 space-y-6">
           {post.media.length ? (
             <section className="space-y-3">
               {post.media.map((media) => (
-                <figure
-                  key={media.id}
-                  className="surface-panel overflow-hidden p-2"
-                >
+                <figure key={media.id} className="min-w-0 overflow-hidden">
                   <img
                     src={media.url}
                     alt={post.title}
-                    className="h-auto w-full rounded-[8px] bg-surface-2 object-contain"
+                    width={media.width}
+                    height={media.height}
+                    className="h-auto w-full rounded-lg bg-surface-2 object-contain"
                   />
                   {media.role === "PROCESS" ? (
                     <figcaption className="px-2 py-2 text-xs text-text-muted">
@@ -196,9 +197,9 @@ export function PostDetail({
             </section>
           ) : null}
 
-          <article className="surface-panel p-5 sm:p-7">
+          <article className="min-w-0 border-b border-border pb-6">
             <div className="flex flex-wrap items-center gap-2 text-xs text-text-muted">
-              <span className="rounded-full border border-border px-2.5 py-1">
+              <span className="rounded-md bg-surface-2 px-2.5 py-1">
                 {post.shapeLabel}
               </span>
               <span>{post.disciplineLabel}</span>
@@ -211,18 +212,20 @@ export function PostDetail({
                 </>
               ) : null}
             </div>
-            <h1 className="mt-4 text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
+            <h1 className="app-page-title mt-4 break-words text-xl font-semibold leading-8 tracking-normal sm:text-2xl">
               {post.title}
             </h1>
             {post.story ? (
-              <div className="mt-6 whitespace-pre-wrap text-[15px] leading-8 text-text-muted">
+              <div className="mt-4 whitespace-pre-wrap break-words text-sm leading-7 text-text-muted">
                 {post.story}
               </div>
             ) : null}
             {post.sourceNote ? (
-              <div className="mt-6 rounded-lg border border-border bg-surface-2 p-4 text-sm leading-6 text-text-muted">
+              <div className="mt-5 border-l-2 border-border pl-4 text-sm leading-6 text-text-muted">
                 <p className="font-medium text-foreground">来源说明</p>
-                <p className="mt-1 whitespace-pre-wrap">{post.sourceNote}</p>
+                <p className="mt-1 whitespace-pre-wrap break-words">
+                  {post.sourceNote}
+                </p>
               </div>
             ) : null}
             {post.externalUrl ? (
@@ -240,15 +243,16 @@ export function PostDetail({
                 {post.tags.map((tag) => (
                   <span
                     key={tag.id}
-                    className={`inline-flex overflow-hidden rounded-full border ${tag.isFollowing ? "border-brand/50 bg-brand/5" : "border-border"}`}
+                    className={`inline-flex max-w-full items-center overflow-hidden rounded-md border ${tag.isFollowing ? "border-brand/50 bg-brand/5" : "border-border"}`}
                   >
                     <Link
                       href={`${basePath}?tag=${encodeURIComponent(tag.slug)}`}
-                      className="px-2.5 py-1 text-xs text-text-muted hover:text-foreground"
+                      className="min-w-0 break-words px-2.5 py-2 text-xs text-text-muted hover:text-foreground"
                     >
                       #{tag.name}
                     </Link>
-                    <button
+                    <Button
+                      variant="ghost"
                       type="button"
                       aria-label={`${tag.isFollowing ? "取消关注" : "关注"}标签 ${tag.name}`}
                       aria-pressed={Boolean(tag.isFollowing)}
@@ -256,7 +260,7 @@ export function PostDetail({
                       onClick={() =>
                         void followTag(tag.id, Boolean(tag.isFollowing))
                       }
-                      className="flex items-center gap-1 border-l border-inherit px-2 py-1 text-[10px] text-text-muted transition-colors hover:bg-surface-2 hover:text-foreground disabled:cursor-wait disabled:opacity-50"
+                      className="h-9 gap-1 rounded-none border-0 border-l border-inherit px-2 text-xs text-text-muted"
                     >
                       {tag.isFollowing ? (
                         <Check size={11} />
@@ -264,7 +268,7 @@ export function PostDetail({
                         <Plus size={11} />
                       )}
                       {tag.isFollowing ? "已关注" : "关注"}
-                    </button>
+                    </Button>
                   </span>
                 ))}
               </div>
@@ -275,23 +279,23 @@ export function PostDetail({
           </article>
 
           {recipe ? (
-            <section className="surface-panel p-5 sm:p-6">
-              <div className="flex items-center justify-between gap-3">
+            <section className="border-b border-border pb-6">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="eyebrow">Reproducible recipe</p>
-                  <h2 className="mt-1 text-lg font-medium">可复现配方</h2>
+                  <h2 className="app-section-title text-xl font-semibold">
+                    可复现配方
+                  </h2>
                 </div>
-                <Link
-                  href={recipeCreationHref(recipe)}
-                  className="tool-button h-9 px-3 text-xs text-text-muted"
-                >
-                  <RefreshCw size={14} /> 用这套参数创作
-                </Link>
+                <Button asChild>
+                  <Link href={recipeCreationHref(recipe)}>
+                    <RefreshCw size={16} /> 用这套参数创作
+                  </Link>
+                </Button>
               </div>
-              <dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2">
+              <dl className="mt-5 grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
                 {Object.entries(recipe).map(([key, value]) => (
-                  <div key={key}>
-                    <dt className="font-mono text-[10px] uppercase text-text-faint">
+                  <div key={key} className="min-w-0">
+                    <dt className="break-words text-xs text-text-muted">
                       {key}
                     </dt>
                     <dd className="mt-1 break-words leading-6 text-text-muted">
@@ -304,10 +308,12 @@ export function PostDetail({
           ) : null}
 
           {lineage && lineage.nodes.length > 1 ? (
-            <section className="surface-panel p-5 sm:p-6">
+            <section className="min-w-0 border-b border-border pb-6">
               <div className="flex items-center gap-2">
                 <GitBranch size={17} />
-                <h2 className="font-medium">想法传承树</h2>
+                <h2 className="app-section-title text-xl font-semibold">
+                  想法传承树
+                </h2>
               </div>
               <p className="mt-2 text-sm leading-6 text-text-muted">
                 这些帖子不是简单转发，而是在前一个想法上继续推演。
@@ -323,16 +329,16 @@ export function PostDetail({
           <CommentThread postId={post.id} />
         </div>
 
-        <aside className="space-y-4 lg:sticky lg:top-20 lg:h-fit">
-          <section className="surface-panel p-5">
-            <p className="eyebrow">作者</p>
+        <aside className="min-w-0 space-y-5 lg:sticky lg:top-6 lg:h-fit lg:border-l lg:border-border lg:pl-6">
+          <section className="border-b border-border pb-5">
+            <p className="text-xs text-text-muted">作者</p>
             <Link
               href={
                 post.author.id
                   ? `${basePath === "/app/inspiration" ? "/app/inspiration/u" : "/u"}/${post.author.id}`
                   : "#"
               }
-              className="mt-3 block text-lg font-medium"
+              className="mt-2 block break-words text-xl font-semibold"
             >
               {post.author.name}
             </Link>
@@ -346,20 +352,21 @@ export function PostDetail({
                 {post.viewer.isFollowingAuthor ? "已关注" : "关注设计师"}
               </Button>
             ) : null}
-            <Link
-              href={`/app/publish?derivedFrom=${post.id}`}
-              className="tool-button mt-2 h-9 w-full text-xs text-text-muted"
-            >
-              <GitBranch size={14} /> 接着这个想法创作
-            </Link>
+            <Button asChild variant="primary" className="mt-2 w-full">
+              <Link href={`/app/publish?derivedFrom=${post.id}`}>
+                <GitBranch size={16} /> 接着这个想法创作
+              </Link>
+            </Button>
           </section>
           {post.dailyPrompt ? (
             <Link
               href={`${basePath}/daily`}
-              className="surface-panel block p-5 transition-colors hover:border-border-strong"
+              className="block min-w-0 py-1 transition-colors hover:text-brand"
             >
-              <p className="eyebrow">每日命题</p>
-              <h3 className="mt-2 font-medium">{post.dailyPrompt.title}</h3>
+              <p className="text-xs text-text-muted">每日命题</p>
+              <h3 className="mt-2 break-words text-sm font-medium">
+                {post.dailyPrompt.title}
+              </h3>
               <p className="mt-2 line-clamp-3 text-sm leading-6 text-text-muted">
                 {post.dailyPrompt.prompt}
               </p>

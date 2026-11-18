@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@/components/ui";
+import { Button, IconButton } from "@/components/ui";
 
 import { Textarea } from "@/components/ui";
 
@@ -39,6 +39,7 @@ import { readActiveConversationId } from "../lib/active-conversation";
 import type { ReferenceItem } from "../CommandDock";
 import { ReferenceDropZone, ReferenceThumbnails } from "../ReferenceDropZone";
 import { CopyTextButton } from "../CopyTextButton";
+import styles from "../chat/ChatControls.module.css";
 import {
   referenceRequest,
   REFERENCE_ACCEPT,
@@ -383,10 +384,10 @@ export function ConversationPanel({
     false;
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col bg-surface">
-      <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border px-2.5">
+    <div className="relative flex h-full min-h-0 min-w-0 flex-col bg-background text-sm tracking-normal">
+      <div className="flex min-h-11 shrink-0 flex-wrap items-center gap-2 border-b border-border px-3 py-2">
         {activeId ? (
-          <Button
+          <IconButton
             variant="ghost"
             type="button"
             onClick={() => setActiveId(null)}
@@ -396,12 +397,13 @@ export function ConversationPanel({
               submittingPreview
             }
             aria-label="返回线程列表"
-            className="flex h-7 w-7 items-center justify-center rounded-md p-0 text-text-muted transition-colors hover:bg-surface-2 hover:text-foreground"
+            title="返回线程列表"
+            className="h-11 w-11 rounded-md sm:h-9 sm:w-9"
           >
             <ArrowLeft size={14} />
-          </Button>
+          </IconButton>
         ) : null}
-        <span className="min-w-0 flex-1 truncate text-xs font-medium">
+        <span className="min-w-0 flex-1 truncate text-sm font-medium">
           {activeId ? (conversation?.title ?? "对话") : "对话线程"}
         </span>
         {conversation?.messages.length ? (
@@ -417,7 +419,7 @@ export function ConversationPanel({
         ) : null}
         {activeId && hasAssistantReply ? (
           <Button
-            variant="ghost"
+            variant="primary"
             type="button"
             onClick={() => void generateFromConversation()}
             disabled={
@@ -426,18 +428,18 @@ export function ConversationPanel({
               streaming !== null ||
               referenceInput.uploading > 0
             }
-            className="flex h-7 items-center gap-1 rounded-md bg-brand px-2 text-[11px] font-medium text-on-accent transition-colors hover:bg-brand/88 disabled:opacity-50"
+            className="h-11 gap-2 rounded-md px-3 text-sm sm:h-9"
           >
             {compiling ? (
-              <Loader2 size={11} className="animate-spin" />
+              <Loader2 size={16} className="animate-spin" />
             ) : (
-              <Sparkles size={11} />
+              <Sparkles size={16} />
             )}
             {compiling ? "整理中…" : "生成图片"}
           </Button>
         ) : null}
         {activeId ? (
-          <Button
+          <IconButton
             variant="ghost"
             type="button"
             onClick={() => void archiveThread(activeId)}
@@ -448,10 +450,10 @@ export function ConversationPanel({
             }
             aria-label="归档对话"
             title="归档对话"
-            className="flex h-7 w-7 items-center justify-center rounded-md p-0 text-text-muted transition-colors hover:bg-surface-2 hover:text-foreground"
+            className="h-11 w-11 rounded-md sm:h-9 sm:w-9"
           >
             <Trash2 size={13} />
-          </Button>
+          </IconButton>
         ) : null}
       </div>
 
@@ -462,12 +464,12 @@ export function ConversationPanel({
             type="button"
             onClick={() => void createNewConversation()}
             disabled={creating}
-            className="mb-1 flex w-full items-center gap-2 rounded-md border border-dashed border-border px-3 py-2.5 text-left text-xs text-text-muted transition-colors hover:border-border-strong hover:text-foreground"
+            className="mb-2 h-auto min-h-11 w-full flex-wrap justify-start gap-2 rounded-md border border-dashed border-border px-3 py-2 text-left text-sm sm:min-h-9"
           >
             <Plus size={13} />
             {creating ? "创建中…" : "新对话"}
             {pricing ? (
-              <span className="ml-auto text-[10px] text-text-faint">
+              <span className="ml-auto text-xs text-text-muted">
                 {pricing.standardCredits} 点/轮
               </span>
             ) : null}
@@ -476,7 +478,7 @@ export function ConversationPanel({
           {threads.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-12 text-center">
               <MessageSquare size={18} className="text-text-faint" />
-              <p className="text-xs text-text-muted">
+              <p className="text-sm leading-6 text-text-muted">
                 还没有对话，从「新对话」开始
               </p>
             </div>
@@ -487,7 +489,7 @@ export function ConversationPanel({
                 key={thread.id}
                 type="button"
                 onClick={() => setActiveId(thread.id)}
-                className="flex w-full items-center gap-2.5 rounded-md px-3 py-2.5 text-left transition-colors hover:bg-surface-2"
+                className="h-auto min-h-11 w-full min-w-0 flex-wrap items-center gap-3 rounded-md px-3 py-3 text-left font-normal"
               >
                 {thread.thumbnailUrl ? (
                   <img
@@ -501,14 +503,14 @@ export function ConversationPanel({
                   </span>
                 )}
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-xs font-medium text-foreground">
+                  <span className="block truncate text-sm font-medium text-foreground">
                     {thread.title}
                   </span>
-                  <span className="block truncate text-[11px] text-text-faint">
+                  <span className="block truncate text-xs text-text-muted">
                     {thread.latestMessage ?? "…"}
                   </span>
                 </span>
-                <span className="shrink-0 text-[10px] text-text-faint">
+                <span className="shrink-0 text-xs text-text-muted">
                   {formatDate(thread.lastMessageAt)}
                 </span>
               </Button>
@@ -517,7 +519,10 @@ export function ConversationPanel({
         </div>
       ) : (
         <>
-          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto p-3">
+          <div
+            ref={scrollRef}
+            className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain p-3"
+          >
             {loadingThread ? (
               <p
                 role="status"
@@ -535,15 +540,15 @@ export function ConversationPanel({
               <div
                 key={message.id}
                 className={cn(
-                  "mb-2 flex",
+                  "mb-4 flex min-w-0",
                   message.role === "user" ? "justify-end" : "justify-start",
                 )}
               >
                 <div
                   className={cn(
-                    "min-w-0 max-w-[95%] rounded-lg px-3 py-2 text-sm leading-6",
+                    "min-w-0 max-w-full rounded-lg px-3 py-3 text-sm leading-6 sm:max-w-[95%]",
                     message.role === "user"
-                      ? "bg-brand/12 text-foreground"
+                      ? "border border-border bg-surface-2 text-foreground"
                       : "border border-border bg-surface text-foreground",
                   )}
                 >
@@ -554,22 +559,22 @@ export function ConversationPanel({
                     <img
                       src={message.thumbnailUrl}
                       alt="生成结果"
-                      className="mt-2 max-h-40 rounded-md border border-border object-cover"
+                      className="mt-3 max-h-40 max-w-full rounded-md border border-border object-contain"
                     />
                   ) : null}
                   <div className="mt-1 flex flex-wrap items-center justify-end gap-1 border-t border-border/60 pt-1">
                     <CopyTextButton text={message.content} label="复制消息" />
-                    <Button
+                    <IconButton
                       type="button"
                       variant="ghost"
                       aria-label="重新编辑消息"
                       title="重新编辑消息"
                       disabled={streaming !== null}
                       onClick={() => setDraft(message.content)}
-                      className="h-11 w-11 p-0 text-text-muted sm:h-8 sm:w-8"
+                      className="h-11 w-11 rounded-md text-text-muted sm:h-9 sm:w-9"
                     >
                       <SquarePen size={15} />
-                    </Button>
+                    </IconButton>
                     {message.generationPrompt ? (
                       <>
                         <CopyTextButton text={message.generationPrompt} />
@@ -580,7 +585,7 @@ export function ConversationPanel({
                             onClick={() =>
                               onUsePrompt(message.generationPrompt!)
                             }
-                            className="h-9 px-2 text-xs"
+                            className="h-11 rounded-md px-3 text-sm sm:h-9"
                           >
                             使用提示词
                           </Button>
@@ -593,13 +598,13 @@ export function ConversationPanel({
             ))}
 
             {pendingUser ? (
-              <p className="mb-3 ml-auto max-w-[95%] whitespace-pre-wrap break-words rounded-lg bg-brand/12 p-3 text-sm leading-6">
+              <p className="mb-4 ml-auto max-w-full whitespace-pre-wrap break-words rounded-lg border border-border bg-surface-2 p-3 text-sm leading-6 [overflow-wrap:anywhere] sm:max-w-[95%]">
                 {pendingUser}
               </p>
             ) : null}
             {streaming !== null ? (
               <div className="mb-2 flex justify-start">
-                <div className="max-w-[85%] rounded-lg border border-border bg-surface px-3 py-2 text-[13px] leading-5 text-foreground">
+                <div className="min-w-0 max-w-full rounded-lg border border-border bg-surface px-3 py-3 text-sm leading-6 text-foreground [overflow-wrap:anywhere] sm:max-w-[95%]">
                   {streaming ? (
                     <p className="whitespace-pre-wrap">{streaming}</p>
                   ) : (
@@ -617,30 +622,32 @@ export function ConversationPanel({
             !streaming ? (
               <div className="flex flex-col items-center gap-2 py-12 text-center">
                 <MessageSquare size={18} className="text-text-faint" />
-                <p className="text-xs text-text-muted">
+                <p className="text-sm leading-6 text-text-muted">
                   描述画面需求，助手会把对话整理成可生成的提示词
                 </p>
               </div>
             ) : null}
           </div>
 
-          <div className="shrink-0 border-t border-border p-2.5">
+          <div className="max-h-[55%] min-w-0 shrink-0 overflow-y-auto overscroll-contain border-t border-border px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             <ReferenceDropZone
               onFile={(file) => void referenceInput.upload(file)}
               onReference={referenceInput.add}
               disabled={streaming !== null || loadingThread || !conversation}
-              className="rounded-lg border border-border-strong bg-surface-2"
+              className="rounded-lg border border-border-strong bg-surface focus-within:border-brand"
             >
-              <ReferenceThumbnails
-                references={references}
-                uploading={referenceInput.uploading}
-                onRemove={(key) =>
-                  setReferences((items) =>
-                    items.filter((item) => item.key !== key),
-                  )
-                }
-              />
-              <div className="flex items-end gap-2 p-2">
+              <div className={styles.attachments}>
+                <ReferenceThumbnails
+                  references={references}
+                  uploading={referenceInput.uploading}
+                  onRemove={(key) =>
+                    setReferences((items) =>
+                      items.filter((item) => item.key !== key),
+                    )
+                  }
+                />
+              </div>
+              <div className="flex min-w-0 items-end gap-2 p-3">
                 <Textarea
                   value={draft}
                   disabled={
@@ -660,11 +667,11 @@ export function ConversationPanel({
                       void send();
                     }
                   }}
-                  className="max-h-32 min-w-0 flex-1 resize-none bg-transparent px-1 py-1 text-sm leading-6 outline-none placeholder:text-text-muted"
+                  className="max-h-32 min-w-0 flex-1 resize-none rounded-none border-0 bg-transparent p-0 text-sm leading-6 outline-none placeholder:text-text-muted hover:bg-transparent focus:shadow-none"
                   aria-label="对话输入"
                 />
-                <Button
-                  variant="ghost"
+                <IconButton
+                  variant="primary"
                   type="button"
                   onClick={() => void send()}
                   disabled={
@@ -675,21 +682,17 @@ export function ConversationPanel({
                     !conversation
                   }
                   aria-label="发送"
-                  className={cn(
-                    "flex h-11 w-11 shrink-0 items-center justify-center rounded-md transition-colors",
-                    !draft.trim() || streaming !== null
-                      ? "bg-surface-2 text-text-faint"
-                      : "bg-brand text-on-accent hover:bg-brand/88",
-                  )}
+                  title="发送"
+                  className="h-11 w-11 rounded-md sm:h-9 sm:w-9"
                 >
-                  <Send size={13} />
-                </Button>
+                  <Send size={16} />
+                </IconButton>
               </div>
-              <div className="flex items-center justify-between px-2 pb-2">
+              <div className="mx-3 flex flex-wrap items-center justify-between gap-2 border-t border-border py-2">
                 {model?.capabilities.supportsReferenceImage ? (
                   <label
                     title="添加参考图"
-                    className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md border border-border-strong bg-surface text-foreground focus-within:ring-2 focus-within:ring-brand"
+                    className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-md border border-border-strong bg-surface text-foreground focus-within:ring-2 focus-within:ring-brand sm:h-9 sm:w-9"
                   >
                     <ImagePlus size={16} />
                     <input
@@ -722,25 +725,27 @@ export function ConversationPanel({
       )}
 
       {pendingGeneration ? (
-        <div className="absolute inset-0 z-10 flex flex-col bg-surface">
-          <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border px-3">
+        <div className="absolute inset-0 z-10 flex min-w-0 flex-col bg-surface">
+          <div className="flex min-h-11 shrink-0 flex-wrap items-center gap-2 border-b border-border px-3 py-2">
             <Sparkles size={13} className="text-text-muted" />
-            <span className="min-w-0 flex-1 truncate text-xs font-medium">
+            <span className="min-w-0 flex-1 text-xl font-semibold leading-6">
               确认生成
             </span>
             <CopyTextButton text={pendingGeneration.prompt} />
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto p-3">
-            <ReferenceThumbnails
-              references={references}
-              onRemove={(key) =>
-                setReferences((items) =>
-                  items.filter((item) => item.key !== key),
-                )
-              }
-            />
-            <p className="mb-1.5 text-[11px] font-medium text-text-muted">
+            <div className={styles.attachments}>
+              <ReferenceThumbnails
+                references={references}
+                onRemove={(key) =>
+                  setReferences((items) =>
+                    items.filter((item) => item.key !== key),
+                  )
+                }
+              />
+            </div>
+            <p className="mb-2 text-xs font-medium text-text-muted">
               根据对话整理出的提示词（可修改）
             </p>
             <Textarea
@@ -754,33 +759,33 @@ export function ConversationPanel({
                 )
               }
               aria-label="生成提示词预览"
-              className="h-36 w-full resize-none rounded-md border border-border bg-background p-2.5 text-[13px] leading-5 text-foreground outline-none focus:border-border-strong"
+              className="h-36 w-full resize-none rounded-md border border-border bg-background p-3 text-sm leading-6 text-foreground"
             />
-            <p className="mt-2 text-[11px] leading-4 text-text-faint">
+            <p className="mt-3 text-xs leading-5 text-text-muted [overflow-wrap:anywhere]">
               将使用模型 {model?.displayName ?? "…"} 生成 1 张图片，
               确认后才会扣减额度并进入队列。
             </p>
           </div>
 
-          <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border p-2.5">
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             <Button
-              variant="ghost"
+              variant="secondary"
               type="button"
               onClick={() => setPendingGeneration(null)}
               disabled={submittingPreview}
-              className="flex h-8 items-center rounded-md border border-border px-3 text-xs text-text-muted transition-colors hover:border-border-strong hover:text-foreground disabled:opacity-50"
+              className="h-11 rounded-md px-3 text-sm sm:h-9"
             >
               取消
             </Button>
             <Button
-              variant="ghost"
+              variant="primary"
               type="button"
               onClick={() => void confirmPendingGeneration()}
               disabled={
                 submittingPreview ||
                 pendingGeneration.prompt.trim().length === 0
               }
-              className="flex h-8 items-center gap-1.5 rounded-md bg-brand px-3.5 text-xs font-medium text-on-accent transition-colors hover:bg-brand/88 disabled:opacity-50"
+              className="h-11 gap-2 rounded-md px-3 text-sm sm:h-9"
             >
               {submittingPreview ? (
                 <Loader2 size={12} className="animate-spin" />

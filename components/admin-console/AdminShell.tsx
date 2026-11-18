@@ -68,7 +68,9 @@ function ThemeToggle() {
 
   return (
     <IconButton
+      className="h-9 w-9"
       aria-label="切换主题"
+      title="切换主题"
       onClick={() => setTheme(isDark ? "light" : "dark")}
     >
       {mounted && !isDark ? <Sun size={14} /> : <Moon size={14} />}
@@ -108,18 +110,18 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   };
 
   const sidebar = (
-    <div className="flex h-full min-h-0 flex-col bg-background">
+    <div className="flex h-full min-h-0 flex-col bg-surface">
       <div className="flex h-12 items-center gap-2.5 border-b border-border px-4">
-        <span className="flex h-5 w-5 items-center justify-center rounded bg-brand text-[10px] font-bold text-on-accent">
+        <span className="flex h-5 w-5 items-center justify-center rounded bg-brand text-xs font-bold text-on-accent">
           C
         </span>
-        <span className="text-[13px] font-semibold tracking-tight">
+        <span className="text-sm font-semibold tracking-normal">
           Chūgǎo <span className="text-text-faint">/ 管理端</span>
         </span>
         <IconButton
           aria-label="关闭管理导航"
           title="关闭管理导航"
-          className="ml-auto md:hidden"
+          className="ml-auto md:hidden h-9 w-9"
           onClick={() => setNavOpen(false)}
         >
           <X />
@@ -129,7 +131,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       <nav className="min-h-0 flex-1 overflow-y-auto px-2.5 py-3">
         {NAV_GROUPS.map((group) => (
           <div key={group.label} className="mb-5">
-            <p className="mb-1 px-2 font-mono text-[10px] uppercase tracking-[0.14em] text-text-faint">
+            <p className="mb-1 px-2 text-xs font-medium tracking-normal text-text-faint">
               {group.label}
             </p>
             <div className="space-y-0.5">
@@ -142,7 +144,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                   onClick={() => setNavOpen(false)}
                   aria-current={isActive(item.href) ? "page" : undefined}
                   className={cn(
-                    "relative block rounded-md px-2 py-1.5 text-[13px] transition-colors",
+                    "relative flex min-h-9 items-center rounded-md px-2 py-1.5 text-sm transition-colors",
                     isActive(item.href)
                       ? "bg-surface-2 font-medium text-foreground"
                       : "text-text-muted hover:bg-surface-2 hover:text-foreground",
@@ -162,7 +164,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       <div className="flex items-center justify-between gap-1 border-t border-border px-2.5 py-2.5">
         <Link
           href="/app"
-          className="flex h-8 items-center gap-1.5 rounded-md px-2 text-xs text-text-muted transition-colors hover:bg-surface-2 hover:text-foreground"
+          className="flex h-9 items-center gap-1.5 rounded-md px-2 text-sm text-text-muted transition-colors hover:bg-surface-2 hover:text-foreground"
         >
           <ArrowLeft size={13} strokeWidth={1.5} />
           回到工作台
@@ -173,7 +175,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             aria-label="退出登录"
             title="退出登录"
             onClick={() => void handleLogout()}
-            className="hover:text-danger"
+            className="hover:text-danger h-9 w-9"
           >
             <LogOut size={14} strokeWidth={1.5} />
           </IconButton>
@@ -183,12 +185,13 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-background text-foreground md:h-screen md:flex-row">
+    <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-background text-sm tracking-normal text-foreground md:h-screen md:flex-row">
       <Dialog open={navOpen} onOpenChange={setNavOpen}>
         <header className="flex h-12 shrink-0 items-center justify-between border-b border-border px-3 md:hidden">
           <span className="text-sm font-semibold">Chūgǎo / 管理端</span>
           <DialogTrigger>
             <IconButton
+              className="h-11 w-11"
               aria-label="打开管理导航"
               title="打开管理导航"
               size="lg"
@@ -200,7 +203,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         <DialogContent
           hideClose
           aria-describedby={undefined}
-          className="inset-y-0 left-0 top-0 h-dvh w-[min(17rem,86vw)] max-w-none translate-x-0 translate-y-0 rounded-none border-y-0 border-l-0"
+          className="inset-y-0 left-0 top-0 h-dvh max-h-none w-[min(17rem,86vw)] max-w-none translate-x-0 translate-y-0 rounded-none border-y-0 border-l-0"
         >
           <DialogTitle className="sr-only">管理导航</DialogTitle>
           {sidebar}
@@ -211,7 +214,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-[1200px] px-3 py-4 sm:px-6 sm:py-6">
+        <div className="mx-auto min-w-0 w-full max-w-[1200px] px-3 py-4 sm:px-6 sm:py-6">
           {children}
         </div>
       </main>

@@ -92,6 +92,13 @@ export const CHAT_IMAGE_RESPONSES_TOOL = {
   parameters: imageToolParameters,
 } as const;
 
+/** Anthropic Messages shape. Same name, description and parameters. */
+export const CHAT_IMAGE_ANTHROPIC_TOOL = {
+  name: CHAT_IMAGE_TOOL_NAME,
+  description: CHAT_IMAGE_TOOL_DESCRIPTION,
+  input_schema: imageToolParameters,
+} as const;
+
 export type ChatImageToolResult =
   | {
       ok: true;

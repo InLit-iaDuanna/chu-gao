@@ -8,7 +8,7 @@ export default async function InspirationDetailPage({
   const { id } = await params;
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div className="h-full min-w-0 overflow-y-auto">
       <PostDetail postId={id} basePath="/app/inspiration" />
     </div>
   );

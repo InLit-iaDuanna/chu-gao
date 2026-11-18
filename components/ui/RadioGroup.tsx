@@ -52,9 +52,9 @@ export function RadioGroup({
               id={id}
               value={option.value}
               disabled={option.disabled}
-              className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-border bg-surface outline-none transition-colors hover:border-border-strong focus:shadow-[var(--shadow-focus)] data-[state=checked]:border-foreground disabled:cursor-not-allowed disabled:opacity-45"
+              className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-[rgb(var(--control-border))] bg-surface outline-none transition-colors hover:border-[rgb(var(--control-border-hover))] focus:shadow-[var(--shadow-focus)] data-[state=checked]:border-brand disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <RadixRadioGroup.Indicator className="h-2 w-2 rounded-full bg-foreground" />
+              <RadixRadioGroup.Indicator className="h-2 w-2 rounded-full bg-brand" />
             </RadixRadioGroup.Item>
             <span className="min-w-0 text-sm">
               <span className="block text-foreground">{option.label}</span>

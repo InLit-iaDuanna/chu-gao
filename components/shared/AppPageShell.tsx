@@ -17,18 +17,18 @@ export function AppPageShell({
   wide = false,
 }: AppPageShellProps): React.ReactElement {
   return (
-    <div className="flex h-full flex-col bg-background">
-      <header className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-border px-4">
-        <h1 className="truncate text-[13px] font-medium text-foreground">
+    <div className="flex h-full min-h-0 min-w-0 flex-col bg-background">
+      <header className="flex min-h-12 shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-1.5">
+        <h1 className="min-w-0 truncate text-sm font-medium text-foreground">
           {title}
         </h1>
-        <div className="flex items-center gap-1">
+        <div className="flex max-w-full flex-wrap items-center gap-1">
           {actions}
           <ThemeToggle />
           <AccountMenu compact />
         </div>
       </header>
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
         <div
           className={
             wide

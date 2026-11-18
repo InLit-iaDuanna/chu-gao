@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { ArrowRight, Eye, EyeOff } from "lucide-react";
 
 import { ActionableStatus } from "@/components/shared/ActionableStatus";
 import { friendlyErrorMessage } from "@/components/shared/error-copy";
@@ -139,21 +138,12 @@ export function RegisterForm({
   }
 
   return (
-    <form className="anim-rise mt-8 space-y-4" onSubmit={submit}>
-      <Button
-        asChild
-        variant="link"
-        leftIcon={<ArrowLeft className="h-4 w-4" />}
-      >
-        <Link href={`/login?next=${encodeURIComponent(safeNext)}`}>
-          返回登录
-        </Link>
-      </Button>
-
+    <form className="space-y-4 text-sm tracking-normal" onSubmit={submit}>
       <FormField label="邮箱" htmlFor="register-email" required>
         <Input
           id="register-email"
           controlSize="lg"
+          className="h-11 text-sm tracking-normal"
           placeholder="you@example.com"
           type="email"
           autoComplete="email"
@@ -167,6 +157,7 @@ export function RegisterForm({
         <Input
           id="register-name"
           controlSize="lg"
+          className="h-11 text-sm tracking-normal"
           placeholder="可选"
           value={name}
           autoComplete="name"
@@ -185,15 +176,16 @@ export function RegisterForm({
             minLength={8}
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            className="pr-10"
+            className="h-11 pr-12 text-sm tracking-normal"
             required
           />
           <IconButton
             type="button"
             onClick={() => setShowPassword((value) => !value)}
-            className="absolute right-1 top-1/2 -translate-y-1/2"
+            className="absolute right-1 top-1/2 h-9 w-9 -translate-y-1/2"
             aria-pressed={showPassword}
             aria-label={showPassword ? "隐藏密码" : "显示密码"}
+            title={showPassword ? "隐藏密码" : "显示密码"}
           >
             {showPassword ? <EyeOff /> : <Eye />}
           </IconButton>
@@ -203,7 +195,7 @@ export function RegisterForm({
             <span
               key={index}
               className={cn(
-                "h-1 rounded-full bg-surface-2 transition-colors",
+                "h-1 rounded-sm bg-surface-2 transition-colors",
                 index < passwordStrength && strengthBarClass[strengthTone],
               )}
             />
@@ -240,15 +232,16 @@ export function RegisterForm({
             autoComplete="new-password"
             value={confirmPassword}
             onChange={(event) => setConfirmPassword(event.target.value)}
-            className="pr-10"
+            className="h-11 pr-12 text-sm tracking-normal"
             required
           />
           <IconButton
             type="button"
             onClick={() => setShowConfirmPassword((value) => !value)}
-            className="absolute right-1 top-1/2 -translate-y-1/2"
+            className="absolute right-1 top-1/2 h-9 w-9 -translate-y-1/2"
             aria-pressed={showConfirmPassword}
             aria-label={showConfirmPassword ? "隐藏密码" : "显示密码"}
+            title={showConfirmPassword ? "隐藏密码" : "显示密码"}
           >
             {showConfirmPassword ? <EyeOff /> : <Eye />}
           </IconButton>
@@ -260,6 +253,7 @@ export function RegisterForm({
           <Input
             id="invite-code"
             controlSize="lg"
+            className="h-11 text-sm tracking-normal"
             placeholder="输入管理员发放的邀请码"
             value={inviteCode}
             onChange={(event) => setInviteCode(event.target.value)}
@@ -283,17 +277,18 @@ export function RegisterForm({
           tone="danger"
           title="无法创建账户"
           description={error}
-          className="py-3"
+          className="rounded-none border-0 bg-transparent p-0 shadow-none sm:p-0"
         />
       ) : null}
 
       <Button
-        className="w-full"
+        className="w-full text-sm tracking-normal"
         disabled={!canSubmit}
         loading={isSubmitting}
         size="lg"
         type="submit"
         variant="primary"
+        rightIcon={<ArrowRight className="h-4 w-4" strokeWidth={1.6} />}
       >
         {isSubmitting ? "创建中" : "创建账户"}
       </Button>

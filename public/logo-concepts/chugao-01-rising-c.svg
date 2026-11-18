@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">Chugao logo concept 01: Rising C</title>
+  <desc id="desc">A compact C-shaped mark with a diagonal upward stroke and a lowercase chugao wordmark.</desc>
+
+  <rect x="42" y="42" width="336" height="336" rx="82" fill="#151817"/>
+  <path d="M270 126H168C127.683 126 95 158.683 95 199C95 239.317 127.683 272 168 272H270" stroke="#F4F7F5" stroke-width="30" stroke-linecap="round"/>
+  <path d="M192 272L292 172" stroke="#73C69E" stroke-width="30" stroke-linecap="round"/>
+  <path d="M262 172H292V142" stroke="#73C69E" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <text x="470" y="230" fill="#151817" font-family="Inter, Avenir Next, Helvetica Neue, Arial, sans-serif" font-size="132" font-weight="650" letter-spacing="3">chugao</text>
+  <text x="475" y="286" fill="#5B6761" font-family="Inter, Avenir Next, Helvetica Neue, Arial, sans-serif" font-size="24" font-weight="600" letter-spacing="7">CREATIVE STUDIO</text>
+</svg>

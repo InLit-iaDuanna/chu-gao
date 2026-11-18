@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@/components/ui";
+import { IconButton } from "@/components/ui";
 
 import { ListChecks, X } from "lucide-react";
 
@@ -29,42 +29,44 @@ export function QueuePanel({ generations, onCancel }: QueuePanelProps) {
 
   if (active.length === 0) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
+      <div className="flex h-full min-w-0 flex-col items-center justify-center gap-3 p-6 text-center tracking-normal">
         <ListChecks size={18} className="text-text-faint" />
-        <p className="text-xs text-text-muted">当前没有进行中的任务</p>
+        <p className="text-sm leading-6 text-text-muted">
+          当前没有进行中的任务
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="h-full overflow-y-auto p-1.5">
+    <div className="h-full min-w-0 overflow-y-auto p-3 text-sm tracking-normal">
       {active.map((generation) => (
         <div
           key={generation.id}
-          className="mb-1 rounded-md border border-border px-2.5 py-2"
+          className="mb-3 rounded-lg border border-border bg-surface p-3"
         >
           <div className="flex items-start justify-between gap-2">
-            <p className="line-clamp-2 min-w-0 flex-1 text-xs leading-4 text-foreground">
+            <p className="line-clamp-2 min-w-0 flex-1 text-sm leading-6 text-foreground [overflow-wrap:anywhere]">
               {generation.prompt}
             </p>
-            <Button
+            <IconButton
               variant="ghost"
               type="button"
               onClick={() => onCancel(generation.id)}
               aria-label="取消任务"
               title="取消任务"
-              className="flex h-5 w-5 shrink-0 items-center justify-center rounded p-0 text-text-faint transition-colors hover:bg-surface-2 hover:text-foreground"
+              className="h-11 w-11 rounded-md sm:h-9 sm:w-9"
             >
-              <X size={12} />
-            </Button>
+              <X size={16} />
+            </IconButton>
           </div>
-          <div className="mt-2 flex items-center gap-2">
-            <span className="shrink-0 text-[10px] tabular-nums text-text-muted">
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="shrink-0 text-xs tabular-nums text-text-muted">
               {STATUS_LABEL[generation.status]} · {generation.progress}%
             </span>
-            <span className="h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-border">
+            <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-md bg-surface-3">
               <span
-                className="progress-stripes block h-full rounded-full bg-brand transition-[width] duration-500"
+                className="block h-full rounded-md bg-brand transition-[width] duration-500"
                 style={{
                   width: `${Math.max(4, generation.progress)}%`,
                 }}

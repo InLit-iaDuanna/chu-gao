@@ -4,7 +4,12 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Loader2, RefreshCw, Save } from "lucide-react";
 import { Button, Input, Switch, Textarea, Tooltip } from "@/components/ui";
 import {
+  FABLE_MODEL_ID,
+  GEMINI_ARGON_MODEL_ID,
+  GEMINI_CARBON_MODEL_ID,
+  GEMINI_HYDROGEN_MODEL_ID,
   LUNA_MODEL_ID,
+  PREMIUM_OPUS_MODEL_ID,
   SOL_MODEL_ID,
   OPUS_MODEL_ID,
 } from "@/lib/chat-model-options";
@@ -16,9 +21,14 @@ import {
 import { AdminField, ErrorText } from "./ui";
 
 const profiles = [
-  [LUNA_MODEL_ID, "GPT-5.6 Luna"],
-  [SOL_MODEL_ID, "GPT-6.1 Sol"],
   [OPUS_MODEL_ID, "Opus 5.5"],
+  [PREMIUM_OPUS_MODEL_ID, "Opus 5.5 高价"],
+  [FABLE_MODEL_ID, "Fable 5.2"],
+  [GEMINI_ARGON_MODEL_ID, "Gemini 4 Argon"],
+  [GEMINI_CARBON_MODEL_ID, "Gemini 4 Carbon"],
+  [GEMINI_HYDROGEN_MODEL_ID, "Gemini 4 Hydrogen"],
+  [SOL_MODEL_ID, "GPT-6.1 Sol"],
+  [LUNA_MODEL_ID, "GPT-5.6 Luna"],
 ] as const;
 
 export function ChatRuntimeSection() {
@@ -96,7 +106,7 @@ export function ChatRuntimeSection() {
   }
 
   return (
-    <section className="surface-panel min-w-0 overflow-hidden p-5">
+    <section className="min-w-0 overflow-hidden border-t border-border pt-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-sm font-semibold">对话运行状态</h2>
         <div className="flex items-center gap-3 text-xs text-text-muted">
@@ -110,7 +120,7 @@ export function ChatRuntimeSection() {
             <Button
               type="button"
               aria-label="刷新运行状态"
-              className="h-8 w-8 p-0"
+              className="h-9 w-9 p-0"
               disabled={loading || saving}
               onClick={() => void load()}
             >
@@ -172,7 +182,7 @@ export function ChatRuntimeSection() {
                   >
                     <input
                       type="checkbox"
-                      className="h-4 w-4 accent-[var(--accent)]"
+                      className="h-4 w-4 accent-brand h-4 w-4 shrink-0 accent-brand"
                       checked={form.profiles.includes(id)}
                       onChange={(event) =>
                         setForm((current) => ({
@@ -206,6 +216,7 @@ export function ChatRuntimeSection() {
               </AdminField>
               <AdminField label="排队超时（秒，留空不限时）">
                 <Input
+                  className="h-9 text-sm"
                   aria-label="排队超时（秒）"
                   type="number"
                   min={1}
@@ -244,7 +255,7 @@ export function ChatRuntimeSection() {
             </div>
           </form>
           {status.health.instances.length ? (
-            <div className="mt-5 overflow-x-auto border-t border-border pt-3">
+            <div className="mt-5 min-w-0 max-w-full overflow-x-auto border-t border-border pt-3">
               <table className="w-full min-w-[540px] text-left text-xs">
                 <thead className="text-text-muted">
                   <tr>
@@ -290,7 +301,7 @@ export function ChatRuntimeSection() {
           ) : null}
         </>
       ) : loading ? (
-        <div className="h-44 animate-pulse bg-surface-soft" />
+        <div className="h-44 animate-pulse bg-surface-2" />
       ) : null}
     </section>
   );

@@ -1,7 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { Check, Clock3, KeyRound, Search, ShieldCheck, X } from "lucide-react";
+import {
+  ArrowLeft,
+  Check,
+  Clock3,
+  KeyRound,
+  Search,
+  ShieldCheck,
+  X,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { isApiError } from "@/components/studio/lib/api";
@@ -43,9 +51,9 @@ export function AgentAuthorizeView({
   const [busy, setBusy] = useState(false);
 
   return (
-    <div className="min-w-0 space-y-6">
+    <div className="min-w-0 space-y-6 text-sm tracking-normal">
       <form
-        className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-end"
+        className="flex min-w-0 flex-col flex-wrap items-stretch gap-3 border-t border-border pt-6 sm:flex-row sm:items-end"
         onSubmit={(event) => {
           event.preventDefault();
           if (!code.trim() || busy) return;
@@ -66,11 +74,10 @@ export function AgentAuthorizeView({
             spellCheck={false}
             maxLength={30}
             disabled={busy}
-            controlSize="lg"
-            className="font-mono"
+            className="h-11 font-mono"
           />
         </FormField>
-        <Button type="submit" disabled={busy || !code.trim()} className="h-10">
+        <Button type="submit" disabled={busy || !code.trim()} className="h-11">
           <Search size={16} aria-hidden="true" />
           核对授权码
         </Button>
@@ -84,8 +91,11 @@ export function AgentAuthorizeView({
         />
       ) : null}
 
-      <Button asChild variant="link">
-        <Link href="/app/settings#agent">返回 Agent 接入设置</Link>
+      <Button asChild variant="ghost" className="max-w-full">
+        <Link href="/app/settings#agent">
+          <ArrowLeft size={16} aria-hidden="true" />
+          返回 Agent 接入设置
+        </Link>
       </Button>
     </div>
   );
@@ -232,7 +242,7 @@ function AuthorizationRequest({
       className="min-w-0 border-t border-border pt-5"
     >
       <header className="flex flex-wrap items-center gap-3">
-        <h2 id="agent-request-heading" className="text-base font-semibold">
+        <h2 id="agent-request-heading" className="app-section-title">
           授权请求
         </h2>
         <Badge
@@ -265,7 +275,12 @@ function AuthorizationRequest({
         </div>
         <div className="min-w-0">
           <dt className="text-xs text-text-muted">请求授权码</dt>
-          <dd className="mt-1 break-all font-mono">{request.userCode}</dd>
+          <dd
+            tabIndex={0}
+            className="mt-1 max-w-full overflow-x-auto whitespace-nowrap font-mono"
+          >
+            {request.userCode}
+          </dd>
         </div>
         <div>
           <dt className="text-xs text-text-muted">账户余额</dt>
@@ -286,8 +301,11 @@ function AuthorizationRequest({
       </dl>
 
       {pending ? (
-        <div className="mt-6 border-t border-border pt-5">
-          <p id="agent-mode-label" className="mb-3 text-sm font-medium">
+        <div className="mt-6 min-w-0 border-t border-border pt-5">
+          <p
+            id="agent-mode-label"
+            className="mb-3 text-xs font-medium text-text-muted"
+          >
             授权方式
           </p>
           <RadioGroup
@@ -304,7 +322,7 @@ function AuthorizationRequest({
           />
           {mode === "timed" ? (
             <div className="mt-4">
-              <div className="grid max-w-sm grid-cols-[minmax(0,1fr)_6rem] gap-3">
+              <div className="grid min-w-0 max-w-sm grid-cols-[minmax(0,1fr)_6rem] gap-3">
                 <FormField label="授权时长" error={durationError}>
                   <Input
                     id="agent-duration"
@@ -318,7 +336,7 @@ function AuthorizationRequest({
                     disabled={decision !== null}
                     invalid={Boolean(durationError)}
                     aria-describedby="agent-duration-range"
-                    controlSize="lg"
+                    className="h-9"
                   />
                 </FormField>
                 <div className="space-y-1.5">
@@ -333,7 +351,7 @@ function AuthorizationRequest({
                     value={unit}
                     onValueChange={(value) => setUnit(value as DurationUnit)}
                     disabled={decision !== null}
-                    controlSize="lg"
+                    className="h-9"
                     options={[
                       { value: "hours", label: "小时" },
                       { value: "days", label: "天" },
@@ -349,10 +367,10 @@ function AuthorizationRequest({
               </p>
             </div>
           ) : null}
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row-reverse sm:justify-end">
+          <div className="mt-6 flex flex-col flex-wrap gap-3 sm:flex-row-reverse sm:justify-end">
             <Button
               variant="primary"
-              className="h-10 sm:w-40"
+              className="h-11 sm:w-40"
               disabled={decision !== null || Boolean(durationError)}
               loading={decision === "approve"}
               onClick={() => void decide("approve")}
@@ -361,7 +379,7 @@ function AuthorizationRequest({
               批准授权
             </Button>
             <Button
-              className="h-10 sm:w-40"
+              className="h-11 sm:w-40"
               disabled={decision !== null}
               loading={decision === "deny"}
               onClick={() => void decide("deny")}

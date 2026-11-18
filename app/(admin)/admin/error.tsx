@@ -1,6 +1,6 @@
 "use client";
 
-import { TriangleAlert } from "lucide-react";
+import { RotateCcw, TriangleAlert } from "lucide-react";
 
 import { Button, EmptyState } from "@/components/ui";
 
@@ -12,7 +12,7 @@ export default function AdminError({
   reset: () => void;
 }) {
   return (
-    <div className="flex min-h-[60vh] items-center justify-center">
+    <div className="flex min-h-[50vh] items-center justify-center">
       <EmptyState
         icon={TriangleAlert}
         title="管理页面出错了"
@@ -23,6 +23,7 @@ export default function AdminError({
         }
         action={
           <Button variant="secondary" onClick={reset}>
+            <RotateCcw size={14} />
             重试
           </Button>
         }

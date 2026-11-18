@@ -278,7 +278,7 @@ it("restores a lost create ACK after remount by the persisted user/conversation 
     screen.getByRole("navigation", { name: "回复来源" }),
   ).toHaveTextContent("证据");
   fireEvent.click(screen.getByText("用量"));
-  expect(screen.getByText(/输入总量 20 · 输出 8/)).toBeVisible();
+  expect(screen.getByText(/输入 20 · 输出 8/)).toBeVisible();
   expect(posts.filter((item) => item.path === "/api/chat/turns")).toHaveLength(
     1,
   );

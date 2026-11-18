@@ -1,4 +1,11 @@
-import { access, mkdir, mkdtemp, rm, utimes, writeFile } from "node:fs/promises";
+import {
+  access,
+  mkdir,
+  mkdtemp,
+  rm,
+  utimes,
+  writeFile,
+} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -17,7 +24,9 @@ async function exists(filePath: string): Promise<boolean> {
 }
 
 beforeEach(async () => {
-  storageDir = await mkdtemp(path.join(os.tmpdir(), "chugao-upload-retention-"));
+  storageDir = await mkdtemp(
+    path.join(os.tmpdir(), "chugao-upload-retention-"),
+  );
   process.env.PRIVATE_STORAGE_DIR = storageDir;
   vi.resetModules();
 });
@@ -66,15 +75,34 @@ describe("uploaded reference retention", () => {
     await expect(exists(recent)).resolves.toBe(true);
     await expect(exists(publicSnapshot)).resolves.toBe(true);
   });
+});
 
-  it("rejects insecure and private remote reference URLs", async () => {
-    const { fetchSafeRemoteImage } = await import("@/lib/storage");
+describe("provider image DNS pinning", () => {
+  it("returns all addresses in the shape required by Node's all lookup mode", async () => {
+    const { pinnedProviderImageLookup } = await import("@/lib/storage");
+    const callback = vi.fn();
 
-    await expect(fetchSafeRemoteImage("http://example.com/image.png")).rejects.toThrow(
-      "requires https",
+    pinnedProviderImageLookup("203.0.113.10", 4)(
+      "images.example",
+      { all: true },
+      callback,
     );
-    await expect(fetchSafeRemoteImage("https://127.0.0.1/image.png")).rejects.toThrow(
-      "private address",
+
+    expect(callback).toHaveBeenCalledWith(null, [
+      { address: "203.0.113.10", family: 4 },
+    ]);
+  });
+
+  it("keeps the single-address callback shape for legacy lookup calls", async () => {
+    const { pinnedProviderImageLookup } = await import("@/lib/storage");
+    const callback = vi.fn();
+
+    pinnedProviderImageLookup("203.0.113.10", 4)(
+      "images.example",
+      { all: false },
+      callback,
     );
+
+    expect(callback).toHaveBeenCalledWith(null, "203.0.113.10", 4);
   });
 });

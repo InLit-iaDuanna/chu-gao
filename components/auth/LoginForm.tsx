@@ -85,14 +85,17 @@ export function LoginForm({
   }
 
   return (
-    <form className={cn("anim-rise", className)} onSubmit={handleSubmit}>
+    <form
+      className={cn("text-sm tracking-normal", className)}
+      onSubmit={handleSubmit}
+    >
       <div className="flex flex-col gap-4">
         {error ? (
           <ActionableStatus
             tone="danger"
             title="无法登录"
             description={error}
-            className="py-3"
+            className="rounded-none border-0 bg-transparent p-0 shadow-none sm:p-0"
           />
         ) : null}
 
@@ -101,6 +104,7 @@ export function LoginForm({
             id="email"
             type="email"
             controlSize="lg"
+            className="h-11 text-sm tracking-normal"
             autoComplete="email"
             required
             value={email}
@@ -121,15 +125,16 @@ export function LoginForm({
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="输入密码"
-              className="pr-10"
+              className="h-11 pr-12 text-sm tracking-normal"
               aria-invalid={Boolean(error)}
             />
             <IconButton
               type="button"
               onClick={() => setShowPassword((v) => !v)}
-              className="absolute right-1 top-1/2 -translate-y-1/2"
+              className="absolute right-1 top-1/2 h-9 w-9 -translate-y-1/2"
               aria-pressed={showPassword}
               aria-label={showPassword ? "隐藏密码" : "显示密码"}
+              title={showPassword ? "隐藏密码" : "显示密码"}
             >
               {showPassword ? <EyeOff /> : <Eye />}
             </IconButton>
@@ -138,7 +143,7 @@ export function LoginForm({
 
         <Button
           type="submit"
-          className="mt-1 w-full"
+          className="mt-1 w-full text-sm tracking-normal"
           disabled={loading}
           loading={loading}
           rightIcon={<ArrowRight className="h-4 w-4" strokeWidth={1.6} />}

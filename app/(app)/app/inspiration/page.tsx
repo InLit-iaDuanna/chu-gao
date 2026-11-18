@@ -4,6 +4,7 @@ import { Compass, Plus, Sparkles, UserRound } from "lucide-react";
 
 import { InspirationDashboard } from "@/components/inspiration/InspirationDashboard";
 import { InspirationFeed } from "@/components/inspiration/InspirationFeed";
+import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 type InspirationWorkspacePageProps = {
@@ -27,36 +28,33 @@ export default async function InspirationWorkspacePage({
       : "posts";
   const tabClass = (active: boolean) =>
     cn(
-      "inline-flex h-9 items-center gap-1.5 border-b-2 px-1 text-xs font-medium transition-colors",
+      "inline-flex h-9 items-center gap-2 border-b-2 px-1 text-sm font-medium transition-colors",
       active
         ? "border-brand text-foreground"
         : "border-transparent text-text-muted hover:text-foreground",
     );
 
   return (
-    <div className="h-full overflow-y-auto">
-      <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur-xl">
+    <div className="h-full min-w-0 overflow-y-auto text-sm tracking-normal">
+      <header className="sticky top-0 z-20 border-b border-border bg-background">
         <div className="mx-auto max-w-7xl px-4 pt-4 sm:px-6 sm:pt-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="app-page-header flex flex-wrap items-center justify-between gap-3 border-0 pb-0">
             <div>
-              <p className="eyebrow">Inspiration Circle</p>
-              <h1 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">
+              <h1 className="app-page-title text-xl font-semibold tracking-normal sm:text-2xl">
                 灵感圈
               </h1>
             </div>
-            <div className="flex items-center gap-2">
-              <Link
-                href="/app/inspiration/daily"
-                className="tool-button h-9 px-3 text-xs text-text-muted"
-              >
-                <Sparkles size={14} /> 每日命题
-              </Link>
-              <Link
-                href="/app/publish"
-                className="tool-button h-9 border-brand bg-brand px-3 text-xs text-on-accent hover:bg-brand-hover"
-              >
-                <Plus size={14} /> 发布
-              </Link>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button asChild>
+                <Link href="/app/inspiration/daily">
+                  <Sparkles size={16} /> 每日命题
+                </Link>
+              </Button>
+              <Button asChild variant="primary">
+                <Link href="/app/publish">
+                  <Plus size={16} /> 发布
+                </Link>
+              </Button>
             </div>
           </div>
           <nav aria-label="灵感圈视图" className="mt-3 flex gap-5">

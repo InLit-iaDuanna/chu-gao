@@ -194,14 +194,14 @@ export function CreativeBriefPanel({
   return (
     <section
       aria-label="创作 Agent"
-      className="mx-auto w-full max-w-[50rem] px-1 py-6"
+      className="mx-auto w-full min-w-0 max-w-[50rem] px-1 py-6 text-sm tracking-normal [overflow-wrap:anywhere]"
     >
       <header className="flex items-start gap-3 border-b border-border pb-5">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-foreground text-background">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-brand text-on-accent">
           <Sparkles size={17} />
         </span>
         <div className="min-w-0">
-          <h2 className="text-base font-semibold">创作 Agent</h2>
+          <h2 className="text-xl font-semibold leading-6">创作 Agent</h2>
           <p className="mt-1 text-sm leading-6 text-text-muted">
             {hasPlan
               ? "我已经整理出当前方案，你可以继续修改，或直接确认生成。"
@@ -212,7 +212,7 @@ export function CreativeBriefPanel({
 
       <div className="space-y-5 py-5">
         {!turns.length ? (
-          <div className="flex items-start gap-3 text-[15px] leading-7">
+          <div className="flex items-start gap-3 text-sm leading-6">
             <Sparkles
               size={17}
               className="mt-1 shrink-0 text-text-muted"
@@ -243,8 +243,8 @@ export function CreativeBriefPanel({
                 <p
                   className={
                     turn.role === "user"
-                      ? "max-w-[88%] rounded-2xl bg-surface-2 px-4 py-2.5 text-[15px] leading-7"
-                      : "max-w-[92%] text-[15px] leading-7"
+                      ? "min-w-0 max-w-full whitespace-pre-wrap rounded-lg border border-border bg-surface-2 px-4 py-3 text-sm leading-6 sm:max-w-[88%]"
+                      : "min-w-0 max-w-full whitespace-pre-wrap text-sm leading-6"
                   }
                 >
                   {turn.content}
@@ -257,7 +257,7 @@ export function CreativeBriefPanel({
         {pendingInstruction ? (
           <div className="space-y-3" aria-live="polite">
             <div className="flex justify-end">
-              <p className="max-w-[88%] whitespace-pre-wrap break-words rounded-2xl bg-surface-2 px-4 py-2.5 text-[15px] leading-7">
+              <p className="min-w-0 max-w-full whitespace-pre-wrap break-words rounded-lg border border-border bg-surface-2 px-4 py-3 text-sm leading-6 sm:max-w-[88%]">
                 {pendingInstruction}
               </p>
             </div>
@@ -280,7 +280,7 @@ export function CreativeBriefPanel({
 
         {agentGeneration ? (
           <div
-            className="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface-2/40 px-4 py-3"
+            className="flex flex-wrap items-center justify-between gap-3 border-y border-border py-4"
             aria-live="polite"
           >
             <div className="min-w-0">
@@ -297,14 +297,14 @@ export function CreativeBriefPanel({
                         : "生成未完成"}
               </p>
             </div>
-            <span className="shrink-0 text-xs text-text-muted">
+            <span className="min-w-0 text-xs text-text-muted">
               {agentGeneration.modelId}
             </span>
           </div>
         ) : null}
 
         {qualityChecking || qualityCheck || qualityError ? (
-          <div className="space-y-2 rounded-lg border border-border bg-surface-2/40 p-4">
+          <div className="space-y-3 border-y border-border py-4">
             <div className="flex items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-2">
                 {qualityChecking ? (
@@ -341,6 +341,7 @@ export function CreativeBriefPanel({
                     type="button"
                     variant="ghost"
                     size="sm"
+                    className="h-11 rounded-md text-sm sm:h-9"
                     disabled={busy || qualityChecking}
                     onClick={onRecheckQuality}
                   >
@@ -351,6 +352,7 @@ export function CreativeBriefPanel({
                     type="button"
                     variant="secondary"
                     size="sm"
+                    className="h-11 rounded-md text-sm sm:h-9"
                     disabled={busy}
                     onClick={() => onContinue("继续修改这张图：")}
                   >
@@ -367,8 +369,8 @@ export function CreativeBriefPanel({
         ) : null}
 
         {draft.questions.length ? (
-          <div className="space-y-2 rounded-lg border border-border bg-surface-2/40 p-4">
-            <p className="text-xs font-medium uppercase tracking-[0.08em] text-text-muted">
+          <div className="space-y-3 border-y border-border py-4">
+            <p className="text-xs font-medium tracking-normal text-text-muted">
               需要你决定
             </p>
             <div className="flex flex-wrap gap-2">
@@ -380,7 +382,7 @@ export function CreativeBriefPanel({
                   size="sm"
                   disabled={locked}
                   onClick={() => onSuggestion(question)}
-                  className="h-auto min-h-9 whitespace-normal rounded-full px-3 py-2 text-left text-sm leading-5"
+                  className="h-auto min-h-11 min-w-0 max-w-full whitespace-normal rounded-md px-3 py-2 text-left text-sm leading-6 sm:min-h-9"
                 >
                   {question}
                 </Button>
@@ -390,7 +392,7 @@ export function CreativeBriefPanel({
         ) : null}
 
         {hasPlan && !draft.questions.length ? (
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-brand/30 bg-brand/5 px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-y border-border py-4">
             <div className="min-w-0">
               <p className="text-sm font-medium">方案已经可以执行</p>
               <p className="mt-1 text-xs leading-5 text-text-muted">
@@ -403,6 +405,7 @@ export function CreativeBriefPanel({
                 type="button"
                 variant="ghost"
                 size="sm"
+                className="h-11 rounded-md text-sm sm:h-9"
                 disabled={locked}
                 onClick={() => onContinue()}
               >
@@ -412,9 +415,9 @@ export function CreativeBriefPanel({
           </div>
         ) : null}
 
-        <div className="overflow-hidden rounded-lg border border-border bg-surface">
-          <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
-            <div className="flex min-w-0 items-center gap-2">
+        <div className="min-w-0 border-y border-border">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border py-3">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
               <FileText size={17} className="shrink-0 text-text-muted" />
               <span className="text-sm font-semibold">当前方案</span>
               <span className="text-xs text-text-muted">
@@ -427,7 +430,7 @@ export function CreativeBriefPanel({
               size="sm"
               disabled={locked}
               onClick={() => setDetailsOpen((value) => !value)}
-              className="shrink-0 gap-1.5 text-text-muted"
+              className="h-11 shrink-0 gap-2 rounded-md text-sm text-text-muted sm:h-9"
             >
               <Pencil size={14} />
               {detailsOpen ? "收起详情" : "编辑方案"}
@@ -442,7 +445,7 @@ export function CreativeBriefPanel({
             </Button>
           </div>
 
-          <div className="space-y-4 p-4">
+          <div className="space-y-4 py-4">
             {hasPlan ? (
               <div className="space-y-3">
                 <div>
@@ -478,6 +481,7 @@ export function CreativeBriefPanel({
                   <p className="text-xs text-text-muted">修改基图</p>
                   <Select
                     aria-label="修改基图"
+                    className="h-11 rounded-md text-sm sm:h-9"
                     value={baseKey}
                     disabled={locked}
                     onValueChange={(value) => {
@@ -538,7 +542,7 @@ export function CreativeBriefPanel({
                       aria-pressed={draft.locked.includes("goal")}
                       disabled={locked}
                       onClick={() => toggleLock("goal")}
-                      className="h-8 w-8 text-text-muted"
+                      className="h-11 w-11 rounded-md text-text-muted sm:h-9 sm:w-9"
                     >
                       {draft.locked.includes("goal") ? (
                         <LockKeyhole size={15} className="text-foreground" />
@@ -558,7 +562,7 @@ export function CreativeBriefPanel({
                     onChange={(event) =>
                       updateBrief("goal", event.target.value)
                     }
-                    className="min-h-16 resize-y text-sm leading-6 read-only:bg-surface-2"
+                    className="min-h-16 resize-y rounded-md text-sm leading-6 read-only:bg-surface-2"
                   />
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -580,7 +584,7 @@ export function CreativeBriefPanel({
                             aria-pressed={fieldLocked}
                             disabled={locked}
                             onClick={() => toggleLock(field)}
-                            className="h-8 w-8 text-text-muted"
+                            className="h-11 w-11 rounded-md text-text-muted sm:h-9 sm:w-9"
                           >
                             {fieldLocked ? (
                               <LockKeyhole
@@ -603,7 +607,7 @@ export function CreativeBriefPanel({
                           onChange={(event) =>
                             updateBrief(field, event.target.value)
                           }
-                          className="min-h-20 resize-y text-sm leading-6 read-only:bg-surface-2"
+                          className="min-h-20 resize-y rounded-md text-sm leading-6 read-only:bg-surface-2"
                         />
                       </div>
                     );
@@ -613,7 +617,7 @@ export function CreativeBriefPanel({
             ) : null}
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-surface-2/40 px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border py-3">
             <p className="text-xs text-text-muted">
               {model
                 ? `${model.displayName} · ${sizeLabel(params.size ?? model.defaults.size)}`
@@ -623,6 +627,7 @@ export function CreativeBriefPanel({
               type="button"
               variant="primary"
               size="sm"
+              className="h-11 rounded-md text-sm sm:h-9"
               disabled={locked || !hasPlan || Boolean(unavailable)}
               loading={quoting}
               onClick={() => void review()}
@@ -654,10 +659,12 @@ export function CreativeBriefPanel({
         <DialogContent
           hideClose={busy}
           aria-describedby={undefined}
-          className="max-h-[85dvh] space-y-5 overflow-y-auto p-5"
+          className="max-h-[calc(100dvh-24px)] space-y-5 overflow-y-auto rounded-lg p-5 tracking-normal [&>button.absolute]:h-11 [&>button.absolute]:w-11 sm:[&>button.absolute]:h-9 sm:[&>button.absolute]:w-9"
         >
-          <DialogTitle className="tracking-normal">确认本次生成</DialogTitle>
-          <dl className="grid grid-cols-[auto_1fr] gap-x-5 gap-y-3 text-sm">
+          <DialogTitle className="pr-11 text-xl leading-6 tracking-normal">
+            确认本次生成
+          </DialogTitle>
+          <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-3 text-sm [overflow-wrap:anywhere]">
             <dt className="text-text-muted">模型</dt>
             <dd className="break-words text-right">{model?.displayName}</dd>
             <dt className="text-text-muted">尺寸</dt>
@@ -685,7 +692,7 @@ export function CreativeBriefPanel({
             />
           ) : null}
           <details className="border-y border-border py-3 text-sm">
-            <summary className="cursor-pointer text-text-muted">
+            <summary className="min-h-11 cursor-pointer rounded-md py-3 text-text-muted sm:min-h-9 sm:py-2">
               生成提示词
             </summary>
             <p className="mt-3 whitespace-pre-wrap break-words leading-6">
@@ -693,7 +700,8 @@ export function CreativeBriefPanel({
             </p>
           </details>
           <Button
-            className="w-full"
+            variant="primary"
+            className="h-auto min-h-11 w-full whitespace-normal rounded-md py-2 text-sm sm:min-h-9"
             loading={busy}
             disabled={!confirmation || busy}
             onClick={async () => {

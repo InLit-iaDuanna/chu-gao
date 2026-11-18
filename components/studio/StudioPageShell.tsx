@@ -18,19 +18,17 @@ export function StudioPageShell({
   children,
 }: StudioPageShellProps) {
   return (
-    <div className="h-full overflow-y-auto">
+    <div className="h-full min-h-0 min-w-0 overflow-y-auto">
       <div
         className={cn(
-          "mx-auto flex w-full flex-col px-4 pb-10 pt-5 sm:px-6 sm:pb-16 sm:pt-8",
+          "mx-auto flex min-w-0 w-full flex-col px-4 py-6 sm:px-6",
           wide ? "max-w-7xl" : "max-w-4xl",
         )}
       >
-        <header className="flex flex-wrap items-end justify-between gap-3 pb-5 sm:gap-4 sm:pb-6">
-          <div>
+        <header className="app-page-header mb-6">
+          <div className="min-w-0">
             {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
-            <h1 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">
-              {title}
-            </h1>
+            <h1 className="app-page-title mt-1 break-words">{title}</h1>
           </div>
           {actions ? (
             <div className="flex max-w-full flex-wrap items-center justify-end gap-2">

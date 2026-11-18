@@ -27,7 +27,7 @@ export function TabsTrigger({
   return (
     <RadixTabs.Trigger
       className={cn(
-        "h-7 rounded-[4px] px-2.5 text-xs text-text-muted outline-none transition-colors hover:text-foreground focus:shadow-[var(--shadow-focus)] data-[state=active]:bg-surface data-[state=active]:text-foreground data-[state=active]:shadow-[var(--shadow-xs)] disabled:opacity-45",
+        "h-8 shrink-0 whitespace-nowrap rounded-sm px-3 text-xs font-medium text-text-muted outline-none transition-colors hover:text-foreground focus:shadow-[var(--shadow-focus)] data-[state=active]:bg-surface data-[state=active]:text-foreground data-[state=active]:shadow-[var(--shadow-xs)] disabled:text-[rgb(var(--icon-disabled))]",
         className,
       )}
       {...props}

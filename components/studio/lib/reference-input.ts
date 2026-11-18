@@ -7,8 +7,9 @@ import type { ModelInfo } from "./types";
 import { uploadReferenceImage } from "./api";
 
 export const REFERENCE_DRAG_MIME = "application/x-chugao-reference";
-export const REFERENCE_ACCEPT = "image/png,image/jpeg,image/webp";
-const IMAGE_TYPES = new Set(REFERENCE_ACCEPT.split(","));
+// HEIC/HEIF are accepted by the picker too: the server converts what it can
+// decode, and only then explains a format it cannot handle.
+export const REFERENCE_ACCEPT = "image/png,image/jpeg,image/webp,image/heic,image/heif";
 
 export function parseReferenceDrag(raw: string): ReferenceItem | null {
   try {
@@ -106,11 +107,10 @@ export function useReferenceInput({
   };
 
   const upload = async (file: File) => {
-    if (!IMAGE_TYPES.has(file.type) || file.size === 0) {
-      toast({
-        title: "请选择有效的 PNG、JPEG 或 WEBP 图片",
-        variant: "danger",
-      });
+    // Phone pickers often report an empty or generic type for a valid photo, so
+    // only an empty file is refused here; the server inspects the bytes.
+    if (file.size === 0) {
+      toast({ title: "这张图片是空文件，请重新选择", variant: "danger" });
       return;
     }
     if (!room()) return;

@@ -10,7 +10,9 @@ import type { ChatSearchSource } from "@/lib/chat-search";
  * entertainment queries — hence the honesty clause in the output.
  */
 
-export const CHAT_SEARCH_TOOL_NAME = "web_search";
+// The relay answers a tool literally named "web_search" itself with canned
+// search text, so the application tool uses a name it leaves alone.
+export const CHAT_SEARCH_TOOL_NAME = "search_web";
 /** At most this many searches in one turn; each is a paid relay request. */
 export const CHAT_SEARCH_LIMIT = 2;
 
@@ -35,6 +37,13 @@ export const CHAT_SEARCH_TOOL = {
       additionalProperties: false,
     },
   },
+} as const;
+
+/** Anthropic Messages shape of the same tool, for relay chat models. */
+export const CHAT_SEARCH_ANTHROPIC_TOOL = {
+  name: CHAT_SEARCH_TOOL_NAME,
+  description: CHAT_SEARCH_TOOL_DESCRIPTION,
+  input_schema: CHAT_SEARCH_TOOL.function.parameters,
 } as const;
 
 export interface ChatSearchOutcome {

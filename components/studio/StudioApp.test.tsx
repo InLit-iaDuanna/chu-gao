@@ -555,7 +555,10 @@ it("surfaces reference inspection failures while continuing text planning", asyn
 
 async function ready() {
   await screen.findByRole("button", { name: "庭院方案" });
-  await screen.findByRole("button", { name: "选择模型，当前 Image2.5" });
+  // The composer opens in discussion mode now, so either control means ready.
+  await screen.findByRole("button", {
+    name: /^(选择模型，当前 Image2.5|模型与思考强度：)/,
+  });
 }
 
 it("submits GIF request sizes, corrects model changes, and shows the credit range", async () => {
@@ -855,20 +858,18 @@ it("keeps image progress inside the correct conversation", async () => {
 it("uses the same composer for discussion without submitting an image", async () => {
   render(<StudioApp />);
   await ready();
-  fireEvent.click(screen.getByRole("radio", { name: "讨论想法" }));
-  expect(chatModelTrigger()).toHaveTextContent("GPT-5.6 Luna");
-  await openEffort();
-  expect(screen.getByRole("slider", { name: "思考强度" })).toHaveAttribute(
-    "aria-valuetext",
-    "High",
+  await waitFor(() =>
+    expect(chatModelTrigger()).toHaveTextContent("GPT-5.6 Luna"),
   );
-  await userEvent
-    .setup()
-    .click(screen.getByRole("button", { name: "选择聊天模型" }));
+  await openEffort();
+  expect(checkedEffort()).toBe("High");
   expect(
-    screen.getByRole("radio", { name: /GPT-5.6 Luna 2 积分/ }),
+    screen.getByRole("menuitemradio", { name: /GPT-5.6 Luna.*2 积分/ }),
   ).toBeVisible();
   await userEvent.setup().keyboard("{Escape}");
+  await waitFor(() =>
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument(),
+  );
   fireEvent.change(screen.getByRole("textbox", { name: "对话输入" }), {
     target: { value: "帮我分析坡道设计" },
   });
@@ -1026,7 +1027,7 @@ it("stops a streaming reply and preserves its received text", async () => {
 });
 
 async function openChat() {
-  fireEvent.click(screen.getByRole("radio", { name: "讨论想法" }));
+  // Discussion is the composer's only text mode now; there is no mode switch.
   await waitFor(() =>
     expect(chatModelTrigger()).toHaveTextContent("GPT-5.6 Luna"),
   );
@@ -1038,12 +1039,14 @@ async function openChat() {
 async function selectChatModel(name: string) {
   const user = userEvent.setup();
   await user.click(chatModelTrigger());
-  const chooseModel = screen.queryByRole("button", { name: "选择聊天模型" });
-  if (chooseModel) await user.click(chooseModel);
   await user.click(
-    screen.getByRole("radio", { name: (label) => label.startsWith(name) }),
+    screen.getByRole("menuitemradio", {
+      name: (label) => label.startsWith(name),
+    }),
   );
-  await user.keyboard("{Escape}");
+  await waitFor(() =>
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument(),
+  );
 }
 
 function chatModelTrigger() {
@@ -1051,10 +1054,37 @@ function chatModelTrigger() {
     name: /^(模型与思考强度：|聊天模型未就绪)/,
   });
 }
+const EFFORT_NAMES = /^(Low|Medium|High|XHigh|Max)$/;
+
+/** Opens the model menu and its effort side menu; returns the levels in order. */
 async function openEffort() {
-  if (!screen.queryByRole("slider", { name: "思考强度" }))
-    await userEvent.setup().click(chatModelTrigger());
-  return screen.findByRole("slider", { name: "思考强度" });
+  const user = userEvent.setup();
+  if (!screen.queryAllByRole("menu").length)
+    await user.click(chatModelTrigger());
+  if (!screen.queryAllByRole("menuitemradio", { name: EFFORT_NAMES }).length)
+    await user.click(screen.getByRole("menuitem", { name: "思考强度" }));
+  const levels = await screen.findAllByRole("menuitemradio", {
+    name: EFFORT_NAMES,
+  });
+  return levels.map((item) => item.getAttribute("aria-label"));
+}
+
+function checkedEffort() {
+  return screen
+    .getAllByRole("menuitemradio", { name: EFFORT_NAMES })
+    .find((item) => item.getAttribute("aria-checked") === "true")
+    ?.getAttribute("aria-label");
+}
+
+/** Picks an effort the way a user does; the whole menu closes afterwards. */
+async function chooseEffort(label: string) {
+  await openEffort();
+  // jsdom has no layout, so a pointer path would leave the side menu's grace
+  // area and close it before the click lands; select the item directly.
+  fireEvent.click(screen.getByRole("menuitemradio", { name: label }));
+  await waitFor(() =>
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument(),
+  );
 }
 
 it("keeps a text-only model selectable and omits unsupported reasoning effort", async () => {
@@ -1063,9 +1093,11 @@ it("keeps a text-only model selectable and omits unsupported reasoning effort", 
   await openChat();
   await selectChatModel("Text-only model");
   expect(chatModelTrigger()).toHaveTextContent("Text-only model");
+  await userEvent.setup().click(chatModelTrigger());
   expect(
-    screen.queryByRole("slider", { name: "思考强度" }),
+    screen.queryByRole("menuitem", { name: "思考强度" }),
   ).not.toBeInTheDocument();
+  await userEvent.setup().keyboard("{Escape}");
   fireEvent.click(screen.getByRole("button", { name: "发送" }));
   await waitFor(() => expect(mocks.chat).toHaveBeenCalledOnce());
   expect(mocks.chat).toHaveBeenCalledWith(
@@ -1113,12 +1145,10 @@ it("keeps Opus effort selectable without a token rate row, and submits its selec
   expect(screen.queryByText("0 积分 / 轮")).not.toBeInTheDocument();
   expect(screen.queryByText(/预扣|冻结|免费/)).not.toBeInTheDocument();
   expect(screen.queryByLabelText("选择参考图文件")).not.toBeInTheDocument();
-  const slider = await openEffort();
-  expect(slider).toHaveAttribute("max", "4");
-  expect(slider).toHaveAttribute("aria-valuetext", "Low");
-  fireEvent.change(slider, { target: { value: "4" } });
-  expect(slider).toHaveAttribute("aria-valuetext", "Max");
-  await userEvent.setup().keyboard("{Escape}");
+  expect(await openEffort()).toEqual(["Low", "Medium", "High", "XHigh", "Max"]);
+  expect(checkedEffort()).toBe("Low");
+  await chooseEffort("Max");
+  expect(chatModelTrigger()).toHaveTextContent("Opus 5.5Max");
   fireEvent.click(screen.getByRole("button", { name: "发送" }));
   await waitFor(() =>
     expect(mocks.chat).toHaveBeenCalledWith(
@@ -1134,10 +1164,7 @@ it("persists the selected chat model and reasoning separately from image setting
   const view = render(<StudioApp />);
   await ready();
   await openChat();
-  await openEffort();
-  fireEvent.change(screen.getByRole("slider", { name: "思考强度" }), {
-    target: { value: "4" },
-  });
+  await chooseEffort("Max");
   await waitFor(() =>
     expect(
       JSON.parse(
@@ -1149,21 +1176,12 @@ it("persists the selected chat model and reasoning separately from image setting
       chatReasoningEffort: "max",
     }),
   );
-  fireEvent.click(screen.getByRole("radio", { name: "生成图片" }));
-  expect(
-    screen.getByRole("button", { name: "选择模型，当前 Image2.5" }),
-  ).toBeVisible();
-  fireEvent.click(screen.getByRole("radio", { name: "讨论想法" }));
   view.unmount();
   render(<StudioApp />);
   await waitFor(() => expect(chatModelTrigger()).toHaveTextContent("Max"));
   await openEffort();
-  await waitFor(() =>
-    expect(screen.getByRole("slider", { name: "思考强度" })).toHaveAttribute(
-      "aria-valuetext",
-      "Max",
-    ),
-  );
+  await waitFor(() => expect(checkedEffort()).toBe("Max"));
+  await userEvent.setup().keyboard("{Escape}");
   fireEvent.click(screen.getByRole("button", { name: "发送" }));
   await waitFor(() =>
     expect(mocks.chat).toHaveBeenCalledWith(
@@ -1208,17 +1226,10 @@ it.each([
     );
     render(<StudioApp />);
     await screen.findByRole("button", { name: /模型与思考强度：GPT-5.6 Luna/ });
-    await openEffort();
-    await waitFor(() =>
-      expect(screen.getByRole("slider", { name: "思考强度" })).toHaveAttribute(
-        "aria-valuetext",
-        "Low",
-      ),
-    );
-    expect(screen.getByRole("slider", { name: "思考强度" })).toHaveAttribute(
-      "max",
-      "1",
-    );
+    await waitFor(() => expect(chatModelTrigger()).toHaveTextContent("Low"));
+    expect(await openEffort()).toEqual(["Low", "High"]);
+    expect(checkedEffort()).toBe("Low");
+    await userEvent.setup().keyboard("{Escape}");
     expect(screen.getByRole("textbox", { name: "对话输入" })).toHaveValue(
       "保留草稿内容",
     );
@@ -1242,10 +1253,9 @@ it("uses the first available effort when the server default was removed", async 
   render(<StudioApp />);
   await ready();
   await openChat();
-  await openEffort();
-  const slider = screen.getByRole("slider", { name: "思考强度" });
-  expect(slider).toHaveAttribute("aria-valuetext", "Medium");
-  expect(slider).toBeDisabled();
+  expect(await openEffort()).toEqual(["Medium"]);
+  expect(checkedEffort()).toBe("Medium");
+  await userEvent.setup().keyboard("{Escape}");
   fireEvent.click(screen.getByRole("button", { name: "发送" }));
   await waitFor(() =>
     expect(mocks.chat).toHaveBeenCalledWith(
@@ -1453,10 +1463,7 @@ it("restores separate chat settings when moving between conversations", async ()
   render(<StudioApp initialThreadId="thread-1" />);
   await ready();
   await openChat();
-  await openEffort();
-  fireEvent.change(screen.getByRole("slider", { name: "思考强度" }), {
-    target: { value: "3" },
-  });
+  await chooseEffort("XHigh");
   await waitFor(() =>
     expect(
       JSON.parse(
@@ -1464,7 +1471,6 @@ it("restores separate chat settings when moving between conversations", async ()
       ),
     ).toMatchObject({ mode: "chat", chatReasoningEffort: "xhigh" }),
   );
-  await userEvent.setup().keyboard("{Escape}");
   await userEvent
     .setup()
     .click(screen.getByRole("button", { name: "海报设计" }));
@@ -1481,13 +1487,7 @@ it("restores separate chat settings when moving between conversations", async ()
     .setup()
     .click(screen.getByRole("button", { name: "庭院方案" }));
   await screen.findByRole("button", { name: /模型与思考强度：GPT-5.6 Luna/ });
-  await openEffort();
-  await waitFor(() =>
-    expect(screen.getByRole("slider", { name: "思考强度" })).toHaveAttribute(
-      "aria-valuetext",
-      "XHigh",
-    ),
-  );
+  await waitFor(() => expect(chatModelTrigger()).toHaveTextContent("XHigh"));
   expect(screen.getByRole("textbox", { name: "对话输入" })).toHaveValue(
     "讨论庭院设计",
   );

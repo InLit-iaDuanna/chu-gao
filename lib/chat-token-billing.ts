@@ -244,6 +244,10 @@ export function chatInputTokenUpperBound(body: unknown): number {
     const part = object(value);
     if (part.type === "image_url" || part.type === "input_image")
       return OPUS_IMAGE_TOKEN_BOUND;
+    // Anthropic Messages image block: { type: "image", source: { data: <base64> } }.
+    // Its base64 is not text; counting it rejected every turn with a reference.
+    if (part.type === "image" && part.source && typeof part.source === "object")
+      return OPUS_IMAGE_TOKEN_BOUND;
     return (
       64 +
       Object.values(part).reduce<number>((sum, item) => sum + count(item), 0)

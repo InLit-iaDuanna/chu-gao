@@ -8,14 +8,36 @@ export interface StructuredChatMemory {
   pending: string[];
 }
 
-function cleanMemoryItems(value: unknown) {
-  return Array.isArray(value)
-    ? value
-        .filter((item): item is string => typeof item === "string")
-        .map((item) => item.trim())
-        .filter(Boolean)
-        .slice(0, 32)
-    : [];
+/**
+ * Code-side forgetting (OpenHands/Goose style): the model is asked to prune,
+ * but dedupe and per-section caps are enforced here so incremental memories
+ * cannot grow without bound. Lists are oldest-first, so caps keep the tail.
+ */
+const SECTION_LIMITS = {
+  goals: 8,
+  facts: 24,
+  constraints: 16,
+  decisions: 16,
+  references: 12,
+  pending: 6,
+} as const;
+const MAX_ITEM_CHARS = 200;
+
+function cleanMemoryItems(value: unknown, limit: number) {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const items: string[] = [];
+  for (const item of value) {
+    if (typeof item !== "string") continue;
+    const text = item.trim();
+    const key = text.replace(/[\s\p{P}]+/gu, "").toLowerCase();
+    if (!text || seen.has(key)) continue;
+    seen.add(key);
+    items.push(
+      text.length > MAX_ITEM_CHARS ? `${text.slice(0, MAX_ITEM_CHARS)}…` : text,
+    );
+  }
+  return items.slice(-limit);
 }
 
 export function parseStructuredChatMemory(
@@ -26,12 +48,18 @@ export function parseStructuredChatMemory(
   if (source.version !== 1) return null;
   return {
     version: 1,
-    goals: cleanMemoryItems(source.goals),
-    facts: cleanMemoryItems(source.facts),
-    constraints: cleanMemoryItems(source.constraints),
-    decisions: cleanMemoryItems(source.decisions),
-    references: cleanMemoryItems(source.references),
-    pending: cleanMemoryItems(source.pending),
+    goals: cleanMemoryItems(source.goals, SECTION_LIMITS.goals),
+    facts: cleanMemoryItems(source.facts, SECTION_LIMITS.facts),
+    constraints: cleanMemoryItems(
+      source.constraints,
+      SECTION_LIMITS.constraints,
+    ),
+    decisions: cleanMemoryItems(source.decisions, SECTION_LIMITS.decisions),
+    references: cleanMemoryItems(
+      source.references,
+      SECTION_LIMITS.references,
+    ),
+    pending: cleanMemoryItems(source.pending, SECTION_LIMITS.pending),
   };
 }
 

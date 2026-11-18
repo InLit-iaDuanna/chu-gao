@@ -12,11 +12,7 @@ import {
   compactChatContext,
   getChatContextStatus,
 } from "@/lib/chat-context";
-import {
-  LUNA_MODEL_ID,
-  SOL_MODEL_ID,
-  OPUS_MODEL_ID,
-} from "@/lib/chat-model-options";
+import { CHAT_MODEL_IDS } from "@/lib/chat-model-options";
 import { readJsonBodySafe } from "@/lib/request-body";
 import { isDatabaseUnavailableError } from "@/lib/service-errors";
 
@@ -24,12 +20,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const conversationIdSchema = z.string().trim().min(1).max(128);
-const modelIdSchema = z.enum([
-  "default",
-  LUNA_MODEL_ID,
-  SOL_MODEL_ID,
-  OPUS_MODEL_ID,
-]);
+const modelIdSchema = z.enum(CHAT_MODEL_IDS);
 const compactSchema = z
   .object({
     conversationId: conversationIdSchema,

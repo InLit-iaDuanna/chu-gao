@@ -22,8 +22,8 @@ export function Switch({
     <button
       aria-checked={checked}
       className={cn(
-        "inline-flex shrink-0 items-center rounded-full border border-border bg-surface-2 p-0.5 transition-colors duration-[var(--duration-fast)] ease-out hover:border-border-strong",
-        checked && "border-foreground bg-foreground hover:border-foreground",
+        "inline-flex shrink-0 items-center rounded-full border border-[rgb(var(--control-border))] bg-surface-2 p-0.5 transition-colors duration-[var(--duration-fast)] ease-out hover:border-[rgb(var(--control-border-hover))] disabled:cursor-not-allowed disabled:opacity-50",
+        checked && "border-brand bg-brand hover:border-brand",
         size === "sm" ? "h-5 w-9" : "h-6 w-11",
         className,
       )}
@@ -38,7 +38,7 @@ export function Switch({
       <span
         className={cn(
           "block rounded-full bg-foreground transition-transform duration-[var(--duration-fast)] ease-out",
-          checked && "bg-background",
+          checked && "bg-[rgb(var(--on-accent))]",
           size === "sm" ? "h-4 w-4" : "h-5 w-5",
           checked && (size === "sm" ? "translate-x-4" : "translate-x-5"),
         )}

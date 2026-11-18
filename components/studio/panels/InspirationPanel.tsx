@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@/components/ui";
+import { Button, IconButton } from "@/components/ui";
 
 import { Lightbulb, Shuffle } from "lucide-react";
 import Link from "next/link";
@@ -52,53 +52,54 @@ export function InspirationPanel({ onPick }: InspirationPanelProps) {
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="flex h-9 shrink-0 items-center justify-between border-b border-border px-3">
-        <span className="text-[11px] text-text-muted">点击填入提示词</span>
-        <Button
+    <div className="flex h-full min-h-0 min-w-0 flex-col text-sm tracking-normal">
+      <div className="flex min-h-11 shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-1">
+        <span className="text-xs text-text-muted">点击填入提示词</span>
+        <IconButton
           variant="ghost"
           type="button"
           onClick={shuffle}
           aria-label="换一批"
           title="换一批"
-          className="flex h-6 w-6 items-center justify-center rounded p-0 text-text-faint transition-colors hover:bg-surface-2 hover:text-foreground"
+          className="h-11 w-11 rounded-md sm:h-9 sm:w-9"
         >
-          <Shuffle size={12} />
-        </Button>
+          <Shuffle size={16} />
+        </IconButton>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
         {daily ? (
-          <div className="mb-2 rounded-md border border-brand/40 bg-brand/5 p-3">
-            <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-brand">
+          <div className="mb-3 border-b border-border px-1 pb-4 pt-2 [overflow-wrap:anywhere]">
+            <p className="text-xs font-medium tracking-normal text-brand">
               每日命题
             </p>
-            <p className="mt-1 text-xs font-medium">{daily.title}</p>
-            <p className="mt-1 line-clamp-3 text-[11px] leading-5 text-text-muted">
+            <p className="mt-2 text-sm font-medium">{daily.title}</p>
+            <p className="mt-1 line-clamp-3 text-sm leading-6 text-text-muted">
               {daily.prompt}
             </p>
-            <div className="mt-2 flex gap-2">
+            <div className="mt-3 flex flex-wrap gap-2">
               <Button
                 variant="secondary"
                 size="sm"
-                className="h-7 text-[11px]"
+                className="h-11 rounded-md text-sm sm:h-9"
                 onClick={() => onPick(daily.prompt)}
               >
                 带入工作台
               </Button>
-              <Link
-                href="/app/inspiration/daily"
-                className="tool-button h-7 px-2 text-[11px] text-text-muted"
+              <Button
+                asChild
+                variant="ghost"
+                className="h-11 rounded-md px-3 text-sm sm:h-9"
               >
-                查看讨论
-              </Link>
+                <Link href="/app/inspiration/daily">查看讨论</Link>
+              </Button>
             </div>
           </div>
         ) : null}
         {pool.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-12 text-center">
             <Lightbulb size={18} className="text-text-faint" />
-            <p className="text-xs text-text-muted">暂时没有灵感词</p>
+            <p className="text-sm text-text-muted">暂时没有灵感词</p>
           </div>
         ) : (
           pool.map((text) => (
@@ -107,13 +108,13 @@ export function InspirationPanel({ onPick }: InspirationPanelProps) {
               key={text}
               type="button"
               onClick={() => onPick(text)}
-              className="mb-1 flex w-full items-start gap-2 rounded-md border border-border px-2.5 py-2 text-left text-xs leading-4 text-text-muted transition-colors hover:border-border-strong hover:text-foreground"
+              className="mb-2 h-auto min-h-11 w-full min-w-0 items-start justify-start gap-2 whitespace-normal rounded-md border border-border px-3 py-3 text-left text-sm font-normal leading-6 text-foreground [overflow-wrap:anywhere] sm:min-h-9"
             >
               <Lightbulb
-                size={12}
+                size={16}
                 className="mt-0.5 shrink-0 text-text-faint"
               />
-              {text}
+              <span className="min-w-0">{text}</span>
             </Button>
           ))
         )}

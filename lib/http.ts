@@ -23,7 +23,45 @@ function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === "AbortError";
 }
 
+/**
+ * Errors where the request never reached the host. Retrying the same base URL
+ * only burns the whole attempt budget (five connect timeouts ≈ 60s), so the
+ * caller should fail over to another channel instead.
+ */
+const UNREACHABLE_CODES = new Set([
+  "ENOTFOUND",
+  "EAI_AGAIN",
+  "ECONNREFUSED",
+  "EHOSTUNREACH",
+  "ENETUNREACH",
+  "UND_ERR_CONNECT_TIMEOUT",
+]);
+
+/** A connection dropped after the request was sent (upstream reset). */
+const INTERRUPTED_CODES = new Set(["UND_ERR_SOCKET", "ECONNRESET", "EPIPE"]);
+
+export function isInterruptedNetworkError(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; depth < 4 && current; depth += 1) {
+    const code = (current as { code?: unknown }).code;
+    if (typeof code === "string" && INTERRUPTED_CODES.has(code)) return true;
+    current = (current as { cause?: unknown }).cause;
+  }
+  return error instanceof Error && error.message === "terminated";
+}
+
+export function isUnreachableNetworkError(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; depth < 4 && current; depth += 1) {
+    const code = (current as { code?: unknown }).code;
+    if (typeof code === "string" && UNREACHABLE_CODES.has(code)) return true;
+    current = (current as { cause?: unknown }).cause;
+  }
+  return false;
+}
+
 function isRetryableNetworkError(error: unknown): boolean {
+  if (isUnreachableNetworkError(error)) return false;
   return error instanceof HttpTimeoutError || !isAbortError(error);
 }
 

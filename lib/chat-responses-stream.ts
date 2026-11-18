@@ -1,5 +1,6 @@
 import { createParser } from "eventsource-parser";
 import { readCitedResponse, type ChatSearchSource } from "@/lib/chat-search";
+import { ThinkingStreamFilter, stripThinkingTags } from "@/lib/chat-text-filter";
 import type { ChatTerminalStatus } from "@/lib/chat-turn-types";
 
 const record = (value: unknown): Record<string, unknown> =>
@@ -59,6 +60,7 @@ export class ResponsesAccumulator {
   private seenSequences = new Set<number>();
   private deltaParts = new Map<string, string>();
   private functionArguments = new Map<string, string>();
+  private thinkingFilters = new Map<string, ThinkingStreamFilter>();
 
   get activity() {
     return this.currentActivity;
@@ -240,11 +242,20 @@ export class ResponsesAccumulator {
       (typeof text === "string" && part.text !== text)
     ) {
       part.type = content.type;
-      if (typeof text === "string") part.text = text;
+      if (typeof text === "string") part.text = stripThinkingTags(text);
       part.revision = ++this.revision;
     }
     if (Array.isArray(content.annotations))
       this.annotations(part, content.annotations);
+  }
+
+  private thinkingFilter(payload: Record<string, unknown>) {
+    const key = `${string(payload.item_id)}:${string(payload.content_index)}`;
+    const existing = this.thinkingFilters.get(key);
+    if (existing) return existing;
+    const created = new ThinkingStreamFilter();
+    this.thinkingFilters.set(key, created);
+    return created;
   }
 
   private item(item: Record<string, unknown>, outputIndex: number) {
@@ -303,12 +314,15 @@ export class ResponsesAccumulator {
       this.providerStatus = response.status;
       this.revision++;
     }
-    if (
-      response.usage &&
-      JSON.stringify(this.usage) !== JSON.stringify(response.usage)
-    ) {
-      this.usage = record(response.usage);
-      this.revision++;
+    if (response.usage) {
+      const incomingUsage = record(response.usage);
+      const nextUsage = this.usage
+        ? { ...this.usage, ...incomingUsage }
+        : incomingUsage;
+      if (JSON.stringify(this.usage) !== JSON.stringify(nextUsage)) {
+        this.usage = nextUsage;
+        this.revision++;
+      }
     }
     if (
       type === "response.output_text.delta" ||
@@ -317,10 +331,12 @@ export class ResponsesAccumulator {
       const part = this.part(payload);
       const delta = string(payload.delta);
       part.type = type === "response.refusal.delta" ? "refusal" : "output_text";
-      part.text += delta;
+      const visible =
+        type === "response.refusal.delta" ? delta : this.thinkingFilter(payload).push(delta);
+      part.text += visible;
       if (delta) part.revision = ++this.revision;
       const key = `${part.itemId}:${part.contentIndex}`;
-      this.deltaParts.set(key, (this.deltaParts.get(key) ?? "") + delta);
+      this.deltaParts.set(key, (this.deltaParts.get(key) ?? "") + visible);
       this.activity = "answering";
     } else if (
       type === "response.output_text.done" ||
@@ -408,6 +424,7 @@ export class ResponsesAccumulator {
           id: payload.item_id,
           type: "web_search_call",
           status: type.split(".").at(-1),
+          action: payload.action,
         },
         outputIndex,
       );
@@ -516,6 +533,17 @@ export class ResponsesAccumulator {
         };
       })
       .filter((item): item is ResponseFunctionCall => Boolean(item));
+  }
+
+  recordSources(added: ChatSearchSource[]) {
+    let changed = false;
+    for (const source of added) {
+      if (this.sources.some((known) => known.url === source.url)) continue;
+      if (this.sources.length >= 8) break;
+      this.sources.push(source);
+      changed = true;
+    }
+    if (changed) this.revision++;
   }
 
   recordToolResult(

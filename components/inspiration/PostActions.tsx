@@ -77,11 +77,11 @@ export function PostActions({
   };
 
   const buttonClass = compact
-    ? "h-11 min-w-11 gap-1 px-1.5 text-xs text-text-muted md:h-8 md:min-w-8"
-    : "h-11 min-w-11 gap-1.5 px-2.5 text-xs text-text-muted md:h-9";
+    ? "h-9 min-w-9 gap-1 px-1.5 text-xs text-text-muted"
+    : "h-9 min-w-9 gap-1.5 px-2.5 text-sm text-text-muted";
 
   return (
-    <div className="flex flex-wrap items-center gap-1">
+    <div className="flex min-w-0 flex-wrap items-center gap-1">
       <Button
         variant="ghost"
         className={buttonClass}
@@ -97,7 +97,7 @@ export function PostActions({
         ) : (
           <Heart
             size={compact ? 13 : 15}
-            className={liked ? "fill-current text-danger" : ""}
+            className={liked ? "fill-current text-brand" : ""}
           />
         )}
         {likes}
@@ -122,22 +122,24 @@ export function PostActions({
         )}
         {bookmarks}
       </Button>
-      <Link
-        href={`${basePath}/${post.id}#discussion`}
-        aria-label={`查看讨论，${post.counts.comments} 条回应`}
-        title="查看讨论"
-        className={`pressable inline-flex items-center rounded-md hover:bg-surface-2 ${buttonClass}`}
-      >
-        <MessageCircle size={compact ? 13 : 15} /> {post.counts.comments}
-      </Link>
-      <Link
-        href={`/app/publish?derivedFrom=${post.id}`}
-        aria-label="接着这个想法创作"
-        title="接着这个想法创作"
-        className={`pressable inline-flex items-center rounded-md hover:bg-surface-2 ${buttonClass}`}
-      >
-        <GitFork size={compact ? 13 : 15} /> {post.counts.derived}
-      </Link>
+      <Button asChild variant="ghost" className={buttonClass}>
+        <Link
+          href={`${basePath}/${post.id}#discussion`}
+          aria-label={`查看讨论，${post.counts.comments} 条回应`}
+          title="查看讨论"
+        >
+          <MessageCircle size={compact ? 13 : 15} /> {post.counts.comments}
+        </Link>
+      </Button>
+      <Button asChild variant="ghost" className={buttonClass}>
+        <Link
+          href={`/app/publish?derivedFrom=${post.id}`}
+          aria-label="接着这个想法创作"
+          title="接着这个想法创作"
+        >
+          <GitFork size={compact ? 13 : 15} /> {post.counts.derived}
+        </Link>
+      </Button>
       {!compact ? (
         <>
           <Button

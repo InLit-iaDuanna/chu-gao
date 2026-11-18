@@ -11,7 +11,7 @@ import {
   UserPlus,
 } from "lucide-react";
 
-import { Button } from "@/components/ui";
+import { Button, EmptyState } from "@/components/ui";
 import {
   inspirationRequest,
   InspirationApiError,
@@ -91,16 +91,15 @@ export function DesignerProfile({
       </div>
     );
   return (
-    <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-12">
-      <Link
-        href={basePath}
-        className="inline-flex items-center gap-1.5 text-xs text-text-muted hover:text-foreground"
-      >
-        <ArrowLeft size={14} /> 返回广场
-      </Link>
-      <section className="mt-6 flex flex-col justify-between gap-5 border-b border-border pb-8 sm:flex-row sm:items-end">
-        <div className="max-w-2xl">
-          <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-3xl border border-border bg-surface-2 text-2xl font-semibold">
+    <main className="mx-auto min-w-0 max-w-7xl break-words px-4 py-6 text-sm tracking-normal sm:px-6">
+      <Button asChild variant="ghost" className="px-2">
+        <Link href={basePath}>
+          <ArrowLeft size={16} /> 返回广场
+        </Link>
+      </Button>
+      <section className="app-page-header mt-5 flex flex-col justify-between gap-5 border-b border-border pb-6 sm:flex-row sm:items-end">
+        <div className="min-w-0 max-w-2xl">
+          <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-lg border border-border bg-surface-2 text-2xl font-semibold">
             {data.user.avatarUrl ? (
               <img
                 src={data.user.avatarUrl}
@@ -111,7 +110,7 @@ export function DesignerProfile({
               data.user.name.slice(0, 1).toUpperCase()
             )}
           </div>
-          <h1 className="mt-4 text-3xl font-semibold tracking-tight">
+          <h1 className="app-page-title mt-4 break-words text-xl font-semibold tracking-normal sm:text-2xl">
             {data.user.name}
           </h1>
           {data.user.designerTitle ? (
@@ -120,7 +119,7 @@ export function DesignerProfile({
             </p>
           ) : null}
           {data.user.bio ? (
-            <p className="mt-4 max-w-xl whitespace-pre-wrap text-sm leading-6 text-text-muted">
+            <p className="mt-4 max-w-xl whitespace-pre-wrap break-words text-sm leading-6 text-text-muted">
               {data.user.bio}
             </p>
           ) : null}
@@ -129,7 +128,7 @@ export function DesignerProfile({
               {data.user.designDisciplines.map((item) => (
                 <span
                   key={item.value}
-                  className="rounded-full border border-border px-2.5 py-1 text-xs text-text-muted"
+                  className="rounded-md bg-surface-2 px-2.5 py-1 text-xs text-text-muted"
                 >
                   {item.label}
                 </span>
@@ -142,8 +141,11 @@ export function DesignerProfile({
               {new Date(data.user.joinedAt).toLocaleDateString("zh-CN")} 加入
             </span>
             {data.user.designerLocation ? (
-              <span className="flex items-center gap-1.5">
-                <MapPin size={13} /> {data.user.designerLocation}
+              <span className="flex min-w-0 max-w-full items-center gap-1.5">
+                <MapPin size={13} className="shrink-0" />{" "}
+                <span className="min-w-0 break-words">
+                  {data.user.designerLocation}
+                </span>
               </span>
             ) : null}
             {data.user.designerWebsite ? (
@@ -157,7 +159,7 @@ export function DesignerProfile({
               </a>
             ) : null}
           </div>
-          <div className="mt-4 flex gap-4 text-sm">
+          <div className="mt-4 flex flex-wrap gap-4 text-sm">
             <span>
               <strong>{data.user.followerCount}</strong>{" "}
               <span className="text-text-muted">关注者</span>
@@ -186,8 +188,7 @@ export function DesignerProfile({
         )}
       </section>
       <section className="py-8">
-        <p className="eyebrow">Published ideas</p>
-        <h2 className="mt-2 text-xl font-semibold">公开内容</h2>
+        <h2 className="app-section-title text-xl font-semibold">公开内容</h2>
         {data.posts.length ? (
           <div className="mt-5 columns-1 gap-4 sm:columns-2 lg:columns-3 xl:columns-4">
             {data.posts.map((post) => (
@@ -195,9 +196,7 @@ export function DesignerProfile({
             ))}
           </div>
         ) : (
-          <div className="surface-panel mt-5 flex min-h-48 items-center justify-center text-sm text-text-muted">
-            还没有公开发布。
-          </div>
+          <EmptyState className="mt-5 min-h-48" title="还没有公开发布。" />
         )}
       </section>
     </main>

@@ -50,7 +50,10 @@ export function UserDetailView({ userId }: { userId: string }) {
   }
 
   if (failed) return <EmptyPanel text="用户详情暂时不可用" />;
-  if (!user) return <div className="surface-panel h-64 animate-pulse" />;
+  if (!user)
+    return (
+      <div className="h-64 animate-pulse rounded-lg border border-border bg-surface-2" />
+    );
 
   return (
     <div>
@@ -61,7 +64,7 @@ export function UserDetailView({ userId }: { userId: string }) {
         actions={
           <Button
             type="button"
-            className="h-9 px-3 text-xs text-text-muted"
+            className="h-9 px-3 text-sm text-text-muted"
             onClick={() => router.push("/admin/users")}
           >
             返回列表
@@ -72,7 +75,7 @@ export function UserDetailView({ userId }: { userId: string }) {
       <ErrorText message={error} />
       {notice ? <p className="mb-4 text-sm text-success">{notice}</p> : null}
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+      <div className="mt-4 grid items-start gap-6 lg:grid-cols-2">
         <ProfileSection
           user={user}
           onSave={(patch) =>
@@ -152,11 +155,12 @@ function ProfileSection({
   const [busy, setBusy] = useState(false);
 
   return (
-    <section className="surface-panel p-5">
-      <p className="eyebrow">资料</p>
+    <section className="min-w-0 border-t border-border pt-5">
+      <h2 className="text-sm font-semibold">资料</h2>
       <div className="mt-4 grid gap-3">
         <AdminField label="邮箱">
           <Input
+            className="h-9 text-sm"
             value={form.email}
             onChange={(event) =>
               setForm({ ...form, email: event.target.value })
@@ -165,6 +169,7 @@ function ProfileSection({
         </AdminField>
         <AdminField label="昵称">
           <Input
+            className="h-9 text-sm"
             value={form.name}
             onChange={(event) => setForm({ ...form, name: event.target.value })}
           />
@@ -172,6 +177,7 @@ function ProfileSection({
         <div className="grid grid-cols-2 gap-3">
           <AdminField label="角色">
             <Select
+              className="h-9 text-sm"
               aria-label="角色"
               value={form.role}
               onValueChange={(value) =>
@@ -188,6 +194,7 @@ function ProfileSection({
           </AdminField>
           <AdminField label="状态">
             <Select
+              className="h-9 text-sm"
               aria-label="状态"
               value={form.status}
               onValueChange={(value) =>
@@ -206,6 +213,7 @@ function ProfileSection({
         <div className="grid grid-cols-2 gap-3">
           <AdminField label="日生成上限">
             <Input
+              className="h-9 text-sm"
               type="number"
               min={1}
               max={1000000}
@@ -217,6 +225,7 @@ function ProfileSection({
           </AdminField>
           <AdminField label="并发上限">
             <Input
+              className="h-9 text-sm"
               type="number"
               min={1}
               max={10000}
@@ -233,7 +242,7 @@ function ProfileSection({
         <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
-            className="h-4 w-4 accent-[var(--accent)]"
+            className="h-4 w-4 accent-brand h-4 w-4 shrink-0 accent-brand"
             checked={form.materialInboxBeta}
             onChange={(event) =>
               setForm({ ...form, materialInboxBeta: event.target.checked })
@@ -244,6 +253,7 @@ function ProfileSection({
         {form.status === "BANNED" ? (
           <AdminField label="封禁原因">
             <Input
+              className="h-9 text-sm"
               value={form.bannedReason}
               onChange={(event) =>
                 setForm({ ...form, bannedReason: event.target.value })
@@ -314,12 +324,13 @@ function CreditsSection({
   const [busy, setBusy] = useState(false);
 
   return (
-    <section className="surface-panel p-5">
-      <p className="eyebrow">点数</p>
+    <section className="min-w-0 border-t border-border pt-5">
+      <h2 className="text-sm font-semibold">点数</h2>
       <p className="mt-2 font-mono text-2xl font-semibold">{user.credits}</p>
       <div className="mt-4 grid gap-3">
         <AdminField label="调整数量（正数充值 / 负数扣减）">
           <Input
+            className="h-9 text-sm"
             type="number"
             step="0.000001"
             value={amount}
@@ -328,16 +339,17 @@ function CreditsSection({
         </AdminField>
         <AdminField label="备注（可选）">
           <Input
+            className="h-9 text-sm"
             value={note}
             onChange={(event) => setNote(event.target.value)}
           />
         </AdminField>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {[100, 500, -100].map((preset) => (
             <Button
               key={preset}
               type="button"
-              className="h-8 px-3 text-xs text-text-muted"
+              className="h-9 px-3 text-sm text-text-muted"
               onClick={() => setAmount(preset)}
             >
               {preset > 0 ? `+${preset}` : preset}
@@ -377,17 +389,18 @@ function SecuritySection({
   void userId;
 
   return (
-    <section className="surface-panel p-5">
-      <p className="eyebrow">安全</p>
+    <section className="min-w-0 border-t border-border pt-5">
+      <h2 className="text-sm font-semibold">安全</h2>
       <div className="mt-4 grid gap-3">
         <AdminField label="重置密码（至少 8 位）">
           <Input
+            className="h-9 text-sm"
             type="text"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
           />
         </AdminField>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button
             type="button"
             className="h-9 px-4 text-text-muted disabled:opacity-45"
@@ -439,12 +452,12 @@ function DangerSection({
   };
 
   return (
-    <section className="surface-panel border-danger/30 p-5">
-      <p className="eyebrow text-danger">危险操作</p>
+    <section className="min-w-0 border-t border-danger/30 pt-5">
+      <h2 className="text-sm font-semibold text-danger">危险操作</h2>
       <div className="mt-4 flex flex-wrap gap-2">
         <Button
           type="button"
-          className="h-9 px-3 text-xs text-text-muted disabled:opacity-45"
+          className="h-9 px-3 text-sm text-text-muted disabled:opacity-45"
           disabled={busy}
           onClick={guarded(
             () => onArchive("inactive"),
@@ -455,7 +468,7 @@ function DangerSection({
         </Button>
         <Button
           type="button"
-          className="h-9 px-3 text-xs text-text-muted disabled:opacity-45"
+          className="h-9 px-3 text-sm text-text-muted disabled:opacity-45"
           disabled={busy}
           onClick={guarded(() => onArchive("all"), "归档该用户全部对话？")}
         >
@@ -463,7 +476,7 @@ function DangerSection({
         </Button>
         <Button
           type="button"
-          className="h-9 px-3 text-xs text-text-muted disabled:opacity-45"
+          className="h-9 px-3 text-sm text-text-muted disabled:opacity-45"
           disabled={busy}
           onClick={guarded(
             () => onDeleteGenerations("failed"),
@@ -474,7 +487,7 @@ function DangerSection({
         </Button>
         <Button
           type="button"
-          className="h-9 px-3 text-xs text-text-muted disabled:opacity-45"
+          className="h-9 px-3 text-sm text-text-muted disabled:opacity-45"
           disabled={busy}
           onClick={guarded(
             () => onDeleteGenerations("all"),
@@ -486,7 +499,7 @@ function DangerSection({
         {user.status === "ACTIVE" ? (
           <Button
             type="button"
-            className="h-9 px-3 text-xs text-danger disabled:opacity-45"
+            className="h-9 px-3 text-sm text-danger disabled:opacity-45"
             disabled={busy}
             onClick={guarded(onBan, `封禁用户 ${user.email}？`)}
           >

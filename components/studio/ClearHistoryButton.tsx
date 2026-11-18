@@ -41,18 +41,25 @@ export function ClearHistoryButton({
   }
 
   return (
-    <div className="flex flex-col items-end gap-1">
+    <div className="flex min-w-0 flex-col items-end gap-2 tracking-normal">
       <Button
         variant="secondary"
         type="button"
-        className="h-9 text-danger disabled:cursor-not-allowed disabled:opacity-45"
+        className="h-11 rounded-md text-sm text-danger sm:h-9"
         disabled={disabled || isClearing}
         onClick={() => void handleClear()}
       >
         <Trash2 className="h-4 w-4 stroke-[1.5]" />
         {isClearing ? "清除中…" : "清除历史"}
       </Button>
-      {error ? <p className="text-xs text-danger">{error}</p> : null}
+      {error ? (
+        <p
+          role="alert"
+          className="text-xs leading-5 text-danger [overflow-wrap:anywhere]"
+        >
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui";
 
 import type { CSSProperties } from "react";
 import {
+  AlertTriangle,
   Ban,
   Download,
   ImageOff,
@@ -11,6 +12,7 @@ import {
   Maximize2,
   RefreshCw,
   Share2,
+  Sparkles,
 } from "lucide-react";
 
 import { friendlyErrorMessage } from "@/components/shared/error-copy";
@@ -20,7 +22,6 @@ import type { Generation } from "./lib/types";
 import { CopyTextButton } from "./CopyTextButton";
 import { REFERENCE_DRAG_MIME } from "./lib/reference-input";
 import { NO_CREDIT_CHARGE, TurnCredits } from "./chat/ChatReplyBubbles";
-import { Xiie } from "./chat/Xiie";
 
 interface GenerationCardProps {
   generation: Generation;
@@ -85,23 +86,20 @@ export function GenerationCard({
   return (
     <figure
       className={cn(
-        "group overflow-hidden bg-transparent",
+        "group overflow-hidden rounded-xl border border-border bg-surface shadow-[var(--shadow-xs)]",
         variant === "wall"
-          ? "card-lift img-enter mb-4 break-inside-avoid shadow-[var(--shadow-xs)]"
-          : "my-3 max-w-full",
+          ? "card-lift img-enter mb-4 break-inside-avoid"
+          : "my-4 w-full max-w-[32rem]",
       )}
-      style={
-        variant === "conversation"
-          ? {
-              // As wide as the picture is at the height cap, so the frame
-              // hugs the image instead of leaving an empty strip beside it.
-              width: `max(15rem, calc(min(26rem, 44dvh) * ${ratio}))`,
-              ...style,
-            }
-          : style
-      }
+      style={style}
     >
-      <div className="relative" style={{ aspectRatio: String(ratio) }}>
+      <div
+        className={cn(
+          "relative",
+          variant === "conversation" && "max-h-[min(26rem,44dvh)] min-h-40",
+        )}
+        style={{ aspectRatio: String(ratio) }}
+      >
         {succeeded && generation.images.length > 0 ? (
           <div
             className={cn(
@@ -115,7 +113,7 @@ export function GenerationCard({
                 key={image.id}
                 type="button"
                 onClick={() => onOpen(generation, index)}
-                className="relative block h-full w-full overflow-hidden rounded-xl bg-surface-2 p-0"
+                className="relative block h-full w-full overflow-hidden bg-surface-2 p-0"
                 aria-label={`查看第 ${index + 1} 张大图`}
                 title={`查看第 ${index + 1} 张大图`}
               >
@@ -151,7 +149,7 @@ export function GenerationCard({
         ) : (
           <div
             className={cn(
-              "flex h-full w-full flex-col items-center justify-center gap-2 rounded-xl px-4",
+              "flex h-full w-full flex-col items-center justify-center gap-2 px-4",
               failed
                 ? "bg-danger/5 text-danger"
                 : canceled
@@ -171,11 +169,7 @@ export function GenerationCard({
                     </span>
                   </span>
                   <span className="generation-progress-scan" />
-                  <Xiie
-                    pose={
-                      generation.status === "PENDING" ? "running" : "building"
-                    }
-                  />
+                  <Sparkles className="generation-progress-glyph" size={18} />
                 </div>
                 <span className="text-xs font-medium tabular-nums">
                   {STATUS_LABEL[generation.status]} · {generation.progress}%
@@ -200,7 +194,7 @@ export function GenerationCard({
               </>
             ) : failed ? (
               <>
-                <Xiie pose="debugging" />
+                <AlertTriangle size={18} />
                 <span className="line-clamp-3 max-w-full text-center text-xs">
                   {generationErrorMessage(generation)}
                 </span>
@@ -235,12 +229,12 @@ export function GenerationCard({
         )}
       </div>
       {succeeded ? (
-        <div className="-ml-2 flex flex-wrap items-center gap-0.5 pt-1">
+        <div className="flex flex-wrap items-center gap-1.5 border-t border-border bg-surface px-3 py-2">
           <Button
             variant="ghost"
             type="button"
             onClick={() => onOpen(generation, 0)}
-            className="pressable flex h-9 items-center gap-1.5 rounded-md px-2 text-xs text-text-muted hover:bg-surface-2 hover:text-foreground sm:h-8"
+            className="pressable flex h-10 items-center gap-2 rounded-md px-2.5 text-xs text-foreground hover:bg-surface-2 sm:h-9 sm:px-3"
           >
             <Maximize2 size={15} />
             查看大图
@@ -248,7 +242,7 @@ export function GenerationCard({
           <Button
             asChild
             variant="ghost"
-            className="pressable flex h-9 items-center gap-1.5 rounded-md px-2 text-xs text-text-muted hover:bg-surface-2 hover:text-foreground sm:h-8"
+            className="pressable flex h-10 items-center gap-2 rounded-md px-2.5 text-xs text-foreground hover:bg-surface-2 sm:h-9 sm:px-3"
           >
             <a
               href={generation.images[0]?.downloadUrl}
@@ -264,7 +258,7 @@ export function GenerationCard({
             variant="ghost"
             type="button"
             onClick={() => onUseAsReference(generation)}
-            className="pressable flex h-9 items-center gap-1.5 rounded-md px-2 text-xs text-text-muted hover:bg-surface-2 hover:text-foreground sm:h-8"
+            className="pressable flex h-10 items-center gap-2 rounded-md px-2.5 text-xs text-foreground hover:bg-surface-2 sm:h-9 sm:px-3"
           >
             <ImagePlus size={15} />
             作为参考图
@@ -273,7 +267,7 @@ export function GenerationCard({
             <Button
               asChild
               variant="ghost"
-              className="pressable flex h-9 items-center gap-1.5 rounded-md px-2 text-xs text-text-muted hover:bg-surface-2 hover:text-foreground sm:h-8"
+              className="pressable flex h-10 items-center gap-2 rounded-md px-2.5 text-xs text-foreground hover:bg-surface-2 sm:h-9 sm:px-3"
             >
               <a
                 href={`/app/publish?imageId=${encodeURIComponent(generation.images[0].id)}`}

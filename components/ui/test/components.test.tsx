@@ -92,12 +92,12 @@ describe("UI controls", () => {
   it("keeps the legacy Input size prop compatible", () => {
     const { rerender } = render(<Input aria-label="兼容输入" inputSize="lg" />);
     expect(screen.getByRole("textbox", { name: "兼容输入" })).toHaveClass(
-      "h-10",
+      "h-11",
     );
 
     rerender(<Input aria-label="兼容输入" controlSize="sm" inputSize="lg" />);
     expect(screen.getByRole("textbox", { name: "兼容输入" })).toHaveClass(
-      "h-7",
+      "h-8",
     );
   });
 

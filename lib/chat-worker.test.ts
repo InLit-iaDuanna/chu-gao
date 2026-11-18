@@ -41,7 +41,10 @@ vi.mock("@/lib/chat-turns", () => ({
   appendChatEvent: mocks.append,
   finishChatAttempt: mocks.finish,
 }));
-vi.mock("@/lib/chat-context", () => ({ prepareChatContext: mocks.context }));
+vi.mock("@/lib/chat-context", () => ({
+  prepareChatContext: mocks.context,
+  precompactChatContext: async () => null,
+}));
 vi.mock("@/lib/chat-profiles", () => ({ getChatProfile: mocks.profile }));
 vi.mock("@/lib/model-call-log", () => ({
   startModelCall: async () => ({

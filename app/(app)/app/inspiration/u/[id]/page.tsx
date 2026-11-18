@@ -7,7 +7,7 @@ export default async function WorkspaceDesignerPage({
 }) {
   const { id } = await params;
   return (
-    <div className="h-full overflow-y-auto">
+    <div className="h-full min-w-0 overflow-y-auto">
       <DesignerProfile key={id} userId={id} basePath="/app/inspiration" />
     </div>
   );

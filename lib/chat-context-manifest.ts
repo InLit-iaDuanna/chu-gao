@@ -60,6 +60,11 @@ export function estimateChatRequestTokens(body: unknown): number {
           : object.detail;
       return detail === "low" ? 256 : 1_200;
     }
+    // Anthropic Messages image block: { type: "image", source: { data: <base64> } }.
+    // Counting the base64 as text made any turn with an image look like
+    // millions of tokens and fail with CHAT_CONTEXT_TOO_LARGE.
+    if (object.type === "image" && typeof object.source === "object")
+      return 1_200;
     return (
       8 +
       Object.values(object).reduce<number>(

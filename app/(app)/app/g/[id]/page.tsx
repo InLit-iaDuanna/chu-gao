@@ -1,7 +1,14 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
-import { Download, Share2 } from "lucide-react";
+import {
+  ArrowLeft,
+  CircleAlert,
+  Download,
+  MessageSquare,
+  Share2,
+} from "lucide-react";
+import { Button, EmptyState } from "@/components/ui";
 
 import { downloadImageUrl } from "@/components/canvas/gallery-images";
 import { friendlyErrorMessage } from "@/components/shared/error-copy";
@@ -73,13 +80,14 @@ export default async function GenerationDetailPage({
 
   if (result.status === "unavailable") {
     return (
-      <StudioPageShell eyebrow="Task" title="生成详情" wide>
-        <div className="surface-panel flex min-h-72 flex-col items-center justify-center gap-3 px-6 py-10 text-center">
-          <h2 className="text-xl font-medium">生成详情暂不可用</h2>
-          <p className="max-w-md text-sm leading-6 text-text-muted">
-            暂时无法读取当前账户的生成详情，请稍后刷新。
-          </p>
-        </div>
+      <StudioPageShell title="生成详情" wide>
+        <EmptyState
+          role="status"
+          icon={CircleAlert}
+          className="min-h-72 border-t border-border"
+          title="生成详情暂不可用"
+          description="暂时无法读取当前账户的生成详情，请稍后刷新。"
+        />
       </StudioPageShell>
     );
   }
@@ -99,35 +107,40 @@ export default async function GenerationDetailPage({
 
   return (
     <StudioPageShell
-      eyebrow="Task"
       title="生成详情"
       wide
       actions={
-        <Link
-          href="/app/history"
-          className="tool-button h-9 px-3 text-xs text-text-muted"
-        >
-          历史
-        </Link>
+        <Button asChild>
+          <Link href="/app/history">
+            <ArrowLeft size={16} aria-hidden="true" />
+            历史
+          </Link>
+        </Button>
       }
     >
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="surface-panel p-3 sm:p-4">
+      <div className="grid min-w-0 gap-6 border-t border-border pt-6 text-sm tracking-normal lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-8">
+        <div className="min-w-0">
           {viewableImages.length ? (
-            <ImageGallery generation={generation} />
+            <ImageGallery
+              generation={generation}
+              frameClassName="h-[320px] rounded-lg sm:h-[480px] lg:h-[620px]"
+            />
           ) : (
-            <div className="flex min-h-[360px] items-center justify-center px-6 text-center lg:min-h-[560px]">
-              <div className="max-w-sm">
+            <div
+              role="status"
+              className="flex min-h-[320px] items-center justify-center rounded-lg border border-border bg-surface-2 px-5 text-center sm:min-h-[480px] lg:min-h-[560px]"
+            >
+              <div className="min-w-0 max-w-sm">
                 <p
-                  className={`eyebrow ${generationStatusTone(generation.status)}`}
+                  className={`text-xs font-medium ${generationStatusTone(generation.status)}`}
                 >
                   {generationStatusLabel(generation.status)}
                 </p>
-                <h2 className="mt-2 text-2xl">
+                <h2 className="mt-2 text-xl font-semibold">
                   {generation.status === "FAILED" ? "任务失败" : "暂未产出图片"}
                 </h2>
                 {generation.status === "FAILED" ? (
-                  <p className="mt-3 text-sm leading-6 text-danger">
+                  <p className="mt-3 break-words text-sm leading-6 text-danger [overflow-wrap:anywhere]">
                     {friendlyErrorMessage(
                       {
                         code: generation.errorCode ?? undefined,
@@ -147,52 +160,61 @@ export default async function GenerationDetailPage({
           )}
         </div>
 
-        <aside className="surface-panel h-fit p-5">
-          <p className="eyebrow">任务详情</p>
-          <p className="mt-2 break-all font-mono text-xs text-text-muted">
+        <aside
+          aria-labelledby="generation-details-heading"
+          className="h-fit min-w-0 border-t border-border pt-6 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0"
+        >
+          <h2 id="generation-details-heading" className="app-section-title">
+            任务详情
+          </h2>
+          <p
+            tabIndex={0}
+            className="mt-2 max-w-full overflow-x-auto whitespace-nowrap font-mono text-xs text-text-muted"
+          >
             {generation.id}
           </p>
 
           <div className="mt-4 grid gap-2">
             {generation.conversationId ? (
-              <Link
-                href={`/app?thread=${generation.conversationId}`}
-                className="tool-button h-9 text-text-muted"
-              >
-                继续这个对话
-              </Link>
+              <Button asChild variant="primary">
+                <Link href={`/app?thread=${generation.conversationId}`}>
+                  <MessageSquare size={16} aria-hidden="true" />
+                  继续这个对话
+                </Link>
+              </Button>
             ) : (
-              <Link href="/app" className="tool-button h-9 text-text-muted">
-                回到工作台
-              </Link>
+              <Button asChild variant="primary">
+                <Link href="/app">
+                  <ArrowLeft size={16} aria-hidden="true" />
+                  回到工作台
+                </Link>
+              </Button>
             )}
             {viewableImages.map((image, index) => {
               const href = downloadImageUrl(image);
 
               return href ? (
-                <a
-                  key={image.id ?? `${href}-${index}`}
-                  href={href}
-                  download
-                  className="tool-button h-9 text-text-muted"
-                >
-                  <Download className="h-4 w-4 stroke-[1.5]" />
-                  下载原图 {index + 1}
-                </a>
+                <Button asChild key={image.id ?? `${href}-${index}`}>
+                  <a href={href} download>
+                    <Download className="h-4 w-4 stroke-[1.5]" />
+                    下载原图 {index + 1}
+                  </a>
+                </Button>
               ) : null;
             })}
             {viewableImages[0]?.id ? (
-              <Link
-                href={`/app/publish?imageId=${encodeURIComponent(viewableImages[0].id)}`}
-                className="tool-button h-9 text-text-muted"
-              >
-                <Share2 className="h-4 w-4 stroke-[1.5]" />
-                发布到灵感圈
-              </Link>
+              <Button asChild>
+                <Link
+                  href={`/app/publish?imageId=${encodeURIComponent(viewableImages[0].id)}`}
+                >
+                  <Share2 className="h-4 w-4 stroke-[1.5]" />
+                  发布到灵感圈
+                </Link>
+              </Button>
             ) : null}
           </div>
 
-          <dl className="mt-6 space-y-4 text-sm">
+          <dl className="mt-6 space-y-4 border-t border-border pt-5 text-sm [&_dt]:text-xs [&_dd]:break-words [&_dd]:[overflow-wrap:anywhere]">
             <div>
               <dt className="text-text-muted">状态</dt>
               <dd className={`mt-1 ${generationStatusTone(generation.status)}`}>
@@ -204,7 +226,7 @@ export default async function GenerationDetailPage({
               <dd className="mt-1">{formatDate(generation.createdAt)}</dd>
             </div>
             <div>
-              <dt className="flex items-center justify-between text-text-muted">
+              <dt className="flex items-center justify-between gap-3 text-text-muted [&_button]:h-9 [&_button]:w-9">
                 提示词
                 <CopyTextButton text={generation.prompt} />
               </dt>
@@ -231,7 +253,7 @@ export default async function GenerationDetailPage({
             {generation.errorCode || generation.errorMessage ? (
               <div>
                 <dt className="text-text-muted">错误</dt>
-                <dd className="mt-1 leading-6 text-danger">
+                <dd role="status" className="mt-1 leading-6 text-danger">
                   {friendlyErrorMessage(
                     {
                       code: generation.errorCode ?? undefined,

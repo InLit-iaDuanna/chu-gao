@@ -1,0 +1,42 @@
+{
+  "project": "Chūgǎo Studio",
+  "version": "2.3.0",
+  "versionDirectory": "chugao_v2.3",
+  "testDirectory": "../test",
+  "status": "account-bridge-development",
+  "verifiedAt": "2026-09-27",
+  "nextVersionDirectory": "chugao_v2.3.1",
+  "sourceLineage": {
+    "origin": "New project 2",
+    "migrationMode": "parallel-copy",
+    "oldSourcePreserved": true,
+    "previousVersion": "chugao_v2.2"
+  },
+  "releasePolicy": {
+    "major": "chugao_vN",
+    "minor": "chugao_vN.M",
+    "patch": "chugao_vN.M.P",
+    "formalFilesOnly": true,
+    "testsAndTemporaryFilesIn": "../test"
+  },
+  "architecture": {
+    "style": "modular monolith",
+    "web": "Next.js App Router + React + TypeScript",
+    "data": "PostgreSQL + Prisma",
+    "queue": "Redis + BullMQ",
+    "worker": "Node.js first; Go only after measured boundary is justified"
+  },
+  "verification": {
+    "typecheck": "passed",
+    "lint": "passed",
+    "tests": {
+      "files": 52,
+      "cases": 203,
+      "status": "passed"
+    },
+    "productionBuild": "passed; no-cache rebuild and runtime Prisma field check on 198.44.177.67",
+    "accountBridge": "deployed; main session cookie shared with test.chugao.art; admin bypasses beta flag; user access is administrator-controlled",
+    "migration": "passed; materialInboxBeta migration applied and final migrate reports no pending migrations",
+    "runtimeImageCheck": "passed; web and worker generated clients include materialInboxBeta"
+  }
+}

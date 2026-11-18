@@ -26,16 +26,22 @@ export function AdminPageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <p className="eyebrow">{eyebrow}</p>
-        <h1 className="mt-1 text-xl font-semibold tracking-tight">{title}</h1>
+    <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+      <div className="min-w-0 flex-1 basis-64">
+        <p className="text-xs leading-5 text-text-faint">{eyebrow}</p>
+        <h1 className="mt-1 break-words text-xl font-semibold leading-7 tracking-normal">
+          {title}
+        </h1>
         {description ? (
-          <p className="mt-1 text-sm text-text-muted">{description}</p>
+          <p className="mt-1 break-words text-sm leading-6 text-text-muted">
+            {description}
+          </p>
         ) : null}
       </div>
       {actions ? (
-        <div className="flex items-center gap-2">{actions}</div>
+        <div className="flex max-w-full flex-wrap items-center gap-2">
+          {actions}
+        </div>
       ) : null}
     </div>
   );
@@ -53,18 +59,20 @@ export function StatCard({
   tone?: "default" | "danger" | "success";
 }) {
   return (
-    <div className="surface-panel p-4">
+    <div className="min-w-0 rounded-lg border border-border bg-surface p-4">
       <p className="text-xs text-text-muted">{label}</p>
       <p
         className={cn(
-          "mt-1.5 font-mono text-2xl font-semibold tracking-tight",
+          "mt-1.5 break-words font-mono text-2xl font-semibold tracking-normal tabular-nums",
           tone === "danger" && "text-danger",
           tone === "success" && "text-success",
         )}
       >
         {value}
       </p>
-      {hint ? <p className="mt-1 text-[11px] text-text-faint">{hint}</p> : null}
+      {hint ? (
+        <p className="mt-1 text-xs leading-5 text-text-faint">{hint}</p>
+      ) : null}
     </div>
   );
 }
@@ -109,9 +117,9 @@ export function AdminTable({
   children: ReactNode;
 }) {
   return (
-    <TableContainer>
+    <TableContainer className="min-w-0 max-w-full">
       <Table>
-        <TableHeader>
+        <TableHeader className="bg-surface-2">
           <tr className="border-b border-border text-left">
             {head.map((cell, index) => (
               <TableHead key={index}>{cell}</TableHead>
@@ -142,9 +150,13 @@ export function AdminField({
 
 export function ErrorText({ message }: { message: string | null }) {
   if (!message) return null;
-  return <p className="text-sm text-danger">{message}</p>;
+  return (
+    <p role="alert" className="mb-3 break-words text-sm leading-6 text-danger">
+      {message}
+    </p>
+  );
 }
 
 export function EmptyPanel({ text }: { text: string }) {
-  return <EmptyState className="surface-panel" title={text} />;
+  return <EmptyState className="border-y border-border" title={text} />;
 }

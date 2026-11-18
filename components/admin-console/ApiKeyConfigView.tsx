@@ -67,9 +67,10 @@ export function ApiKeyConfigView() {
         actions={
           <Button
             type="button"
-            className="h-8 w-8 p-0 text-text-muted"
+            className="h-9 w-9 p-0 text-text-muted"
             onClick={reload}
             title="刷新"
+            aria-label="刷新 API 配置"
           >
             <RefreshCw className="h-3.5 w-3.5" />
           </Button>
@@ -104,8 +105,8 @@ function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-border bg-surface">
-      <header className="border-b border-border px-5 py-3.5">
+    <section className="min-w-0 border-t border-border">
+      <header className="py-4">
         <h2 className="text-sm font-semibold">{title}</h2>
         <p className="mt-0.5 text-xs text-text-muted">{description}</p>
       </header>
@@ -129,7 +130,7 @@ function SaveButton({
     <Button
       type="button"
       disabled={busy || !dirty}
-      className="h-8 px-4 text-sm disabled:opacity-40"
+      className="h-9 px-4 text-sm disabled:opacity-40"
       onClick={onClick}
     >
       {busy ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : null}
@@ -140,7 +141,13 @@ function SaveButton({
 
 // ─── Multiplier & rate limit ──────────────────────────────────────────────────
 
-function RuntimeSection({ config, onSave }: { config: ApiKeyAdminConfig; onSave: SaveFn }) {
+function RuntimeSection({
+  config,
+  onSave,
+}: {
+  config: ApiKeyAdminConfig;
+  onSave: SaveFn;
+}) {
   const [multiplier, setMultiplier] = useState(String(config.creditMultiplier));
   const [rateLimit, setRateLimit] = useState(String(config.rateLimitPerMin));
   const [busy, setBusy] = useState(false);
@@ -186,18 +193,20 @@ function RuntimeSection({ config, onSave }: { config: ApiKeyAdminConfig; onSave:
       {rows.map((row) => (
         <div
           key={row.label}
-          className="flex items-start justify-between gap-4 border-b border-border px-5 py-4 last:border-0"
+          className="flex flex-wrap items-start justify-between gap-4 border-b border-border py-4 last:border-0"
         >
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium">{row.label}</p>
-            <p className="mt-0.5 text-xs leading-relaxed text-text-muted">{row.hint}</p>
+            <p className="mt-0.5 text-xs leading-relaxed text-text-muted">
+              {row.hint}
+            </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <Input
               type="number"
               min={0}
               step={row.step}
-              className="h-8 w-28 font-mono text-sm"
+              className="w-28 font-mono h-9 text-sm"
               value={row.value}
               onChange={(e) => row.onChange(e.target.value)}
             />
@@ -205,14 +214,17 @@ function RuntimeSection({ config, onSave }: { config: ApiKeyAdminConfig; onSave:
           </div>
         </div>
       ))}
-      <div className="border-t border-border px-5 py-3">
+      <div className="border-t border-border py-3">
         <SaveButton
           dirty={dirty}
           busy={busy}
           onClick={async () => {
             setBusy(true);
             await onSave(
-              { creditMultiplier: nextMultiplier, rateLimitPerMin: nextRateLimit },
+              {
+                creditMultiplier: nextMultiplier,
+                rateLimitPerMin: nextRateLimit,
+              },
               "基础设置已保存",
             );
             setBusy(false);
@@ -251,7 +263,13 @@ function fromDraft(draft: PriceDraft): ApiPriceTable | null {
   return table;
 }
 
-function PriceSection({ config, onSave }: { config: ApiKeyAdminConfig; onSave: SaveFn }) {
+function PriceSection({
+  config,
+  onSave,
+}: {
+  config: ApiKeyAdminConfig;
+  onSave: SaveFn;
+}) {
   const [draft, setDraft] = useState<PriceDraft>(() => toDraft(config.prices));
   const [busy, setBusy] = useState(false);
 
@@ -266,13 +284,18 @@ function PriceSection({ config, onSave }: { config: ApiKeyAdminConfig; onSave: S
       title="API 定价"
       description="单位：积分/张，按实际出图分辨率计费。留空 = 网页价 × 默认倍率（灰色为当前生效价）。只影响 API 调用，不影响网页端。"
     >
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+      <div className="min-w-0 max-w-full overflow-x-auto rounded-lg border border-border bg-surface">
+        <table className="w-full min-w-[560px] text-sm">
           <thead>
             <tr className="border-b border-border">
-              <th className="px-5 py-2.5 text-left text-xs font-medium text-text-muted">模型</th>
+              <th className="px-5 py-2.5 text-left text-xs font-medium text-text-muted">
+                模型
+              </th>
               {TIERS.map((tier) => (
-                <th key={tier} className="px-3 py-2.5 text-left text-xs font-medium text-text-muted">
+                <th
+                  key={tier}
+                  className="px-3 py-2.5 text-left text-xs font-medium text-text-muted"
+                >
                   {tier}
                 </th>
               ))}
@@ -283,13 +306,17 @@ function PriceSection({ config, onSave }: { config: ApiKeyAdminConfig; onSave: S
               <tr key={model.id}>
                 <td className="px-5 py-2.5">
                   <p className="font-medium">{model.displayName}</p>
-                  <p className="font-mono text-[11px] text-text-faint">{model.id}</p>
+                  <p className="font-mono text-xs text-text-faint">
+                    {model.id}
+                  </p>
                 </td>
                 {TIERS.map((tier) => {
                   const supported = model.resolutions.includes(tier);
                   const web = model.webPrices[tier];
                   const fallback =
-                    web === undefined ? "" : String(round2(web * config.creditMultiplier));
+                    web === undefined
+                      ? ""
+                      : String(round2(web * config.creditMultiplier));
                   return (
                     <td key={tier} className="px-3 py-2.5 align-top">
                       {supported ? (
@@ -300,16 +327,21 @@ function PriceSection({ config, onSave }: { config: ApiKeyAdminConfig; onSave: S
                             step={0.5}
                             aria-label={`${model.displayName} ${tier} API 价格`}
                             placeholder={fallback}
-                            className="h-8 w-24 font-mono text-xs"
+                            className="w-24 font-mono h-9 text-sm"
                             value={draft[model.id]?.[tier] ?? ""}
                             onChange={(e) =>
                               setDraft((prev) => ({
                                 ...prev,
-                                [model.id]: { ...prev[model.id], [tier]: e.target.value },
+                                [model.id]: {
+                                  ...prev[model.id],
+                                  [tier]: e.target.value,
+                                },
                               }))
                             }
                           />
-                          <p className="mt-1 text-[10px] text-text-faint">网页价 {web ?? "—"}</p>
+                          <p className="mt-1 text-xs text-text-faint">
+                            网页价 {web ?? "—"}
+                          </p>
                         </>
                       ) : (
                         <span className="text-xs text-text-faint">不支持</span>
@@ -322,7 +354,7 @@ function PriceSection({ config, onSave }: { config: ApiKeyAdminConfig; onSave: S
           </tbody>
         </table>
       </div>
-      <div className="flex items-center gap-3 border-t border-border px-5 py-3">
+      <div className="flex items-center gap-3 border-t border-border py-3">
         <SaveButton
           dirty={dirty}
           busy={busy}
@@ -344,7 +376,13 @@ function PriceSection({ config, onSave }: { config: ApiKeyAdminConfig; onSave: S
 
 // ─── Docs editor ──────────────────────────────────────────────────────────────
 
-function DocsSection({ config, onSave }: { config: ApiKeyAdminConfig; onSave: SaveFn }) {
+function DocsSection({
+  config,
+  onSave,
+}: {
+  config: ApiKeyAdminConfig;
+  onSave: SaveFn;
+}) {
   const [text, setText] = useState(config.docsMarkdown);
   const [mode, setMode] = useState<"edit" | "preview">("edit");
   const [models, setModels] = useState<ApiDocsModel[] | null>(null);
@@ -370,29 +408,31 @@ function DocsSection({ config, onSave }: { config: ApiKeyAdminConfig; onSave: Sa
       title="API 文档"
       description={`Markdown 格式，显示在用户「设置 → API 密钥」页。写 ${MODELS_PLACEHOLDER} 的那一行会自动替换成实时的模型、参数和价格表。`}
     >
-      <div className="flex items-center gap-1 border-b border-border px-5 py-2">
+      <div className="flex flex-wrap items-center gap-1 border-b border-border py-2">
         {(["edit", "preview"] as const).map((value) => (
           <button
             key={value}
             type="button"
             onClick={() => setMode(value)}
+            aria-pressed={mode === value}
             className={cn(
-              "rounded-md px-3 py-1 text-xs font-medium",
+              "h-9 rounded-md px-3 text-sm font-medium",
               mode === value
-                ? "bg-foreground/10 text-foreground"
+                ? "bg-surface-2 text-foreground"
                 : "text-text-muted hover:text-foreground",
             )}
           >
             {value === "edit" ? "编辑" : "预览"}
           </button>
         ))}
-        <span className="ml-auto text-[11px] text-text-faint">
-          {config.docsIsDefault ? "当前使用内置默认文档" : "当前使用自定义文档"} · {text.length} 字
+        <span className="ml-auto text-xs text-text-faint">
+          {config.docsIsDefault ? "当前使用内置默认文档" : "当前使用自定义文档"}{" "}
+          · {text.length} 字
         </span>
       </div>
 
       {mode === "edit" ? (
-        <div className="px-5 py-4">
+        <div className="py-4">
           <Textarea
             aria-label="API 文档 Markdown"
             spellCheck={false}
@@ -402,12 +442,12 @@ function DocsSection({ config, onSave }: { config: ApiKeyAdminConfig; onSave: Sa
           />
         </div>
       ) : (
-        <div className="max-h-[640px] overflow-y-auto px-5 py-5">
+        <div className="max-h-[640px] overflow-y-auto py-5">
           <ApiDocsContent markdown={text} models={models} />
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-3 border-t border-border px-5 py-3">
+      <div className="flex flex-wrap items-center gap-3 border-t border-border py-3">
         <SaveButton
           dirty={dirty && !tooLong}
           busy={busy}
@@ -423,19 +463,24 @@ function DocsSection({ config, onSave }: { config: ApiKeyAdminConfig; onSave: Sa
             type="button"
             disabled={busy}
             onClick={async () => {
-              if (!window.confirm("恢复为内置默认文档？当前自定义内容会被覆盖。")) return;
+              if (
+                !window.confirm("恢复为内置默认文档？当前自定义内容会被覆盖。")
+              )
+                return;
               setBusy(true);
               await onSave({ docsMarkdown: "" }, "已恢复默认文档");
               setBusy(false);
             }}
-            className="flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-xs text-text-muted hover:text-foreground disabled:opacity-40"
+            className="flex h-9 items-center gap-1.5 rounded-md border border-border px-3 text-sm text-text-muted hover:text-foreground disabled:opacity-40"
           >
             <RotateCcw className="h-3 w-3" />
             恢复默认
           </button>
         )}
         {tooLong && (
-          <span className="text-xs text-danger">文档不能超过 {MAX_DOCS_LENGTH} 字</span>
+          <span className="text-xs text-danger">
+            文档不能超过 {MAX_DOCS_LENGTH} 字
+          </span>
         )}
       </div>
     </Panel>

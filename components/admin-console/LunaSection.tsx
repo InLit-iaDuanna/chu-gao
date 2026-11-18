@@ -127,16 +127,16 @@ export function LunaSection({
 
   return (
     <section
-      className="surface-panel p-5"
+      className="min-w-0 border-t border-border pt-5"
       aria-labelledby={`${variant}-section-title`}
       aria-busy={busy}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 id={`${variant}-section-title`} className="eyebrow">
+        <h2 id={`${variant}-section-title`} className="text-sm font-semibold">
           {name}
         </h2>
         {status ? (
-          <span className="text-[11px] text-text-faint">
+          <span className="text-xs text-text-faint">
             {status.hasKey ? "已配置密钥" : "未配置密钥"}
           </span>
         ) : null}
@@ -176,6 +176,7 @@ export function LunaSection({
           <div className="grid gap-3 sm:grid-cols-2">
             <AdminField label="Base URL">
               <Input
+                className="h-9 text-sm"
                 type="url"
                 required
                 disabled={busy}
@@ -186,11 +187,17 @@ export function LunaSection({
               />
             </AdminField>
             <AdminField label="模型">
-              <Input value={modelId} readOnly disabled={busy} />
+              <Input
+                className="h-9 text-sm"
+                value={modelId}
+                readOnly
+                disabled={busy}
+              />
             </AdminField>
           </div>
           <AdminField label="API Key（留空不修改）">
             <Input
+              className="h-9 text-sm"
               type="password"
               autoComplete="new-password"
               spellCheck={false}
@@ -211,6 +218,7 @@ export function LunaSection({
           </label>
           <AdminField label="每轮积分">
             <Input
+              className="h-9 text-sm"
               type="number"
               min={0}
               max={1_000_000}

@@ -1,6 +1,12 @@
 "use client";
 
-import { Button, Dialog, DialogContent, DialogTitle } from "@/components/ui";
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  IconButton,
+} from "@/components/ui";
 
 import {
   ChevronLeft,
@@ -85,6 +91,7 @@ export function Lightbox({
     >
       <DialogContent
         hideClose
+        aria-describedby={undefined}
         onOpenAutoFocus={(event) => {
           event.preventDefault();
           closeButtonRef.current?.focus();
@@ -94,28 +101,28 @@ export function Lightbox({
           const returnFocus = returnFocusRef.current;
           if (returnFocus?.isConnected) returnFocus.focus();
         }}
-        className="inset-0 flex h-[100dvh] w-full max-w-none translate-x-0 translate-y-0 animate-[fadeIn_180ms_ease-out] flex-col overflow-hidden rounded-none border-0 bg-background/95 p-0 shadow-none backdrop-blur-sm"
+        className="inset-0 flex h-[100dvh] max-h-none w-full max-w-none translate-x-0 translate-y-0 flex-col overflow-hidden rounded-none border-0 bg-background p-0 text-sm tracking-normal shadow-none"
       >
         <DialogTitle className="sr-only">
           图片预览，第 {index + 1} 张，共 {images.length} 张
         </DialogTitle>
 
-        <div className="flex h-12 shrink-0 items-center justify-between px-4">
-          <span className="text-xs text-text-muted">
+        <div className="flex min-h-14 shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border px-3 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] sm:px-4">
+          <span className="shrink-0 text-xs tabular-nums text-text-muted">
             {index + 1} / {images.length}
           </span>
-          <div className="flex items-center gap-1">
-            <Button
+          <div className="ml-auto flex max-w-full flex-wrap items-center gap-1">
+            <IconButton
               type="button"
               variant="ghost"
               aria-label={actualSize ? "适应窗口" : "查看原尺寸"}
               title={actualSize ? "适应窗口" : "查看原尺寸"}
               aria-pressed={actualSize}
               onClick={() => setActualSize((value) => !value)}
-              className="h-11 w-11 p-0 text-foreground"
+              className="h-11 w-11 rounded-md sm:h-9 sm:w-9"
             >
               {actualSize ? <Scan size={17} /> : <ZoomIn size={17} />}
-            </Button>
+            </IconButton>
             <CopyTextButton text={generation.prompt} />
             {onUseAsReference && image.id ? (
               <Button
@@ -124,60 +131,70 @@ export function Lightbox({
                 aria-label="继续修改"
                 title="继续修改"
                 onClick={() => onUseAsReference(image)}
-                className="h-11 gap-1.5 px-2 text-xs"
+                className="h-11 w-11 gap-2 rounded-md px-0 text-sm sm:h-9 sm:w-auto sm:px-3"
               >
                 <ImagePlus size={16} />
                 <span className="hidden sm:inline">继续修改</span>
               </Button>
             ) : null}
             {image.id ? (
-              <a
-                href={`/app/publish?imageId=${encodeURIComponent(image.id)}`}
+              <IconButton
+                asChild
+                variant="ghost"
                 aria-label="发布到灵感圈"
                 title="发布到灵感圈"
                 onClick={(event) => event.stopPropagation()}
-                className="flex h-8 w-8 items-center justify-center rounded-md p-0 text-text-muted transition-colors hover:bg-surface-2 hover:text-foreground"
+                className="h-11 w-11 rounded-md sm:h-9 sm:w-9"
               >
-                <Share2 size={15} aria-hidden="true" />
-              </a>
+                <a
+                  href={`/app/publish?imageId=${encodeURIComponent(image.id)}`}
+                >
+                  <Share2 size={16} aria-hidden="true" />
+                </a>
+              </IconButton>
             ) : null}
-            <a
-              href={image.downloadUrl ?? image.url}
-              download
+            <IconButton
+              asChild
+              variant="ghost"
               aria-label="下载"
+              title="下载"
               onClick={(event) => event.stopPropagation()}
-              className="flex h-8 w-8 items-center justify-center rounded-md p-0 text-text-muted transition-colors hover:bg-surface-2 hover:text-foreground"
+              className="h-11 w-11 rounded-md sm:h-9 sm:w-9"
             >
-              <Download size={15} aria-hidden="true" />
-            </a>
+              <a href={image.downloadUrl ?? image.url} download>
+                <Download size={16} aria-hidden="true" />
+              </a>
+            </IconButton>
             <Button
               ref={closeButtonRef}
               variant="ghost"
               type="button"
               aria-label="关闭"
+              title="关闭"
               onClick={onClose}
-              className="flex h-8 w-8 items-center justify-center rounded-md p-0 text-text-muted transition-colors hover:bg-surface-2 hover:text-foreground"
+              className="h-11 w-11 rounded-md p-0 sm:h-9 sm:w-9"
             >
               <X size={16} aria-hidden="true" />
             </Button>
           </div>
         </div>
 
-        <div className="relative min-h-0 flex-1 px-10 pb-4 sm:px-14">
-          <div className="flex h-full w-full overflow-auto">
+        <div className="relative min-h-0 flex-1 px-14 py-4">
+          <div className="flex h-full w-full overflow-auto overscroll-contain">
             {index > 0 ? (
-              <Button
-                variant="ghost"
+              <IconButton
+                variant="secondary"
                 type="button"
                 aria-label="上一张"
+                title="上一张"
                 onClick={(event) => {
                   event.stopPropagation();
                   onNavigate(index - 1);
                 }}
-                className="pressable absolute left-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-md border border-border bg-surface p-0 text-text-muted transition-colors hover:border-border-strong hover:text-foreground md:left-4 md:h-9 md:w-9"
+                className="absolute left-2 top-1/2 h-11 w-11 -translate-y-1/2 rounded-md border-border bg-surface sm:left-3 sm:h-9 sm:w-9"
               >
                 <ChevronLeft size={16} aria-hidden="true" />
-              </Button>
+              </IconButton>
             ) : null}
 
             <img
@@ -193,24 +210,25 @@ export function Lightbox({
             />
 
             {index < images.length - 1 ? (
-              <Button
-                variant="ghost"
+              <IconButton
+                variant="secondary"
                 type="button"
                 aria-label="下一张"
+                title="下一张"
                 onClick={(event) => {
                   event.stopPropagation();
                   onNavigate(index + 1);
                 }}
-                className="pressable absolute right-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-md border border-border bg-surface p-0 text-text-muted transition-colors hover:border-border-strong hover:text-foreground md:right-4 md:h-9 md:w-9"
+                className="absolute right-2 top-1/2 h-11 w-11 -translate-y-1/2 rounded-md border-border bg-surface sm:right-3 sm:h-9 sm:w-9"
               >
                 <ChevronRight size={16} aria-hidden="true" />
-              </Button>
+              </IconButton>
             ) : null}
           </div>
         </div>
 
-        <div className="flex max-h-[25dvh] shrink-0 items-start gap-3 overflow-y-auto border-t border-border px-4 py-3">
-          <p className="mx-auto min-w-0 max-w-3xl flex-1 select-text whitespace-pre-wrap break-words text-sm leading-6 text-text-muted">
+        <div className="flex max-h-[30dvh] shrink-0 flex-col items-start gap-3 overflow-y-auto border-t border-border bg-surface px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:flex-row">
+          <p className="mx-auto min-w-0 max-w-3xl flex-1 select-text whitespace-pre-wrap break-words text-sm leading-6 text-text-muted [overflow-wrap:anywhere]">
             {generation.prompt}
           </p>
           {onUsePrompt ? (
@@ -218,7 +236,7 @@ export function Lightbox({
               type="button"
               variant="secondary"
               onClick={() => onUsePrompt(generation.prompt)}
-              className="h-10 shrink-0 text-xs"
+              className="h-11 shrink-0 rounded-md text-sm sm:h-9"
             >
               使用提示词
             </Button>

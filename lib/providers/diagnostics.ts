@@ -1,3 +1,5 @@
+import { isInterruptedNetworkError, isUnreachableNetworkError } from "@/lib/http";
+
 const SECRET_PATTERNS = [
   /sk-[A-Za-z0-9_-]+/g,
   /Bearer\s+[A-Za-z0-9._~+/=-]+/gi,
@@ -143,6 +145,17 @@ export function classifyProviderFailure(
   }
 
   if (isProviderTimeoutError(error)) {
+    return { category: "TRANSIENT_PROVIDER" };
+  }
+
+  // A dead or unreachable channel must fail over, not block the request.
+  if (isUnreachableNetworkError(error)) {
+    return { category: "TRANSIENT_PROVIDER" };
+  }
+
+  // A dropped connection is worth retrying on another account, otherwise the
+  // user is stuck on a channel that still has capacity.
+  if (isInterruptedNetworkError(error)) {
     return { category: "TRANSIENT_PROVIDER" };
   }
 

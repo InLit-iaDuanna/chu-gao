@@ -2,6 +2,7 @@
 
 import {
   Copy,
+  Check,
   Eye,
   EyeOff,
   Key,
@@ -24,6 +25,7 @@ import {
 } from "@/components/ui/Dialog";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Input } from "@/components/ui/Input";
+import { IconButton } from "@/components/ui/IconButton";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { cn, formatDate } from "@/lib/utils";
 
@@ -43,7 +45,10 @@ export function ApiKeySection() {
   const [items, setItems] = useState<ApiKey[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const [notice, setNotice] = useState<{
+    tone: "success" | "error";
+    text: string;
+  } | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [newKey, setNewKey] = useState<string | null>(null);
 
@@ -74,11 +79,14 @@ export function ApiKeySection() {
     try {
       await revokeApiKey(id);
       setItems((prev) => prev.filter((k) => k.id !== id));
-      setNotice("API 密钥已撤销");
-      setTimeout(() => setNotice(""), 3000);
+      setNotice({ tone: "success", text: "API 密钥已撤销" });
+      setTimeout(() => setNotice(null), 3000);
     } catch (cause) {
-      setNotice(cause instanceof Error ? cause.message : "撤销失败");
-      setTimeout(() => setNotice(""), 4000);
+      setNotice({
+        tone: "error",
+        text: cause instanceof Error ? cause.message : "撤销失败",
+      });
+      setTimeout(() => setNotice(null), 4000);
     }
   };
 
@@ -92,14 +100,14 @@ export function ApiKeySection() {
       ref={sectionRef}
       id="apikeys"
       aria-labelledby="apikeys-heading"
-      className="min-w-0 scroll-mt-6 border-t border-border pt-6"
+      className="min-w-0 scroll-mt-6 border-t border-border pt-6 text-sm tracking-normal"
     >
       <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 id="apikeys-heading" className="text-lg font-semibold">
+        <div className="min-w-0">
+          <h2 id="apikeys-heading" className="app-section-title">
             API 密钥
           </h2>
-          <p className="mt-0.5 text-sm text-text-muted">
+          <p className="mt-2 text-sm leading-6 text-text-muted">
             用于服务端直接调用图像生成 API，支持高并发接入。
           </p>
         </div>
@@ -109,8 +117,14 @@ export function ApiKeySection() {
       </header>
 
       {notice && (
-        <p role="status" className="mt-4 break-words text-sm text-success">
-          {notice}
+        <p
+          role={notice.tone === "error" ? "alert" : "status"}
+          className={cn(
+            "mt-4 break-words text-sm",
+            notice.tone === "error" ? "text-danger" : "text-success",
+          )}
+        >
+          {notice.text}
         </p>
       )}
 
@@ -120,7 +134,11 @@ export function ApiKeySection() {
 
       <div className="mt-5">
         {state === "loading" && (
-          <div role="status" aria-label="正在加载密钥列表" className="space-y-3">
+          <div
+            role="status"
+            aria-label="正在加载密钥列表"
+            className="space-y-3"
+          >
             <span className="sr-only">正在加载密钥列表</span>
             <Skeleton className="h-14 w-full rounded-md" />
             <Skeleton className="h-14 w-full rounded-md" />
@@ -132,10 +150,7 @@ export function ApiKeySection() {
             <p role="alert" className="break-words text-sm text-danger">
               密钥列表加载失败：{error}
             </p>
-            <Button
-              className="mt-3"
-              onClick={() => setAttempt((n) => n + 1)}
-            >
+            <Button className="mt-3" onClick={() => setAttempt((n) => n + 1)}>
               <RotateCcw size={15} aria-hidden="true" />
               重试
             </Button>
@@ -153,10 +168,7 @@ export function ApiKeySection() {
 
         {state === "ready" && items.length > 0 && (
           <>
-            <ul
-              aria-label="API 密钥列表"
-              className="divide-y divide-border"
-            >
+            <ul aria-label="API 密钥列表" className="divide-y divide-border">
               {items.map((item) => (
                 <ApiKeyRow key={item.id} item={item} onRevoke={handleRevoke} />
               ))}
@@ -197,43 +209,50 @@ function NewKeyBanner({
   return (
     <div
       role="alert"
-      className="mt-4 rounded-lg border border-warning/30 bg-warning/[0.06] px-4 py-3"
+      className="mt-4 min-w-0 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3"
     >
       <p className="text-sm font-medium text-warning">
         请立即复制密钥，关闭后将无法再次查看。
       </p>
-      <div className="mt-2 flex items-center gap-2">
-        <code className="min-w-0 flex-1 truncate rounded-md bg-foreground/[0.05] px-3 py-1.5 font-mono text-xs">
+      <div className="mt-2 flex min-w-0 flex-wrap items-center gap-2">
+        <code
+          tabIndex={0}
+          aria-label="新建 API 密钥"
+          className="block min-w-0 max-w-full flex-1 overflow-x-auto whitespace-nowrap rounded-md bg-surface-2 px-3 py-2 font-mono text-xs"
+        >
           {visible ? value : `${value.slice(0, 14)}${"•".repeat(20)}`}
         </code>
-        <button
+        <IconButton
           type="button"
           aria-label={visible ? "隐藏密钥" : "显示密钥"}
+          title={visible ? "隐藏密钥" : "显示密钥"}
           onClick={() => setVisible((v) => !v)}
-          className="shrink-0 rounded p-1.5 text-text-muted hover:bg-foreground/[0.06] hover:text-foreground"
+          className="h-9 w-9"
         >
-          {visible ? <EyeOff size={14} /> : <Eye size={14} />}
-        </button>
-        <button
+          {visible ? <EyeOff size={16} /> : <Eye size={16} />}
+        </IconButton>
+        <IconButton
           type="button"
           aria-label="复制密钥"
+          title={copied ? "已复制" : "复制密钥"}
           onClick={copy}
           className={cn(
-            "shrink-0 rounded p-1.5 hover:bg-foreground/[0.06]",
+            "h-9 w-9",
             copied ? "text-success" : "text-text-muted hover:text-foreground",
           )}
         >
-          <Copy size={14} />
-        </button>
+          {copied ? <Check size={16} /> : <Copy size={16} />}
+        </IconButton>
       </div>
-      <div className="mt-2 flex justify-end">
-        <button
+      <div className="mt-2 flex flex-wrap justify-end">
+        <Button
+          variant="ghost"
           type="button"
           onClick={onDismiss}
-          className="text-xs text-text-muted underline-offset-2 hover:text-foreground hover:underline"
+          className="text-text-muted"
         >
           已保存，关闭提示
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -253,16 +272,18 @@ function ApiKeyRow({
     item.expiresAt != null && new Date(item.expiresAt) < new Date();
 
   return (
-    <li className="flex items-center gap-3 py-3.5">
+    <li className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-3 py-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
       <Key
         size={15}
-        className="shrink-0 text-text-muted"
+        className="mt-1 shrink-0 text-text-muted sm:mt-0"
         aria-hidden="true"
       />
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium">{item.name}</span>
+          <span className="min-w-0 break-words text-sm font-medium [overflow-wrap:anywhere]">
+            {item.name}
+          </span>
           {isExpired && (
             <Badge variant="warning" className="text-xs">
               已过期
@@ -270,8 +291,10 @@ function ApiKeyRow({
           )}
         </div>
 
-        <div className="mt-0.5 flex flex-wrap gap-x-4 text-xs text-text-muted">
-          <span className="font-mono">{item.keyPrefix}••••••••</span>
+        <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-muted">
+          <span className="max-w-full overflow-x-auto whitespace-nowrap font-mono">
+            {item.keyPrefix}••••••••
+          </span>
           <span>创建 {formatDate(item.createdAt)}</span>
           {item.lastUsedAt && (
             <span>最近使用 {formatDate(item.lastUsedAt)}</span>
@@ -283,11 +306,10 @@ function ApiKeyRow({
       </div>
 
       {confirming ? (
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="col-span-2 flex flex-wrap items-center gap-2 sm:col-span-1 sm:justify-self-end">
           <span className="text-xs text-text-muted">确认撤销？</span>
           <Button
             variant="danger"
-            size="sm"
             onClick={() => {
               onRevoke(item.id);
               setConfirming(false);
@@ -295,23 +317,21 @@ function ApiKeyRow({
           >
             撤销
           </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setConfirming(false)}
-          >
+          <Button variant="secondary" onClick={() => setConfirming(false)}>
             取消
           </Button>
         </div>
       ) : (
-        <button
+        <IconButton
           type="button"
           aria-label={`撤销密钥 ${item.name}`}
+          title="撤销密钥"
+          variant="danger"
           onClick={() => setConfirming(true)}
-          className="shrink-0 rounded p-1.5 text-text-muted hover:bg-danger/10 hover:text-danger"
+          className="col-span-2 h-9 w-9 justify-self-end sm:col-span-1"
         >
-          <Trash2 size={14} aria-hidden="true" />
-        </button>
+          <Trash2 size={16} aria-hidden="true" />
+        </IconButton>
       )}
     </li>
   );
@@ -354,24 +374,27 @@ function CreateKeyDialog({
           新建密钥
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="rounded-lg tracking-normal">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>新建 API 密钥</DialogTitle>
+            <DialogTitle className="text-xl tracking-normal">
+              新建 API 密钥
+            </DialogTitle>
             <DialogDescription>
               密钥只在创建时显示一次，请立即保存到安全位置。
             </DialogDescription>
           </DialogHeader>
 
-          <div className="mt-4">
+          <div className="px-5 pb-5 pt-2">
             <label
               htmlFor="key-name"
-              className="mb-1.5 block text-sm font-medium"
+              className="mb-1.5 block text-xs font-medium text-text-muted"
             >
               名称
             </label>
             <Input
               id="key-name"
+              className="h-9"
               placeholder="例如：生产环境、测试脚本"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -386,7 +409,7 @@ function CreateKeyDialog({
             )}
           </div>
 
-          <DialogFooter className="mt-6">
+          <DialogFooter className="flex-wrap [&>button]:flex-1 sm:[&>button]:flex-none">
             <Button
               type="button"
               variant="secondary"
@@ -394,7 +417,12 @@ function CreateKeyDialog({
             >
               取消
             </Button>
-            <Button type="submit" disabled={submitting || !name.trim()}>
+            <Button
+              variant="primary"
+              type="submit"
+              loading={submitting}
+              disabled={submitting || !name.trim()}
+            >
               {submitting ? "创建中…" : "创建"}
             </Button>
           </DialogFooter>

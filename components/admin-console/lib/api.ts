@@ -2,10 +2,14 @@
 
 import type { ModelInfo } from "@/components/studio/lib/types";
 import type {
+  GeminiConfigUpdate,
+  GeminiStatus,
   LunaConfigUpdate,
   LunaStatus,
   OpusConfigUpdate,
   OpusStatus,
+  PremiumAnthropicConfigUpdate,
+  PremiumAnthropicStatus,
 } from "@/lib/chat-model-options";
 import type { AdminModelCall } from "@/lib/model-call-types";
 
@@ -519,6 +523,21 @@ export const getAdminOpus = () =>
   request<OpusStatus>("/api/admin/integrations/opus");
 export const patchAdminOpus = (input: OpusConfigUpdate) =>
   patch<OpusStatus>("/api/admin/integrations/opus", input);
+
+export const getAdminPremiumAnthropic = () =>
+  request<PremiumAnthropicStatus>("/api/admin/integrations/anthropic-premium");
+export const patchAdminPremiumAnthropic = (
+  input: PremiumAnthropicConfigUpdate,
+) =>
+  patch<PremiumAnthropicStatus>(
+    "/api/admin/integrations/anthropic-premium",
+    input,
+  );
+
+export const getAdminGemini = () =>
+  request<GeminiStatus>("/api/admin/integrations/gemini");
+export const patchAdminGemini = (input: GeminiConfigUpdate) =>
+  patch<GeminiStatus>("/api/admin/integrations/gemini", input);
 
 // ---------- 系统配置 ----------
 

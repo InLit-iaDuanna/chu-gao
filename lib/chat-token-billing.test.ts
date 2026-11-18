@@ -184,6 +184,18 @@ describe("per-million chat token billing", () => {
     ).toBe(small);
     expect(small).toBeGreaterThan(OPUS_IMAGE_TOKEN_BOUND);
     expect(chatInputTokenUpperBound({ messages: [] })).toBeLessThan(2_000);
+    // Anthropic Messages blocks carry the same image as raw base64.
+    const anthropic = (data: string) => ({
+      messages: [
+        {
+          role: "user",
+          content: [{ type: "image", source: { type: "base64", media_type: "image/png", data } }],
+        },
+      ],
+    });
+    expect(chatInputTokenUpperBound(anthropic("a".repeat(1_000_000)))).toBe(
+      chatInputTokenUpperBound(anthropic("a")),
+    );
   });
 
   it("keeps absent usage empty across recovery requests", () => {

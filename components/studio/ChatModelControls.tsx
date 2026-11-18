@@ -1,24 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import * as Menu from "@radix-ui/react-dropdown-menu";
+import { Check, ChevronDown, ChevronRight } from "lucide-react";
 import {
-  ArrowLeft,
-  Check,
-  ChevronDown,
-  ChevronRight,
-  RotateCcw,
-  Zap,
-} from "lucide-react";
-import {
-  Button,
-  IconButton,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui";
-import type {
-  ChatModelOption,
-  ReasoningEffort,
+  LUNA_MODEL_ID,
+  OPUS_MODEL_ID,
+  SOL_MODEL_ID,
+  type ChatModelOption,
+  type ReasoningEffort,
 } from "@/lib/chat-model-options";
 import { cn } from "@/lib/utils";
 
@@ -30,6 +19,25 @@ const REASONING_LABELS = {
   max: "Max",
 } as const;
 
+const REASONING_HINTS: Record<ReasoningEffort, string> = {
+  low: "回答最快",
+  medium: "速度与深度均衡",
+  high: "多想一会儿",
+  xhigh: "适合复杂问题",
+  max: "想得最久",
+};
+
+/** One line under each model name, the way Claude's picker describes its models. */
+const MODEL_TAGLINES: Record<string, string> = {
+  [OPUS_MODEL_ID]: "长文与复杂推理",
+  [SOL_MODEL_ID]: "深入分析与方案推敲",
+  [LUNA_MODEL_ID]: "轻快的日常讨论",
+};
+
+function priceLine(model: ChatModelOption) {
+  return model.pricing ? "按用量计费" : `${model.credits} 积分 / 轮`;
+}
+
 export function ChatModelPrice({
   model,
   className,
@@ -38,28 +46,13 @@ export function ChatModelPrice({
   className?: string;
 }) {
   if (!model) return null;
-  const pricing = model.pricing;
-  return (
-    <span
-      className={cn(
-        "inline-flex min-w-0 flex-wrap gap-x-3 gap-y-0.5 tabular-nums",
-        className,
-      )}
-    >
-      {pricing ? (
-        <>
-          <span>积分 / 百万 Token</span>
-          <span>输入 {pricing.input}</span>
-          <span>输出 {pricing.output}</span>
-          <span>缓存读取 {pricing.cacheRead}</span>
-          <span>缓存写入 {pricing.cacheCreation}</span>
-        </>
-      ) : (
-        `${model.credits} 积分 / 轮`
-      )}
-    </span>
-  );
+  return <span className={cn("tabular-nums", className)}>{priceLine(model)}</span>;
 }
+
+const panel =
+  "studio-workspace studio-model-menu z-50 rounded-xl border border-border bg-surface p-1.5 text-foreground outline-none";
+const row =
+  "studio-model-item relative flex w-full cursor-pointer select-none items-center gap-3 rounded-lg px-2.5 text-left outline-none transition-colors focus:outline-none focus-visible:outline-none data-[highlighted]:bg-surface-2 data-[state=open]:bg-surface-2 data-[disabled]:cursor-not-allowed data-[disabled]:opacity-45";
 
 export function ChatModelControls({
   models,
@@ -76,201 +69,157 @@ export function ChatModelControls({
   onReasoningEffortChange: (effort: ReasoningEffort) => void;
   disabled?: boolean;
 }) {
-  const [choosingModel, setChoosingModel] = useState(false);
   const efforts = model?.reasoningEfforts ?? [];
-  const selectedIndex = Math.max(
-    0,
-    efforts.findIndex(
+  const selectedEffort =
+    efforts.find(
       (effort) => effort === (reasoningEffort ?? model?.defaultReasoningEffort),
-    ),
-  );
-  const selectedEffort = efforts[selectedIndex];
+    ) ?? efforts[0];
   const defaultEffort =
     efforts.find((effort) => effort === model?.defaultReasoningEffort) ??
     efforts[0];
-  const progress =
-    efforts.length > 1 ? selectedIndex / (efforts.length - 1) : 0;
-  const showModels = choosingModel || !selectedEffort;
 
   return (
     <div
       className="studio-model-container min-w-0 flex-1"
       aria-label="聊天模型设置"
     >
-      <Popover
-        onOpenChange={(open) => {
-          if (!open) setChoosingModel(false);
-        }}
-      >
-        <PopoverTrigger asChild>
-          <Button
-            type="button"
-            variant="ghost"
-            disabled={disabled || !model}
-            aria-label={
-              model
-                ? `模型与思考强度：${model.displayName}${selectedEffort ? `，${REASONING_LABELS[selectedEffort]}` : ""}`
-                : "聊天模型未就绪"
-            }
-            title="选择模型与思考强度"
-            className="studio-model-trigger smooth-surface relative h-9 max-w-full min-w-0 gap-1.5 rounded-lg border-transparent bg-transparent px-2 text-[13px] font-normal text-foreground hover:bg-surface-3"
-          >
-            <span className="min-w-0 truncate">
-              {model?.displayName ?? "选择模型"}
-            </span>
-            {selectedEffort ? (
-              <span className="shrink-0 text-text-muted">
-                {REASONING_LABELS[selectedEffort]}
-              </span>
-            ) : null}
-            <ChevronDown size={14} className="shrink-0 text-text-muted" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent
-          side="top"
-          align="center"
-          sideOffset={12}
-          collisionPadding={12}
-          aria-label="模型与思考强度"
-          className="studio-workspace studio-model-controls w-[min(288px,calc(100vw-24px))] max-w-[calc(100vw-24px)] overflow-hidden rounded-xl border-border bg-surface p-4 shadow-[0_12px_32px_-24px_rgb(0_0_0/0.3)]"
+      <Menu.Root modal={false}>
+        <Menu.Trigger
+          type="button"
+          disabled={disabled || !model}
+          aria-label={
+            model
+              ? `模型与思考强度：${model.displayName}${selectedEffort ? `，${REASONING_LABELS[selectedEffort]}` : ""}`
+              : "聊天模型未就绪"
+          }
+          title="选择模型与思考强度"
+          className="studio-model-trigger smooth-surface inline-flex h-8 max-w-full min-w-0 items-center gap-1 rounded-lg px-2 text-[13px] text-text-muted outline-none transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-50 data-[state=open]:text-foreground"
         >
-          {showModels ? (
-            <div className="space-y-2">
-              <div className="flex h-9 items-center gap-2 px-1">
-                {selectedEffort ? (
-                  <IconButton
-                    type="button"
-                    variant="ghost"
-                    aria-label="返回思考强度"
-                    title="返回思考强度"
-                    onClick={() => setChoosingModel(false)}
-                    className="h-9 w-9"
-                  >
-                    <ArrowLeft size={16} />
-                  </IconButton>
-                ) : null}
-                <p className="text-sm font-medium">选择模型</p>
-              </div>
-              <div
-                className="max-h-[min(320px,45dvh)] space-y-1 overflow-y-auto"
-                role="radiogroup"
-                aria-label="聊天模型"
-              >
-                {models.map((item) => (
-                  <button
+          <span className="min-w-0 truncate text-foreground">
+            {model?.displayName ?? "选择模型"}
+          </span>
+          {selectedEffort ? (
+            <span className="shrink-0">{REASONING_LABELS[selectedEffort]}</span>
+          ) : null}
+          <ChevronDown size={14} strokeWidth={1.8} className="shrink-0" />
+        </Menu.Trigger>
+        <Menu.Portal>
+          <Menu.Content
+            side="top"
+            align="end"
+            sideOffset={8}
+            collisionPadding={12}
+            aria-label="模型与思考强度"
+            className={cn(
+              panel,
+              "w-[min(272px,calc(100vw-24px))] max-h-[min(440px,70dvh)] overflow-y-auto",
+            )}
+          >
+            <Menu.RadioGroup
+              aria-label="聊天模型"
+              value={model?.id ?? ""}
+              onValueChange={(id) => {
+                if (id && id !== model?.id) onSelectModel(id);
+              }}
+            >
+              {models.map((item) => {
+                const tagline = MODEL_TAGLINES[item.id];
+                return (
+                  <Menu.RadioItem
                     key={item.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={item.id === model?.id}
+                    value={item.id}
                     disabled={disabled}
-                    onClick={() => {
-                      onSelectModel(item.id);
-                      setChoosingModel(false);
-                    }}
-                    className="flex min-h-12 w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-50"
+                    textValue={item.displayName}
+                    className={cn(row, "min-h-12 py-2")}
                   >
                     <span className="min-w-0 flex-1">
-                      <span className="block break-words text-sm">
+                      <span className="block truncate text-sm leading-5">
                         {item.displayName}
                       </span>
-                      <span className="mt-0.5 block text-xs text-text-faint">
-                        <ChatModelPrice model={item} />
+                      <span className="block truncate text-xs leading-4 text-text-faint">
+                        {tagline ? `${tagline} · ` : ""}
+                        {priceLine(item)}
                       </span>
                     </span>
-                    {item.id === model?.id ? (
-                      <Check size={16} className="shrink-0 text-foreground" />
-                    ) : null}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="mb-3 grid grid-cols-[36px_minmax(0,1fr)_36px] items-start gap-1">
-                <span
-                  className="flex h-9 items-center justify-center text-text-faint"
-                  aria-hidden="true"
-                >
-                  <Zap size={16} strokeWidth={1.7} />
-                </span>
-                <div className="min-w-0 text-center">
-                  <p
-                    className="text-base font-light leading-6 tracking-[0.04em] text-foreground"
-                    aria-live="polite"
+                    <Menu.ItemIndicator className="shrink-0">
+                      <Check size={16} strokeWidth={2} />
+                    </Menu.ItemIndicator>
+                  </Menu.RadioItem>
+                );
+              })}
+            </Menu.RadioGroup>
+
+            {selectedEffort ? (
+              <>
+                <Menu.Separator className="mx-1 my-1.5 h-px bg-border" />
+                <Menu.Sub>
+                  <Menu.SubTrigger
+                    disabled={disabled}
+                    aria-label="思考强度"
+                    className={cn(row, "min-h-10 py-1.5")}
                   >
-                    {REASONING_LABELS[selectedEffort]}
-                  </p>
-                  <button
-                    type="button"
-                    aria-label="选择聊天模型"
-                    onClick={() => setChoosingModel(true)}
-                    className="inline-flex min-h-7 max-w-full items-center justify-center gap-0.5 rounded-md px-1 text-xs text-text-muted transition-colors hover:text-foreground"
-                  >
-                    <span className="min-w-0 truncate">
-                      {model?.displayName}
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm leading-5">思考强度</span>
                     </span>
-                    <ChevronRight size={14} className="shrink-0" />
-                  </button>
-                </div>
-                <IconButton
-                  type="button"
-                  variant="ghost"
-                  aria-label="恢复默认思考强度"
-                  title="恢复默认思考强度"
-                  disabled={disabled || selectedEffort === defaultEffort}
-                  onClick={() => {
-                    if (defaultEffort) onReasoningEffortChange(defaultEffort);
-                  }}
-                  className="h-9 w-9 border-transparent bg-transparent text-text-faint hover:bg-surface-2 hover:text-foreground"
-                >
-                  <RotateCcw size={16} strokeWidth={1.7} />
-                </IconButton>
-              </div>
-              <div className={cn("relative h-11", disabled && "opacity-50")}>
-                <div className="pointer-events-none absolute inset-x-0 top-[21px] h-[2px] bg-border">
-                  <div
-                    className="h-full bg-foreground"
-                    style={{
-                      width: `calc(${progress * 100}% + ${8 - progress * 16}px)`,
-                    }}
-                  />
-                </div>
-                <div
-                  className="pointer-events-none absolute inset-x-[6px] inset-y-0 flex items-center justify-between"
-                  aria-hidden="true"
-                >
-                  {efforts.map((effort, index) => (
-                    <span
-                      key={effort}
-                      className={cn(
-                        "h-1 w-1",
-                        index <= selectedIndex
-                          ? "bg-foreground"
-                          : "bg-border-strong",
-                      )}
+                    <span className="shrink-0 text-[13px] text-text-muted">
+                      {REASONING_LABELS[selectedEffort]}
+                    </span>
+                    <ChevronRight
+                      size={15}
+                      strokeWidth={1.8}
+                      className="shrink-0 text-text-faint"
                     />
-                  ))}
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={efforts.length - 1}
-                  step={1}
-                  value={selectedIndex}
-                  disabled={disabled || efforts.length === 1}
-                  aria-label="思考强度"
-                  aria-valuetext={REASONING_LABELS[selectedEffort]}
-                  onChange={(event) => {
-                    const effort = efforts[Number(event.target.value)];
-                    if (effort) onReasoningEffortChange(effort);
-                  }}
-                  className="studio-effort-range"
-                />
-              </div>
-            </>
-          )}
-        </PopoverContent>
-      </Popover>
+                  </Menu.SubTrigger>
+                  <Menu.Portal>
+                    <Menu.SubContent
+                      sideOffset={6}
+                      alignOffset={-6}
+                      collisionPadding={12}
+                      aria-label="思考强度"
+                      className={cn(panel, "w-[min(232px,calc(100vw-24px))]")}
+                    >
+                      <Menu.RadioGroup
+                        value={selectedEffort}
+                        onValueChange={(value) =>
+                          onReasoningEffortChange(value as ReasoningEffort)
+                        }
+                      >
+                        {efforts.map((effort) => (
+                          <Menu.RadioItem
+                            key={effort}
+                            value={effort}
+                            disabled={disabled}
+                            textValue={REASONING_LABELS[effort]}
+                            aria-label={REASONING_LABELS[effort]}
+                            className={cn(row, "min-h-11 py-1.5")}
+                          >
+                            <span className="min-w-0 flex-1">
+                              <span className="flex items-center gap-2 text-sm leading-5">
+                                {REASONING_LABELS[effort]}
+                                {effort === defaultEffort ? (
+                                  <span className="text-xs text-text-faint">
+                                    默认
+                                  </span>
+                                ) : null}
+                              </span>
+                              <span className="block text-xs leading-4 text-text-faint">
+                                {REASONING_HINTS[effort]}
+                              </span>
+                            </span>
+                            <Menu.ItemIndicator className="shrink-0">
+                              <Check size={16} strokeWidth={2} />
+                            </Menu.ItemIndicator>
+                          </Menu.RadioItem>
+                        ))}
+                      </Menu.RadioGroup>
+                    </Menu.SubContent>
+                  </Menu.Portal>
+                </Menu.Sub>
+              </>
+            ) : null}
+          </Menu.Content>
+        </Menu.Portal>
+      </Menu.Root>
     </div>
   );
 }

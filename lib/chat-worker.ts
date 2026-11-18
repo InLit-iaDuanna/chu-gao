@@ -5,16 +5,26 @@ import { join } from "node:path";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { getChatProfile } from "@/lib/chat-profiles";
-import { prepareChatContext } from "@/lib/chat-context";
+import {
+  precompactChatContext,
+  prepareChatContext,
+} from "@/lib/chat-context";
 import {
   chatEndpoint,
   chatCompletionsRequestBody,
+  anthropicMessagesRequestBody,
+  readAnthropicStreamEvents,
   responsesRequestBody,
+  type AnthropicToolContinuation,
   type UpstreamChatMessage,
 } from "@/lib/chat-upstream";
 import { consumeChatSse } from "@/lib/chat-responses-stream";
 import { finalizeChatContextManifest } from "@/lib/chat-context-manifest";
-import type { ChatContextManifest } from "@/lib/chat-context-types";
+import {
+  ChatContextError,
+  COMPACTION_FALLBACK_CODES,
+  type ChatContextManifest,
+} from "@/lib/chat-context-types";
 import {
   ChatResponseRecovery,
   canRetryChatResponse,
@@ -28,6 +38,7 @@ import {
 } from "@/lib/chat-turns";
 import { CHAT_RUNTIME_PROTOCOL_VERSIONS } from "@/lib/chat-runtime-config";
 import {
+  CHAT_WORKER_HEARTBEAT_TTL_SECONDS,
   removeChatWorkerHeartbeat,
   touchChatWorkerHeartbeat,
   withChatRuntimeTimeout,
@@ -37,17 +48,20 @@ import { startModelCall } from "@/lib/model-call-log";
 import { providerError } from "@/lib/providers/diagnostics";
 import type { ChatTurnInput } from "@/lib/chat-turn-types";
 import type { ReasoningEffort } from "@/lib/chat-model-options";
-import { OPUS_MODEL_ID } from "@/lib/chat-model-options";
+import {
+  geminiUpstreamModel,
+  isTokenPricedChatModel,
+} from "@/lib/chat-model-options";
 import {
   CHAT_IMAGE_TOOL,
+  CHAT_IMAGE_ANTHROPIC_TOOL,
   CHAT_IMAGE_RESPONSES_TOOL,
   CHAT_IMAGE_TOOL_NAME,
-  chatImageToolOutput,
 } from "@/lib/chat-image-tool-definition";
 import { submitChatImageTool } from "@/lib/chat-image-tool";
 import {
+  CHAT_SEARCH_ANTHROPIC_TOOL,
   CHAT_SEARCH_LIMIT,
-  CHAT_SEARCH_TOOL,
   CHAT_SEARCH_TOOL_NAME,
   runChatSearchTool,
 } from "@/lib/chat-search-tool";
@@ -178,10 +192,9 @@ export async function executeChatAttempt(
     arguments: string;
     output: string;
   }> = [];
+  const anthropicToolContinuations: AnthropicToolContinuation[] = [];
   const handledToolCalls = new Set<string>();
   let imageToolCalls = 0;
-  // Web search for models whose provider has no search of its own (Opus).
-  let searchToolCalls = 0;
   let requestedInputTokens = 0;
   let requestCount = 0;
   const startedAt = Date.now();
@@ -351,6 +364,8 @@ export async function executeChatAttempt(
     );
   }, 40);
 
+  let lastImageToolResult: { ok: boolean; message?: string } | null = null;
+  let searchCalls = 0;
   const stopAndDrainFlush = async () => {
     clearInterval(flushTimer);
     await Promise.resolve(flushing).catch(() => undefined);
@@ -364,7 +379,7 @@ export async function executeChatAttempt(
       typeof requestLimits.maxOutputTokens === "number"
         ? requestLimits.maxOutputTokens
         : tokenPricing?.maxOutputTokens;
-    if (turn.modelId === OPUS_MODEL_ID && !tokenPricing)
+    if (isTokenPricedChatModel(turn.modelId) && !tokenPricing)
       throw new Error("missing_token_pricing_snapshot");
     const config = await getChatProfile(turn.modelId);
     apiKey = config.apiKey ?? "";
@@ -405,53 +420,17 @@ export async function executeChatAttempt(
           : ""),
     };
     const responses = snapshot.transport === "responses_sse";
+    const anthropic = snapshot.transport === "anthropic_messages_sse";
     const promptCacheKey = createHash("sha256")
       .update(JSON.stringify(["chat-cache-v1", turn.userId, snapshot.model]))
       .digest("hex");
-    // The image tool is spent after one call; search keeps its own budget so
-    // the model can look a second thing up before it answers.
-    const chatTools = () => {
-      const tools: unknown[] = [];
-      if (!handledToolCalls.size) tools.push(CHAT_IMAGE_TOOL);
-      if (config.searchTool && input.webSearch && searchToolCalls < CHAT_SEARCH_LIMIT)
-        tools.push(CHAT_SEARCH_TOOL);
-      return tools;
-    };
-    // Search is our own tool: the relay has no usable search of its own, so we
-    // run it here and hand the model a digest plus its sources.
-    const runSearch = async (argumentsJson: string) => {
-      let query = "";
-      try {
-        const parsed: unknown = JSON.parse(argumentsJson);
-        const value =
-          typeof parsed === "object" && parsed !== null
-            ? (parsed as Record<string, unknown>).query
-            : undefined;
-        if (typeof value === "string") query = value;
-      } catch {
-        /* an unreadable call is reported below */
-      }
-      if (searchToolCalls >= CHAT_SEARCH_LIMIT)
-        return `[联网检索结果] 本轮已经检索了 ${CHAT_SEARCH_LIMIT} 次，不再检索。用已有资料回答，或说明还缺什么。`;
-      searchToolCalls += 1;
-      state.activity = "searching";
-      await flush(true);
-      const outcome = await runChatSearchTool(query, {
-        baseUrl: String(snapshot.baseUrl),
-        apiKey,
-        model: String(snapshot.model),
-        signal: abort.signal,
-      });
-      for (const source of outcome.sources)
-        if (!state.sources.some((known) => known.url === source.url))
-          state.sources.push(source);
-      if (outcome.ok) state.searched = true;
-      return outcome.output;
-    };
     const buildRequest = (messages: UpstreamChatMessage[]) =>
       responses
         ? responsesRequestBody(
-            String(snapshot.model),
+            geminiUpstreamModel(
+              String(snapshot.model),
+              snapshot.effort as ReasoningEffort,
+            ),
             continuationMessages(
               [...messages, ...toolMessages],
               recovery.retries.length ? recovery.prefix : "",
@@ -459,7 +438,9 @@ export async function executeChatAttempt(
             String(snapshot.instructions),
             snapshot.effort as ReasoningEffort,
             {
-              webSearch: input.webSearch,
+              // After a tool result the reply only reports the submission;
+              // relays answer a lone web_search tool with a canned search.
+              webSearch: input.webSearch && !handledToolCalls.size,
               maxOutputTokens: 16_384,
               tools: handledToolCalls.size ? [] : [CHAT_IMAGE_RESPONSES_TOOL],
               toolContinuations: responseToolContinuations,
@@ -474,29 +455,52 @@ export async function executeChatAttempt(
                 : {}),
             },
           )
-        : chatCompletionsRequestBody(
-            String(snapshot.model),
-            continuationMessages(
-              [...messages, ...toolMessages],
-              recovery.retries.length ? recovery.prefix : "",
-            ),
-            String(snapshot.instructions),
-            tokenPricing
-              ? {
-                  effort: snapshot.effort as ReasoningEffort,
-                  maxOutputTokens: requestOutputTokens,
-                  includeUsage: true,
-                  tools: chatTools(),
-                }
-              : { tools: chatTools() },
-          );
+        : anthropic
+          ? anthropicMessagesRequestBody(
+              String(snapshot.model),
+              continuationMessages(
+                [...messages, ...toolMessages],
+                recovery.retries.length ? recovery.prefix : "",
+              ),
+              String(snapshot.instructions),
+              snapshot.effort as ReasoningEffort,
+              {
+                // The relay answers its own web_search tool with canned text;
+                // searching goes through the application tool instead.
+                webSearch: false,
+                maxOutputTokens: requestOutputTokens,
+                tools: [
+                  ...(input.webSearch && searchCalls < CHAT_SEARCH_LIMIT
+                    ? [CHAT_SEARCH_ANTHROPIC_TOOL]
+                    : []),
+                  ...(handledToolCalls.size ? [] : [CHAT_IMAGE_ANTHROPIC_TOOL]),
+                ],
+                toolContinuations: anthropicToolContinuations,
+              },
+            )
+          : chatCompletionsRequestBody(
+              String(snapshot.model),
+              continuationMessages(
+                [...messages, ...toolMessages],
+                recovery.retries.length ? recovery.prefix : "",
+              ),
+              String(snapshot.instructions),
+              tokenPricing
+                ? {
+                    effort: snapshot.effort as ReasoningEffort,
+                    maxOutputTokens: requestOutputTokens,
+                    includeUsage: true,
+                    tools: handledToolCalls.size ? [] : [CHAT_IMAGE_TOOL],
+                  }
+                : { tools: handledToolCalls.size ? [] : [CHAT_IMAGE_TOOL] },
+            );
     type PreparedContext = Awaited<ReturnType<typeof prepareChatContext>> & {
       manifest?: unknown;
       contextManifest?: unknown;
       snapshotId?: string | null;
       contextSnapshotId?: string | null;
     };
-    const context: PreparedContext = await prepareChatContext({
+    const contextInput = {
       userId: turn.userId,
       conversationId: turn.conversationId,
       modelId: turn.modelId,
@@ -516,6 +520,23 @@ export async function executeChatAttempt(
           ? input.contextBudgetTokens
           : undefined,
       signal: abort.signal,
+    };
+    // A failed summary must not interrupt a turn that still fits the budget;
+    // prepareChatContext still rejects it with CHAT_CONTEXT_TOO_LARGE if not.
+    const context: PreparedContext = await prepareChatContext(
+      contextInput,
+    ).catch((error: unknown) => {
+      if (
+        abort.signal.aborted ||
+        !(error instanceof ChatContextError) ||
+        !COMPACTION_FALLBACK_CODES.has(error.code)
+      )
+        throw error;
+      logger.warn(
+        { turnId: turn.id, code: error.code },
+        "Context compaction failed; sending without it.",
+      );
+      return prepareChatContext({ ...contextInput, skipCompaction: true });
     });
     abort.signal.throwIfAborted();
     timings.context_completed_at = new Date().toISOString();
@@ -541,20 +562,36 @@ export async function executeChatAttempt(
         .update(requestBody)
         .digest("hex");
       let manifest = record(context.manifest ?? context.contextManifest);
-      if (recovery.retries.length && typeof manifest.budgetTokens === "number")
+      // The stored hash describes the body built for an earlier request of this
+      // turn (a continuation prefix, or the snapshot a regenerate reused), not
+      // a tampering signal. Re-measure the body being sent now instead of
+      // failing the turn; finalize still rejects a payload over the budget.
+      const hashDrifted =
+        typeof manifest.requestHash === "string" &&
+        manifest.requestHash !== requestHash &&
+        !toolMessages.length &&
+        !responseToolContinuations.length;
+      if (
+        (recovery.retries.length || hashDrifted) &&
+        typeof manifest.budgetTokens === "number"
+      ) {
+        if (hashDrifted && !recovery.retries.length)
+          logger.warn(
+            {
+              turnId: turn.id,
+              attemptId,
+              storedHash: manifest.requestHash,
+              actualHash: requestHash,
+            },
+            "Chat context request hash drifted; re-baselined the manifest.",
+          );
         manifest = record(
           finalizeChatContextManifest(
             manifest as unknown as ChatContextManifest,
             body,
           ),
         );
-      if (
-        typeof manifest.requestHash === "string" &&
-        manifest.requestHash !== requestHash &&
-        !toolMessages.length &&
-        !responseToolContinuations.length
-      )
-        throw new Error("context_request_hash_mismatch");
+      }
       const contextRetained = await db.$transaction(async (tx) => {
         if (
           !(await appendActiveChatEvent(tx, {
@@ -603,7 +640,14 @@ export async function executeChatAttempt(
       if (abort.signal.aborted) stopRequest();
       let transportError: unknown;
       let toolRoundComplete = false;
-      const endpoint = chatEndpoint(String(snapshot.baseUrl), responses);
+      const endpoint = chatEndpoint(
+        String(snapshot.baseUrl),
+        anthropic
+          ? "anthropic_messages_sse"
+          : responses
+            ? "responses_sse"
+            : "chat_completions_sse",
+      );
       const completionToolCalls = new Map<
         number,
         { id: string; name: string; arguments: string }
@@ -638,6 +682,7 @@ export async function executeChatAttempt(
             "Content-Type": "application/json",
             Accept: "text/event-stream",
             "Accept-Encoding": "identity",
+            ...(anthropic ? { "anthropic-version": "2023-06-01" } : {}),
           },
           body: requestBody,
           signal: requestAbort.signal,
@@ -671,7 +716,11 @@ export async function executeChatAttempt(
             ? await providerError(
                 response.clone(),
                 turn.modelId,
-                responses ? "responses" : "chat-completions",
+                anthropic
+                  ? "anthropic-messages"
+                  : responses
+                    ? "responses"
+                    : "chat-completions",
                 endpoint,
               )
             : undefined;
@@ -696,23 +745,17 @@ export async function executeChatAttempt(
           async (payload) => {
             const value = record(payload);
             const before = state.rawText;
+            const normalized = anthropic
+              ? readAnthropicStreamEvents(payload)
+              : [payload];
             if (responses) state.consume(payload);
-            else {
+            else if (anthropic) {
+              for (const event of normalized) state.consume(event);
+            } else {
               const choice = record(
                 Array.isArray(value.choices) ? value.choices[0] : null,
               );
               const delta = record(choice.delta);
-              // Chat Completions relays stream thinking as `reasoning_content`
-              // (some use `reasoning`). The text is not stored, but the user
-              // should see "thinking" instead of an unexplained wait.
-              if (
-                (typeof delta.reasoning_content === "string" &&
-                  delta.reasoning_content) ||
-                (typeof delta.reasoning === "string" && delta.reasoning)
-              ) {
-                if (state.activity !== "answering")
-                  state.activity = "reasoning";
-              }
               if (typeof delta.content === "string")
                 state.consume({
                   type: "response.output_text.delta",
@@ -752,12 +795,19 @@ export async function executeChatAttempt(
                 state.terminal =
                   choice.finish_reason === "stop" ? "completed" : "incomplete";
             }
-            const type = typeof value.type === "string" ? value.type : "";
+            const semanticTypes = anthropic
+              ? normalized
+                  .map((event) => record(event).type)
+                  .filter((type): type is string => typeof type === "string")
+              : [typeof value.type === "string" ? value.type : ""];
             if (
               (state.rawText !== before && state.rawText.trim()) ||
               completionToolCalls.size > 0 ||
-              /web_search_call\.(searching|completed)$/.test(type) ||
-              type === "response.output_item.added"
+              semanticTypes.some(
+                (type) =>
+                  /web_search_call\.(searching|completed)$/.test(type) ||
+                  type === "response.output_item.added",
+              )
             )
               lastSemanticAt = Date.now();
             if (firstTextMs === null && state.rawText.trim()) {
@@ -769,7 +819,9 @@ export async function executeChatAttempt(
             await flush(Boolean(state.terminal));
             // Chat Completions sends its authoritative usage AFTER finish_reason.
             // Read through [DONE]/EOF so a successful answer retains that frame.
-            return responses ? !state.terminal : state.terminal !== "failed";
+            return responses || anthropic
+              ? !state.terminal
+              : state.terminal !== "failed";
           },
           { signal: requestAbort.signal, idleMs: 90_000 },
         );
@@ -793,13 +845,16 @@ export async function executeChatAttempt(
           text: state.rawText,
           error: state.error,
         });
-        responseToolCalls = responses
-          ? state
-              .functionCalls()
-              .filter((toolCall) => !handledToolCalls.has(toolCall.callId))
-          : [];
+        responseToolCalls =
+          responses || anthropic
+            ? state
+                .functionCalls()
+                .filter((toolCall) => !handledToolCalls.has(toolCall.callId))
+            : [];
         const hasToolCall =
-          (responses ? state.terminal === "completed" : toolRoundComplete) &&
+          (responses || anthropic
+            ? state.terminal === "completed"
+            : toolRoundComplete) &&
           (responseToolCalls.length > 0 || completionToolCalls.size > 0);
         await call.finish(
           transportError ??
@@ -812,10 +867,13 @@ export async function executeChatAttempt(
                 )),
         );
       }
-      const chatToolCalls = !responses ? [...completionToolCalls.values()] : [];
+      const chatToolCalls =
+        !responses && !anthropic ? [...completionToolCalls.values()] : [];
       if (
         !transportError &&
-        (responses ? state.terminal === "completed" : toolRoundComplete) &&
+        (responses || anthropic
+          ? state.terminal === "completed"
+          : toolRoundComplete) &&
         (responseToolCalls.length || chatToolCalls.length)
       ) {
         const calls = [
@@ -826,49 +884,86 @@ export async function executeChatAttempt(
           })),
           ...chatToolCalls,
         ];
-        // A search round is allowed to continue; anything else is one-shot.
-        const searchOnly = calls.every(
-          (toolCall) => toolCall.name === CHAT_SEARCH_TOOL_NAME,
-        );
-        if (
-          handledToolCalls.size &&
-          !(searchOnly && searchToolCalls < CHAT_SEARCH_LIMIT)
-        )
+        const searchRound =
+          calls.every((call) => call.name === CHAT_SEARCH_TOOL_NAME) &&
+          searchCalls < CHAT_SEARCH_LIMIT;
+        if (handledToolCalls.size && !searchRound)
           throw new Error("unexpected_tool_call_after_continuation");
-        for (const toolCall of calls) {
-          const name = toolCall?.name || CHAT_IMAGE_TOOL_NAME;
-          const callId =
-            toolCall?.id || `tool-${attemptId}-${handledToolCalls.size + 1}`;
-          let output: string;
-          if (!toolCall.id || !toolCall.name || !toolCall.arguments) {
-            output =
-              "[工具调用不完整] 这次调用缺少参数，没有执行。要生图就重新完整描述画面，要联网就重新给出检索词。";
-            state.recordToolResult(callId, name, {
-              ok: false,
-              message: "工具调用不完整",
+        if (searchRound) {
+          for (const call of calls) {
+            let query = "";
+            try {
+              const parsed = JSON.parse(call.arguments);
+              if (parsed && typeof parsed.query === "string") query = parsed.query;
+            } catch {
+              query = "";
+            }
+            state.activity = "searching";
+            await flush(true);
+            const outcome = await runChatSearchTool(query, {
+              baseUrl: String(snapshot.baseUrl),
+              apiKey,
+              model: String(snapshot.model),
+              signal: abort.signal,
+              timeoutMs: 30_000,
             });
-          } else if (toolCall.name === CHAT_SEARCH_TOOL_NAME) {
-            output = await runSearch(toolCall.arguments);
+            if (outcome.sources.length) state.recordSources(outcome.sources);
+            searchCalls++;
+            handledToolCalls.add(call.id);
+            if (responses)
+              responseToolContinuations.push({
+                callId: call.id,
+                name: call.name,
+                arguments: call.arguments,
+                output: outcome.output,
+              });
+            else
+              anthropicToolContinuations.push({
+                callId: call.id,
+                name: call.name,
+                arguments: call.arguments,
+                output: outcome.output,
+              });
+          }
+          state = recovery.continueAfterTool();
+          state.activity = "waiting_upstream";
+          lastSemanticAt = Date.now();
+          await flush(true);
+          continue;
+        }
+        for (const toolCall of calls) {
+          let toolResult:
+            | Awaited<ReturnType<typeof submitChatImageTool>>
+            | {
+                ok: false;
+                code: string;
+                message: string;
+              };
+          if (!toolCall.id || !toolCall.name || !toolCall.arguments) {
+            toolResult = {
+              ok: false,
+              code: "INVALID_TOOL_CALL",
+              message: "生图工具调用不完整，请重新描述图片需求",
+            };
           } else if (
             imageToolCalls >= 1 ||
             toolCall.name !== CHAT_IMAGE_TOOL_NAME
           ) {
-            output =
-              "[工具未执行] 本轮只支持一次生图调用，请把多个要求合并后再试。";
-            state.recordToolResult(callId, name, {
+            toolResult = {
               ok: false,
-              message: "本轮只支持一次生图调用",
-            });
+              code: "UNSUPPORTED_TOOL_CALL",
+              message: "本轮只支持一次生图调用，请把多个要求合并后再试",
+            };
           } else {
             imageToolCalls++;
             state.activity = "image_generating";
             await flush(true);
-            const toolResult = await submitChatImageTool(toolCall.arguments, {
+            toolResult = await submitChatImageTool(toolCall.arguments, {
               userId: turn.userId,
               conversationId: turn.conversationId,
               turnId: turn.id,
               attemptId,
-              callId,
+              callId: toolCall.id || `image-${attemptId}-${imageToolCalls}`,
               imageModelId: input.imageModelId,
               imageSize: input.imageSize,
               imageQuality: input.imageQuality,
@@ -878,39 +973,47 @@ export async function executeChatAttempt(
               sourceImageIds: input.sourceImageIds,
               references: input.references,
             });
-            if (toolResult.ok) {
-              const linked = await db.$transaction(async (tx) => {
-                const updated = await tx.conversationMessage.updateMany({
-                  where: {
-                    chatAttemptId: attemptId,
-                    role: "ASSISTANT",
-                  },
-                  data: { generationId: toolResult.generationId },
-                });
-                if (!updated.count) return false;
-                return appendActiveChatEvent(tx, {
-                  turnId: turn.id,
-                  attemptId,
-                  executionToken,
-                  type: "generation.created",
-                  payload: {
-                    generationId: toolResult.generationId,
-                    status: toolResult.status,
-                    modelId: toolResult.modelId,
-                  },
-                });
-              });
-              if (!linked) throw new Error("attempt_no_longer_active");
-            }
-            state.recordToolResult(callId, CHAT_IMAGE_TOOL_NAME, toolResult);
-            // The model gets a receipt with a next step, not the raw result.
-            output = chatImageToolOutput(toolResult);
           }
+          const callId = toolCall?.id || `image-${attemptId}-${imageToolCalls}`;
           handledToolCalls.add(callId);
+          if (toolResult.ok) {
+            const linked = await db.$transaction(async (tx) => {
+              const updated = await tx.conversationMessage.updateMany({
+                where: {
+                  chatAttemptId: attemptId,
+                  role: "ASSISTANT",
+                },
+                data: { generationId: toolResult.generationId },
+              });
+              if (!updated.count) return false;
+              return appendActiveChatEvent(tx, {
+                turnId: turn.id,
+                attemptId,
+                executionToken,
+                type: "generation.created",
+                payload: {
+                  generationId: toolResult.generationId,
+                  status: toolResult.status,
+                  modelId: toolResult.modelId,
+                },
+              });
+            });
+            if (!linked) throw new Error("attempt_no_longer_active");
+          }
+          state.recordToolResult(callId, CHAT_IMAGE_TOOL_NAME, toolResult);
+          lastImageToolResult = toolResult;
+          const output = JSON.stringify(toolResult);
           if (responses) {
             responseToolContinuations.push({
               callId,
-              name,
+              name: toolCall?.name || CHAT_IMAGE_TOOL_NAME,
+              arguments: toolCall?.arguments || "{}",
+              output,
+            });
+          } else if (anthropic) {
+            anthropicToolContinuations.push({
+              callId,
+              name: toolCall?.name || CHAT_IMAGE_TOOL_NAME,
               arguments: toolCall?.arguments || "{}",
               output,
             });
@@ -923,7 +1026,7 @@ export async function executeChatAttempt(
                   id: callId,
                   type: "function",
                   function: {
-                    name,
+                    name: toolCall?.name || CHAT_IMAGE_TOOL_NAME,
                     arguments: toolCall?.arguments || "{}",
                   },
                 },
@@ -932,7 +1035,7 @@ export async function executeChatAttempt(
             toolMessages.push({
               role: "tool",
               tool_call_id: callId,
-              name,
+              name: CHAT_IMAGE_TOOL_NAME,
               content: output,
             });
           }
@@ -1027,12 +1130,20 @@ export async function executeChatAttempt(
                 ? "文字回复未完成，收到的内容已保存，文字回复未收费"
                 : "文字回复在生成过程中中断，收到的内容已保存，文字回复未收费",
           };
+    // Some upstreams answer the post-tool round with nothing but (filtered)
+    // reasoning; never leave an empty bubble when the tool already ran.
+    const replyText =
+      recovery.text.trim() || !lastImageToolResult
+        ? recovery.text
+        : lastImageToolResult.ok
+          ? "已提交图片生成，图片稍后会显示在下方。"
+          : `图片没有提交成功：${lastImageToolResult.message ?? "请稍后重试"}`;
     await finishWithRetries({
       turnId: turn.id,
       attemptId,
       executionToken,
       status,
-      text: recovery.text,
+      text: replyText,
       parts: recovery.checkpoint(),
       sources: recovery.sources,
       usage: recovery.usage,
@@ -1051,6 +1162,40 @@ export async function executeChatAttempt(
       },
       "Chat attempt finished.",
     );
+    if (status === "completed") {
+      // Background pre-compaction: never blocks or fails the finished turn.
+      const precompactStartedAt = Date.now();
+      void precompactChatContext({
+        userId: turn.userId,
+        conversationId: turn.conversationId,
+        modelId: turn.modelId,
+        budgetTokens:
+          typeof input.contextBudgetTokens === "number"
+            ? input.contextBudgetTokens
+            : undefined,
+      })
+        .then((compacted) => {
+          if (compacted)
+            logger.info(
+              {
+                turnId: turn.id,
+                estimatedTokens: compacted.estimatedTokens,
+                budgetTokens: compacted.budgetTokens,
+                ms: Date.now() - precompactStartedAt,
+              },
+              "Context pre-compacted after turn.",
+            );
+        })
+        .catch((error: unknown) =>
+          logger.warn(
+            {
+              turnId: turn.id,
+              code: error instanceof ChatContextError ? error.code : undefined,
+            },
+            "Context pre-compaction skipped.",
+          ),
+        );
+    }
   } catch (error) {
     // Freeze and drain the periodic writer before persisting the accumulator.
     // A bad frame or reader rejection may follow a large delta within 40ms.
@@ -1137,6 +1282,32 @@ export function startChatWorker(
     16,
     Math.max(1, Number(process.env.CHAT_WORKER_CONCURRENCY) || 2),
   );
+  let heartbeatInFlight = false;
+  const publishHeartbeat = () => {
+    if (stopping || heartbeatInFlight) return;
+    heartbeatInFlight = true;
+    void touchChatWorkerHeartbeat({
+      instanceId,
+      hostname: hostname(),
+      pid: process.pid,
+      buildId,
+      protocolVersions: CHAT_RUNTIME_PROTOCOL_VERSIONS,
+      updatedAt: new Date().toISOString(),
+      status: "accepting",
+      running: running.size,
+    })
+      .catch(() => {
+        // Redis liveness is advisory. Accepted PG work must still drain while
+        // Redis is down; a failed heartbeat never disables execution.
+        if (Date.now() - lastWarning > 30_000) {
+          logger.warn({ instanceId }, "Chat worker heartbeat unavailable.");
+          lastWarning = Date.now();
+        }
+      })
+      .finally(() => {
+        heartbeatInFlight = false;
+      });
+  };
   const pump = async () => {
     if (pumping || stopping) return;
     pumping = true;
@@ -1154,23 +1325,6 @@ export function startChatWorker(
           })
         : [];
       if (stopping) return;
-      await touchChatWorkerHeartbeat({
-        instanceId,
-        hostname: hostname(),
-        pid: process.pid,
-        buildId,
-        protocolVersions: CHAT_RUNTIME_PROTOCOL_VERSIONS,
-        updatedAt: new Date().toISOString(),
-        status: "accepting",
-        running: running.size,
-      }).catch(() => {
-        // Redis liveness is advisory. Accepted PG work must still drain while
-        // Redis is down; a failed heartbeat never disables recovery/execution.
-        if (Date.now() - lastWarning > 30_000) {
-          logger.warn({ instanceId }, "Chat worker heartbeat unavailable.");
-          lastWarning = Date.now();
-        }
-      });
       if (stopping) return;
       for (const attempt of queued) {
         if (running.has(attempt.id)) continue;
@@ -1211,6 +1365,14 @@ export function startChatWorker(
     });
   };
   const timer = setInterval(runPump, 1_000);
+  const heartbeatTimer = setInterval(
+    publishHeartbeat,
+    Math.max(
+      1_000,
+      Math.floor((CHAT_WORKER_HEARTBEAT_TTL_SECONDS * 1_000) / 4),
+    ),
+  );
+  publishHeartbeat();
   runPump();
   logger.info(
     { instanceId, buildId, protocolVersions: CHAT_RUNTIME_PROTOCOL_VERSIONS },
@@ -1221,6 +1383,7 @@ export function startChatWorker(
     if (stopped) return stopped;
     stopping = true;
     clearInterval(timer);
+    clearInterval(heartbeatTimer);
     for (const job of running.values())
       job.abort.abort(new Error("worker_shutdown"));
     stopped = (async () => {

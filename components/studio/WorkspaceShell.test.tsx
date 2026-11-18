@@ -74,7 +74,9 @@ function StudioControls() {
 }
 
 beforeEach(() => {
+  vi.restoreAllMocks();
   vi.clearAllMocks();
+  localStorage.clear();
   mocks.pathname = "/app/history";
   mocks.list.mockResolvedValue({
     items: [{ id: "thread-1", title: "庭院方案" }],
@@ -177,12 +179,187 @@ describe("shared workspace navigation", () => {
       </WorkspaceShell>,
     );
     await screen.findByRole("button", { name: "庭院方案" });
-    fireEvent.click(screen.getByRole("button", { name: "展开对话侧栏" }));
+    fireEvent.click(screen.getByRole("button", { name: "打开工作区导航" }));
     const drawer = screen.getByRole("dialog", { name: "对话与导航" });
     fireEvent.click(within(drawer).getByRole("link", { name: "PPT" }));
     await waitFor(() =>
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
+  });
+
+  it.each(["/app/canvas", "/app/nodes", "/app/canvas/design-1"])(
+    "starts %s with a collapsed sidebar and keeps it accessible",
+    async (pathname) => {
+      mocks.pathname = pathname;
+      render(
+        <WorkspaceShell>
+          <p>画布内容</p>
+        </WorkspaceShell>,
+      );
+      expect(
+        screen.queryByRole("complementary", { name: "对话侧栏" }),
+      ).not.toBeInTheDocument();
+      const toggle = screen.getByRole("button", { name: "展开对话侧栏" });
+      expect(toggle).toHaveAttribute("aria-expanded", "false");
+      fireEvent.click(toggle);
+      expect(
+        screen.getByRole("complementary", { name: "对话侧栏" }),
+      ).toBeVisible();
+      expect(
+        screen.getByRole("button", { name: "收起对话侧栏" }),
+      ).toHaveAttribute("aria-expanded", "true");
+      await screen.findByRole("button", { name: "庭院方案" });
+    },
+  );
+
+  it("remembers separate canvas, nodes and regular workspace preferences", async () => {
+    const view = render(
+      <WorkspaceShell>
+        <p>内容</p>
+      </WorkspaceShell>,
+    );
+    await screen.findByRole("button", { name: "庭院方案" });
+    const navigate = (pathname: string) => {
+      mocks.pathname = pathname;
+      view.rerender(
+        <WorkspaceShell>
+          <p>内容</p>
+        </WorkspaceShell>,
+      );
+    };
+    fireEvent.click(screen.getByRole("button", { name: "收起对话侧栏" }));
+    navigate("/app/canvas");
+    fireEvent.click(screen.getByRole("button", { name: "展开对话侧栏" }));
+    navigate("/app/nodes");
+    expect(
+      screen.getByRole("button", { name: "展开对话侧栏" }),
+    ).toHaveAttribute("aria-expanded", "false");
+    navigate("/app/canvas");
+    expect(
+      screen.getByRole("button", { name: "收起对话侧栏" }),
+    ).toHaveAttribute("aria-expanded", "true");
+    navigate("/app/history");
+    expect(
+      screen.getByRole("button", { name: "展开对话侧栏" }),
+    ).toHaveAttribute("aria-expanded", "false");
+    navigate("/app/canvas");
+    fireEvent.click(screen.getByRole("button", { name: "收起对话侧栏" }));
+    navigate("/app/settings");
+    fireEvent.click(screen.getByRole("button", { name: "展开对话侧栏" }));
+    navigate("/app/canvas");
+    expect(
+      screen.getByRole("button", { name: "展开对话侧栏" }),
+    ).toHaveAttribute("aria-expanded", "false");
+    await waitFor(() => expect(mocks.list).toHaveBeenCalledTimes(8));
+  });
+
+  it("restores route preferences after remounting", async () => {
+    mocks.pathname = "/app/canvas";
+    const view = render(
+      <WorkspaceShell>
+        <p>画布内容</p>
+      </WorkspaceShell>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "展开对话侧栏" }));
+    await screen.findByRole("button", { name: "庭院方案" });
+    view.unmount();
+    render(
+      <WorkspaceShell>
+        <p>画布内容</p>
+      </WorkspaceShell>,
+    );
+    expect(
+      screen.getByRole("button", { name: "收起对话侧栏" }),
+    ).toHaveAttribute("aria-expanded", "true");
+    await screen.findByRole("button", { name: "庭院方案" });
+  });
+
+  it.each(["invalid-json", '{"canvas":"true","workspace":null}', "null"])(
+    "uses defaults for invalid stored preferences: %s",
+    async (saved) => {
+      localStorage.setItem("chugao.workspace-sidebar", saved);
+      mocks.pathname = "/app/canvas";
+      render(
+        <WorkspaceShell>
+          <p>画布内容</p>
+        </WorkspaceShell>,
+      );
+      expect(
+        screen.getByRole("button", { name: "展开对话侧栏" }),
+      ).toHaveAttribute("aria-expanded", "false");
+      fireEvent.click(screen.getByRole("button", { name: "展开对话侧栏" }));
+      await screen.findByRole("button", { name: "庭院方案" });
+    },
+  );
+
+  it("still toggles the sidebar when browser storage is blocked", async () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    mocks.pathname = "/app/nodes";
+    render(
+      <WorkspaceShell>
+        <p>画布内容</p>
+      </WorkspaceShell>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "展开对话侧栏" }));
+    await screen.findByRole("button", { name: "庭院方案" });
+    fireEvent.click(screen.getByRole("button", { name: "收起对话侧栏" }));
+    expect(
+      screen.getByRole("button", { name: "展开对话侧栏" }),
+    ).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("preserves the conversation search while the desktop sidebar is collapsed", async () => {
+    const view = render(
+      <WorkspaceShell>
+        <p>内容</p>
+      </WorkspaceShell>,
+    );
+    await screen.findByRole("button", { name: "庭院方案" });
+    fireEvent.change(screen.getByRole("textbox", { name: "搜索最近对话" }), {
+      target: { value: "庭院" },
+    });
+    mocks.pathname = "/app/canvas";
+    view.rerender(
+      <WorkspaceShell>
+        <p>内容</p>
+      </WorkspaceShell>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "展开对话侧栏" }));
+    expect(screen.getByRole("textbox", { name: "搜索最近对话" })).toHaveValue(
+      "庭院",
+    );
+    await screen.findByRole("button", { name: "庭院方案" });
+  });
+
+  it("opens conversations from the mobile canvas drawer without changing desktop preferences", async () => {
+    mocks.pathname = "/app/canvas";
+    render(
+      <WorkspaceShell researchEnabled>
+        <p>画布内容</p>
+      </WorkspaceShell>,
+    );
+    const toggle = screen.getByRole("button", { name: "打开工作区导航" });
+    fireEvent.click(toggle);
+    const drawer = screen.getByRole("dialog", { name: "对话与导航" });
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(within(drawer).getByRole("link", { name: "研究" })).toHaveAttribute(
+      "href",
+      "/app/research",
+    );
+    fireEvent.click(
+      await within(drawer).findByRole("button", { name: "庭院方案" }),
+    );
+    expect(mocks.push).toHaveBeenCalledWith("/app?thread=thread-1");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(
+      screen.getByRole("button", { name: "展开对话侧栏" }),
+    ).toHaveAttribute("aria-expanded", "false");
   });
 
   it("can reload the conversation list after a failure", async () => {

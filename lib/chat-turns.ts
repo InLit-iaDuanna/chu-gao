@@ -12,9 +12,16 @@ import {
   readChatTokenPricingSnapshot,
 } from "@/lib/chat-token-billing";
 import { prepareChatContext } from "@/lib/chat-context";
+import {
+  ChatContextError,
+  COMPACTION_FALLBACK_CODES,
+} from "@/lib/chat-context-types";
 import { normalizeChatContextBudget } from "@/lib/chat-context-types";
 import {
+  anthropicMessagesRequestBody,
   chatCompletionsRequestBody,
+  geminiUpstreamModel,
+  responsesRequestBody,
   type UpstreamChatMessage,
 } from "@/lib/chat-upstream";
 import {
@@ -28,14 +35,12 @@ import {
 } from "@/lib/chat-runtime-config";
 import { getConversationSystemPrompt } from "@/lib/ai-config";
 import {
+  chatSystemInstructions,
   chatTimeInstruction,
-  chatTurnInstructions,
 } from "@/lib/chat-instructions";
-import { CHAT_SEARCH_TOOL } from "@/lib/chat-search-tool";
 import {
-  LUNA_MODEL_ID,
-  SOL_MODEL_ID,
-  OPUS_MODEL_ID,
+  CHAT_MODEL_IDS,
+  isTokenPricedChatModel,
   REASONING_EFFORTS,
   type ReasoningEffort,
 } from "@/lib/chat-model-options";
@@ -52,7 +57,11 @@ import {
   normalizeChatReferences,
 } from "@/lib/chat-references-types";
 import { resolveChatReferences } from "@/lib/chat-references";
-import { CHAT_IMAGE_TOOL } from "@/lib/chat-image-tool-definition";
+import {
+  CHAT_IMAGE_ANTHROPIC_TOOL,
+  CHAT_IMAGE_RESPONSES_TOOL,
+  CHAT_IMAGE_TOOL,
+} from "@/lib/chat-image-tool-definition";
 import {
   chatCreditSettlement,
   chatReplyErrorMessage,
@@ -63,7 +72,7 @@ export const chatTurnSchema = z
     conversationId: z.string().min(1).max(128),
     clientRequestId: z.string().min(8).max(128),
     content: z.string().trim().min(1).max(CHAT_INPUT_MAX_CHARS),
-    modelId: z.enum(["default", LUNA_MODEL_ID, SOL_MODEL_ID, OPUS_MODEL_ID]),
+    modelId: z.enum(CHAT_MODEL_IDS),
     contextBudgetTokens: z.number().int().optional(),
     reasoningEffort: z.enum(REASONING_EFFORTS).optional(),
     webSearch: z.boolean().default(false),
@@ -464,10 +473,16 @@ export async function createChatTurn(
       );
     }
   }
-  const instructions = chatTurnInstructions(
+  // The Anthropic relay answers its own web_search tool with canned text, so
+  // those models search through the application tool instead.
+  const searchAsTool =
+    config.transport === "anthropic_messages_sse" && input.webSearch;
+  const instructions = chatSystemInstructions(
     await getConversationSystemPrompt(),
     input.webSearch,
-    config.searchTool,
+    false,
+    true,
+    searchAsTool,
   );
   const runtimeTime = chatTimeInstruction();
   const effort = input.reasoningEffort ?? config.efforts[0] ?? null;
@@ -477,29 +492,60 @@ export async function createChatTurn(
     | undefined;
   if (tokenPricing) {
     const buildRequest = (messages: UpstreamChatMessage[]) =>
-      chatCompletionsRequestBody(config.model, messages, instructions, {
-        effort: effort as ReasoningEffort,
-        maxOutputTokens: tokenPricing.maxOutputTokens,
-        includeUsage: true,
-        tools:
-          config.searchTool && input.webSearch
-            ? [CHAT_IMAGE_TOOL, CHAT_SEARCH_TOOL]
-            : [CHAT_IMAGE_TOOL],
-      });
-    const prepared = await prepareChatContext({
+      config.transport === "responses_sse"
+        ? responsesRequestBody(
+            geminiUpstreamModel(config.model, effort as ReasoningEffort),
+            messages,
+            instructions,
+            effort as ReasoningEffort,
+            {
+              maxOutputTokens: tokenPricing.maxOutputTokens,
+              tools: [CHAT_IMAGE_RESPONSES_TOOL],
+            },
+          )
+        : config.transport === "anthropic_messages_sse"
+          ? anthropicMessagesRequestBody(
+              config.model,
+              messages,
+              instructions,
+              effort as ReasoningEffort,
+              {
+                webSearch: input.webSearch,
+                maxOutputTokens: tokenPricing.maxOutputTokens,
+                tools: [CHAT_IMAGE_ANTHROPIC_TOOL],
+              },
+            )
+          : chatCompletionsRequestBody(config.model, messages, instructions, {
+              effort: effort as ReasoningEffort,
+              maxOutputTokens: tokenPricing.maxOutputTokens,
+              includeUsage: true,
+              tools: [CHAT_IMAGE_TOOL],
+            });
+    const contextInput = {
       userId,
       conversationId: input.conversationId,
       modelId: input.modelId,
       latestMessage: {
-        role: "user",
+        role: "user" as const,
         content: `${input.content}\n\n[本轮运行时间]\n${runtimeTime}`,
       },
       references,
       instructions,
       buildRequest,
       budgetTokens: contextBudgetTokens,
-      skipCompaction: true,
-    });
+    };
+    // Compaction runs before the turn is created so the 85% threshold really
+    // compacts. A failed summary must not block a turn that still fits.
+    const prepared = await prepareChatContext(contextInput).catch(
+      async (error: unknown) => {
+        if (
+          !(error instanceof ChatContextError) ||
+          !COMPACTION_FALLBACK_CODES.has(error.code)
+        )
+          throw error;
+        return prepareChatContext({ ...contextInput, skipCompaction: true });
+      },
+    );
     const bound = chatInputTokenUpperBound(buildRequest(prepared.messages));
     if (bound > tokenPricing.maxInputTokens)
       throw new ChatTurnError(
@@ -640,7 +686,9 @@ export async function createChatTurn(
             mode:
               config.transport === "responses_sse"
                 ? "native_responses"
-                : "chat_completions",
+                : config.transport === "anthropic_messages_sse"
+                  ? "native_anthropic"
+                  : "chat_completions",
           },
         });
         await recordChatReserve(tx, {
@@ -692,7 +740,9 @@ export async function createChatTurn(
           mode:
             config.transport === "responses_sse"
               ? "native_responses"
-              : "chat_completions",
+              : config.transport === "anthropic_messages_sse"
+                ? "native_anthropic"
+                : "chat_completions",
           reservedCredits: reserveCredits,
         });
         return turn.id;
@@ -781,7 +831,7 @@ export async function finishChatAttempt(input: {
       const tokenPricing = readChatTokenPricingSnapshot(
         object(turn.configSnapshot).tokenPricing,
       );
-      if (turn.modelId === OPUS_MODEL_ID && !tokenPricing)
+      if (isTokenPricedChatModel(turn.modelId) && !tokenPricing)
         throw new Error("MISSING_CHAT_TOKEN_PRICING_SNAPSHOT");
       const rawUsage = input.usage !== undefined ? input.usage : attempt.usage;
       const normalized = tokenPricing

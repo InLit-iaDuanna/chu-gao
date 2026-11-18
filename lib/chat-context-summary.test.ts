@@ -100,7 +100,7 @@ describe("summary transport follows the existing profile", () => {
         stream: true,
         store: false,
         reasoning: { effort: "low" },
-        max_output_tokens: 2048,
+        max_output_tokens: 4096,
       });
       expect(body).not.toHaveProperty("tools");
       expect(body).not.toHaveProperty("tool_choice");
@@ -129,7 +129,7 @@ describe("summary transport follows the existing profile", () => {
     expect(JSON.parse(mocks.fetch.mock.calls[0][1].body)).toMatchObject({
       stream: true,
       reasoning_effort: "low",
-      max_tokens: 2048,
+      max_tokens: 4096,
     });
   });
 
@@ -217,7 +217,7 @@ describe("summary transport follows the existing profile", () => {
     );
     await expect(
       (await createContextSummarizer("gpt-6.1-sol"))(
-        [{ role: "user", content: "中".repeat(10_000) }],
+        [{ role: "user", content: "中".repeat(30_000) }],
         null,
       ),
     ).rejects.toMatchObject({ code: "CHAT_CONTEXT_MESSAGE_TOO_LARGE" });

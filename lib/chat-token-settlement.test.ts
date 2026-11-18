@@ -299,7 +299,8 @@ describe("actual-token settlement transactions", () => {
       "user",
       result.priceCredits,
     );
-    expect(mocks.context.mock.calls[0][0].skipCompaction).toBe(true);
+    // Compaction runs before admission so the 85% threshold really compacts.
+    expect(mocks.context.mock.calls[0][0].skipCompaction).toBeUndefined();
     const config = await mocks.profile();
     config.tokenPricing.pricing.output = 999;
     expect(frozen.pricing.output).toBe(500);

@@ -41,9 +41,7 @@ function sortedResolutions(grid: RuleGrid): string[] {
   const all = Array.from(grid.keys());
   return all.sort(
     (a, b) =>
-      (RESOLUTION_ORDER.indexOf(a) === -1
-        ? 99
-        : RESOLUTION_ORDER.indexOf(a)) -
+      (RESOLUTION_ORDER.indexOf(a) === -1 ? 99 : RESOLUTION_ORDER.indexOf(a)) -
       (RESOLUTION_ORDER.indexOf(b) === -1 ? 99 : RESOLUTION_ORDER.indexOf(b)),
   );
 }
@@ -76,9 +74,7 @@ export function PricingView() {
         setRules(pd.rules);
         setPricing(cp);
       })
-      .catch((err) =>
-        setError(isAdminApiError(err) ? err.message : "加载失败"),
-      )
+      .catch((err) => setError(isAdminApiError(err) ? err.message : "加载失败"))
       .finally(() => setLoading(false));
   }, []);
 
@@ -106,9 +102,10 @@ export function PricingView() {
         actions={
           <Button
             type="button"
-            className="h-8 w-8 p-0 text-text-muted"
+            className="h-9 w-9 p-0 text-text-muted"
             onClick={reload}
             title="刷新"
+            aria-label="刷新定价"
           >
             <RefreshCw className="h-3.5 w-3.5" />
           </Button>
@@ -117,20 +114,19 @@ export function PricingView() {
 
       <ErrorText message={error} />
 
-      {notice && (
-        <p className="mb-4 text-sm text-success">{notice}</p>
-      )}
+      {notice && <p className="mb-4 text-sm text-success">{notice}</p>}
 
       {/* Tab bar */}
-      <div className="mb-6 flex gap-1 rounded-lg border border-border bg-surface p-1 w-fit">
+      <div className="mb-6 flex w-fit max-w-full flex-wrap gap-1 rounded-lg border border-border bg-surface p-1">
         {(["image", "chat"] as Tab[]).map((t) => (
           <button
             key={t}
             type="button"
             onClick={() => setTab(t)}
-            className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+            aria-pressed={tab === t}
+            className={`h-9 rounded-md px-4 text-sm font-medium transition-colors ${
               tab === t
-                ? "bg-foreground/10 text-foreground"
+                ? "bg-surface-2 text-foreground"
                 : "text-text-muted hover:text-foreground"
             }`}
           >
@@ -191,9 +187,7 @@ function ImagePricingTab({
             onError={onError}
             onRulesChange={(updated) => {
               onRulesChange(
-                rules
-                  .filter((r) => r.modelId !== model.id)
-                  .concat(updated),
+                rules.filter((r) => r.modelId !== model.id).concat(updated),
               );
             }}
           />
@@ -255,8 +249,8 @@ function ModelPricingCard({
   };
 
   return (
-    <section className="rounded-xl border border-border bg-surface">
-      <div className="flex items-center justify-between border-b border-border px-5 py-3">
+    <section className="rounded-lg border border-border bg-surface">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-3">
         <div>
           <span className="font-medium">{model.displayName}</span>
           <span className="ml-2 font-mono text-xs text-text-faint">
@@ -271,7 +265,7 @@ function ModelPricingCard({
           暂无活跃规则，使用系统默认成本
         </p>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="min-w-0 max-w-full overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border">
@@ -290,7 +284,7 @@ function ModelPricingCard({
             </thead>
             <tbody className="divide-y divide-border">
               {resolutions.map((res) => (
-                <tr key={res} className="hover:bg-foreground/[0.02]">
+                <tr key={res} className="hover:bg-surface-2">
                   <td className="px-5 py-2 font-mono text-xs font-medium">
                     {res}
                   </td>
@@ -355,7 +349,7 @@ function CreditCell({
         value={value}
         placeholder="—"
         disabled={busy}
-        className="h-7 w-20 rounded border border-border bg-transparent px-2 font-mono text-xs outline-none focus:border-accent disabled:opacity-50"
+        className="w-24 rounded-md border border-border bg-surface px-2 font-mono outline-none focus:border-accent disabled:opacity-50 h-9 text-sm"
         onChange={(e) => {
           setValue(e.target.value);
           setDirty(true);
@@ -396,15 +390,15 @@ function ChatPricingTab({
     form.reasoningCredits !== pricing.reasoningCredits;
 
   return (
-    <div className="max-w-md rounded-xl border border-border bg-surface">
-      <div className="border-b border-border px-5 py-3">
+    <div className="max-w-md border-t border-border">
+      <div className="border-b border-border py-3">
         <span className="font-medium">对话计费</span>
         <p className="mt-0.5 text-xs text-text-muted">
           每次对话消耗的积分数。推理模式使用更多计算资源，单独定价。
         </p>
       </div>
 
-      <div className="space-y-4 px-5 py-4">
+      <div className="space-y-4 py-4">
         <div>
           <label className="mb-1.5 block text-xs font-medium text-text-muted">
             标准对话（积分 / 次）
@@ -414,7 +408,7 @@ function ChatPricingTab({
               type="number"
               min={0}
               step={0.5}
-              className="h-8 w-32 font-mono text-sm"
+              className="w-32 font-mono h-9 text-sm"
               value={form.standardCredits}
               onChange={(e) =>
                 setForm({ ...form, standardCredits: Number(e.target.value) })
@@ -433,7 +427,7 @@ function ChatPricingTab({
               type="number"
               min={0}
               step={0.5}
-              className="h-8 w-32 font-mono text-sm"
+              className="w-32 font-mono h-9 text-sm"
               value={form.reasoningCredits}
               onChange={(e) =>
                 setForm({ ...form, reasoningCredits: Number(e.target.value) })
@@ -446,7 +440,7 @@ function ChatPricingTab({
         <Button
           type="button"
           disabled={busy || !isDirty}
-          className="mt-2 h-8 px-4 text-sm disabled:opacity-40"
+          className="mt-2 h-9 px-4 text-sm disabled:opacity-40"
           onClick={async () => {
             setBusy(true);
             try {

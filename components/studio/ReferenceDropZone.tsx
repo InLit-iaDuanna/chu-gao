@@ -74,7 +74,7 @@ export function ReferenceDropZone({
       {over ? (
         <div
           role="status"
-          className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-brand bg-surface/95 p-4 text-sm text-foreground"
+          className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center gap-2 rounded-[inherit] border-2 border-dashed border-brand bg-surface/95 p-4 text-sm text-foreground"
         >
           <ImagePlus size={20} />
           {disabled ? "当前暂不能添加参考图" : "松开添加参考图"}

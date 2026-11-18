@@ -1,7 +1,16 @@
 import Link from "next/link";
 import { headers } from "next/headers";
-import { Download, Search, ChevronLeft, ChevronRight } from "lucide-react";
-import { Button, Input } from "@/components/ui";
+import {
+  ArrowLeft,
+  CircleAlert,
+  Download,
+  History,
+  Search,
+  SearchX,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
+import { Button, EmptyState, Input } from "@/components/ui";
 import type { GenerationStatus } from "@/components/studio/lib/types";
 
 import {
@@ -166,7 +175,6 @@ export default async function HistoryPage({
 
   return (
     <StudioPageShell
-      eyebrow="History"
       title="历史"
       wide
       actions={
@@ -174,18 +182,18 @@ export default async function HistoryPage({
           {hasHistory && !query && !status && page === 1 ? (
             <ClearHistoryButton />
           ) : null}
-          <Link
-            href="/app"
-            className="tool-button h-9 px-3 text-xs text-text-muted"
-          >
-            回到工作台
-          </Link>
+          <Button asChild variant="secondary">
+            <Link href="/app">
+              <ArrowLeft size={16} aria-hidden="true" />
+              回到工作台
+            </Link>
+          </Button>
         </>
       }
     >
       <form
         action="/app/history"
-        className="mb-6 flex flex-wrap items-center gap-2"
+        className="mb-6 flex min-w-0 flex-wrap items-center gap-2 border-y border-border py-4 tracking-normal"
       >
         <Input
           key={query}
@@ -193,14 +201,14 @@ export default async function HistoryPage({
           defaultValue={query}
           aria-label="搜索历史提示词或对话标题"
           placeholder="搜索提示词或对话标题"
-          className="min-w-0 flex-1 basis-56"
+          className="h-9 min-w-0 flex-1 basis-full sm:basis-56"
         />
         <select
           key={status ?? "all"}
           name="status"
           defaultValue={status ?? ""}
           aria-label="任务状态"
-          className="h-9 rounded-md border border-border bg-surface px-3 text-sm text-foreground"
+          className="h-9 min-w-0 flex-1 basis-36 rounded-md border border-[rgb(var(--control-border))] bg-[rgb(var(--control-bg))] px-3 text-sm text-foreground outline-none hover:border-[rgb(var(--control-border-hover))] focus:border-brand focus:shadow-[var(--shadow-focus)] sm:w-40 sm:flex-none sm:basis-auto"
         >
           <option value="">全部状态</option>
           {GENERATION_STATUSES.map((value) => (
@@ -209,54 +217,72 @@ export default async function HistoryPage({
             </option>
           ))}
         </select>
-        <Button type="submit">
+        <Button type="submit" variant="primary">
           <Search size={16} /> 搜索
         </Button>
         {query || status ? (
-          <Link href="/app/history" className="tool-button h-9 px-3 text-sm">
-            清空筛选
-          </Link>
+          <Button asChild variant="ghost">
+            <Link href="/app/history">清空筛选</Link>
+          </Button>
         ) : null}
       </form>
       {!conversations || !generations ? (
-        <div className="surface-panel flex min-h-72 flex-col items-center justify-center gap-3 px-6 py-10 text-center">
-          <h2 className="text-xl font-medium">历史暂时无法读取</h2>
-          <p className="max-w-md text-sm leading-6 text-text-muted">
-            请稍后刷新页面。你仍然可以返回工作台，服务恢复后新的任务会继续保存。
-          </p>
-          <Link href="/app" className="tool-button mt-2 h-9 text-text-muted">
-            返回工作台
-          </Link>
-        </div>
+        <EmptyState
+          role="status"
+          icon={CircleAlert}
+          className="min-h-72"
+          title="历史暂时无法读取"
+          description="请稍后刷新页面。你仍然可以返回工作台，服务恢复后新的任务会继续保存。"
+          action={
+            <Button asChild>
+              <Link href="/app">返回工作台</Link>
+            </Button>
+          }
+        />
       ) : conversations.length === 0 && generations.length === 0 ? (
-        <div className="surface-panel flex min-h-72 flex-col items-center justify-center gap-3 px-6 py-10 text-center">
-          <h2 className="text-xl font-medium">
-            {query || status || page > 1
+        <EmptyState
+          icon={query || status || page > 1 ? SearchX : History}
+          className="min-h-72"
+          title={
+            query || status || page > 1
               ? "没有找到匹配的历史记录"
-              : "当前账户还没有创作历史"}
-          </h2>
-          <p className="max-w-md text-sm leading-6 text-text-muted">
-            {query || status || page > 1
+              : "当前账户还没有创作历史"
+          }
+          description={
+            query || status || page > 1
               ? "调整关键词、状态或返回前一页。"
-              : "回到工作台，描述第一张图。完成后的结果会出现在这里。"}
-          </p>
-          <Link href="/app" className="tool-button mt-2 h-9 text-text-muted">
-            开始创作
-          </Link>
-        </div>
+              : "回到工作台，描述第一张图。完成后的结果会出现在这里。"
+          }
+          action={
+            <Button asChild variant="primary">
+              <Link href="/app">开始创作</Link>
+            </Button>
+          }
+        />
       ) : (
-        <div className="space-y-10">
+        <div className="min-w-0 space-y-8 text-sm tracking-normal">
           {conversations.length ? (
-            <section>
-              <p className="eyebrow mb-3">对话 · 继续创作</p>
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <section
+              aria-labelledby="history-conversations-heading"
+              className="min-w-0"
+            >
+              <header className="mb-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <h2
+                  id="history-conversations-heading"
+                  className="app-section-title"
+                >
+                  对话
+                </h2>
+                <p className="text-xs text-text-muted">继续创作</p>
+              </header>
+              <div className="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {conversations.map((conversation) => (
                   <Link
                     key={conversation.id}
                     href={`/app?thread=${conversation.id}`}
-                    className="surface-panel img-enter block overflow-hidden p-3 transition-colors hover:border-border-strong"
+                    className="img-enter block min-w-0 overflow-hidden rounded-lg border border-border bg-surface p-3 transition-colors hover:border-border-strong focus-visible:outline-brand"
                   >
-                    <div className="relative mb-3 h-40 overflow-hidden rounded-[8px] bg-surface-2">
+                    <div className="relative mb-3 aspect-video overflow-hidden rounded-md bg-surface-2">
                       {conversation.thumbnailUrl ? (
                         <img
                           src={conversation.thumbnailUrl}
@@ -271,15 +297,15 @@ export default async function HistoryPage({
                         </div>
                       )}
                     </div>
-                    <div className="flex items-center justify-between gap-3 font-mono text-xs text-text-muted">
+                    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-text-muted">
                       <span>{formatDate(conversation.lastMessageAt)}</span>
                       <span>{conversation.generationCount} 个任务</span>
                     </div>
-                    <h3 className="mt-2 line-clamp-1 font-medium">
+                    <h3 className="mt-2 line-clamp-1 break-words text-sm font-medium [overflow-wrap:anywhere]">
                       {conversation.title}
                     </h3>
                     {conversation.latestMessage ? (
-                      <p className="mt-2 line-clamp-2 text-sm leading-6 text-text-muted">
+                      <p className="mt-2 line-clamp-2 break-words text-sm leading-6 text-text-muted [overflow-wrap:anywhere]">
                         {conversation.latestMessage}
                       </p>
                     ) : null}
@@ -289,9 +315,23 @@ export default async function HistoryPage({
             </section>
           ) : null}
 
-          <section>
-            <p className="eyebrow mb-3">任务 · 单次生成记录</p>
-            <div className="columns-1 gap-4 md:columns-2 xl:columns-3">
+          <section
+            aria-labelledby="history-generations-heading"
+            className="min-w-0 border-t border-border pt-6"
+          >
+            <header className="mb-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <h2
+                id="history-generations-heading"
+                className="app-section-title"
+              >
+                任务
+              </h2>
+              <p className="text-xs text-text-muted">单次生成记录</p>
+            </header>
+            {generations.length === 0 ? (
+              <EmptyState title="暂无匹配的生成任务" />
+            ) : null}
+            <div className="min-w-0 columns-1 gap-4 md:columns-2 xl:columns-3">
               {generations.map((generation) => {
                 const previewImages = generation.images.filter(
                   (image) => image.src ?? image.url,
@@ -305,21 +345,24 @@ export default async function HistoryPage({
                 return (
                   <article
                     key={generation.id}
-                    className="surface-panel img-enter mb-4 block break-inside-avoid p-3 transition-colors hover:border-border-strong"
+                    className="img-enter mb-4 block min-w-0 break-inside-avoid rounded-lg border border-border bg-surface p-3 transition-colors hover:border-border-strong"
                   >
-                    <Link href={detailHref} className="block">
-                      <div className="relative mb-3 h-64 overflow-hidden rounded-[8px] bg-surface-2 sm:h-80">
+                    <Link
+                      href={detailHref}
+                      className="block min-w-0 rounded-md focus-visible:outline-brand"
+                    >
+                      <div className="relative mb-3 aspect-square overflow-hidden rounded-md bg-surface-2">
                         {imageUrl ? (
                           <>
                             <img
                               src={imageUrl}
                               alt={generation.prompt}
-                              className="h-full w-full object-cover"
+                              className="h-full w-full object-contain"
                               loading="lazy"
                               decoding="async"
                             />
                             {previewImages.length > 1 ? (
-                              <span className="absolute left-3 top-3 rounded-full bg-black/55 px-2.5 py-1 font-mono text-xs text-white">
+                              <span className="absolute left-3 top-3 rounded-md border border-border bg-surface/95 px-2 py-1 text-xs text-foreground">
                                 {previewImages.length} 张
                               </span>
                             ) : null}
@@ -339,19 +382,22 @@ export default async function HistoryPage({
                           </div>
                         )}
                       </div>
-                      <div className="flex items-center justify-between font-mono text-xs text-text-muted">
-                        <span>{formatDate(generation.createdAt)}{generation.source === "agent" ? " · Agent" : ""}</span>
+                      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-text-muted">
+                        <span>
+                          {formatDate(generation.createdAt)}
+                          {generation.source === "agent" ? " · Agent" : ""}
+                        </span>
                         <span
                           className={generationStatusTone(generation.status)}
                         >
                           {generationStatusLabel(generation.status)}
                         </span>
                       </div>
-                      <p className="mt-2 line-clamp-3 text-sm leading-6">
+                      <p className="mt-2 line-clamp-3 break-words text-sm leading-6 [overflow-wrap:anywhere]">
                         {generation.prompt}
                       </p>
                     </Link>
-                    <div className="mt-2 flex items-center justify-end">
+                    <div className="mt-2 flex items-center justify-end [&_button]:h-9 [&_button]:w-9">
                       <CopyTextButton text={generation.prompt} />
                     </div>
                     {previewImages.length ? (
@@ -360,15 +406,16 @@ export default async function HistoryPage({
                           const href = downloadImageUrl(image);
 
                           return href ? (
-                            <a
+                            <Button
+                              asChild
+                              variant="secondary"
                               key={image.id ?? `${href}-${index}`}
-                              href={href}
-                              download
-                              className="tool-button h-9 text-text-muted"
                             >
-                              <Download className="h-4 w-4 stroke-[1.5]" />
-                              下载原图 {index + 1}
-                            </a>
+                              <a href={href} download>
+                                <Download className="h-4 w-4 stroke-[1.5]" />
+                                下载原图 {index + 1}
+                              </a>
+                            </Button>
                           ) : null;
                         })}
                       </div>
@@ -383,24 +430,22 @@ export default async function HistoryPage({
       {conversations && generations && (page > 1 || hasNext) ? (
         <nav
           aria-label="历史分页"
-          className="mt-6 flex items-center justify-center gap-4"
+          className="mt-6 flex flex-wrap items-center justify-center gap-3 border-t border-border pt-5"
         >
           {page > 1 ? (
-            <Link
-              href={pageHref(page - 1)}
-              className="tool-button h-10 px-3 text-sm"
-            >
-              <ChevronLeft size={16} /> 上一页
-            </Link>
+            <Button asChild>
+              <Link href={pageHref(page - 1)}>
+                <ChevronLeft size={16} /> 上一页
+              </Link>
+            </Button>
           ) : null}
           <span className="text-sm text-text-muted">第 {page} 页</span>
           {hasNext ? (
-            <Link
-              href={pageHref(page + 1)}
-              className="tool-button h-10 px-3 text-sm"
-            >
-              下一页 <ChevronRight size={16} />
-            </Link>
+            <Button asChild>
+              <Link href={pageHref(page + 1)}>
+                下一页 <ChevronRight size={16} />
+              </Link>
+            </Button>
           ) : null}
         </nav>
       ) : null}

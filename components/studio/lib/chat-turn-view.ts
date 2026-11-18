@@ -46,14 +46,18 @@ export function mergeChatTurn(
     .at(-1);
   if ((latest?.chatAttemptNumber ?? 0) > turn.attemptNumber)
     return conversation;
+  // A retry gets a new attempt id but is still the same user turn. Replace the
+  // previous assistant row so the old terminal error does not remain beside
+  // the active retry status.
+  const existing = previous ?? latest;
   const createdAt =
-    previous?.chatStartedAt ??
+    existing?.chatStartedAt ??
     turn.createdAt ??
     turn.startedAt ??
     new Date().toISOString();
   const reply = {
-    ...previous,
-    id: previous?.id ?? `chat-assistant-${turn.attemptId}`,
+    ...existing,
+    id: existing?.id ?? `chat-assistant-${turn.attemptId}`,
     role: "assistant" as const,
     content: turn.text,
     chatTurnId: turn.id,
@@ -77,7 +81,7 @@ export function mergeChatTurn(
     },
     chatError: turn.error?.message ?? null,
     ...(turn.generationId ? { generationId: turn.generationId } : {}),
-    createdAt: previous?.createdAt ?? createdAt,
+    createdAt: existing?.createdAt ?? createdAt,
   };
   const messages = [...conversation.messages];
   if (
@@ -94,7 +98,7 @@ export function mergeChatTurn(
       createdAt,
     });
   }
-  const index = previous ? messages.indexOf(previous) : -1;
+  const index = existing ? messages.indexOf(existing) : -1;
   if (index < 0) messages.push(reply);
   else messages[index] = reply;
   return { ...conversation, messages };

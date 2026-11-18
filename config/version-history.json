@@ -1,0 +1,89 @@
+{
+  "current": "2.3.0",
+  "versions": [
+    {
+      "version": "2.3.0",
+      "directory": "chugao_v2.3",
+      "type": "minor",
+      "status": "deployed",
+      "createdAt": "2026-09-27",
+      "summary": "把素材收录测试站接入 chugao.art 账号；管理员直接进入，普通账号由管理员开启内测权限。",
+      "changes": [
+        "User 新增 materialInboxBeta 管理字段与 Prisma 迁移",
+        "主站 /api/me 和管理员用户后台展示、修改素材收录内测权限",
+        "登录回跳仅允许明确的 test.chugao.art 目标",
+        "测试站通过共享会话向主站校验，不保存密码或另建账号系统"
+      ],
+      "verification": {
+        "typecheck": "passed",
+        "migration": "passed on 198.44.177.67",
+        "deployment": "passed; main session bridge live and test site switched to v2.10"
+      }
+    },
+    {
+      "version": "2.0.0",
+      "directory": "chugao_v2",
+      "type": "major",
+      "status": "preserved",
+      "createdAt": "2026-08-14",
+      "verifiedAt": "2026-08-14",
+      "summary": "独立正式目录迁移；测试与临时产物移出正式项目目录；建立领域、基础设施和共享浏览器请求边界。",
+      "changes": [
+        "正式源码迁移到 chugao_v2",
+        "测试、历史 SQL、重复路由和构建产物集中到 test",
+        "统一 Studio、Admin、Inspiration 和 Auth 浏览器请求层",
+        "建立 auth、conversation、generation、inspiration、ppt、provider 领域入口",
+        "生成、对话、历史、PPT 和灵感帖子路由开始使用新边界",
+        "生成创建接口在解析与查询前完成认证判断"
+      ],
+      "verification": {
+        "typecheck": "passed",
+        "lint": "passed",
+        "tests": "52 files / 203 cases passed",
+        "productionBuild": "passed"
+      }
+    },
+    {
+      "version": "2.1.0",
+      "directory": "chugao_v2.1",
+      "type": "minor",
+      "status": "preserved",
+      "createdAt": "2026-08-14",
+      "verifiedAt": "2026-08-14",
+      "summary": "Canvas 状态边界重构；将画布加载、持久化和交互状态集中到独立 hook，保持既有交互与存储行为。",
+      "changes": [
+        "新增 components/canvas/useInfiniteCanvasState.ts",
+        "InfiniteCanvas 保留渲染与交互编排，状态和 localStorage 持久化移入 hook",
+        "保留会话切换时草稿迁移、400ms 尾随写入、pagehide 和 visibilitychange 冲刷",
+        "测试配置切换到 chugao_v2.1 正式目录"
+      ],
+      "verification": {
+        "typecheck": "passed",
+        "lint": "passed",
+        "tests": "52 files / 203 cases passed",
+        "productionBuild": "passed; 54 routes generated"
+      }
+    },
+    {
+      "version": "2.2.0",
+      "directory": "chugao_v2.2",
+      "type": "minor",
+      "status": "active",
+      "createdAt": "2026-08-14",
+      "verifiedAt": "2026-08-14",
+      "summary": "内容开发前的交互状态边界收尾；统一 DesignStudio、StudioApp、PptStudio 和 PublishComposer 的状态与动作 hook。",
+      "changes": [
+        "新增 DesignStudio、StudioApp、PptStudio 和 PublishComposer 的状态边界 hook",
+        "保留现有 API、localStorage、上传、导出、发布、生成和编辑行为",
+        "正式目录切换为 chugao_v2.2，测试配置同步切换",
+        "保留 v2.0.0 和 v2.1.0 版本记录"
+      ],
+      "verification": {
+        "typecheck": "passed",
+        "lint": "passed",
+        "tests": "52 files / 203 cases passed",
+        "productionBuild": "passed; 54 routes generated"
+      }
+    }
+  ]
+}

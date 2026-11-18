@@ -1,4 +1,8 @@
-import { LUNA_MODEL_ID, type ReasoningEffort } from "@/lib/chat-model-options";
+import {
+  geminiUpstreamModel,
+  LUNA_MODEL_ID,
+  type ReasoningEffort,
+} from "@/lib/chat-model-options";
 import { readCitedResponse, type ChatSearchSource } from "@/lib/chat-search";
 
 export function chatCompletionsRequestBody(
@@ -28,6 +32,13 @@ export function chatCompletionsRequestBody(
   };
 }
 
+export interface AnthropicToolContinuation {
+  callId: string;
+  name: string;
+  arguments: string;
+  output: string;
+}
+
 type ContentPart =
   | { type: "text"; text: string }
   | {
@@ -49,9 +60,154 @@ export interface UpstreamFunctionToolCall {
   function: { name: string; arguments: string };
 }
 
-export function chatEndpoint(baseUrl: string, responses: boolean): string {
+function anthropicContent(content: string | ContentPart[]) {
+  if (typeof content === "string") return content;
+  return content.map((part) => {
+    if (part.type === "text") return part;
+    const dataUrl = /^data:([^;,]+);base64,([\s\S]*)$/.exec(part.image_url.url);
+    return {
+      type: "image" as const,
+      source: dataUrl
+        ? { type: "base64" as const, media_type: dataUrl[1], data: dataUrl[2] }
+        : { type: "url" as const, url: part.image_url.url },
+    };
+  });
+}
+
+function jsonObject(value: string) {
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+export function anthropicMessagesRequestBody(
+  model: string,
+  messages: UpstreamChatMessage[],
+  instructions: string,
+  effort: ReasoningEffort,
+  options: {
+    webSearch?: boolean;
+    maxOutputTokens?: number;
+    stream?: boolean;
+    tools?: readonly unknown[];
+    toolContinuations?: AnthropicToolContinuation[];
+  } = {},
+) {
+  const input: Array<{
+    role: "user" | "assistant";
+    content: unknown;
+  }> = messages.flatMap(
+    (
+      message,
+    ): Array<{
+      role: "user" | "assistant";
+      content: unknown;
+    }> => {
+      if (message.role === "system") return [];
+      if (message.role === "tool") {
+        return [
+          {
+            role: "user" as const,
+            content: [
+              {
+                type: "tool_result" as const,
+                tool_use_id: message.tool_call_id ?? "unknown",
+                content:
+                  typeof message.content === "string"
+                    ? message.content
+                    : JSON.stringify(message.content ?? ""),
+              },
+            ],
+          },
+        ];
+      }
+      return [
+        {
+          role:
+            message.role === "assistant"
+              ? ("assistant" as const)
+              : ("user" as const),
+          content: anthropicContent(message.content),
+        },
+      ];
+    },
+  );
+  // Without any tool definitions in the request, tool_use/tool_result blocks
+  // are rejected or mishandled by relays, so the exchange is replayed as text.
+  const replayAsText = !options.tools?.length && !options.webSearch;
+  const toolContinuations = (options.toolContinuations ?? []).flatMap(
+    (tool): Array<{ role: "user" | "assistant"; content: unknown }> => replayAsText ? [
+      {
+        role: "assistant" as const,
+        content: `[已调用 ${tool.name}]\n${tool.arguments}`,
+      },
+      {
+        role: "user" as const,
+        content: `[${tool.name} 回执]\n${tool.output}\n请根据回执直接用文字回复用户，不要再调用工具，也不要检索。`,
+      },
+    ] : [
+      {
+        role: "assistant" as const,
+        content: [
+          {
+            type: "tool_use" as const,
+            id: tool.callId,
+            name: tool.name,
+            input: jsonObject(tool.arguments),
+          },
+        ],
+      },
+      {
+        role: "user" as const,
+        content: [
+          {
+            type: "tool_result" as const,
+            tool_use_id: tool.callId,
+            content: tool.output,
+          },
+        ],
+      },
+    ],
+  );
+  const tools = [
+    ...(options.webSearch
+      ? [{ type: "web_search_20250305", name: "web_search", max_uses: 5 }]
+      : []),
+    ...(options.tools ?? []),
+  ];
+  return {
+    model,
+    system: instructions,
+    messages: [...input, ...toolContinuations],
+    max_tokens: options.maxOutputTokens ?? 16_384,
+    ...(effort ? { output_config: { effort } } : {}),
+    ...(tools.length ? { tools } : {}),
+    stream: options.stream ?? true,
+  };
+}
+
+export type ChatTransport =
+  | "chat_completions_sse"
+  | "responses_sse"
+  | "anthropic_messages_sse";
+
+export function chatEndpoint(
+  baseUrl: string,
+  transport: boolean | ChatTransport,
+): string {
   const root = baseUrl.replace(/\/+$/, "").replace(/\/v1$/, "");
-  return `${root}/v1/${responses ? "responses" : "chat/completions"}`;
+  const path =
+    transport === true
+      ? "responses"
+      : transport === "anthropic_messages_sse"
+        ? "messages"
+        : "chat/completions";
+  return `${root}/v1/${path}`;
 }
 
 export function lunaRequestBody(
@@ -188,6 +344,8 @@ export function responsesRequestBody(
   };
 }
 
+export { geminiUpstreamModel };
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -244,4 +402,173 @@ export function readLunaStreamEvent(payload: unknown): {
     return { error: "对话未能完成，请重试" };
   }
   return {};
+}
+
+function searchSources(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter(
+        (item) =>
+          isRecord(item) &&
+          typeof item.url === "string" &&
+          typeof item.title === "string",
+      )
+    : [];
+}
+
+/** Convert Anthropic Messages SSE into the internal Responses event shape. */
+export function readAnthropicStreamEvents(payload: unknown): unknown[] {
+  if (!isRecord(payload) || typeof payload.type !== "string") return [];
+  const type = payload.type;
+  if (type === "message_start") {
+    const message = isRecord(payload.message) ? payload.message : {};
+    return [
+      {
+        type: "response.created",
+        response: {
+          id: message.id,
+          status: "in_progress",
+          usage: message.usage,
+        },
+      },
+    ];
+  }
+  if (type === "content_block_start") {
+    const index = typeof payload.index === "number" ? payload.index : 0;
+    const block = isRecord(payload.content_block) ? payload.content_block : {};
+    const id =
+      typeof block.id === "string" ? block.id : `anthropic-block-${index}`;
+    if (block.type === "text")
+      return [
+        {
+          type: "response.output_item.added",
+          output_index: index,
+          item: { id, type: "message", role: "assistant" },
+        },
+      ];
+    if (block.type === "thinking")
+      return [
+        {
+          type: "response.output_item.added",
+          output_index: index,
+          item: { id, type: "reasoning" },
+        },
+      ];
+    if (block.type === "tool_use") {
+      // Short arguments arrive complete on the start block, with no deltas.
+      const input = isRecord(block.input) ? block.input : null;
+      return [
+        {
+          type: "response.output_item.added",
+          output_index: index,
+          item: {
+            id,
+            call_id: id,
+            name: block.name,
+            type: "function_call",
+          },
+        },
+        ...(input && Object.keys(input).length
+          ? [
+              {
+                type: "response.function_call_arguments.done",
+                output_index: index,
+                call_id: id,
+                arguments: JSON.stringify(input),
+              },
+            ]
+          : []),
+      ];
+    }
+    if (block.type === "server_tool_use")
+      return [
+        {
+          type: "response.web_search_call.searching",
+          output_index: index,
+          item_id: id,
+          action: {
+            type: "search",
+            query: isRecord(block.input) ? block.input.query : undefined,
+          },
+        },
+      ];
+    if (block.type === "web_search_tool_result")
+      return [
+        {
+          type: "response.web_search_call.completed",
+          output_index: index,
+          item_id:
+            typeof payload.tool_use_id === "string"
+              ? payload.tool_use_id
+              : typeof block.tool_use_id === "string"
+                ? block.tool_use_id
+                : id,
+          action: { type: "search", sources: searchSources(block.content) },
+        },
+      ];
+    if (block.type === "web_search_tool_result_error")
+      return [
+        {
+          type: "response.web_search_call.failed",
+          output_index: index,
+          item_id:
+            typeof payload.tool_use_id === "string" ? payload.tool_use_id : id,
+        },
+      ];
+    return [];
+  }
+  if (type === "content_block_delta") {
+    const index = typeof payload.index === "number" ? payload.index : 0;
+    const delta = isRecord(payload.delta) ? payload.delta : {};
+    if (delta.type === "text_delta" && typeof delta.text === "string")
+      return [
+        {
+          type: "response.output_text.delta",
+          output_index: index,
+          content_index: 0,
+          delta: delta.text,
+        },
+      ];
+    if (
+      delta.type === "input_json_delta" &&
+      typeof delta.partial_json === "string"
+    )
+      return [
+        {
+          type: "response.function_call_arguments.delta",
+          output_index: index,
+          delta: delta.partial_json,
+        },
+      ];
+    return [];
+  }
+  if (type === "message_delta") {
+    const delta = isRecord(payload.delta) ? payload.delta : {};
+    const stopReason = delta.stop_reason;
+    return [
+      {
+        type: "response.completed",
+        response: {
+          status: stopReason === "max_tokens" ? "incomplete" : "completed",
+          usage: payload.usage,
+        },
+      },
+    ];
+  }
+  if (type === "error") {
+    const error = isRecord(payload.error) ? payload.error : {};
+    return [
+      {
+        type: "response.failed",
+        error: {
+          type: typeof error.type === "string" ? error.type : "upstream_error",
+          code: typeof error.code === "string" ? error.code : undefined,
+          message:
+            typeof error.message === "string"
+              ? error.message.slice(0, 400)
+              : "Anthropic 上游请求失败",
+        },
+      },
+    ];
+  }
+  return [];
 }

@@ -4,9 +4,11 @@ import { fail, ok } from "@/lib/api-response";
 import { authenticatedUser, checkSession } from "@/lib/auth";
 import { userActionRateLimitResponse } from "@/lib/api-rate-limit";
 import {
+  UnsupportedImageFormatError,
   createPrivateStorageReadStream,
   normalizeUploadedReferenceKey,
   saveUploadedReferenceImage,
+  sniffImageFormat,
   statPrivateStorageKey,
 } from "@/lib/storage";
 
@@ -100,12 +102,6 @@ export async function POST(request: Request) {
     return fail("VALIDATION_ERROR", "请选择一张参考图", { status: 400 });
   }
 
-  if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
-    return fail("VALIDATION_ERROR", "参考图仅支持 PNG、JPEG 或 WEBP", {
-      status: 400,
-    });
-  }
-
   if (file.size <= 0 || file.size > maxUploadBytes()) {
     return fail(
       "VALIDATION_ERROR",
@@ -115,18 +111,35 @@ export async function POST(request: Request) {
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
+  // The declared type is a hint only: phone pickers send "" or the wrong type
+  // for otherwise perfect photos, so the bytes decide what the file is.
+  const sniffed = sniffImageFormat(buffer);
+  const mimeType = ALLOWED_IMAGE_TYPES.has(file.type)
+    ? file.type
+    : sniffed === "png" || sniffed === "jpeg" || sniffed === "webp"
+      ? `image/${sniffed}`
+      : file.type;
 
   let saved;
 
   try {
     saved = await saveUploadedReferenceImage({
       buffer,
-      mimeType: file.type,
+      mimeType,
       userId: user.id,
     });
   } catch (error) {
+    if (error instanceof UnsupportedImageFormatError) {
+      const hint =
+        error.detected === "heic" || error.detected === "heif"
+          ? "这是 iPhone 的 HEIC 原图，请在相机设置里选择「兼容性最佳」，或在相册里先转成 JPEG 再上传。"
+          : error.detected === "gif" || error.detected === "tiff"
+            ? "请把图片另存为 PNG、JPEG 或 WEBP 再上传。"
+            : "参考图仅支持 PNG、JPEG 或 WEBP。";
+      return fail("VALIDATION_ERROR", hint, { status: 400 });
+    }
     if (error instanceof Error && error.message === "invalid uploaded image") {
-      return fail("VALIDATION_ERROR", "上传文件不是有效图片", { status: 400 });
+      return fail("VALIDATION_ERROR", "图片文件已损坏，请重新选择", { status: 400 });
     }
 
     throw error;

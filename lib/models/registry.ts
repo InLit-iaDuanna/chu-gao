@@ -109,8 +109,16 @@ export function getModel(id: string): ModelDefinition | null {
   return MODELS[id] ?? null;
 }
 
+/**
+ * Retired models stay resolvable so existing generations still render, but they
+ * are no longer offered in catalogs or pickers.
+ */
+const RETIRED_MODEL_IDS = new Set(["gpt-image-2.6"]);
+
 export function listModels(): ModelDefinition[] {
-  return Object.values(MODELS);
+  return Object.values(MODELS).filter(
+    (model) => !RETIRED_MODEL_IDS.has(model.id),
+  );
 }
 
 export function modelsByProtocol(protocol: ProtocolName): ModelDefinition[] {

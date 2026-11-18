@@ -8,7 +8,6 @@ import { ArrowUp, Wand2 } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 import { Spinner } from "@/components/ui";
-import { cn } from "@/lib/utils";
 
 import type { ModelInfo } from "../lib/types";
 
@@ -44,7 +43,7 @@ export function ComposerPanel({
   }, []);
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-surface">
+    <div className="flex h-full min-h-0 min-w-0 flex-col bg-surface text-sm tracking-normal">
       <Textarea
         ref={textareaRef}
         value={prompt}
@@ -62,40 +61,35 @@ export function ComposerPanel({
           }
         }}
         aria-label="提示词编辑"
-        className="min-h-0 w-full flex-1 resize-none bg-transparent p-3 text-[13px] leading-6 text-foreground outline-none placeholder:text-text-faint"
+        className="min-h-0 w-full min-w-0 flex-1 resize-none rounded-none border-0 bg-transparent p-3 text-sm leading-6 text-foreground outline-none placeholder:text-text-muted"
       />
 
-      <div className="flex h-11 shrink-0 items-center gap-2 border-t border-border px-2.5">
-        <span className="min-w-0 flex-1 truncate text-[11px] text-text-faint">
+      <div className="flex min-h-11 shrink-0 flex-wrap items-center gap-2 border-t border-border p-3">
+        <span className="min-w-0 basis-full truncate text-xs text-text-muted sm:flex-1 sm:basis-auto">
           {model ? model.displayName : "模型加载中…"}
           <span className="ml-2 tabular-nums">{prompt.length}/4000</span>
         </span>
 
         <Button
-          variant="ghost"
+          variant="secondary"
           type="button"
           onClick={onOptimize}
           disabled={optimizing || prompt.trim().length === 0}
-          className="flex h-7 items-center gap-1 rounded-md border border-border px-2 text-[11px] text-text-muted transition-colors hover:border-border-strong hover:text-foreground disabled:opacity-40"
+          className="h-11 gap-2 rounded-md px-3 text-sm sm:h-9"
         >
-          {optimizing ? <Spinner className="h-3 w-3" /> : <Wand2 size={12} />}
+          {optimizing ? <Spinner className="h-4 w-4" /> : <Wand2 size={16} />}
           优化
         </Button>
 
         <Button
-          variant="ghost"
+          variant="primary"
           type="button"
           onClick={onSubmit}
           disabled={submitDisabled}
           title={disabledReason ?? "生成"}
-          className={cn(
-            "flex h-7 items-center gap-1 rounded-md px-2.5 text-[11px] font-medium transition-colors",
-            submitDisabled
-              ? "bg-surface-2 text-text-faint"
-              : "sweep pressable bg-brand text-on-accent hover:bg-brand/88",
-          )}
+          className="h-11 gap-2 rounded-md px-3 text-sm sm:h-9"
         >
-          {busy ? <Spinner className="h-3 w-3" /> : <ArrowUp size={12} />}
+          {busy ? <Spinner className="h-4 w-4" /> : <ArrowUp size={16} />}
           生成
         </Button>
       </div>

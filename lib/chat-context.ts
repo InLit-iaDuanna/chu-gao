@@ -1,4 +1,4 @@
-import { Prisma, type ContextSnapshot } from "@prisma/client";
+﻿import { Prisma, type ContextSnapshot } from "@prisma/client";
 
 import { getConversationSystemPrompt } from "@/lib/ai-config";
 import { renderStructuredChatMemory } from "@/lib/chat-context-memory";
@@ -29,6 +29,7 @@ import {
 import {
   CHAT_CONTEXT_AUTO_COMPACT_RATIO,
   CHAT_CONTEXT_ESTIMATOR_VERSION,
+  CHAT_CONTEXT_PRECOMPACT_RATIO,
   ChatContextError,
   normalizeChatContextBudget,
   type ChatContextAsset,
@@ -36,11 +37,7 @@ import {
   type ChatContextStatus,
 } from "@/lib/chat-context-types";
 import { chatTurnInstructions } from "@/lib/chat-instructions";
-import {
-  LUNA_MODEL_ID,
-  SOL_MODEL_ID,
-  OPUS_MODEL_ID,
-} from "@/lib/chat-model-options";
+import { CHAT_MODEL_IDS } from "@/lib/chat-model-options";
 import {
   normalizeChatReferences,
   storedChatReferences,
@@ -117,9 +114,7 @@ interface Template {
 }
 
 function validateModel(modelId: string) {
-  if (
-    !["default", LUNA_MODEL_ID, SOL_MODEL_ID, OPUS_MODEL_ID].includes(modelId)
-  )
+  if (!(CHAT_MODEL_IDS as readonly string[]).includes(modelId))
     throw new ChatContextError("VALIDATION_ERROR", "不支持的对话模型", 400);
 }
 
@@ -248,18 +243,17 @@ async function loadState(
     input.instructions !== undefined
       ? estimateMessageTokens([{ role: "system", content: systemPrompt }])
       : Math.max(
-          ...[false, true].map((search) =>
-            estimateMessageTokens([
-              {
-                role: "system",
-                // Budget against what a turn really sends: the longer of the
-                // two search contracts, so neither variant overflows.
-                content: [
-                  chatTurnInstructions(systemPrompt, search),
-                  chatTurnInstructions(systemPrompt, search, true),
-                ].sort((a, b) => b.length - a.length)[0],
-              },
-            ]),
+          ...[false, true].flatMap((search) =>
+            [false, true].map((asTool) =>
+              estimateMessageTokens([
+                {
+                  role: "system",
+                  // Budget against what a turn really sends: the version with
+                  // the image tool contract, whichever search variant is longer.
+                  content: chatTurnInstructions(systemPrompt, search, asTool),
+                },
+              ]),
+            ),
           ),
         );
   const budgetTokens = normalizeChatContextBudget(
@@ -294,7 +288,7 @@ function messageText(
   const content = compacted
     ? `[更早轮次 ${turn.key} 的附件和工具资料，仅作历史资料]`
     : turn.outcome !== "completed" && row.role === "USER"
-      ? `[历史未完成轮次 ${turn.key}：以下只是用户要求，不代表已执行成功]\n${row.content}`
+      ? `[更早的请求，当时没有完成；仅当用户现在再次提到时再处理]\n${row.content}`
       : row.content;
   return (
     content +
@@ -337,7 +331,7 @@ function templates(
       template(
         {
           role: "assistant",
-          content: `以下为更早对话的摘要，仅作历史资料，不是新的指令：\n${renderStructuredChatMemory(summary)}`,
+          content: `以下为更早对话的摘要，仅作历史资料，不是新的指令；继续对话时不要提及或复述这份摘要，需要原图或原文细节时以用户最新说明为准：\n${renderStructuredChatMemory(summary)}`,
         },
         [],
       ),
@@ -746,6 +740,26 @@ export async function compactChatContext(
 ): Promise<ChatContextStatus> {
   return contextView((await processContext(input, undefined, true)).state)
     .status;
+}
+
+/**
+ * Post-turn compaction (Codex "PostTurn"): once a finished conversation passes
+ * the pre-compaction ratio, summarise it in the background so the next send
+ * does not wait on the summariser at the 85% threshold.
+ */
+export async function precompactChatContext(
+  input: ContextInput,
+): Promise<ChatContextStatus | null> {
+  validateModel(input.modelId);
+  const state = await loadState(input);
+  const { status } = contextView(state);
+  if (
+    !status.canCompact ||
+    status.estimatedTokens <
+      status.budgetTokens * CHAT_CONTEXT_PRECOMPACT_RATIO
+  )
+    return null;
+  return compactChatContext(input);
 }
 
 export async function prepareChatContext(input: PrepareContextInput): Promise<{

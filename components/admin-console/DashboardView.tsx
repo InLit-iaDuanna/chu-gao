@@ -109,6 +109,25 @@ export function chartPoints(
   }));
 }
 
+export function chartTickIndices(count: number, plotWidth: number) {
+  if (count === 0) return [];
+  if (count === 1 || plotWidth < 88) return [count - 1];
+
+  const pointSpacing = plotWidth / (count - 1);
+  const step = Math.max(1, Math.ceil(64 / pointSpacing));
+  const indices = [0];
+  // Reserve room for the final label before sampling the interior ticks.
+  for (let index = step; index < count - 1; index += step) {
+    if ((count - 1 - index) * pointSpacing < 64) break;
+    indices.push(index);
+  }
+  return [...indices, count - 1];
+}
+
+export function chartYAxisTicks(maximum: number) {
+  return [...new Set([maximum, Math.floor(maximum / 2), 0])];
+}
+
 function pointsToPath(points: { x: number; y: number }[]) {
   return points
     .map(
@@ -174,17 +193,12 @@ function Panel({
   className?: string;
 }) {
   return (
-    <section
-      className={cn(
-        "min-w-0 rounded-xl border border-border bg-surface",
-        className,
-      )}
-    >
-      <div className="flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
-        <div>
+    <section className={cn("min-w-0 border-t border-border", className)}>
+      <div className="flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-border py-3">
+        <div className="min-w-0 break-words">
           <h2 className="text-sm font-semibold">{title}</h2>
           {description ? (
-            <p className="mt-0.5 text-[11px] leading-4 text-text-muted">
+            <p className="mt-0.5 text-xs leading-4 text-text-muted">
               {description}
             </p>
           ) : null}
@@ -200,7 +214,7 @@ function PanelLink({ href, children }: { href: string; children: ReactNode }) {
   return (
     <Link
       href={href}
-      className="inline-flex items-center gap-1 text-[11px] text-text-muted transition-colors hover:text-foreground"
+      className="inline-flex min-h-9 items-center gap-1 text-xs text-text-muted transition-colors hover:text-foreground"
     >
       {children}
       <ArrowUpRight size={12} />
@@ -224,21 +238,21 @@ function MetricCard({
   tone?: Tone;
 }) {
   return (
-    <article className="rounded-xl border border-border bg-surface p-4">
+    <article className="min-w-0 rounded-lg border border-border bg-surface p-4">
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs text-text-muted">{label}</p>
         <Icon size={15} strokeWidth={1.5} className="text-text-faint" />
       </div>
       <p
         className={cn(
-          "mt-3 font-mono text-[28px] font-semibold leading-none tracking-tight",
+          "mt-3 break-words font-mono text-2xl font-semibold leading-8 tracking-normal tabular-nums",
           toneClass(tone),
         )}
       >
         {value}
       </p>
-      <p className="mt-2.5 text-[11px] text-text-muted">{detail}</p>
-      {hint ? <p className="mt-1 text-[11px] text-text-faint">{hint}</p> : null}
+      <p className="mt-2.5 text-xs text-text-muted">{detail}</p>
+      {hint ? <p className="mt-1 text-xs text-text-faint">{hint}</p> : null}
     </article>
   );
 }
@@ -325,7 +339,7 @@ function HealthPanel({
       action={
         <span
           className={cn(
-            "inline-flex items-center gap-1.5 text-[11px] font-medium",
+            "inline-flex items-center gap-1.5 text-xs font-medium",
             hasDanger
               ? "text-danger"
               : issues.length > 0
@@ -343,8 +357,8 @@ function HealthPanel({
       }
     >
       <div className="grid grid-cols-2 gap-px bg-border">
-        <div className="bg-surface p-4">
-          <div className="flex items-center gap-1.5 text-[11px] text-text-muted">
+        <div className="min-w-0 bg-surface p-4">
+          <div className="flex items-center gap-1.5 text-xs text-text-muted">
             <Server size={12} /> Worker
           </div>
           <p
@@ -355,25 +369,25 @@ function HealthPanel({
           >
             {stats.workerOnline ? "在线" : "离线"}
           </p>
-          <p className="mt-1 truncate text-[10px] text-text-faint">
+          <p className="mt-1 truncate text-xs text-text-faint">
             {stats.workerHeartbeatAt
               ? `心跳 ${formatDate(stats.workerHeartbeatAt)}`
               : "暂无心跳"}
           </p>
         </div>
-        <div className="bg-surface p-4">
-          <div className="flex items-center gap-1.5 text-[11px] text-text-muted">
+        <div className="min-w-0 bg-surface p-4">
+          <div className="flex items-center gap-1.5 text-xs text-text-muted">
             <Clock3 size={12} /> 队列
           </div>
           <p className="mt-2 font-mono text-sm font-semibold">
             {stats.queueWaiting} / {stats.queueActive}
           </p>
-          <p className="mt-1 text-[10px] text-text-faint">
+          <p className="mt-1 text-xs text-text-faint">
             等待 / 运行 · {stats.queueDelayed} 延迟
           </p>
         </div>
-        <div className="bg-surface p-4">
-          <div className="flex items-center justify-between gap-2 text-[11px] text-text-muted">
+        <div className="min-w-0 bg-surface p-4">
+          <div className="flex items-center justify-between gap-2 text-xs text-text-muted">
             <span>账号并发</span>
             <span className="font-mono">{Math.round(utilization)}%</span>
           </div>
@@ -400,8 +414,8 @@ function HealthPanel({
             <rect width={utilization} height="4" rx="2" fill="currentColor" />
           </svg>
         </div>
-        <div className="bg-surface p-4">
-          <div className="flex items-center gap-1.5 text-[11px] text-text-muted">
+        <div className="min-w-0 bg-surface p-4">
+          <div className="flex items-center gap-1.5 text-xs text-text-muted">
             <Zap size={12} /> 可用渠道
           </div>
           <p className="mt-2 font-mono text-sm font-semibold">
@@ -409,7 +423,7 @@ function HealthPanel({
           </p>
           <p
             className={cn(
-              "mt-1 text-[10px]",
+              "mt-1 text-xs",
               stats.stuckGenerations > 0 ? "text-danger" : "text-text-faint",
             )}
           >
@@ -419,11 +433,11 @@ function HealthPanel({
       </div>
 
       <div className="border-t border-border p-3">
-        <p className="mb-2 px-1 text-[11px] font-medium text-text-muted">
+        <p className="mb-2 px-1 text-xs font-medium text-text-muted">
           处置建议
         </p>
         {issues.length === 0 ? (
-          <div className="flex items-center gap-2 rounded-lg bg-success/5 px-3 py-2.5 text-[11px] text-success">
+          <div className="flex items-center gap-2 rounded-lg bg-success/5 px-3 py-2.5 text-xs text-success">
             <CheckCircle2 size={14} />
             当前没有需要处理的异常
           </div>
@@ -440,10 +454,10 @@ function HealthPanel({
                   className={cn("mt-0.5 shrink-0", toneClass(issue.tone))}
                 />
                 <span className="min-w-0 flex-1">
-                  <span className="block text-[11px] font-medium">
+                  <span className="block text-xs font-medium">
                     {issue.title}
                   </span>
-                  <span className="mt-0.5 block text-[10px] leading-4 text-text-muted">
+                  <span className="mt-0.5 block text-xs leading-4 text-text-muted">
                     {issue.detail}
                   </span>
                 </span>
@@ -460,7 +474,7 @@ function HealthPanel({
   );
 }
 
-function ActivityPanel({
+export function ActivityPanel({
   daily,
   hourly,
 }: {
@@ -468,6 +482,26 @@ function ActivityPanel({
   hourly: AdminStats["hourlySeries"];
 }) {
   const [range, setRange] = useState<"daily" | "hourly">("daily");
+  const chartRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  useEffect(() => {
+    const element = chartRef.current;
+    if (!element) return;
+    const measure = () =>
+      setContainerWidth(element.getBoundingClientRect().width);
+    measure();
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", measure);
+      return () => window.removeEventListener("resize", measure);
+    }
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) setContainerWidth(entry.contentRect.width);
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
   const source: (DailyPoint | HourlyPoint)[] =
     range === "daily" ? daily : hourly;
   const points = source.map((item) => {
@@ -514,8 +548,12 @@ function ActivityPanel({
       ]),
     ),
   );
-  const width = 680;
-  const height = 190;
+  const left = Math.max(40, String(maximum).length * 8 + 16);
+  const width = Math.max(0, containerWidth - left - 16);
+  const height = 208;
+  const xTicks = new Set(chartTickIndices(points.length, width));
+  const yTicks = chartYAxisTicks(maximum);
+  const yTickPoints = chartPoints(yTicks, 0, height, maximum);
   const totals = chartPoints(
     points.map((point) => point.total),
     width,
@@ -534,8 +572,6 @@ function ActivityPanel({
     height,
     maximum,
   );
-  const labelEvery = range === "daily" ? 2 : 3;
-
   return (
     <Panel
       title="生成活动"
@@ -554,7 +590,7 @@ function ActivityPanel({
               aria-pressed={range === value}
               onClick={() => setRange(value)}
               className={cn(
-                "rounded px-2.5 py-1 text-[11px] transition-colors",
+                "h-9 rounded-md px-2.5 text-sm transition-colors",
                 range === value
                   ? "bg-surface-2 font-medium text-foreground"
                   : "text-text-muted hover:text-foreground",
@@ -570,137 +606,140 @@ function ActivityPanel({
         <div className="mb-2 flex flex-wrap items-baseline gap-x-4 gap-y-1">
           <span className="font-mono text-xl font-semibold">
             {formatNumber(summary.total)}
-            <span className="ml-1 font-sans text-[11px] font-normal text-text-muted">
+            <span className="ml-1 font-sans text-xs font-normal text-text-muted">
               次生成
             </span>
           </span>
-          <span className="text-[11px] text-text-muted">
+          <span className="text-xs text-text-muted">
             成功率 {completed === 0 ? "—" : `${rate.toFixed(1)}%`}
           </span>
-          <span className="text-[11px] text-danger">失败 {summary.failed}</span>
+          <span className="text-xs text-danger">失败 {summary.failed}</span>
           {range === "daily" ? (
-            <span className="text-[11px] text-text-muted">
+            <span className="text-xs text-text-muted">
               消耗 {formatNumber(summary.credits)} 点
             </span>
           ) : null}
         </div>
-        <div className="relative">
-          <svg
-            viewBox="0 0 736 238"
-            className="h-64 w-full"
-            role="img"
-            aria-label={`${range === "daily" ? "近 14 天" : "近 24 小时"}生成趋势`}
-          >
-            <g transform="translate(42 8)">
-              {[0, 0.5, 1].map((fraction) => {
-                const y = height * fraction;
-                const value = Math.round(maximum * (1 - fraction));
-                return (
-                  <g key={fraction}>
-                    <line
-                      x1="0"
-                      y1={y}
-                      x2={width}
-                      y2={y}
-                      stroke="currentColor"
-                      strokeWidth="1"
-                      strokeDasharray="3 5"
-                      className="text-border"
-                    />
-                    <text
-                      x="-8"
-                      y={y + 3}
-                      textAnchor="end"
-                      fill="currentColor"
-                      className="font-mono text-[9px] text-text-faint"
-                    >
-                      {value}
-                    </text>
-                  </g>
-                );
-              })}
-              <path
-                d={pointsToArea(totals, height)}
-                fill="currentColor"
-                fillOpacity="0.055"
-                className="text-accent"
-              />
-              <path
-                d={pointsToPath(totals)}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.25"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="text-accent"
-              />
-              <path
-                d={pointsToPath(succeeded)}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="text-success"
-              />
-              <path
-                d={pointsToPath(failed)}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="text-danger"
-              />
-              {totals.map((point, index) => {
-                const item = points[index];
-                return (
-                  <g key={item.key}>
-                    <circle
-                      cx={point.x}
-                      cy={point.y}
-                      r="2.5"
-                      fill="currentColor"
-                      className="text-accent"
-                    >
-                      <title>
-                        {`${item.title} · 总量 ${item.total} · 成功 ${item.succeeded} · 失败 ${item.failed}`}
-                      </title>
-                    </circle>
-                    {index % labelEvery === 0 || index === points.length - 1 ? (
+        <div ref={chartRef} className="relative h-64 min-w-0 w-full">
+          {containerWidth > 0 ? (
+            <svg
+              viewBox={`0 0 ${containerWidth} 256`}
+              className="block h-64 w-full"
+              role="img"
+              aria-label={`${range === "daily" ? "近 14 天" : "近 24 小时"}生成趋势`}
+            >
+              <g transform={`translate(${left} 16)`}>
+                {yTicks.map((value, index) => {
+                  const y = yTickPoints[index].y;
+                  return (
+                    <g key={value}>
+                      <line
+                        x1="0"
+                        y1={y}
+                        x2={width}
+                        y2={y}
+                        stroke="currentColor"
+                        strokeWidth="1"
+                        strokeDasharray="3 5"
+                        className="text-border"
+                      />
                       <text
-                        x={point.x}
-                        y={height + 20}
-                        textAnchor={
-                          index === 0
-                            ? "start"
-                            : index === points.length - 1
-                              ? "end"
-                              : "middle"
-                        }
+                        x="-8"
+                        y={y + 3}
+                        textAnchor="end"
                         fill="currentColor"
-                        className="font-mono text-[9px] text-text-faint"
+                        className="font-mono text-xs text-text-faint"
                       >
-                        {item.label}
+                        {value}
                       </text>
-                    ) : null}
-                  </g>
-                );
-              })}
-            </g>
-          </svg>
+                    </g>
+                  );
+                })}
+                <path
+                  d={pointsToArea(totals, height)}
+                  fill="currentColor"
+                  fillOpacity="0.055"
+                  className="text-info"
+                />
+                <path
+                  d={pointsToPath(totals)}
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.25"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="text-info"
+                />
+                <path
+                  d={pointsToPath(succeeded)}
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeDasharray="5 3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="text-success"
+                />
+                <path
+                  d={pointsToPath(failed)}
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="text-danger"
+                />
+                {totals.map((point, index) => {
+                  const item = points[index];
+                  return (
+                    <g key={item.key}>
+                      <circle
+                        cx={point.x}
+                        cy={point.y}
+                        r="2.5"
+                        fill="currentColor"
+                        className="text-info"
+                      >
+                        <title>
+                          {`${item.title} · 总量 ${item.total} · 成功 ${item.succeeded} · 失败 ${item.failed}`}
+                        </title>
+                      </circle>
+                      {xTicks.has(index) ? (
+                        <text
+                          x={point.x}
+                          y={height + 20}
+                          textAnchor={
+                            index === 0
+                              ? "start"
+                              : index === points.length - 1
+                                ? "end"
+                                : "middle"
+                          }
+                          fill="currentColor"
+                          className="font-mono text-xs text-text-faint"
+                        >
+                          {item.label}
+                        </text>
+                      ) : null}
+                    </g>
+                  );
+                })}
+              </g>
+            </svg>
+          ) : null}
           {summary.total === 0 ? (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center pb-6 text-xs text-text-faint">
               当前时段暂无生成
             </div>
           ) : null}
         </div>
-        <div className="mt-1 flex flex-wrap gap-4 text-[11px]">
+        <div className="mt-1 flex flex-wrap gap-4 text-xs">
           <span className="inline-flex items-center gap-1.5 text-text-muted">
-            <span className="h-0.5 w-3 bg-accent" /> 总量
+            <span className="h-0.5 w-3 bg-info" /> 总量
           </span>
           <span className="inline-flex items-center gap-1.5 text-text-muted">
-            <span className="h-0.5 w-3 bg-success" /> 成功
+            <span className="w-3 border-t-2 border-dashed border-success" />{" "}
+            成功
           </span>
           <span className="inline-flex items-center gap-1.5 text-text-muted">
             <span className="h-0.5 w-3 bg-danger" /> 失败
@@ -729,10 +768,10 @@ function ProviderStatsPanel({
       {sorted.length === 0 ? (
         <p className="px-4 py-8 text-xs text-text-muted">暂无渠道数据</p>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="min-w-0 max-w-full overflow-x-auto">
           <table className="w-full min-w-[560px] text-left">
             <thead>
-              <tr className="border-b border-border text-[10px] text-text-faint">
+              <tr className="border-b border-border text-xs text-text-faint">
                 <th className="px-4 py-2.5 font-medium">渠道</th>
                 <th className="px-3 py-2.5 font-medium">任务</th>
                 <th className="px-3 py-2.5 font-medium">成功率</th>
@@ -763,7 +802,7 @@ function ProviderStatsPanel({
                     </td>
                     <td className="px-3 py-3 font-mono text-xs">
                       {provider.total}
-                      <span className="ml-1.5 text-[10px] text-text-faint">
+                      <span className="ml-1.5 text-xs text-text-faint">
                         / 失败 {provider.failed}
                       </span>
                     </td>
@@ -822,12 +861,12 @@ function BreakdownPanel({
             <div key={row.label}>
               <div className="mb-1.5 flex items-center justify-between gap-3">
                 <span
-                  className="truncate font-mono text-[11px] text-text-muted"
+                  className="truncate font-mono text-xs text-text-muted"
                   title={row.label}
                 >
                   {row.label}
                 </span>
-                <span className="shrink-0 font-mono text-[11px]">
+                <span className="shrink-0 font-mono text-xs">
                   {formatNumber(row.value)}
                   {row.hint ? (
                     <span className="ml-1.5 text-text-faint">{row.hint}</span>
@@ -883,7 +922,7 @@ function TopUsersPanel({ users }: { users: AdminStats["topUsers"] }) {
               href={`/admin/users/${user.userId}`}
               className="group flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-surface-2"
             >
-              <span className="w-5 font-mono text-[11px] text-text-faint">
+              <span className="w-5 font-mono text-xs text-text-faint">
                 {String(index + 1).padStart(2, "0")}
               </span>
               <span className="min-w-0 flex-1">
@@ -891,16 +930,16 @@ function TopUsersPanel({ users }: { users: AdminStats["topUsers"] }) {
                   {user.name || user.email}
                 </span>
                 {user.name ? (
-                  <span className="mt-0.5 block truncate text-[10px] text-text-faint">
+                  <span className="mt-0.5 block truncate text-xs text-text-faint">
                     {user.email}
                   </span>
                 ) : null}
               </span>
-              <span className="text-right">
+              <span className="min-w-0 max-w-[45%] break-words text-right">
                 <span className="block font-mono text-xs">
                   {formatNumber(user.generations)} 次
                 </span>
-                <span className="mt-0.5 block font-mono text-[10px] text-text-faint">
+                <span className="mt-0.5 block font-mono text-xs text-text-faint">
                   {formatNumber(user.credits)} 点
                 </span>
               </span>
@@ -919,17 +958,17 @@ function TopUsersPanel({ users }: { users: AdminStats["topUsers"] }) {
 function DashboardSkeleton() {
   return (
     <div aria-label="正在加载运营数据" className="animate-pulse">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid min-w-0 gap-3 @min-[480px]/admin:grid-cols-2 @min-[1040px]/admin:grid-cols-4">
         {Array.from({ length: 4 }, (_, index) => (
           <div
             key={index}
-            className="h-[142px] rounded-xl border border-border bg-surface"
+            className="h-[142px] rounded-lg border border-border bg-surface"
           />
         ))}
       </div>
-      <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(300px,0.8fr)]">
-        <div className="h-[420px] rounded-xl border border-border bg-surface" />
-        <div className="h-[420px] rounded-xl border border-border bg-surface" />
+      <div className="mt-4 grid min-w-0 gap-4 @min-[1000px]/admin:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+        <div className="h-[420px] rounded-lg border border-border bg-surface" />
+        <div className="h-[420px] rounded-lg border border-border bg-surface" />
       </div>
     </div>
   );
@@ -999,7 +1038,7 @@ export function DashboardView() {
       actions={
         <>
           <div className="hidden text-right sm:block">
-            <p className="text-[11px] text-text-muted" aria-live="polite">
+            <p className="text-xs text-text-muted" aria-live="polite">
               {updatedAt
                 ? `更新于 ${updatedAt.toLocaleTimeString("zh-CN", {
                     hour: "2-digit",
@@ -1009,7 +1048,7 @@ export function DashboardView() {
                   })}`
                 : "等待首次更新"}
             </p>
-            <p className="mt-0.5 text-[10px] text-text-faint">
+            <p className="mt-0.5 text-xs text-text-faint">
               可见时每 30 秒自动刷新
             </p>
           </div>
@@ -1017,7 +1056,7 @@ export function DashboardView() {
             type="button"
             variant="ghost"
             size="sm"
-            className="border border-border"
+            className="border border-border h-9 text-sm"
             disabled={refreshing}
             onClick={() => void load()}
           >
@@ -1031,15 +1070,15 @@ export function DashboardView() {
 
   if (!stats) {
     return (
-      <div>
+      <div className="@container/admin min-w-0 w-full">
         {header}
         {error ? (
-          <div className="rounded-xl border border-border bg-surface p-6">
+          <div className="py-4">
             <EmptyPanel text={error} />
             <Button
               type="button"
               size="sm"
-              className="mt-4"
+              className="mt-4 h-9 text-sm"
               onClick={() => void load()}
             >
               重新加载
@@ -1064,7 +1103,7 @@ export function DashboardView() {
           : "danger";
 
   return (
-    <div>
+    <div className="@container/admin min-w-0 w-full">
       {header}
       {error ? (
         <div
@@ -1074,7 +1113,7 @@ export function DashboardView() {
           <span>{error}，当前展示的是上次成功数据。</span>
           <button
             type="button"
-            className="shrink-0 underline underline-offset-2"
+            className="shrink-0 underline underline-offset-2 min-h-9"
             onClick={() => void load()}
           >
             重试
@@ -1082,7 +1121,7 @@ export function DashboardView() {
         </div>
       ) : null}
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid min-w-0 gap-3 @min-[480px]/admin:grid-cols-2 @min-[1040px]/admin:grid-cols-4">
         <MetricCard
           label="今日生成"
           value={formatNumber(stats.todayGenerations)}
@@ -1121,12 +1160,12 @@ export function DashboardView() {
         />
       </div>
 
-      <div className="mt-4 grid items-start gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(300px,0.8fr)]">
+      <div className="mt-4 grid min-w-0 items-start gap-4 @min-[1000px]/admin:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         <ActivityPanel daily={daily} hourly={hourly} />
         <HealthPanel stats={stats} issues={issues} />
       </div>
 
-      <div className="mt-4 grid items-start gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.75fr)]">
+      <div className="mt-4 grid min-w-0 items-start gap-4 @min-[1000px]/admin:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         <ProviderStatsPanel providers={stats.providerStats} />
         <BreakdownPanel
           title="失败诊断"
@@ -1141,7 +1180,7 @@ export function DashboardView() {
         />
       </div>
 
-      <div className="mt-4 grid items-start gap-4 lg:grid-cols-2">
+      <div className="mt-4 grid min-w-0 items-start gap-4 @min-[900px]/admin:grid-cols-2">
         <BreakdownPanel
           title="模型使用"
           description="近 30 天生成次数与点数消耗"
@@ -1157,7 +1196,7 @@ export function DashboardView() {
         <TopUsersPanel users={stats.topUsers} />
       </div>
 
-      <p className="mt-4 text-[10px] leading-5 text-text-faint">
+      <p className="mt-4 text-xs leading-5 text-text-faint">
         今日指标按自然日统计；渠道、失败、模型和用户榜按近 30
         天统计。队列失败数为队列服务返回的累计值。
       </p>

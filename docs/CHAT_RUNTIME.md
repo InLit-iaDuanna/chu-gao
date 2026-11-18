@@ -218,15 +218,6 @@ production mutation was performed for this operational acceptance work.
 
 ## Context And Browser Acceptance
 
-The next local UI revision gives Sol a 96,000-token application sending budget,
-with usage-triggered automatic compaction at 75% (72,000 tokens), rather than the
-legacy twenty-turn trigger. Other chat profiles retain their 24,000-token budget.
-These are application budgets, not verified upstream model limits. The status
-request includes the selected model so the displayed budget matches execution.
-Supported interactive chat models allow native web search automatically; the
-retired per-draft switch no longer disables it. Search remains model-selected,
-not mandatory on every turn. This UI/context revision is local, not yet deployed.
-
 PostgreSQL `ContextSnapshot` and per-attempt request/context metadata are present
 in the implementation. A table existing or a mocked summary succeeding does not
 validate real long-context/vision behavior. Nullable delivery timing fields are

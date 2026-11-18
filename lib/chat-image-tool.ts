@@ -248,13 +248,28 @@ export async function enqueueChatImageGeneration(
   }
   const sourceRows = await sourceReferences(context.userId, sourceImageIds);
   const sourceById = new Map(sourceRows.map((row) => [row.id, row]));
+  // Optional parameters the assistant picked on its own (e.g. background
+  // "opaque" for "白色背景") must not sink the whole submission when the model
+  // cannot honour them; fall back to the user's settings instead.
+  const capabilities = model.capabilities as {
+    backgrounds?: readonly string[];
+    outputFormats?: readonly string[];
+  };
+  const background =
+    args.background && capabilities.backgrounds?.includes(args.background)
+      ? args.background
+      : undefined;
+  const outputFormat =
+    args.outputFormat && capabilities.outputFormats?.includes(args.outputFormat)
+      ? args.outputFormat
+      : context.imageOutputFormat;
   const input = generationRequestSchema.parse({
     modelId,
     prompt: args.prompt,
     size: args.size ?? context.imageSize,
     quality: args.quality ?? context.imageQuality,
-    outputFormat: args.outputFormat ?? context.imageOutputFormat,
-    background: args.background,
+    outputFormat,
+    background,
     n: args.n ?? context.imageN ?? 1,
     referenceImageKeys: uploadKeys,
     sourceImageIds,

@@ -1,6 +1,5 @@
 import { LoginForm } from "@/components/auth/LoginForm";
 import { AuthShell } from "@/components/auth/AuthShell";
-import { Logo } from "@/components/shared/Logo";
 import { checkSessionFromHeaders } from "@/lib/auth";
 import { safeNextPath } from "@/lib/safe-next-path";
 import { headers } from "next/headers";
@@ -30,9 +29,8 @@ export default async function LoginPage({
       }
       asideNote="统一接入海外主流图像生成模型，专注创作，无需切换工具。"
     >
-      <Logo className="mb-8 lg:hidden" />
-      <h2 className="text-2xl font-semibold tracking-[-0.02em]">登录</h2>
-      <p className="mt-2 text-sm text-text-muted">欢迎回来，继续你的创作。</p>
+      <h2 className="text-[28px] font-semibold tracking-[-0.03em]">欢迎回来</h2>
+      <p className="mt-2 text-[15px] text-text-muted">登录后继续你的创作。</p>
       <LoginForm className="mt-8" nextPath={safeNext} />
       <p className="mt-6 text-center text-sm text-text-muted">
         还没有账户？{" "}

@@ -1,4 +1,23 @@
-# Chūgǎo Studio
+# Chūgǎo Studio v2.3.0
+
+本目录是 Chūgǎo Studio 的正式项目目录。测试源码、测试配置、截图和临时运行数据统一放在同级 `../test/`，不写回正式目录。
+
+- 版本配置：`config/project-version.json`
+- 版本记录：`config/version-history.json`
+- 测试工作区：`../test/`
+- v2 架构：`docs/ARCHITECTURE_V2.md`
+- v2.0 迁移报告：`docs/MIGRATION_REPORT_V2.md`
+- v2.1 更新报告：`docs/MIGRATION_REPORT_V2.1.md`
+- v2.2 重构报告：`docs/MIGRATION_REPORT_V2.2.md`
+- 当前版本：`2.3.0`
+
+## 素材收录内测账号
+
+`test.chugao.art` 复用本主站的 `chugao_session` 和 `chugao_device_id`，不建立第二套密码。管理员角色直接进入；普通用户需要管理员在用户详情中开启“素材收录内测”。测试站只把会话转发给 `chugao.art/api/me` 做校验，账号权限变化会在下一次请求生效。
+
+v2.2.0 的验证结果记录在 `config/version-history.json`。
+
+后续版本使用独立目录：`chugao_v2.3`、`chugao_v2.2.1` 等；旧目录保留到人工确认后再处理。
 
 基于 Next.js App Router 的图像生成站点骨架，按 `PROJECT_PLAN_v3_1.md` 的 v3 spec 初始化，当前已完成：
 

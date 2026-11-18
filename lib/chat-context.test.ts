@@ -36,6 +36,7 @@ import {
   compactChatContext,
   finalizeChatContextManifest,
   getChatContextStatus,
+  precompactChatContext,
   prepareChatContext,
 } from "@/lib/chat-context";
 import type { ContextHistory } from "@/lib/chat-context-history";
@@ -303,6 +304,19 @@ describe("durable server-owned context", () => {
         latestMessage: { role: "user", content: "a".repeat(95_800) },
       }),
     ).rejects.toMatchObject({ code: "CHAT_CONTEXT_TOO_LARGE" });
+    expect(mocks.fetch).not.toHaveBeenCalled();
+  });
+
+  it("pre-compacts after a turn only once the history passes the pre-compaction ratio", async () => {
+    const status = await getChatContextStatus(
+      input.userId,
+      input.conversationId,
+      input.modelId,
+    );
+    expect(status.canCompact).toBe(true);
+    expect(status.estimatedTokens).toBeLessThan(status.budgetTokens * 0.7);
+    // Compactable but below the ratio: no summariser call after the turn.
+    await expect(precompactChatContext(input)).resolves.toBeNull();
     expect(mocks.fetch).not.toHaveBeenCalled();
   });
 
@@ -580,7 +594,7 @@ describe("complete turns, current identity and retained evidence", () => {
     });
     expect(result.manifest.excludedMessageIds).toContain("turn-0-1");
     expect(result.manifest.summaryMessageIds).toContain("turn-0-0");
-    expect(JSON.stringify(summaryData())).toContain("不代表已执行成功");
+    expect(JSON.stringify(summaryData())).toContain("当时没有完成");
     expect(JSON.stringify(summaryData())).not.toMatch(
       /FALSE_SUCCESS_FACT|FALSE_TOOL_FACT|failed\.invalid/,
     );
@@ -1029,5 +1043,29 @@ describe("bounded, immutable attempt preparation", () => {
       code: "CHAT_CONTEXT_MODEL_UNAVAILABLE",
     });
     expect(mocks.fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe("estimateChatRequestTokens with Anthropic image blocks", () => {
+  it("counts a base64 image as one image, not as text", () => {
+    const body = {
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "看看这张图" },
+            {
+              type: "image",
+              source: {
+                type: "base64",
+                media_type: "image/png",
+                data: "A".repeat(2_000_000),
+              },
+            },
+          ],
+        },
+      ],
+    };
+    expect(estimateChatRequestTokens(body)).toBeLessThan(2_000);
   });
 });

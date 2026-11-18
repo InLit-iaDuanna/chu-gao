@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui";
 
-import { Copy, Download, ImagePlus, Unlink, X } from "lucide-react";
+import { Copy, Download, ImagePlus, Trash2, Unlink } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
@@ -43,6 +43,9 @@ import {
 } from "./node-graph-types";
 
 interface NodeCanvasProps {
+  tool?: "select" | "hand";
+  focusRequest?: { id: string; version: number } | null;
+  onSelectionChange?: (ids: string[]) => void;
   graph: NodeGraphState;
   models: ModelInfo[];
   history: Generation[];
@@ -308,19 +311,20 @@ const CanvasNode = memo(function CanvasNode({
           title="复制节点"
           onMouseDown={(event) => event.stopPropagation()}
           onClick={() => onDuplicateNode(node.id)}
-          className="flex h-5 w-5 shrink-0 items-center justify-center rounded p-0 text-text-faint transition-colors hover:bg-surface-2 hover:text-foreground"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded p-0 text-text-muted transition-colors hover:bg-surface-2 hover:text-foreground"
         >
-          <Copy size={10} />
+          <Copy size={13} />
         </Button>
         <Button
           variant="ghost"
           type="button"
           aria-label="删除节点"
+          title="删除节点"
           onMouseDown={(event) => event.stopPropagation()}
           onClick={() => onRemoveNode(node.id)}
-          className="flex h-5 w-5 shrink-0 items-center justify-center rounded p-0 text-text-faint transition-colors hover:bg-surface-2 hover:text-foreground"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded p-0 text-text-muted transition-colors hover:bg-danger/10 hover:text-danger"
         >
-          <X size={11} />
+          <Trash2 size={13} />
         </Button>
       </header>
 
@@ -635,6 +639,9 @@ const NodeInputPorts = memo(function NodeInputPorts({
 });
 
 export function NodeCanvas({
+  tool = "select",
+  focusRequest,
+  onSelectionChange,
   graph,
   models,
   history,
@@ -663,10 +670,12 @@ export function NodeCanvas({
 }: NodeCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const interactionRectRef = useRef<DOMRect | null>(null);
+  const interactionNodeHeights = useRef(new Map<string, number>());
   const [selection, setSelection] = useState<Selection>(null);
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
   const [connecting, setConnecting] = useState<Connecting | null>(null);
   const [panning, setPanning] = useState(false);
+  const [spaceHeld, setSpaceHeld] = useState(false);
   const [selectionMarquee, setSelectionMarquee] =
     useState<SelectionMarquee | null>(null);
   const [fileDragActive, setFileDragActive] = useState(false);
@@ -693,6 +702,32 @@ export function NodeCanvas({
   nodesRef.current = graph.nodes;
   graphRef.current = graph;
   selectedNodeIdsRef.current = selectedNodeIds;
+
+  useEffect(() => {
+    onSelectionChange?.(selectedNodeIds);
+  }, [onSelectionChange, selectedNodeIds]);
+
+  useEffect(() => {
+    if (
+      !focusRequest ||
+      !nodesRef.current.some((node) => node.id === focusRequest.id)
+    )
+      return;
+    setSelection({ kind: "node", id: focusRequest.id });
+    setSelectedNodeIds([focusRequest.id]);
+  }, [focusRequest]);
+
+  useEffect(() => {
+    const ids = new Set(graph.nodes.map((node) => node.id));
+    setSelectedNodeIds((current) =>
+      current.every((id) => ids.has(id))
+        ? current
+        : current.filter((id) => ids.has(id)),
+    );
+    setSelection((current) =>
+      current?.kind === "node" && !ids.has(current.id) ? null : current,
+    );
+  }, [graph.nodes]);
   nodeActionRef.current = {
     onUpdateNodeData,
     onDuplicateNode,
@@ -796,12 +831,39 @@ export function NodeCanvas({
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
+      if (!containerRef.current?.contains(document.activeElement)) return;
       if (
         target?.closest("input, textarea, select, [contenteditable='true']")
       ) {
         return;
       }
       const modifier = event.metaKey || event.ctrlKey;
+      if (event.code === "Space") {
+        event.preventDefault();
+        setSpaceHeld(true);
+        return;
+      }
+      if (event.key === "Escape") {
+        setSelectedNodeIds([]);
+        setSelection(null);
+        return;
+      }
+      if (modifier && event.key.toLowerCase() === "a") {
+        event.preventDefault();
+        const ids = nodesRef.current.map((node) => node.id);
+        setSelectedNodeIds(ids);
+        setSelection(ids.length ? { kind: "node", id: ids.at(-1)! } : null);
+        return;
+      }
+      if (modifier && event.key.toLowerCase() === "d") {
+        event.preventDefault();
+        const ids = onDuplicateNodes(selectedNodeIds);
+        if (ids?.length) {
+          setSelectedNodeIds(ids);
+          setSelection({ kind: "node", id: ids.at(-1)! });
+        }
+        return;
+      }
       if (modifier && event.key.toLowerCase() === "c") {
         if (selectedNodeIds.length === 0) return;
         event.preventDefault();
@@ -831,8 +893,18 @@ export function NodeCanvas({
         setSelection(null);
       }
     };
+    const releaseSpace = (event: KeyboardEvent) => {
+      if (event.code === "Space") setSpaceHeld(false);
+    };
+    const blur = () => setSpaceHeld(false);
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", releaseSpace);
+    window.addEventListener("blur", blur);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", releaseSpace);
+      window.removeEventListener("blur", blur);
+    };
   }, [
     onDisconnect,
     onDuplicateNodes,
@@ -929,7 +1001,9 @@ export function NodeCanvas({
               x: node.x,
               y: node.y,
               width: NODE_WIDTH,
-              height: estimatedNodeHeight(node),
+              height:
+                interactionNodeHeights.current.get(node.id) ??
+                estimatedNodeHeight(node),
             }),
           )
           .map((node) => node.id);
@@ -1088,6 +1162,17 @@ export function NodeCanvas({
     interactionRectRef.current =
       containerRef.current?.getBoundingClientRect() ?? null;
     const start = toWorld(event.clientX, event.clientY);
+    interactionNodeHeights.current = new Map(
+      Array.from(
+        containerRef.current?.querySelectorAll<HTMLElement>("[data-node-id]") ??
+          [],
+        (element) => [
+          element.dataset.nodeId!,
+          element.getBoundingClientRect().height /
+            graphRef.current.viewport.zoom,
+        ],
+      ),
+    );
     dragRef.current = {
       type: "marquee",
       startX: start.x,
@@ -1282,6 +1367,24 @@ export function NodeCanvas({
     <div
       ref={containerRef}
       data-node-canvas
+      tabIndex={0}
+      aria-label="节点编辑区"
+      onMouseDownCapture={(event) => {
+        const target = event.target as HTMLElement;
+        if (
+          !target.closest(
+            "input, textarea, select, button, a, [contenteditable='true']",
+          )
+        )
+          containerRef.current?.focus({ preventScroll: true });
+        if (
+          event.button === 1 ||
+          (event.button === 0 && (tool === "hand" || spaceHeld))
+        ) {
+          event.stopPropagation();
+          startPan(event);
+        }
+      }}
       onMouseDown={handleCanvasMouseDown}
       onAuxClick={(event) => {
         if (event.button === 1) event.preventDefault();
@@ -1295,8 +1398,12 @@ export function NodeCanvas({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       className={cn(
-        "relative h-full w-full touch-none overflow-hidden bg-background",
-        panning ? "cursor-grabbing" : "cursor-grab",
+        "relative h-full w-full touch-none overflow-hidden bg-background outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-brand/50",
+        panning
+          ? "cursor-grabbing"
+          : tool === "hand" || spaceHeld
+            ? "cursor-grab"
+            : "cursor-default",
       )}
       style={{
         backgroundImage:
@@ -1401,12 +1508,12 @@ export function NodeCanvas({
         ) : null}
       </div>
 
-      {selectedNodeIds.length > 1 ? (
+      {selectedNodeIds.length > 0 ? (
         <div
           onMouseDown={(event) => event.stopPropagation()}
-          className="absolute left-3 top-3 z-40 flex items-center gap-2 rounded-md border border-border bg-surface/95 px-2 py-1.5 text-[11px] shadow-[var(--shadow-md)] backdrop-blur-sm"
+          className="absolute bottom-28 left-1/2 z-40 flex max-w-[calc(100%-24px)] -translate-x-1/2 items-center gap-2 rounded-md border border-border bg-surface px-3 py-2 text-xs shadow-[var(--shadow-md)]"
         >
-          <span className="tabular-nums text-text-muted">
+          <span className="whitespace-nowrap tabular-nums text-text-muted">
             已选 {selectedNodeIds.length} 个节点
           </span>
           <Button
@@ -1422,10 +1529,9 @@ export function NodeCanvas({
                 setSelection({ kind: "node", id: copied.at(-1)! });
               }
             }}
-            className="flex h-6 items-center gap-1 rounded px-1.5 text-text-muted hover:bg-surface-2 hover:text-foreground"
+            className="h-8 w-8 rounded p-0 text-text-muted hover:bg-surface-2 hover:text-foreground"
           >
-            <Copy size={11} />
-            复制
+            <Copy size={15} />
           </Button>
           <Button
             variant="ghost"
@@ -1438,10 +1544,9 @@ export function NodeCanvas({
               setSelectedNodeIds([]);
               setSelection(null);
             }}
-            className="flex h-6 items-center gap-1 rounded px-1.5 text-danger hover:bg-danger/10"
+            className="h-8 w-8 rounded p-0 text-danger hover:bg-danger/10"
           >
-            <X size={11} />
-            删除
+            <Trash2 size={15} />
           </Button>
         </div>
       ) : null}
@@ -1449,7 +1554,7 @@ export function NodeCanvas({
       {selectedEdge ? (
         <div
           onMouseDown={(event) => event.stopPropagation()}
-          className="absolute left-3 top-14 z-40 flex items-center gap-2 rounded-md border border-brand/40 bg-surface/95 px-2 py-1.5 text-[11px] shadow-[var(--shadow-md)] backdrop-blur-sm"
+          className="absolute bottom-28 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-md border border-brand/40 bg-surface px-3 py-2 text-xs shadow-[var(--shadow-md)]"
         >
           <Unlink size={12} className="text-brand" />
           <span className="text-text-muted">已选中连线</span>
@@ -1463,19 +1568,16 @@ export function NodeCanvas({
               onDisconnect(selectedEdge.id);
               setSelection(null);
             }}
-            className="flex h-6 items-center gap-1 rounded px-1.5 text-danger hover:bg-danger/10"
+            className="h-8 w-8 rounded p-0 text-danger hover:bg-danger/10"
           >
-            <X size={11} />
-            断开
+            <Unlink size={15} />
           </Button>
         </div>
       ) : null}
 
       {graph.nodes.length === 0 ? (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <p className="text-xs text-text-faint">
-            画布是空的，从上方工具栏添加节点开始
-          </p>
+          <p className="text-xs text-text-faint">暂无节点</p>
         </div>
       ) : null}
 

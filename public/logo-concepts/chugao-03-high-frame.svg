@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">Chugao logo concept 03: High Frame</title>
+  <desc id="desc">An open architectural frame rises into a peak, suggesting a high point, structure, and a creative workspace.</desc>
+
+  <path d="M94 282V114H270" stroke="#151817" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M94 114L180 48L270 114" stroke="#73C69E" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M180 282V176H270" stroke="#151817" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M180 176H236" stroke="#151817" stroke-width="28" stroke-linecap="round"/>
+  <circle cx="270" cy="114" r="14" fill="#151817"/>
+
+  <text x="470" y="224" fill="#151817" font-family="Inter, Avenir Next, Helvetica Neue, Arial, sans-serif" font-size="124" font-weight="560" letter-spacing="14">CHUGAO</text>
+  <text x="476" y="286" fill="#5B6761" font-family="Inter, Avenir Next, Helvetica Neue, Arial, sans-serif" font-size="24" font-weight="600" letter-spacing="7">MAKE THE FIRST DRAFT</text>
+</svg>

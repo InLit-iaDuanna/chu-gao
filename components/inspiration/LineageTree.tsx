@@ -108,10 +108,10 @@ function LineageTreeItem({
       aria-level={depth + 1}
       aria-selected={isCurrent}
       aria-expanded={hasChildren ? true : undefined}
-      className="relative"
+      className="relative min-w-0"
     >
       <div className="relative flex min-w-0 items-center gap-3">
-        {depth > 0 ? (
+        {depth > 0 && depth <= 2 ? (
           <span
             aria-hidden="true"
             className="absolute -left-5 top-1/2 h-px w-5 bg-border-strong"
@@ -119,7 +119,7 @@ function LineageTreeItem({
         ) : null}
         <span
           aria-hidden="true"
-          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border font-mono text-[10px] ${
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md border font-mono text-xs ${
             isCurrent
               ? "border-brand bg-brand text-on-accent"
               : "border-border-strong bg-surface-2 text-text-muted"
@@ -134,26 +134,28 @@ function LineageTreeItem({
             isCurrent ? "border-brand bg-brand/5" : "border-border"
           }`}
         >
-          <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-text-faint">
-            <span>
+          <div className="flex flex-wrap items-center gap-1.5 text-xs text-text-muted">
+            <span className="min-w-0 break-words">
               {SHAPE_LABELS[branch.shape] ?? branch.shape} ·{" "}
               {DISCIPLINE_LABELS[branch.discipline] ?? branch.discipline}
             </span>
             {depth === 0 ? (
-              <span className="rounded-full bg-surface-2 px-1.5 py-0.5">
+              <span className="rounded-md bg-surface-2 px-1.5 py-0.5">
                 分支起点
               </span>
             ) : null}
             {isCurrent ? (
-              <span className="rounded-full bg-brand/10 px-1.5 py-0.5 text-brand">
+              <span className="rounded-md bg-brand/10 px-1.5 py-0.5 text-brand">
                 当前帖子
               </span>
             ) : null}
           </div>
-          <p className="mt-1 line-clamp-2 text-sm font-medium">
+          <p className="mt-1 line-clamp-2 break-words text-sm font-medium">
             {branch.title}
           </p>
-          <p className="mt-1 text-xs text-text-muted">{branch.authorName}</p>
+          <p className="mt-1 break-words text-xs text-text-muted">
+            {branch.authorName}
+          </p>
         </Link>
       </div>
 
@@ -161,11 +163,17 @@ function LineageTreeItem({
         <>
           <div
             aria-hidden="true"
-            className="ml-4 h-3 border-l border-border-strong"
+            className={
+              depth < 2 ? "ml-4 h-3 border-l border-border-strong" : "h-3"
+            }
           />
           <ul
             role="group"
-            className="ml-4 space-y-2 border-l border-border-strong pl-5"
+            className={
+              depth < 2
+                ? "ml-4 space-y-2 border-l border-border-strong pl-5"
+                : "min-w-0 space-y-2"
+            }
           >
             {branch.children.map((child) => (
               <LineageTreeItem
@@ -195,7 +203,11 @@ export function LineageTree({
   const branches = useMemo(() => buildLineageForest(data), [data]);
 
   return (
-    <ul role="tree" aria-label="想法传承关系" className="mt-5 space-y-3">
+    <ul
+      role="tree"
+      aria-label="想法传承关系"
+      className="mt-5 min-w-0 space-y-3 text-sm tracking-normal"
+    >
       {branches.map((branch) => (
         <LineageTreeItem
           key={branch.id}

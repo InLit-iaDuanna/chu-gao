@@ -49,7 +49,7 @@ export function QualitySlider({
           )}
         >
           <div
-            className="h-full bg-foreground transition-[width] duration-150"
+            className="h-full bg-brand transition-[width] duration-150"
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -59,7 +59,7 @@ export function QualitySlider({
               key={option}
               className={cn(
                 "h-1.5 w-1.5 rounded-full border border-surface-3 bg-surface",
-                index <= selectedIndex && "border-foreground bg-foreground",
+                index <= selectedIndex && "border-brand bg-brand",
                 compact && "h-1 w-1",
               )}
             />
@@ -90,7 +90,7 @@ export function QualitySlider({
       </div>
       <div
         className={cn(
-          "grid text-[10px] text-text-faint",
+          "grid text-xs text-text-muted",
           compact ? "mt-0" : "mt-0.5",
         )}
         style={{

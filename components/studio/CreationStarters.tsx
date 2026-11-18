@@ -40,18 +40,18 @@ export function CreationStarters({
   return (
     <section
       aria-label="创作灵感"
-      className="mx-auto w-full max-w-[52rem] pb-6 pt-2 sm:pt-3"
+      className="mx-auto w-full max-w-[52rem] pb-6 pt-3 tracking-normal"
     >
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="text-xs font-medium text-text-muted">灵感起点</h2>
         <Link
           href="/app/inspiration"
-          className="inline-flex min-h-8 items-center gap-1.5 text-xs text-text-muted transition-colors hover:text-foreground"
+          className="inline-flex min-h-11 items-center gap-2 rounded-md px-2 text-sm text-text-muted transition-colors hover:bg-surface-2 hover:text-foreground sm:min-h-9"
         >
           灵感圈 <ArrowUpRight size={13} />
         </Link>
       </div>
-      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {starters.map((starter) => (
           <button
             key={starter.title}
@@ -60,11 +60,10 @@ export function CreationStarters({
             onClick={() => onSelect(starter.prompt)}
             aria-label={`使用${starter.title}提示词`}
             title={`使用${starter.title}提示词`}
-            className="studio-starter group min-w-0 overflow-hidden text-left disabled:cursor-not-allowed disabled:opacity-50"
+            className="group flex min-w-0 overflow-hidden rounded-lg border border-border bg-surface text-left transition-colors hover:border-border-strong hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-50 sm:flex-col"
           >
-            <div className="aspect-[2/1] overflow-hidden bg-surface-2">
+            <div className="aspect-square w-20 shrink-0 overflow-hidden bg-surface-2 sm:aspect-[2/1] sm:w-full">
               {/* Local photography references, not generated-output claims. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={starter.image}
                 alt={starter.alt}
@@ -73,18 +72,18 @@ export function CreationStarters({
                 className="h-full w-full object-cover"
               />
             </div>
-            <div className="flex min-w-0 items-center justify-between gap-2 px-2.5 py-3 sm:px-3.5">
+            <div className="flex w-full min-w-0 items-center justify-between gap-3 p-3">
               <div className="min-w-0">
-                <p className="text-xs font-medium leading-5 text-foreground sm:text-[13px]">
+                <p className="text-sm font-medium leading-5 text-foreground">
                   {starter.title}
                 </p>
-                <p className="mt-0.5 hidden text-[11px] text-text-faint sm:block">
+                <p className="mt-1 text-xs leading-5 text-text-muted">
                   {starter.detail}
                 </p>
               </div>
               <ArrowRight
                 size={15}
-                className="hidden shrink-0 text-text-faint transition-colors group-hover:text-foreground sm:block"
+                className="shrink-0 text-text-muted transition-colors group-hover:text-foreground"
               />
             </div>
           </button>

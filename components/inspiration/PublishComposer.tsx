@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
   ImagePlus,
@@ -16,6 +16,8 @@ import {
 import {
   Button,
   Checkbox,
+  EmptyState,
+  IconButton,
   Input,
   Select,
   Textarea,
@@ -126,6 +128,7 @@ export function PublishComposer() {
   const [historyLoading, setHistoryLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
   const [notice, setNotice] = useState("");
   const [preloadToken, setPreloadToken] = useState<string | null>(null);
   const [preloadSource, setPreloadSource] =
@@ -536,7 +539,7 @@ export function PublishComposer() {
 
   if (editId && editLoading) {
     return (
-      <div className="surface-panel min-h-72 p-6 text-sm text-text-muted">
+      <div role="status" className="min-h-64 py-6 text-sm text-text-muted">
         正在读取草稿与现有内容…
       </div>
     );
@@ -544,17 +547,20 @@ export function PublishComposer() {
 
   if (editId && editLoadFailed && !editingPost) {
     return (
-      <div className="surface-panel min-h-72 p-6">
-        <p className="text-sm font-medium">无法载入这条内容</p>
-        <p className="mt-2 text-sm text-text-muted">{notice}</p>
-        <Button
-          variant="secondary"
-          className="mt-5"
-          onClick={() => router.push("/app/inspiration?view=mine")}
-        >
-          返回我的灵感
-        </Button>
-      </div>
+      <EmptyState
+        className="min-h-64"
+        title="无法载入这条内容"
+        description={notice}
+        action={
+          <Button
+            variant="secondary"
+            className="mt-5"
+            onClick={() => router.push("/app/inspiration?view=mine")}
+          >
+            返回我的灵感
+          </Button>
+        }
+      />
     );
   }
 
@@ -562,15 +568,23 @@ export function PublishComposer() {
     editingPost?.status === "HIDDEN" || shape === "REFERENCE";
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
-      <div className="space-y-6">
-        <section className="surface-panel p-5 sm:p-6">
-          <p className="eyebrow">01 · 内容类型</p>
-          <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid min-w-0 grid-cols-1 gap-6 break-words text-sm tracking-normal xl:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="min-w-0 space-y-6">
+        <section className="border-b border-border pb-6">
+          <h2 className="app-section-title text-xl font-semibold">内容类型</h2>
+          <div
+            className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-6"
+            role="group"
+            aria-label="内容类型"
+          >
             {SHAPES.map((item) => (
-              <button
+              <Button
                 key={item.value}
                 type="button"
+                variant="secondary"
+                aria-pressed={shape === item.value}
+                aria-label={`${item.label} ${item.description}`}
+                title={item.description}
                 onClick={() => {
                   setShape(item.value);
                   if (item.value === "REFERENCE") {
@@ -587,42 +601,37 @@ export function PublishComposer() {
                     }
                   }
                 }}
-                className={`rounded-lg border p-3 text-left transition-colors ${shape === item.value ? "border-brand bg-brand/5" : "border-border hover:border-border-strong"}`}
+                className={`h-9 min-w-0 px-2 ${shape === item.value ? "border-brand bg-brand/10 text-brand" : ""}`}
               >
                 <span className="text-sm font-medium">{item.label}</span>
-                <span className="mt-1 block text-xs leading-5 text-text-muted">
-                  {item.description}
-                </span>
-              </button>
+              </Button>
             ))}
           </div>
         </section>
 
-        <section className="surface-panel p-5 sm:p-6">
-          <div className="flex items-center justify-between gap-3">
+        <section className="min-w-0 border-b border-border pb-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="eyebrow">02 · 图片</p>
-              <h2 className="mt-1 font-medium">
-                从生成历史选图，或上传本地作品
-              </h2>
+              <h2 className="app-section-title text-xl font-semibold">图片</h2>
             </div>
-            <label
-              className={`tool-button h-9 px-3 text-xs text-text-muted ${mediaEditingDisabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
+            <Button
+              disabled={uploading || mediaEditingDisabled}
+              onClick={() => uploadInputRef.current?.click()}
             >
               <Upload size={14} /> {uploading ? "上传中…" : "上传图片"}
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                className="hidden"
-                disabled={uploading || mediaEditingDisabled}
-                onChange={(event) =>
-                  void upload(event.target.files?.[0] ?? null)
-                }
-              />
-            </label>
+            </Button>
+            <input
+              ref={uploadInputRef}
+              aria-label="上传图片文件"
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="hidden"
+              disabled={uploading || mediaEditingDisabled}
+              onChange={(event) => void upload(event.target.files?.[0] ?? null)}
+            />
           </div>
           <p className="mt-2 text-xs leading-5 text-text-faint">
-            发布时会复制一份长期公开快照；删除生成历史不会导致帖子图片失效。过程稿只会发布你手动选择的图片。
+            删除生成历史不会影响已发布图片。过程稿仅发布所选图片。
           </p>
           {mediaEditingDisabled ? (
             <p className="mt-2 text-xs leading-5 text-text-faint">
@@ -633,7 +642,7 @@ export function PublishComposer() {
           ) : null}
           {preloadSource ? (
             <div
-              className="mt-3 rounded-lg border border-brand/30 bg-brand/5 px-3 py-2 text-xs leading-5 text-text-muted"
+              className="mt-3 border-l-2 border-brand pl-3 text-xs leading-5 text-text-muted"
               role="status"
             >
               已从{" "}
@@ -646,83 +655,89 @@ export function PublishComposer() {
             </div>
           ) : null}
           {selected.length ? (
-            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
               {selected.map((item, index) => (
                 <div
                   key={item.key}
-                  className="relative overflow-hidden rounded-lg border border-brand bg-surface-2"
+                  className="min-w-0 overflow-hidden rounded-lg border border-border bg-surface"
                 >
                   <img
                     src={item.preview}
                     alt={`已选择图片 ${index + 1}`}
-                    className="aspect-square h-full w-full object-cover"
+                    className="aspect-square w-full bg-surface-2 object-contain"
                   />
-                  {!item.existingMediaId ? (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setSelected((current) =>
-                          current.filter(
-                            (candidate) => candidate.key !== item.key,
-                          ),
-                        )
-                      }
-                      className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-md bg-black/60 text-white"
-                    >
-                      <X size={13} />
-                    </button>
-                  ) : (
-                    <span className="absolute right-1.5 top-1.5 rounded-md bg-black/60 px-2 py-1 text-[10px] text-white">
-                      已有图片
-                    </span>
-                  )}
-                  {!item.existingMediaId ? (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setSelected((current) =>
-                          current.map((candidate) => ({
-                            ...candidate,
-                            isCover: candidate.key === item.key,
-                          })),
-                        )
-                      }
-                      className={`absolute bottom-1.5 left-1.5 rounded-md px-2 py-1 text-[10px] ${item.isCover ? "bg-brand text-on-accent" : "bg-black/60 text-white"}`}
-                    >
-                      {item.isCover ? "封面" : "设为封面"}
-                    </button>
-                  ) : item.isCover ? (
-                    <span className="absolute bottom-1.5 left-1.5 rounded-md bg-brand px-2 py-1 text-[10px] text-on-accent">
-                      封面
-                    </span>
-                  ) : null}
-                  {shape === "PROCESS" && !item.existingMediaId ? (
-                    <label className="absolute bottom-1.5 right-1.5 flex items-center gap-1 rounded-md bg-black/60 px-2 py-1 text-[10px] text-white">
-                      <Checkbox
-                        checked={item.role === "PROCESS"}
-                        onChange={(event) =>
+                  <div className="flex min-h-11 flex-wrap items-center gap-1 p-1">
+                    {!item.existingMediaId ? (
+                      <IconButton
+                        type="button"
+                        aria-label={`移除图片 ${index + 1}`}
+                        title="移除图片"
+                        onClick={() =>
                           setSelected((current) =>
-                            current.map((candidate) =>
-                              candidate.key === item.key
-                                ? {
-                                    ...candidate,
-                                    role: event.target.checked
-                                      ? "PROCESS"
-                                      : "FINAL",
-                                  }
-                                : candidate,
+                            current.filter(
+                              (candidate) => candidate.key !== item.key,
                             ),
                           )
                         }
-                      />{" "}
-                      过程稿
-                    </label>
-                  ) : null}
+                        className="order-2 ml-auto h-9 w-9"
+                      >
+                        <X size={16} />
+                      </IconButton>
+                    ) : (
+                      <span className="px-2 py-1 text-xs text-text-muted">
+                        已有图片
+                      </span>
+                    )}
+                    {!item.existingMediaId ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        aria-pressed={item.isCover}
+                        onClick={() =>
+                          setSelected((current) =>
+                            current.map((candidate) => ({
+                              ...candidate,
+                              isCover: candidate.key === item.key,
+                            })),
+                          )
+                        }
+                        className={`h-9 px-2 text-xs ${item.isCover ? "bg-brand/10 text-brand" : "text-text-muted"}`}
+                      >
+                        {item.isCover ? "封面" : "设为封面"}
+                      </Button>
+                    ) : item.isCover ? (
+                      <span className="rounded-md bg-brand/10 px-2 py-1 text-xs text-brand">
+                        封面
+                      </span>
+                    ) : null}
+                    {shape === "PROCESS" && !item.existingMediaId ? (
+                      <label className="order-3 flex min-h-9 w-full cursor-pointer items-center gap-2 px-2 text-xs text-text-muted">
+                        <Checkbox
+                          checked={item.role === "PROCESS"}
+                          onChange={(event) =>
+                            setSelected((current) =>
+                              current.map((candidate) =>
+                                candidate.key === item.key
+                                  ? {
+                                      ...candidate,
+                                      role: event.target.checked
+                                        ? "PROCESS"
+                                        : "FINAL",
+                                    }
+                                  : candidate,
+                              ),
+                            )
+                          }
+                        />{" "}
+                        过程稿
+                      </label>
+                    ) : null}
+                  </div>
                 </div>
               ))}
             </div>
           ) : null}
-          <div className="mt-4 max-h-[440px] overflow-y-auto rounded-lg border border-border p-2">
+          <div className="mt-4 max-h-[440px] overflow-y-auto">
             {historyLoading ? (
               <div className="flex min-h-40 items-center justify-center gap-2 text-sm text-text-muted">
                 <LoaderCircle className="animate-spin" size={16} />{" "}
@@ -738,17 +753,18 @@ export function PublishComposer() {
                     <button
                       key={image.id}
                       type="button"
+                      aria-pressed={active}
                       disabled={uploading || mediaEditingDisabled}
                       onClick={() => toggleImage(generation, image)}
-                      className={`relative overflow-hidden rounded-md border disabled:cursor-not-allowed disabled:opacity-50 ${active ? "border-brand" : "border-border hover:border-border-strong"}`}
+                      className={`relative aspect-square overflow-hidden rounded-md border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-50 ${active ? "border-brand" : "border-border hover:border-border-strong"}`}
                     >
                       <img
                         src={image.thumbnailUrl || image.url}
                         alt={generation.prompt}
-                        className="aspect-square w-full object-cover"
+                        className="h-full w-full object-cover"
                       />
                       {active ? (
-                        <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-brand text-on-accent">
+                        <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-md bg-brand text-on-accent">
                           <Check size={12} />
                         </span>
                       ) : null}
@@ -757,16 +773,15 @@ export function PublishComposer() {
                 })}
               </div>
             ) : (
-              <div className="flex min-h-40 flex-col items-center justify-center gap-2 text-center text-sm text-text-muted">
-                <ImagePlus size={20} className="text-text-faint" />
-                还没有可发布的生成图片
-              </div>
+              <EmptyState icon={ImagePlus} title="还没有可发布的生成图片" />
             )}
           </div>
         </section>
 
-        <section className="surface-panel space-y-5 p-5 sm:p-6">
-          <p className="eyebrow">03 · 洞察与来源</p>
+        <section className="min-w-0 space-y-5">
+          <h2 className="app-section-title text-xl font-semibold">
+            洞察与来源
+          </h2>
           <label className="block">
             <span className="mb-2 block text-xs text-text-muted">标题</span>
             <Input
@@ -778,7 +793,7 @@ export function PublishComposer() {
                   ? "你真正想讨论的设计问题是什么？"
                   : "给这条灵感一个准确的标题"
               }
-              className="h-11"
+              className="h-9"
             />
           </label>
           <label className="block">
@@ -791,7 +806,7 @@ export function PublishComposer() {
               className="min-h-48"
             />
           </label>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 [&>label]:min-w-0">
             <label>
               <span className="mb-2 block text-xs text-text-muted">
                 主学科（单选必填）
@@ -800,7 +815,7 @@ export function PublishComposer() {
                 value={discipline}
                 onValueChange={(value) => setDiscipline(value as Discipline)}
                 options={DISCIPLINES}
-                controlSize="lg"
+                className="h-9"
               />
             </label>
             <label>
@@ -815,7 +830,7 @@ export function PublishComposer() {
                   { value: "STUDY", label: "研究 / 临摹" },
                   { value: "REPOST", label: "转载" },
                 ]}
-                controlSize="lg"
+                className="h-9"
               />
             </label>
           </div>
@@ -823,9 +838,10 @@ export function PublishComposer() {
             <>
               <label className="block">
                 <span className="mb-2 block text-xs text-text-muted">
-                  外部链接（只保存，不由服务器抓取）
+                  外部链接
                 </span>
                 <Input
+                  className="h-9"
                   value={externalUrl}
                   onChange={(event) => setExternalUrl(event.target.value)}
                   type="url"
@@ -851,6 +867,8 @@ export function PublishComposer() {
             </span>
             <div className="flex gap-2">
               <Input
+                aria-label="标签"
+                className="h-9 min-w-0"
                 value={tagValue}
                 onChange={(event) => setTagValue(event.target.value)}
                 onKeyDown={(event) => {
@@ -861,25 +879,36 @@ export function PublishComposer() {
                 }}
                 placeholder="输入标签后回车"
               />
-              <Button variant="secondary" type="button" onClick={addTag}>
-                <Plus size={14} />
-              </Button>
+              <IconButton
+                variant="secondary"
+                type="button"
+                className="h-9 w-9"
+                aria-label="添加标签"
+                title="添加标签"
+                onClick={addTag}
+              >
+                <Plus size={16} />
+              </IconButton>
             </div>
             {tags.length ? (
               <div className="mt-2 flex flex-wrap gap-2">
                 {tags.map((tag) => (
-                  <button
+                  <Button
                     key={tag}
                     type="button"
+                    variant="ghost"
+                    aria-label={`移除标签 ${tag}`}
+                    title={`移除标签 ${tag}`}
                     onClick={() =>
                       setTags((current) =>
                         current.filter((item) => item !== tag),
                       )
                     }
-                    className="rounded-full border border-border px-2.5 py-1 text-xs text-text-muted hover:text-danger"
+                    className="h-auto min-h-9 max-w-full border border-border px-2.5 py-1 text-xs text-text-muted hover:text-danger"
                   >
-                    #{tag} ×
-                  </button>
+                    <span className="min-w-0 break-words">#{tag}</span>
+                    <X size={14} />
+                  </Button>
                 ))}
               </div>
             ) : null}
@@ -887,9 +916,9 @@ export function PublishComposer() {
         </section>
       </div>
 
-      <aside className="space-y-4 xl:sticky xl:top-4 xl:h-fit">
-        <section className="surface-panel p-5">
-          <p className="eyebrow">发布设置</p>
+      <aside className="min-w-0 border-t border-border pt-6 xl:sticky xl:top-6 xl:h-fit xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
+        <section>
+          <h2 className="app-section-title text-xl font-semibold">发布设置</h2>
           <label className="mt-4 block">
             <span className="mb-2 block text-xs text-text-muted">
               提示词权限
@@ -904,7 +933,7 @@ export function PublishComposer() {
                 { value: "STRUCTURE_ONLY", label: "只公开结构" },
                 { value: "PRIVATE", label: "完全私有" },
               ]}
-              controlSize="lg"
+              className="h-9"
             />
           </label>
           <p className="mt-2 text-xs leading-5 text-text-faint">
@@ -912,13 +941,13 @@ export function PublishComposer() {
             与风格标签，但隐藏提示词原文。
           </p>
           {searchParams.get("derivedFrom") ? (
-            <div className="mt-4 rounded-lg border border-brand/40 bg-brand/5 p-3 text-xs leading-5 text-text-muted">
+            <div className="mt-4 border-l-2 border-brand pl-3 text-xs leading-5 text-text-muted">
               <Sparkles size={14} className="mb-2 text-brand" />
               这条内容会记录为对原帖的继续推演，并进入想法传承树。
             </div>
           ) : null}
           {searchParams.get("dailyPrompt") ? (
-            <div className="mt-4 rounded-lg border border-brand/40 bg-brand/5 p-3 text-xs leading-5 text-text-muted">
+            <div className="mt-4 border-l-2 border-brand pl-3 text-xs leading-5 text-text-muted">
               发布后会自动归入今天的每日命题。
             </div>
           ) : null}
@@ -927,9 +956,10 @@ export function PublishComposer() {
               {notice}
             </div>
           ) : null}
-          <div className="mt-5 grid gap-2">
+          <div className="mt-5 grid grid-cols-1 gap-2">
             <Button
-              className="h-10"
+              variant="primary"
+              className="h-11 text-sm"
               disabled={submitting || uploading}
               onClick={() => void submit(false)}
             >
@@ -957,7 +987,7 @@ export function PublishComposer() {
               </Button>
             )}
           </div>
-          <p className="mt-4 text-[11px] leading-5 text-text-faint">
+          <p className="mt-4 text-xs leading-5 text-text-muted">
             新账号的首帖可能进入人工审核；已有站内创作记录的可信账号默认先发后审。
           </p>
         </section>

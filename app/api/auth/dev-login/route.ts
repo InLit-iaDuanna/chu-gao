@@ -1,15 +1,44 @@
 import { fail, ok } from "@/lib/api-response";
 import { devBypassSession, isDevAuthDbBypassEnabled } from "@/lib/auth";
 import { requestDeviceContext } from "@/lib/device-session";
+import { safeNextPath } from "@/lib/safe-next-path";
 import {
   attachDeviceIdCookie,
   attachSessionCookie,
 } from "@/lib/session-cookie";
+import { NextResponse } from "next/server";
 import { z } from "zod";
 
 const devLoginSchema = z.object({
   account: z.enum(["student", "admin"]).optional(),
 });
+
+export async function GET(request: Request) {
+  if (!isDevAuthDbBypassEnabled()) {
+    return fail("DEV_AUTH_DISABLED", "本地开发登录未启用", { status: 404 });
+  }
+
+  const url = new URL(request.url);
+  const account =
+    url.searchParams.get("account") === "student" ? "student" : "admin";
+  const session = devBypassSession(account);
+  if (!session) {
+    return fail("DEV_AUTH_DISABLED", "本地开发登录未启用", { status: 404 });
+  }
+
+  const device = requestDeviceContext(request.headers);
+  const response = NextResponse.redirect(
+    new URL(
+      safeNextPath(url.searchParams.get("next") ?? undefined),
+      request.url,
+    ),
+  );
+  return attachSessionCookie(
+    attachDeviceIdCookie(response, device.deviceId),
+    session,
+    { deviceType: device.deviceType, deviceId: device.deviceId, version: 1 },
+  );
+}
 
 function requestHasJson(request: Request): boolean {
   return (

@@ -1,0 +1,59 @@
+.attachments > div {
+  max-height: min(192px, 25dvh);
+  gap: 12px;
+  padding: 12px;
+  border-bottom: 1px solid rgb(var(--border));
+}
+
+.attachments > div > div {
+  width: 96px;
+  height: 96px;
+  border-radius: 6px;
+}
+
+.attachments button {
+  top: 4px;
+  right: 4px;
+  width: 44px;
+  height: 44px;
+  border-radius: 6px;
+}
+
+.attachments span {
+  bottom: 4px;
+  left: 4px;
+  padding: 2px 6px;
+  border: 1px solid rgb(var(--border));
+  border-radius: 6px;
+  background: rgb(var(--surface));
+  color: rgb(var(--text));
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.quality > div > div:first-child {
+  height: 44px;
+}
+
+.quality button {
+  min-height: 44px;
+  border-radius: 6px;
+  font-size: 12px;
+  letter-spacing: 0;
+}
+
+.quality :is(button, input):focus-visible {
+  outline: 2px solid rgb(var(--control-focus));
+  outline-offset: 2px;
+}
+
+@media (min-width: 640px) {
+  .attachments button {
+    width: 36px;
+    height: 36px;
+  }
+
+  .quality button {
+    min-height: 36px;
+  }
+}

@@ -1,9 +1,20 @@
 "use client";
 
-import { Copy } from "lucide-react";
+import { Check, Copy } from "lucide-react";
 import { Children, isValidElement, useState, type ReactNode } from "react";
 import Markdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import {
+  IconButton,
+  Skeleton,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui";
 
 import { MODELS_PLACEHOLDER, type ApiDocsModel } from "@/lib/api-docs-shared";
 import { cn } from "@/lib/utils";
@@ -23,25 +34,29 @@ function textOf(node: ReactNode): string {
 }
 
 const components: Components = {
-  h1: ({ children }) => (
-    <h2 className="text-lg font-semibold tracking-tight">{children}</h2>
-  ),
+  h1: ({ children }) => <h3 className="app-section-title">{children}</h3>,
   h2: ({ children }) => (
-    <h3 className="mt-8 border-t border-border pt-6 text-base font-semibold first:mt-0 first:border-0 first:pt-0">
+    <h4 className="mt-6 border-t border-border pt-5 text-sm font-semibold first:mt-0 first:border-0 first:pt-0">
       {children}
-    </h3>
+    </h4>
   ),
   h3: ({ children }) => (
-    <h4 className="mt-5 text-sm font-semibold">{children}</h4>
+    <h5 className="mt-5 text-sm font-semibold">{children}</h5>
   ),
   p: ({ children }) => (
-    <p className="mt-2 leading-relaxed text-text-muted">{children}</p>
+    <p className="mt-2 break-words leading-6 text-text-muted [overflow-wrap:anywhere]">
+      {children}
+    </p>
   ),
   ul: ({ children }) => (
-    <ul className="mt-2 list-disc space-y-1 pl-5 text-text-muted">{children}</ul>
+    <ul className="mt-2 min-w-0 list-disc space-y-1 pl-5 text-text-muted [overflow-wrap:anywhere]">
+      {children}
+    </ul>
   ),
   ol: ({ children }) => (
-    <ol className="mt-2 list-decimal space-y-1 pl-5 text-text-muted">{children}</ol>
+    <ol className="mt-2 min-w-0 list-decimal space-y-1 pl-5 text-text-muted [overflow-wrap:anywhere]">
+      {children}
+    </ol>
   ),
   strong: ({ children }) => (
     <strong className="font-semibold text-foreground">{children}</strong>
@@ -52,31 +67,37 @@ const components: Components = {
     </a>
   ),
   table: ({ children }) => (
-    <div className="mt-3 overflow-x-auto rounded-md border border-border text-xs">
-      <table className="w-full">{children}</table>
-    </div>
+    <TableContainer
+      className="mt-3 min-w-0 max-w-full rounded-lg"
+      role="region"
+      aria-label="API 文档表格"
+      tabIndex={0}
+    >
+      <Table className="min-w-[560px]">{children}</Table>
+    </TableContainer>
   ),
   thead: ({ children }) => (
-    <thead className="bg-foreground/[0.04]">{children}</thead>
+    <TableHeader className="bg-surface-2">{children}</TableHeader>
   ),
-  tbody: ({ children }) => (
-    <tbody className="divide-y divide-border">{children}</tbody>
-  ),
+  tbody: ({ children }) => <TableBody>{children}</TableBody>,
+  tr: ({ children }) => <TableRow>{children}</TableRow>,
   th: ({ children }) => (
-    <th className="whitespace-nowrap px-3 py-2 text-left font-medium">{children}</th>
+    <TableHead className="whitespace-nowrap text-left">{children}</TableHead>
   ),
   td: ({ children }) => (
-    <td className="px-3 py-2 align-top text-text-muted">{children}</td>
+    <TableCell className="align-top text-text-muted">{children}</TableCell>
   ),
   code: ({ children, className }) =>
     className ? (
       <code className={className}>{children}</code>
     ) : (
-      <code className="rounded bg-foreground/[0.06] px-1 py-px font-mono text-[0.85em] text-foreground">
+      <code className="rounded-md bg-surface-2 px-1 py-px font-mono text-xs text-foreground">
         {children}
       </code>
     ),
-  pre: ({ children }) => <CodeBlock code={textOf(children).replace(/\n$/, "")} />,
+  pre: ({ children }) => (
+    <CodeBlock code={textOf(children).replace(/\n$/, "")} />
+  ),
 };
 
 /** Render the API docs Markdown, swapping `{{models}}` for the live table. */
@@ -89,9 +110,9 @@ export function ApiDocsContent({
 }) {
   const parts = markdown.split(MODELS_PLACEHOLDER);
   return (
-    <div className="text-sm">
+    <div className="min-w-0 text-sm tracking-normal">
       {parts.map((part, index) => (
-        <div key={index}>
+        <div key={index} className="min-w-0">
           {part.trim() ? (
             <Markdown remarkPlugins={remarkPlugins} components={components}>
               {part}
@@ -110,50 +131,83 @@ function formatPrice(value: number | undefined) {
 
 function ModelTable({ models }: { models: ApiDocsModel[] | null }) {
   if (!models) {
-    return <div className="mt-3 h-24 animate-pulse rounded-md bg-foreground/[0.04]" />;
+    return (
+      <Skeleton
+        role="status"
+        aria-hidden={false}
+        aria-label="正在加载模型列表"
+        className="mt-3 h-24 rounded-md"
+      />
+    );
   }
   return (
-    <div className="mt-3 overflow-x-auto rounded-md border border-border text-xs">
-      <table className="w-full">
-        <thead className="bg-foreground/[0.04]">
-          <tr>
-            {["modelId", "名称", "1K", "2K", "4K", "size", "quality", "n 上限", "参考图", "状态"].map(
-              (head) => (
-                <th key={head} className="whitespace-nowrap px-3 py-2 text-left font-medium">
-                  {head}
-                </th>
-              ),
-            )}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border">
+    <TableContainer
+      className="mt-3 min-w-0 max-w-full rounded-lg"
+      role="region"
+      aria-label="模型与价格"
+      tabIndex={0}
+    >
+      <Table>
+        <TableHeader className="bg-surface-2">
+          <TableRow>
+            {[
+              "modelId",
+              "名称",
+              "1K",
+              "2K",
+              "4K",
+              "size",
+              "quality",
+              "n 上限",
+              "参考图",
+              "状态",
+            ].map((head) => (
+              <TableHead key={head} scope="col" className="whitespace-nowrap">
+                {head}
+              </TableHead>
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {models.map((model) => (
-            <tr key={model.id} className={cn(!model.available && "opacity-55")}>
-              <td className="whitespace-nowrap px-3 py-2 font-mono text-accent">{model.id}</td>
-              <td className="whitespace-nowrap px-3 py-2">{model.displayName}</td>
+            <TableRow key={model.id}>
+              <TableCell className="whitespace-nowrap font-mono text-accent">
+                {model.id}
+              </TableCell>
+              <TableCell className="whitespace-nowrap">
+                {model.displayName}
+              </TableCell>
               {(["1K", "2K", "4K"] as const).map((tier) => (
-                <td key={tier} className="px-3 py-2 font-mono">
+                <TableCell key={tier} className="font-mono tabular-nums">
                   {formatPrice(model.prices[tier])}
-                </td>
+                </TableCell>
               ))}
-              <td className="px-3 py-2 font-mono text-text-muted">{model.sizes.join(" / ")}</td>
-              <td className="px-3 py-2 font-mono text-text-muted">{model.qualities.join(" / ")}</td>
-              <td className="px-3 py-2 font-mono text-text-muted">{model.maxN}</td>
-              <td className="px-3 py-2 text-text-muted">
-                {model.maxReferenceImages ? `≤ ${model.maxReferenceImages}` : "—"}
-              </td>
-              <td className="whitespace-nowrap px-3 py-2">
+              <TableCell className="font-mono text-text-muted">
+                {model.sizes.join(" / ")}
+              </TableCell>
+              <TableCell className="font-mono text-text-muted">
+                {model.qualities.join(" / ")}
+              </TableCell>
+              <TableCell className="font-mono text-text-muted">
+                {model.maxN}
+              </TableCell>
+              <TableCell className="text-text-muted">
+                {model.maxReferenceImages
+                  ? `≤ ${model.maxReferenceImages}`
+                  : "—"}
+              </TableCell>
+              <TableCell className="whitespace-nowrap">
                 {model.available ? (
                   <span className="text-success">可用</span>
                 ) : (
-                  <span className="text-text-faint">暂不可用</span>
+                  <span className="text-text-muted">暂不可用</span>
                 )}
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
-    </div>
+        </TableBody>
+      </Table>
+    </TableContainer>
   );
 }
 
@@ -167,21 +221,24 @@ export function CodeBlock({ code }: { code: string }) {
   };
 
   return (
-    <div className="relative mt-3 rounded-md border border-border bg-foreground/[0.03]">
-      <pre className="overflow-x-auto px-3 py-3 font-mono text-xs leading-relaxed text-foreground">
+    <div className="mt-3 min-w-0 max-w-full overflow-hidden rounded-lg border border-border bg-surface-2">
+      <div className="flex justify-end border-b border-border px-2 py-1">
+        <IconButton
+          type="button"
+          aria-label="复制代码"
+          title={copied ? "已复制" : "复制代码"}
+          onClick={copy}
+          className={cn("h-9 w-9", copied && "text-success")}
+        >
+          {copied ? <Check size={16} /> : <Copy size={16} />}
+        </IconButton>
+      </div>
+      <pre
+        tabIndex={0}
+        className="min-w-0 max-w-full overflow-x-auto whitespace-pre px-4 py-3 font-mono text-xs leading-6 text-foreground"
+      >
         {code}
       </pre>
-      <button
-        type="button"
-        aria-label="复制代码"
-        onClick={copy}
-        className={cn(
-          "absolute right-2 top-2 rounded p-1 text-text-muted hover:bg-foreground/[0.08] hover:text-foreground",
-          copied && "text-success",
-        )}
-      >
-        <Copy size={12} />
-      </button>
     </div>
   );
 }

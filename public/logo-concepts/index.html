@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Chugao logo concepts</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #151817;
+        --muted: #68736d;
+        --line: #d7dfda;
+        --paper: #f4f7f5;
+        --accent: #73c69e;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-width: 320px;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: Inter, Avenir Next, Helvetica Neue, Arial, sans-serif;
+      }
+
+      main { width: min(1160px, calc(100% - 40px)); margin: 0 auto; padding: 56px 0 72px; }
+
+      header {
+        display: flex;
+        justify-content: space-between;
+        gap: 32px;
+        align-items: flex-start;
+        padding-bottom: 36px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .eyebrow { color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .18em; }
+      h1 { margin: 14px 0 10px; font-size: clamp(34px, 5vw, 58px); line-height: .98; letter-spacing: -.03em; font-weight: 650; }
+      header p { max-width: 540px; margin: 0; color: var(--muted); font-size: 15px; line-height: 1.7; }
+      .edition { color: var(--muted); font-size: 12px; line-height: 1.55; letter-spacing: .12em; text-align: right; white-space: nowrap; }
+
+      .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 24px; }
+      article { min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+      .concept-head { display: flex; gap: 14px; min-height: 106px; padding: 22px 22px 18px; border-bottom: 1px solid var(--line); }
+      .number { color: var(--accent); font-size: 13px; font-weight: 750; letter-spacing: .12em; }
+      h2 { margin: 0; font-size: 19px; font-weight: 650; }
+      .concept-head p { margin: 8px 0 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
+      .art { display: grid; place-items: center; min-height: 222px; padding: 24px 18px; background: #fff; }
+      .art img { display: block; width: 100%; height: auto; }
+      .details { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 15px 22px 18px; border-top: 1px solid var(--line); }
+      .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+      .tag { padding: 5px 8px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: 11px; line-height: 1; }
+      .icon-crop { width: 40px; height: 40px; object-fit: cover; object-position: left center; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+      .download { color: var(--ink); font-size: 12px; font-weight: 650; text-decoration: none; white-space: nowrap; }
+      .download:hover { text-decoration: underline; text-underline-offset: 3px; }
+      footer { margin-top: 24px; color: var(--muted); font-size: 13px; line-height: 1.7; }
+
+      @media (max-width: 860px) {
+        main { width: min(100% - 28px, 640px); padding-top: 32px; }
+        header { padding-bottom: 28px; }
+        .grid { grid-template-columns: 1fr; }
+        .art { min-height: 0; padding: 18px 16px; }
+      }
+
+      @media (max-width: 480px) {
+        header { display: block; }
+        .edition { margin-top: 18px; text-align: left; }
+        .concept-head { min-height: 0; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <div class="eyebrow">CHUGAO / BRAND STUDY</div>
+          <h1>Logo concepts</h1>
+          <p>三个简约方向：上扬 C、折页初稿、高框结构。每个方案都保留了黑白使用能力，绿色只作为小面积识别色。</p>
+        </div>
+        <div class="edition">V1<br />2026.11</div>
+      </header>
+
+      <section class="grid" aria-label="Logo concepts">
+        <article>
+          <div class="concept-head">
+            <span class="number">01</span>
+            <div>
+              <h2>上扬 C</h2>
+              <p>把 C 和上升笔画合成一个紧凑标记，识别最强。</p>
+            </div>
+          </div>
+          <div class="art"><img src="./chugao-01-rising-c.svg" alt="方案一：上扬 C" /></div>
+          <div class="details">
+            <div class="tags"><span class="tag">App 图标</span><span class="tag">易缩小</span></div>
+            <img class="icon-crop" src="./chugao-01-rising-c.svg" alt="方案一图标预览" />
+            <a class="download" href="./chugao-01-rising-c.svg" download>下载 SVG</a>
+          </div>
+        </article>
+
+        <article>
+          <div class="concept-head">
+            <span class="number">02</span>
+            <div>
+              <h2>折页初稿</h2>
+              <p>用两张错位稿纸表达创作、迭代和“初稿”。</p>
+            </div>
+          </div>
+          <div class="art"><img src="./chugao-02-folded-draft.svg" alt="方案二：折页初稿" /></div>
+          <div class="details">
+            <div class="tags"><span class="tag">中文品牌</span><span class="tag">内容感</span></div>
+            <img class="icon-crop" src="./chugao-02-folded-draft.svg" alt="方案二图标预览" />
+            <a class="download" href="./chugao-02-folded-draft.svg" download>下载 SVG</a>
+          </div>
+        </article>
+
+        <article>
+          <div class="concept-head">
+            <span class="number">03</span>
+            <div>
+              <h2>高框结构</h2>
+              <p>用开放框架和顶部上扬线，偏专业工作台气质。</p>
+            </div>
+          </div>
+          <div class="art"><img src="./chugao-03-high-frame.svg" alt="方案三：高框结构" /></div>
+          <div class="details">
+            <div class="tags"><span class="tag">专业感</span><span class="tag">后台适用</span></div>
+            <img class="icon-crop" src="./chugao-03-high-frame.svg" alt="方案三图标预览" />
+            <a class="download" href="./chugao-03-high-frame.svg" download>下载 SVG</a>
+          </div>
+        </article>
+      </section>
+
+      <footer>目前是第一轮方向稿，选定方向后可以继续细化字形、线条粗细、单色版、深色版和 favicon 尺寸。</footer>
+    </main>
+  </body>
+</html>

@@ -158,43 +158,11 @@ describe("Agent image service", () => {
         where: {
           id: "another-job",
           userId: "owner",
-          OR: [
-            { agentAuthorizationId: { not: null } },
-            { apiKeyId: { not: null } },
-          ],
+          agentAuthorizationId: { not: null },
           deletedAt: null,
         },
       }),
     );
-    expect(mocks.bind).not.toHaveBeenCalled();
-  });
-  it("scopes API-key task reads to the presented key", async () => {
-    const apiPrincipal = {
-      user: { id: "owner", email: "owner@test.local", credits: 100 },
-      apiKeyId: "key-a",
-    };
-    mocks.find.mockResolvedValue(null);
-    await expect(
-      ownedAgentGeneration(apiPrincipal, "other-key-job"),
-    ).rejects.toThrow("任务不存在");
-    expect(mocks.find).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          id: "other-key-job",
-          userId: "owner",
-          apiKeyId: "key-a",
-          deletedAt: null,
-        },
-      }),
-    );
-  });
-  it("does not consume a single Agent grant while reading an API-key task", async () => {
-    mocks.find.mockResolvedValue({
-      id: "api-job",
-      agentAuthorizationId: null,
-      images: [],
-    });
-    await ownedAgentGeneration(principal, "api-job");
     expect(mocks.bind).not.toHaveBeenCalled();
   });
   it("maps stored errors to customer messages without upstream content", () => {

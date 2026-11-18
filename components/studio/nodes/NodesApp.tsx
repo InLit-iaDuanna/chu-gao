@@ -1,34 +1,17 @@
 "use client";
 
-import { Button, DropdownMenu, DropdownMenuItem } from "@/components/ui";
-
 import {
-  Coins,
-  ImagePlus,
-  LayoutGrid,
-  Maximize2,
-  Minus,
-  MoreHorizontal,
-  Palette,
-  Play,
-  Plus,
-  Redo2,
-  Share2,
-  SlidersHorizontal,
-  StickyNote,
-  Trash2,
-  Type,
-  Undo2,
-  Frame,
-  Square,
-  X,
-} from "lucide-react";
+  Button,
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { useToast } from "@/components/ui";
 import { savePublishPreload } from "@/components/inspiration/publish-preload";
-import { cn } from "@/lib/utils";
 
 import {
   cancelGeneration,
@@ -61,27 +44,13 @@ import {
   type NodeRunState,
 } from "./node-graph-types";
 import { useNodeGraph } from "./useNodeGraph";
-
-const ADD_NODE_ITEMS = [
-  { kind: "prompt" as const, label: "提示词", icon: Type },
-  { kind: "reference" as const, label: "参考图", icon: ImagePlus },
-  { kind: "model" as const, label: "模型与参数", icon: SlidersHorizontal },
-  { kind: "generate" as const, label: "生成", icon: Play },
-];
-
-const MORE_NODE_ITEMS = [
-  { kind: "style" as const, label: "风格预设", icon: Palette },
-  { kind: "note" as const, label: "批注", icon: StickyNote },
-  { kind: "frame" as const, label: "画板", icon: Frame },
-  { kind: "text" as const, label: "文字", icon: Type },
-  { kind: "shape" as const, label: "形状", icon: Square },
-  { kind: "design-image" as const, label: "设计图片", icon: ImagePlus },
-];
-
-interface CanvasTab {
-  id: string;
-  name: string;
-}
+import {
+  NodeWorkspaceToolbar,
+  NodeCanvasStatus,
+  NodeOverview,
+  type CanvasTool,
+  type CanvasTab,
+} from "./NodeWorkspaceChrome";
 
 const CANVAS_TABS_STORAGE_PREFIX = "chugao.node-canvases.v1";
 
@@ -106,6 +75,14 @@ export function NodesApp() {
     { id: "main", name: "主画布" },
   ]);
   const [activeCanvasId, setActiveCanvasId] = useState("main");
+  const [tool, setTool] = useState<CanvasTool>("select");
+  const [overviewOpen, setOverviewOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [focusRequest, setFocusRequest] = useState<{
+    id: string;
+    version: number;
+  } | null>(null);
+  const [clearOpen, setClearOpen] = useState(false);
   const [canvasTabsLoadedFor, setCanvasTabsLoadedFor] = useState<string | null>(
     null,
   );
@@ -595,7 +572,21 @@ export function NodesApp() {
     [],
   );
 
+  const measuredNodeHeights = () =>
+    new Map(
+      Array.from(
+        document.querySelectorAll<HTMLElement>(
+          "[data-node-canvas] [data-node-id]",
+        ),
+        (element) => [
+          element.dataset.nodeId!,
+          element.getBoundingClientRect().height / graph.viewport.zoom,
+        ],
+      ),
+    );
+
   const addNodeAtCenter = (kind: NodeKind) => {
+    const heights = measuredNodeHeights();
     const rect = document
       .querySelector<HTMLElement>("[data-node-canvas]")
       ?.getBoundingClientRect();
@@ -625,7 +616,10 @@ export function NodesApp() {
               candidate.x + NODE_WIDTH + gap <= node.x ||
               candidate.x >= node.x + NODE_WIDTH + gap ||
               candidate.y + nodeHeight + gap <= node.y ||
-              candidate.y >= node.y + estimatedNodeHeight(node) + gap
+              candidate.y >=
+                node.y +
+                  (heights.get(node.id) ?? estimatedNodeHeight(node)) +
+                  gap
             );
           }),
         ) ?? base;
@@ -649,6 +643,7 @@ export function NodesApp() {
   };
 
   const fitView = () => {
+    const heights = measuredNodeHeights();
     if (graph.nodes.length === 0) {
       graphApi.setViewport({ x: 24, y: 16, zoom: 1 });
       return;
@@ -662,23 +657,30 @@ export function NodesApp() {
     const minY = Math.min(...graph.nodes.map((node) => node.y));
     const maxX = Math.max(...graph.nodes.map((node) => node.x + NODE_WIDTH));
     const maxY = Math.max(
-      ...graph.nodes.map((node) => node.y + estimatedNodeHeight(node)),
+      ...graph.nodes.map(
+        (node) => node.y + (heights.get(node.id) ?? estimatedNodeHeight(node)),
+      ),
     );
     const padding = 56;
+    const topInset = 76;
+    const bottomInset = 128;
     const zoom = Math.min(
       1.25,
       Math.max(
         0.25,
         Math.min(
           (width - padding * 2) / Math.max(1, maxX - minX),
-          (height - padding * 2) / Math.max(1, maxY - minY),
+          (height - topInset - bottomInset) / Math.max(1, maxY - minY),
         ),
       ),
     );
     graphApi.setViewport({
       zoom,
       x: (width - (maxX - minX) * zoom) / 2 - minX * zoom,
-      y: (height - (maxY - minY) * zoom) / 2 - minY * zoom,
+      y:
+        topInset +
+        (height - topInset - bottomInset - (maxY - minY) * zoom) / 2 -
+        minY * zoom,
     });
   };
 
@@ -699,6 +701,41 @@ export function NodesApp() {
       setActiveCanvasId(next[Math.max(0, index - 1)]?.id ?? "main");
     }
     setCanvasTabs(next.length > 0 ? next : [{ id: "main", name: "主画布" }]);
+  };
+
+  const focusNode = (id: string) => {
+    const node = graph.nodes.find((item) => item.id === id);
+    const rect = document
+      .querySelector<HTMLElement>("[data-node-canvas]")
+      ?.getBoundingClientRect();
+    if (!node || !rect) return;
+    const nodeHeight =
+      measuredNodeHeights().get(node.id) ?? estimatedNodeHeight(node);
+    const topInset = 76;
+    const bottomInset = 128;
+    const zoom = Math.min(
+      1,
+      Math.max(0.25, (rect.height - topInset - bottomInset) / nodeHeight),
+      graph.viewport.zoom,
+    );
+    graphApi.setViewport({
+      zoom,
+      x: rect.width / 2 - (node.x + NODE_WIDTH / 2) * zoom,
+      y:
+        topInset +
+        Math.max(
+          0,
+          (rect.height - topInset - bottomInset - nodeHeight * zoom) / 2,
+        ) -
+        node.y * zoom,
+    });
+    setFocusRequest((current) => ({
+      id,
+      version: (current?.version ?? 0) + 1,
+    }));
+    if (window.matchMedia("(max-width: 1023px)").matches) {
+      setOverviewOpen(false);
+    }
   };
 
   useEffect(() => {
@@ -724,275 +761,118 @@ export function NodesApp() {
   }, [graphApi]);
 
   return (
-    <div className="flex h-full flex-col">
-      <header className="flex h-11 shrink-0 items-center gap-2 overflow-x-auto border-b border-border bg-background px-3">
-        <span className="whitespace-nowrap text-[13px] font-semibold tracking-tight">
-          节点生图
-        </span>
-        <span className="h-4 w-px bg-border" aria-hidden />
-        <div className="flex items-center gap-1">
-          {ADD_NODE_ITEMS.map((item) => {
-            const Icon = item.icon;
-            return (
-              <Button
-                variant="ghost"
-                key={item.kind}
-                type="button"
-                onClick={() => addNodeAtCenter(item.kind)}
-                className="flex h-7 items-center gap-1 rounded-md border border-border px-2 text-[11px] text-text-muted transition-colors hover:border-border-strong hover:text-foreground"
-              >
-                <Icon size={11} />
-                {item.label}
-              </Button>
-            );
-          })}
-          <DropdownMenu
-            className="min-w-44"
-            trigger={
-              <Button
-                variant="ghost"
-                type="button"
-                className="flex h-7 items-center gap-1 rounded-md border border-border px-2 text-[11px] text-text-muted transition-colors hover:border-border-strong hover:text-foreground"
-              >
-                <MoreHorizontal size={11} />
-                更多节点
-              </Button>
-            }
-          >
-            {MORE_NODE_ITEMS.map((item) => {
-              const Icon = item.icon;
-              return (
-                <DropdownMenuItem
-                  key={item.kind}
-                  onClick={() => addNodeAtCenter(item.kind)}
-                  className="h-7 text-xs"
-                >
-                  <Icon size={12} className="text-text-muted" />
-                  {item.label}
-                </DropdownMenuItem>
-              );
-            })}
-          </DropdownMenu>
-        </div>
+    <div className="relative isolate flex h-full min-h-0 flex-col overflow-hidden">
+      <NodeWorkspaceToolbar
+        tabs={canvasTabs}
+        activeId={activeCanvasId}
+        onSelectTab={setActiveCanvasId}
+        onCreateTab={createCanvas}
+        onCloseTab={closeCanvas}
+        onRenameTab={(id, name) =>
+          setCanvasTabs((tabs) =>
+            tabs.map((tab) => (tab.id === id ? { ...tab, name } : tab)),
+          )
+        }
+        tool={tool}
+        onToolChange={setTool}
+        onAdd={addNodeAtCenter}
+        onUndo={graphApi.undo}
+        onRedo={graphApi.redo}
+        canUndo={graphApi.canUndo}
+        canRedo={graphApi.canRedo}
+        onArrange={() => graphApi.autoArrange(measuredNodeHeights())}
+        onPublish={handlePublish}
+        onClear={() => setClearOpen(true)}
+        onRun={handleRunAll}
+        readyCount={
+          Object.entries(validationHints).filter(
+            ([id, hint]) => hint === null && runs[id]?.status !== "running",
+          ).length
+        }
+        runningCount={
+          Object.values(runs).filter((run) => run.status === "running").length
+        }
+        saveState={graphApi.saveState}
+        panelOpen={overviewOpen}
+        onTogglePanel={() => setOverviewOpen((open) => !open)}
+      />
 
-        <div className="ml-auto flex shrink-0 items-center gap-1">
-          {me ? (
-            <span className="mr-1 hidden items-center gap-1.5 rounded-md border border-border bg-surface px-2 py-1 text-xs font-medium sm:flex">
-              <Coins size={12} className="text-text-muted" />
-              <span className="tabular-nums">{me.credits}</span>
-            </span>
-          ) : null}
-          <Button
-            variant="ghost"
-            type="button"
-            onClick={graphApi.undo}
-            disabled={!graphApi.canUndo}
-            title="撤销"
-            aria-label="撤销"
-            className="flex h-7 w-7 items-center justify-center rounded-md p-0 text-text-muted hover:bg-surface-2 hover:text-foreground disabled:opacity-35"
-          >
-            <Undo2 size={12} />
-          </Button>
-          <Button
-            variant="ghost"
-            type="button"
-            onClick={graphApi.redo}
-            disabled={!graphApi.canRedo}
-            title="重做"
-            aria-label="重做"
-            className="flex h-7 w-7 items-center justify-center rounded-md p-0 text-text-muted hover:bg-surface-2 hover:text-foreground disabled:opacity-35"
-          >
-            <Redo2 size={12} />
-          </Button>
-          <span className="mx-0.5 h-4 w-px bg-border" aria-hidden />
-          <Button
-            variant="ghost"
-            type="button"
-            onClick={graphApi.autoArrange}
-            title="自动整理"
-            aria-label="自动整理"
-            className="flex h-7 w-7 items-center justify-center rounded-md p-0 text-text-muted hover:bg-surface-2 hover:text-foreground"
-          >
-            <LayoutGrid size={12} />
-          </Button>
-          <Button
-            variant="ghost"
-            type="button"
-            onClick={fitView}
-            title="适配全部节点"
-            aria-label="适配全部节点"
-            className="flex h-7 w-7 items-center justify-center rounded-md p-0 text-text-muted hover:bg-surface-2 hover:text-foreground"
-          >
-            <Maximize2 size={12} />
-          </Button>
-          <span className="flex h-7 items-center rounded-md border border-border">
-            <Button
-              variant="ghost"
-              type="button"
-              onClick={() => zoomBy(1 / 1.15)}
-              title="缩小"
-              aria-label="缩小"
-              className="flex h-6 w-6 items-center justify-center rounded-[4px] p-0 text-text-muted hover:bg-surface-2 hover:text-foreground"
-            >
-              <Minus size={11} />
+      <div className="relative flex min-h-0 flex-1">
+        <div className="min-w-0 flex-1">
+          <NodeCanvas
+            key={activeCanvasId}
+            tool={tool}
+            focusRequest={focusRequest}
+            onSelectionChange={setSelectedIds}
+            graph={graph}
+            models={models}
+            history={history}
+            runs={runs}
+            uploads={uploads}
+            validationHints={validationHints}
+            onMoveNodes={graphApi.moveNodes}
+            onInteractionEnd={graphApi.finishHistoryGroup}
+            onUpdateNodeData={graphApi.updateNodeData}
+            onDuplicateNode={graphApi.duplicateNode}
+            onDuplicateNodes={graphApi.duplicateNodes}
+            onRemoveNode={graphApi.removeNode}
+            onRemoveNodes={graphApi.removeNodes}
+            onConnect={graphApi.connect}
+            onReorderReference={graphApi.reorderEdge}
+            onDisconnect={graphApi.disconnect}
+            onViewportChange={graphApi.setViewport}
+            onRun={(nodeId) => void handleRun(nodeId)}
+            onCancel={(nodeId) => void handleCancel(nodeId)}
+            onUploadFile={(nodeId, file) => void handleUploadFile(nodeId, file)}
+            onDropFiles={handleDropFiles}
+            onOpenImage={handleOpenImage}
+            onResultAsReference={handleResultAsReference}
+            onResultAsDesignImage={handleResultAsDesignImage}
+            onDownloadImage={handleDownloadImage}
+          />
+        </div>
+        {overviewOpen && (
+          <NodeOverview
+            nodes={graph.nodes}
+            runs={runs}
+            hints={validationHints}
+            selectedIds={selectedIds}
+            onFocus={focusNode}
+            onClose={() => setOverviewOpen(false)}
+          />
+        )}
+      </div>
+      <NodeCanvasStatus
+        nodeCount={graph.nodes.length}
+        edgeCount={graph.edges.length}
+        zoom={graph.viewport.zoom}
+        onZoom={zoomBy}
+        onFit={fitView}
+        onReset={() => zoomBy(1 / graph.viewport.zoom)}
+      />
+
+      <Dialog open={clearOpen} onOpenChange={setClearOpen}>
+        <DialogContent className="studio-workspace p-5">
+          <DialogTitle className="tracking-normal">清空当前画布？</DialogTitle>
+          <DialogDescription>
+            移除当前画布的节点和连线，可通过撤销恢复。其他画布和已生成图片不受影响。
+          </DialogDescription>
+          <div className="mt-5 flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setClearOpen(false)}>
+              取消
             </Button>
             <Button
-              variant="ghost"
-              type="button"
-              onClick={() => graphApi.setViewport({ x: 24, y: 16, zoom: 1 })}
-              title="重置为 100%"
-              className="h-6 min-w-11 px-1 text-[10px] tabular-nums text-text-muted hover:text-foreground"
-            >
-              {Math.round(graph.viewport.zoom * 100)}%
-            </Button>
-            <Button
-              variant="ghost"
-              type="button"
-              onClick={() => zoomBy(1.15)}
-              title="放大"
-              aria-label="放大"
-              className="flex h-6 w-6 items-center justify-center rounded-[4px] p-0 text-text-muted hover:bg-surface-2 hover:text-foreground"
-            >
-              <Plus size={11} />
-            </Button>
-          </span>
-          <Button
-            variant="ghost"
-            type="button"
-            onClick={handlePublish}
-            disabled={!graphApi.hydrated}
-            title="把已完成的生成结果和工作流说明带到灵感圈"
-            className="flex h-7 items-center gap-1 rounded-md border border-border px-2 text-[11px] text-text-muted hover:border-border-strong hover:text-foreground disabled:opacity-40"
-          >
-            <Share2 size={11} />
-            发灵感
-          </Button>
-          <Button
-            variant="ghost"
-            type="button"
-            onClick={handleRunAll}
-            disabled={
-              !Object.values(validationHints).some((hint) => hint === null)
-            }
-            title="运行所有已就绪的生成节点"
-            className="flex h-7 items-center gap-1 rounded-md bg-brand px-2 text-[11px] font-medium text-on-accent hover:bg-brand/88 disabled:opacity-40"
-          >
-            <Play size={11} />
-            运行全部
-          </Button>
-          <Button
-            variant="ghost"
-            type="button"
-            onClick={() => {
-              if (window.confirm("清空整张节点图？此操作不可撤销。")) {
+              variant="danger"
+              onClick={() => {
                 graphApi.clearGraph();
-                setRuns({});
-              }
-            }}
-            title="清空画布"
-            className="flex h-7 w-7 items-center justify-center rounded-md p-0 text-text-muted transition-colors hover:bg-surface-2 hover:text-danger"
-          >
-            <Trash2 size={13} />
-          </Button>
-        </div>
-      </header>
-
-      <div
-        role="tablist"
-        aria-label="节点画布"
-        className="flex h-9 shrink-0 items-center gap-1 overflow-x-auto border-b border-border bg-surface/50 px-2"
-      >
-        {canvasTabs.map((tab) => {
-          const active = tab.id === activeCanvasId;
-          return (
-            <div
-              key={tab.id}
-              role="presentation"
-              className={cn(
-                "group flex h-7 shrink-0 items-center rounded-md border transition-colors",
-                active
-                  ? "border-brand/45 bg-brand/10"
-                  : "border-transparent hover:border-border hover:bg-surface-2",
-              )}
+                setClearOpen(false);
+              }}
             >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => setActiveCanvasId(tab.id)}
-                onDoubleClick={() => {
-                  const next = window.prompt("重命名画布", tab.name)?.trim();
-                  if (!next) return;
-                  setCanvasTabs((current) =>
-                    current.map((item) =>
-                      item.id === tab.id ? { ...item, name: next } : item,
-                    ),
-                  );
-                }}
-                className={cn(
-                  "max-w-32 truncate px-2 text-[11px] outline-none",
-                  active ? "text-brand" : "text-text-muted",
-                )}
-              >
-                {tab.name}
-              </button>
-              {tab.id !== "main" ? (
-                <button
-                  type="button"
-                  aria-label={`关闭${tab.name}`}
-                  title={`关闭${tab.name}`}
-                  onClick={() => closeCanvas(tab.id)}
-                  className="mr-1 flex h-5 w-5 items-center justify-center rounded text-text-faint hover:bg-surface-2 hover:text-foreground"
-                >
-                  <X size={11} />
-                </button>
-              ) : null}
-            </div>
-          );
-        })}
-        <Button
-          variant="ghost"
-          type="button"
-          aria-label="新建画布"
-          title="新建画布"
-          onClick={createCanvas}
-          className="flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-[11px] text-text-muted hover:bg-surface-2 hover:text-foreground"
-        >
-          <Plus size={12} />
-          新建
-        </Button>
-      </div>
-
-      <div className="min-h-0 flex-1">
-        <NodeCanvas
-          key={activeCanvasId}
-          graph={graph}
-          models={models}
-          history={history}
-          runs={runs}
-          uploads={uploads}
-          validationHints={validationHints}
-          onMoveNodes={graphApi.moveNodes}
-          onInteractionEnd={graphApi.finishHistoryGroup}
-          onUpdateNodeData={graphApi.updateNodeData}
-          onDuplicateNode={graphApi.duplicateNode}
-          onDuplicateNodes={graphApi.duplicateNodes}
-          onRemoveNode={graphApi.removeNode}
-          onRemoveNodes={graphApi.removeNodes}
-          onConnect={graphApi.connect}
-          onReorderReference={graphApi.reorderEdge}
-          onDisconnect={graphApi.disconnect}
-          onViewportChange={graphApi.setViewport}
-          onRun={(nodeId) => void handleRun(nodeId)}
-          onCancel={(nodeId) => void handleCancel(nodeId)}
-          onUploadFile={(nodeId, file) => void handleUploadFile(nodeId, file)}
-          onDropFiles={handleDropFiles}
-          onOpenImage={handleOpenImage}
-          onResultAsReference={handleResultAsReference}
-          onResultAsDesignImage={handleResultAsDesignImage}
-          onDownloadImage={handleDownloadImage}
-        />
-      </div>
+              清空画布
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {lightbox ? (
         <Lightbox

@@ -23,7 +23,7 @@ interface ImageGalleryProps {
 
 export function ImageGallery({
   generation,
-  frameClassName = "h-[380px] lg:h-[620px]",
+  frameClassName = "h-[320px] sm:h-[480px] lg:h-[620px]",
 }: ImageGalleryProps) {
   const images = generation.images.filter((image) => image.src ?? image.url);
   const [index, setIndex] = useState(0);
@@ -35,15 +35,16 @@ export function ImageGallery({
   const currentUrl = previewImageUrl(current);
 
   return (
-    <div className="flex h-full flex-col gap-3">
+    <div className="flex h-full min-w-0 flex-col gap-3 tracking-normal">
       <Button
         variant="ghost"
         type="button"
         className={cn(
-          "relative w-full cursor-zoom-in overflow-hidden rounded-[10px] bg-surface-2 p-0",
+          "relative w-full cursor-zoom-in overflow-hidden rounded-lg border border-border bg-surface-2 p-0",
           frameClassName,
         )}
         onClick={() => setLightbox(index)}
+        aria-label={`放大查看第 ${index + 1} 张图片`}
       >
         {currentUrl ? (
           <img
@@ -53,14 +54,18 @@ export function ImageGallery({
           />
         ) : null}
         {images.length > 1 ? (
-          <span className="absolute right-3 top-3 rounded-full bg-black/55 px-2.5 py-1 font-mono text-xs text-white">
+          <span className="absolute right-3 top-3 rounded-md border border-border bg-surface/95 px-2 py-1 text-xs text-foreground">
             {index + 1} / {images.length}
           </span>
         ) : null}
       </Button>
 
       {images.length > 1 ? (
-        <div className="flex gap-2 overflow-x-auto pb-1">
+        <div
+          role="group"
+          aria-label="选择图片"
+          className="flex min-w-0 max-w-full gap-2 overflow-x-auto pb-1"
+        >
           {images.map((image, imageIndex) => {
             const url = previewImageUrl(image);
             const href = downloadImageUrl(image);
@@ -70,10 +75,13 @@ export function ImageGallery({
                 key={image.id ?? href ?? imageIndex}
                 type="button"
                 onClick={() => setIndex(imageIndex)}
+                aria-label={`查看第 ${imageIndex + 1} 张图片`}
+                aria-pressed={imageIndex === index}
+                title={`第 ${imageIndex + 1} 张图片`}
                 className={cn(
-                  "h-16 w-16 shrink-0 overflow-hidden rounded-[8px] border p-0 transition-colors",
+                  "h-16 w-16 shrink-0 overflow-hidden rounded-md border bg-surface-2 p-0 transition-colors",
                   imageIndex === index
-                    ? "border-accent"
+                    ? "border-brand ring-1 ring-inset ring-brand"
                     : "border-border hover:border-border-strong",
                 )}
               >
@@ -81,7 +89,7 @@ export function ImageGallery({
                   <img
                     src={url}
                     alt=""
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-contain"
                     loading="lazy"
                     decoding="async"
                   />

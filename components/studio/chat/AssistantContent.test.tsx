@@ -43,6 +43,14 @@ it("renders Markdown and GFM headings, nested lists, tables, tasks and inline co
   expect(screen.getByText("旧内容").tagName).toBe("DEL");
 });
 
+it("preserves intentional single-line breaks without changing code blocks", () => {
+  const { container } = show(
+    "第一行\n第二行\n\n```text\n第一行\n第二行\n```",
+  );
+  expect(container.querySelectorAll("p br")).toHaveLength(1);
+  expect(screen.getByLabelText("text 代码").textContent).toBe("第一行\n第二行");
+});
+
 it.each(["markdown", "md"])(
   "renders a whole %s fence as Markdown, including citations and nested code",
   (language) => {

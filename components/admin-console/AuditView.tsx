@@ -29,7 +29,10 @@ export function AuditView() {
   }, []);
 
   if (failed) return <EmptyPanel text="审计日志暂时不可用" />;
-  if (!entries) return <div className="surface-panel h-64 animate-pulse" />;
+  if (!entries)
+    return (
+      <div className="h-64 animate-pulse rounded-lg border border-border bg-surface-2" />
+    );
 
   return (
     <div>
@@ -62,7 +65,7 @@ export function AuditView() {
               </td>
               <td className="max-w-72 px-4 py-2.5">
                 <p
-                  className="line-clamp-2 font-mono text-[11px] leading-4 text-text-muted"
+                  className="line-clamp-2 font-mono text-xs leading-4 text-text-muted"
                   title={diffPreview(entry.diff)}
                 >
                   {diffPreview(entry.diff)}

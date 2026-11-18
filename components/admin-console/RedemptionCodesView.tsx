@@ -61,7 +61,7 @@ export function RedemptionCodesView() {
       {notice ? <p className="mb-3 text-sm text-success">{notice}</p> : null}
 
       {!codes ? (
-        <div className="surface-panel h-64 animate-pulse" />
+        <div className="h-64 animate-pulse rounded-lg border border-border bg-surface-2" />
       ) : codes.length === 0 ? (
         <EmptyPanel text="暂无兑换码" />
       ) : (
@@ -115,7 +115,7 @@ export function RedemptionCodesView() {
                   {!code.revokedAt && !usedUp ? (
                     <Button
                       type="button"
-                      className="h-7 px-2 text-[11px] text-danger"
+                      className="h-9 px-2 text-sm text-danger"
                       onClick={() =>
                         void run(
                           () => revokeAdminRedemptionCode(code.id),
@@ -157,14 +157,14 @@ function CreateCodeForm({
   const [busy, setBusy] = useState(false);
 
   return (
-    <div className="surface-panel mb-6 p-4">
+    <div className="mb-6 border-y border-border py-4">
       <div className="flex flex-wrap items-end gap-3">
         <AdminField label="数量">
           <Input
             type="number"
             min={1}
             max={500}
-            className="w-24"
+            className="w-24 h-9 text-sm"
             value={form.count}
             onChange={(event) =>
               setForm({ ...form, count: Number(event.target.value) })
@@ -175,7 +175,7 @@ function CreateCodeForm({
           <Input
             type="number"
             min={1}
-            className="w-28"
+            className="w-28 h-9 text-sm"
             value={form.credits}
             onChange={(event) =>
               setForm({ ...form, credits: Number(event.target.value) })
@@ -187,7 +187,7 @@ function CreateCodeForm({
             type="number"
             min={1}
             max={9999}
-            className="w-24"
+            className="w-24 h-9 text-sm"
             value={form.maxUses}
             onChange={(event) =>
               setForm({ ...form, maxUses: Number(event.target.value) })
@@ -197,7 +197,7 @@ function CreateCodeForm({
         <AdminField label="过期时间（可选）">
           <Input
             type="datetime-local"
-            className="w-52"
+            className="w-52 h-9 text-sm"
             value={form.expiresAt}
             onChange={(event) =>
               setForm({ ...form, expiresAt: event.target.value })
@@ -206,7 +206,7 @@ function CreateCodeForm({
         </AdminField>
         <AdminField label="备注（可选）">
           <Input
-            className="w-44"
+            className="w-44 h-9 text-sm"
             value={form.note}
             onChange={(event) => setForm({ ...form, note: event.target.value })}
           />

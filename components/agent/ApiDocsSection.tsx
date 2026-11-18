@@ -4,6 +4,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import type { ApiDocsModel } from "@/lib/api-docs-shared";
+import { Button, Skeleton } from "@/components/ui";
 
 import { ApiDocsContent } from "./ApiDocsContent";
 
@@ -30,13 +31,17 @@ export function ApiDocsSection() {
   }, [open, docs]);
 
   return (
-    <div className="mt-6 rounded-lg border border-border">
-      <button
+    <section
+      aria-label="API 接入文档"
+      className="mt-6 min-w-0 border-t border-border pt-4"
+    >
+      <Button
+        variant="ghost"
         type="button"
         aria-expanded={open}
         aria-controls="api-docs-body"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium hover:bg-foreground/[0.03]"
+        className="h-9 w-full justify-between px-2"
       >
         <span>API 接入文档</span>
         {open ? (
@@ -44,10 +49,10 @@ export function ApiDocsSection() {
         ) : (
           <ChevronDown size={15} className="text-text-muted" />
         )}
-      </button>
+      </Button>
 
       {open && (
-        <div id="api-docs-body" className="border-t border-border px-4 pb-6 pt-5">
+        <div id="api-docs-body" className="min-w-0 pt-5">
           {failed ? (
             <p role="alert" className="text-sm text-danger">
               文档加载失败，请稍后刷新重试。
@@ -56,12 +61,12 @@ export function ApiDocsSection() {
             <ApiDocsContent markdown={docs.markdown} models={docs.models} />
           ) : (
             <div className="space-y-3" role="status" aria-label="正在加载文档">
-              <div className="h-5 w-48 animate-pulse rounded bg-foreground/[0.06]" />
-              <div className="h-24 animate-pulse rounded bg-foreground/[0.04]" />
+              <Skeleton className="h-5 w-48 max-w-full rounded-md" />
+              <Skeleton className="h-24 rounded-md" />
             </div>
           )}
         </div>
       )}
-    </div>
+    </section>
   );
 }

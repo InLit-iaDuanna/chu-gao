@@ -1,11 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import {
-  LUNA_MODEL_ID,
-  SOL_MODEL_ID,
-  OPUS_MODEL_ID,
-} from "@/lib/chat-model-options";
+import { CHAT_MODEL_IDS, OPUS_MODEL_ID } from "@/lib/chat-model-options";
 
 export const CHAT_TASK_PROTOCOL_VERSION = 2;
 export const CHAT_RUNTIME_PROTOCOL_VERSION = CHAT_TASK_PROTOCOL_VERSION;
@@ -15,9 +11,7 @@ export const CHAT_RUNTIME_CONFIG_KEY = "chat.runtime";
 const configSchema = z
   .object({
     enabled: z.boolean(),
-    profiles: z
-      .array(z.enum(["default", LUNA_MODEL_ID, SOL_MODEL_ID, OPUS_MODEL_ID]))
-      .max(4),
+    profiles: z.array(z.enum(CHAT_MODEL_IDS)).max(CHAT_MODEL_IDS.length),
     userAllowlist: z.array(z.string().trim().min(1).max(128)).max(10_000),
     queueTimeoutMs: z.number().int().min(1_000).max(86_400_000).nullable(),
   })
@@ -29,7 +23,7 @@ export const chatRuntimeUpdateSchema = configSchema
 export type ChatRuntimeSettings = z.infer<typeof configSchema>;
 const defaults = (): ChatRuntimeSettings => ({
   enabled: true,
-  profiles: [OPUS_MODEL_ID, LUNA_MODEL_ID, SOL_MODEL_ID],
+  profiles: CHAT_MODEL_IDS.filter((id) => id !== "default"),
   userAllowlist: [],
   queueTimeoutMs: null,
 });
@@ -39,7 +33,7 @@ const parseSettings = (value: unknown): ChatRuntimeSettings => {
     ...new Set(parsed.profiles.filter((id) => id !== "default")),
   ];
   if (!profiles.includes(OPUS_MODEL_ID)) profiles.unshift(OPUS_MODEL_ID);
-  return { ...parsed, profiles: profiles.slice(0, 4) };
+  return { ...parsed, profiles: profiles.slice(0, CHAT_MODEL_IDS.length) };
 };
 
 export class ChatRuntimeAdmissionError extends Error {

@@ -1,7 +1,6 @@
 import { RegisterForm } from "@/components/auth/RegisterForm";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { ActionableStatus } from "@/components/shared/ActionableStatus";
-import { Logo } from "@/components/shared/Logo";
 import { Button } from "@/components/ui";
 import { checkSessionFromHeaders } from "@/lib/auth";
 import { safeNextPath } from "@/lib/safe-next-path";
@@ -50,10 +49,10 @@ export default async function RegisterPage({
         </>
       }
       asideNote="把灵感、模型和生成记录留在同一个安静的工作空间里。"
+      art="/studio/architecture.jpg"
     >
-      <Logo className="mb-8 lg:hidden" />
-      <h2 className="text-2xl font-semibold tracking-[-0.02em]">创建账户</h2>
-      <p className="mt-2 text-sm leading-6 text-text-muted">
+      <h2 className="text-[28px] font-semibold tracking-[-0.03em]">创建账户</h2>
+      <p className="mt-2 text-[15px] leading-6 text-text-muted">
         {configUnavailable
           ? "注册服务暂不可用，请稍后刷新再试。"
           : inviteOnly

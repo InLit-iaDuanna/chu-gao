@@ -1,29 +1,39 @@
 import Link from "next/link";
 
+import { Logo } from "@/components/shared/Logo";
+import { Button } from "@/components/ui";
+
 export default function NotFound() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background px-6 text-foreground">
-      <div className="surface-panel max-w-sm p-8 text-center">
-        <p className="eyebrow">404</p>
-        <h1 className="mt-2 text-xl font-semibold">页面不存在</h1>
-        <p className="mt-3 text-sm leading-6 text-text-muted">
-          你要找的页面可能已被移动或删除。
-        </p>
-        <div className="mt-6 flex items-center justify-center gap-3">
-          <Link
-            href="/app"
-            className="inline-flex h-9 items-center rounded-lg bg-[rgb(var(--brand-primary))] px-4 text-sm text-on-accent transition-colors hover:bg-[rgb(var(--brand-primary))]/88"
-          >
-            回到工作台
-          </Link>
-          <Link
-            href="/"
-            className="inline-flex h-9 items-center rounded-lg border border-border bg-surface px-4 text-sm text-foreground transition-colors hover:border-border-strong hover:bg-surface-2"
-          >
-            返回首页
+    <div className="flex min-h-svh flex-col bg-background text-sm tracking-normal text-foreground">
+      <header className="border-b border-border bg-surface">
+        <div className="mx-auto flex h-12 w-full max-w-7xl items-center px-4 sm:px-6">
+          <Link href="/" aria-label="初稿首页">
+            <Logo />
           </Link>
         </div>
-      </div>
-    </main>
+      </header>
+      <main className="flex flex-1 items-center justify-center px-4 py-10">
+        <div className="w-full max-w-md text-center">
+          <p className="text-sm tabular-nums text-text-muted">404</p>
+          <div className="app-page-header mt-2">
+            <div className="w-full min-w-0">
+              <h1 className="app-page-title">页面不存在</h1>
+              <p className="app-page-description">
+                你要找的页面可能已被移动或删除。
+              </p>
+            </div>
+          </div>
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+            <Button asChild variant="primary">
+              <Link href="/app">回到工作台</Link>
+            </Button>
+            <Button asChild>
+              <Link href="/">返回首页</Link>
+            </Button>
+          </div>
+        </div>
+      </main>
+    </div>
   );
 }

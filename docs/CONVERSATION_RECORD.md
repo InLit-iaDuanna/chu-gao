@@ -6,8 +6,32 @@
 ## 当前状态
 
 - 项目：`Chūgǎo Studio`
+- 正式目录：`/Users/isduanna/Documents/ChatGPT/chugao/chugao_v2.2`
+- 测试与临时目录：`/Users/isduanna/Documents/ChatGPT/chugao/test`
 - 形态：Next.js + Prisma + Redis + BullMQ
-- 当前重点：图像生成、后台号池、服务器安全、渠道稳定性
+- 当前重点：领域边界、共享请求层、图像生成、后台号池、渠道稳定性
+
+## v2 迁移记录（2026-08-14）
+
+- 旧项目 `/Users/isduanna/Documents/New project 2/` 保持不变。
+- v2 已建立 `auth`、`conversation`、`generation`、`inspiration`、`ppt`、`provider`
+  领域入口和 `infrastructure` 基础设施入口。
+- 测试已集中到 `../test/suite`；当前验证为 52 个测试文件、203 个测试通过。
+- 下一次正式更新使用新目录 `chugao_v2.1`，补丁更新使用 `chugao_v2.1.1`。
+
+## v2.1 更新记录（2026-08-14）
+
+- 当前正式目录切换为 `chugao_v2.1`，旧目录 `chugao_v2` 保留作为 v2.0.0 版本快照。
+- `InfiniteCanvas` 的状态、加载和 localStorage 持久化已集中到
+  `components/canvas/useInfiniteCanvasState.ts`。
+- 保留会话草稿迁移、400ms 尾随写入、切换会话/卸载/pagehide/visibilitychange
+  冲刷，以及现有选择和工作流状态行为。
+
+## v2.2 更新记录（2026-08-14）
+
+- 当前正式目录切换为 `chugao_v2.2`，旧目录 `chugao_v2.1` 保留作为 v2.1.0 版本快照。
+- 内容开发前的交互状态中心统一采用独立 hook 边界，先完成
+  `DesignStudio`、`StudioApp`、`PptStudio` 和 `PublishComposer`。
 
 ## 最近确认
 
@@ -20,7 +44,7 @@
 - `components/workbench/hooks/useWorkbenchActions.ts` 已拆出生成 SSE 流监听/合并逻辑与会话水合逻辑，hook 保留用户操作编排。
 - `components/workbench/ConversationMode.tsx` 已拆出底部输入/附件 UI 与对话出图 SSE 状态监听，主文件保留聊天、历史和预览生成流程。
 - `components/workbench/WorkbenchShellV2.tsx` 已拆出 `WorkbenchShellTopBar` 和 `WorkbenchStudioPanel`，主壳保留视图切换、状态编排和 Overlay 组合；当前主文件约 584 行。
-- framer-motion 已移出根布局：`AppThemeProvider` 不再包 `MotionConfig`，改由 `components/shared/MotionProvider.tsx` 在 `app/(app)/layout.tsx` 内提供（reducedMotion="user"）。落地页、登录/注册、管理端 bundle 已不含 framer，只有 `/app`、`/app/canvas` 保留。**不要在 (app) 之外的组件里 import framer-motion**，否则会把它加回这些路由的首载。
+- framer-motion 已从当前主应用移除；落地页、登录/注册、管理端和工作台均不再依赖它。后续新增动画优先使用 CSS，避免把已移除的依赖重新引入首载。
 - `app/page.tsx`（落地页）已转为服务端组件，入场动画改用 CSS 类 `anim-rise` / `anim-slide-left`（globals.css），首屏文案直接 SSR。
 - `components/ui/Toast.tsx` 去 framer 化：进/出场用 CSS（`toast-enter` / `toast-leave`）+ 两段式 leaving 状态；错误 toast 仍不自动消失。
 - `InfiniteCanvas` 的 localStorage 持久化改为 400ms 防抖（原来每次拖拽 pointermove 都同步 JSON.stringify + 写盘）；切会话 / 卸载 / pagehide / visibilitychange 会立即冲刷，拆分该文件时请保留这段逻辑。
@@ -76,7 +100,7 @@
 
 - 重新在服务器上跑一次低成本生成，确认账号池是否真正切号。
 - 如果还有坏账号，继续补自动下线规则。
-- 继续拆工作台/UI 大文件，优先 `components/workbench/InfiniteCanvas.tsx`、`components/admin/ProviderAccountAdminForms.tsx`、`components/admin/ConfigEditor.tsx`。
+- 内容开发开始前，保持各交互 hook 只承载状态和动作，不把页面视觉组合重新搬回服务层。
 - 保持 README 和这个记录文件同步更新。
 
 ## 记录格式建议
