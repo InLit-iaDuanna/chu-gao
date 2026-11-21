@@ -12,6 +12,7 @@ import {
   chatToolActivity,
   cleanToolText,
   parseToolArguments,
+  repairRelayValue,
   sanitizeAskUserArgs,
   sanitizeSuggestRepliesArgs,
   suggestRepliesBlock,
@@ -161,6 +162,40 @@ describe("argument handling", () => {
     ).toEqual(["换成夜景", "长".repeat(30), "再来一张"]);
     expect(suggest({ options: "只有一条" })).toEqual(["只有一条"]);
     expect(suggest({})).toEqual([]);
+  });
+});
+
+describe("relay-leaked XML parameters", () => {
+  // Captured verbatim from the botcf Opus relay on 2026-11-21.
+  const leaked =
+    '{"question": "这张海报是为了什么？", "options": "\\n<parameter name=\\"options\\">[\\n  {\\n    \\"label\\": \\"产品或品牌推广\\"\\n  },\\n  {\\n    \\"label\\": \\"活动/展览/演出宣传\\",\\n    \\"description\\": \\"演唱会等\\"\\n  }\\n]"}';
+
+  it("decodes an array that arrives wrapped in a <parameter> tag", () => {
+    expect(sanitizeAskUserArgs(leaked)).toEqual({
+      kind: "card",
+      card: {
+        question: "这张海报是为了什么？",
+        options: [
+          { label: "产品或品牌推广" },
+          { label: "活动/展览/演出宣传", description: "演唱会等" },
+        ],
+        multiple: false,
+      },
+    });
+  });
+
+  it("repairs suggest_replies the same way and leaves plain strings alone", () => {
+    expect(
+      sanitizeSuggestRepliesArgs(
+        JSON.stringify({
+          options: '<parameter name="options">["换成夜景", "再来一张竖版"]</parameter>',
+        }),
+      ),
+    ).toEqual(["换成夜景", "再来一张竖版"]);
+    expect(repairRelayValue("https://example.com/a")).toBe(
+      "https://example.com/a",
+    );
+    expect(repairRelayValue("[未闭合")).toBe("[未闭合");
   });
 });
 

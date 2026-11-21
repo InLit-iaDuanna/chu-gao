@@ -119,6 +119,18 @@ describe("Luna Responses adapter", () => {
     );
   });
 
+  it("routes every transport name to its own endpoint", () => {
+    expect(chatEndpoint("https://example.com/v1", "responses_sse")).toBe(
+      "https://example.com/v1/responses",
+    );
+    expect(
+      chatEndpoint("https://example.com", "anthropic_messages_sse"),
+    ).toBe("https://example.com/v1/messages");
+    expect(chatEndpoint("https://example.com/", "chat_completions_sse")).toBe(
+      "https://example.com/v1/chat/completions",
+    );
+  });
+
   it("keeps explicit non-streaming summary calls independent of chat streaming", () => {
     expect(
       lunaRequestBody(

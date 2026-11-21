@@ -192,14 +192,39 @@ export const CHECK_CREDITS_ANTHROPIC_TOOL = checkCredits.anthropic;
 // ---------------------------------------------------------------------------
 // Argument handling
 
+/**
+ * Some relays (botcf, measured 2026-11-21) leak their XML tool format into
+ * nested values: an array argument arrives as the string
+ * `"\n<parameter name=\"options\">[ ... ]"`. Strip the tag and decode the JSON
+ * array/object it wraps; anything else is returned unchanged.
+ */
+export function repairRelayValue(value: unknown): unknown {
+  if (typeof value !== "string") return value;
+  const stripped = value
+    .replace(/<\/?parameter\b[^>]*>/gi, "")
+    .replace(/<\/?antml:[a-z_]+\b[^>]*>/gi, "")
+    .trim();
+  if (!/^[[{]/.test(stripped)) return stripped === value.trim() ? value : stripped;
+  try {
+    return JSON.parse(stripped);
+  } catch {
+    return stripped;
+  }
+}
+
 /** Lenient JSON object parse: empty or malformed arguments become {}. */
 export function parseToolArguments(raw: string): Record<string, unknown> {
   if (!raw || !raw.trim()) return {};
   try {
     const parsed: unknown = JSON.parse(raw);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-      ? (parsed as Record<string, unknown>)
-      : {};
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+      return {};
+    return Object.fromEntries(
+      Object.entries(parsed as Record<string, unknown>).map(([key, value]) => [
+        key,
+        repairRelayValue(value),
+      ]),
+    );
   } catch {
     return {};
   }

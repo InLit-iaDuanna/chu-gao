@@ -32,6 +32,7 @@ import { generationOperation } from "@/lib/generation-operation";
 import type { ChatReference } from "@/lib/chat-references-types";
 import { resolveChatReferences } from "@/lib/chat-references";
 import { normalizeUploadedReferenceKey } from "@/lib/storage";
+import { repairRelayValue } from "@/lib/chat-agent-tools";
 import {
   ConversationNotFoundError,
   GenerationQueueError,
@@ -142,7 +143,9 @@ export function parseChatImageToolArgs(
     record.source_images !== "" &&
     !(Array.isArray(record.source_images) && !record.source_images.length)
   ) {
-    const sourceImages = parseSourceImages(record.source_images);
+    const sourceImages = parseSourceImages(
+      repairRelayValue(record.source_images),
+    );
     if (sourceImages) value.source_images = sourceImages;
     else ignored.push("source_images");
   }

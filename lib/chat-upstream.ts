@@ -219,8 +219,11 @@ export function chatEndpoint(
   transport: boolean | ChatTransport,
 ): string {
   const root = baseUrl.replace(/\/+$/, "").replace(/\/v1$/, "");
+  // Callers pass either the legacy boolean or the transport name; both
+  // spellings of the Responses transport must reach /responses (Sol, Luna and
+  // Gemini silently failed on /chat/completions when only `true` matched).
   const path =
-    transport === true
+    transport === true || transport === "responses_sse"
       ? "responses"
       : transport === "anthropic_messages_sse"
         ? "messages"
