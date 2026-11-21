@@ -260,7 +260,7 @@ export function ConversationPanel({
             lastTurn = turn;
             setPendingUser(null);
             setConversation((current) =>
-              mergeChatTurn(current, turn, submitted),
+              mergeChatTurn(current, turn, { content: submitted }),
             );
           },
           onDelta: () => undefined,
@@ -277,7 +277,7 @@ export function ConversationPanel({
       if (!lastTurn || controller.signal.aborted) return;
       const history = await getConversation(conversation.id);
       if (controller.signal.aborted) return;
-      setConversation(mergeChatTurn(history, lastTurn, submitted));
+      setConversation(mergeChatTurn(history, lastTurn, { content: submitted }));
       refreshThreads();
       setDraft((value) => (value.trim() === submitted ? "" : value));
       setPendingUser(null);

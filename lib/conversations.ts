@@ -1,5 +1,6 @@
 import type { ConversationMessageRole, Prisma } from "@prisma/client";
 import { storedChatReferences } from "@/lib/chat-references-types";
+import { db } from "@/lib/db";
 
 import type {
   ConversationMessage,
@@ -202,10 +203,41 @@ export async function serializeConversation(
   row: ConversationWithMessages,
   options: { displayNameMap?: Image2ChannelDisplayNameMap } = {},
 ): Promise<ConversationView> {
-  const generationBilling = await loadGenerationBilling(
-    row.userId,
-    row.messages.flatMap((message) =>
-      message.generation ? [message.generation] : [],
+  const references = row.messages.map((message) =>
+    serializeChatReferences(message.chatReferences),
+  );
+  // A reference can come from another conversation owned by the same user.
+  const sourceIds = [
+    ...new Set(
+      references
+        .flat()
+        .flatMap((ref) => (ref.kind === "generated" ? [ref.id] : [])),
+    ),
+  ];
+  const [generationBilling, sourceImages] = await Promise.all([
+    loadGenerationBilling(
+      row.userId,
+      row.messages.flatMap((message) =>
+        message.generation ? [message.generation] : [],
+      ),
+    ),
+    sourceIds.length
+      ? db.generatedImage.findMany({
+          where: {
+            id: { in: sourceIds },
+            generation: { userId: row.userId, deletedAt: null },
+          },
+          select: { id: true, generationId: true },
+        })
+      : [],
+  ]);
+  const previews = new Map(
+    sourceImages.map(
+      (image) =>
+        [
+          image.id,
+          privateImageThumbnailUrl(image.generationId, image.id),
+        ] as const,
     ),
   );
   const chatAttempts = new Map(
@@ -241,7 +273,7 @@ export async function serializeConversation(
     title: row.title,
     lastMessageAt: row.lastMessageAt.toISOString(),
     createdAt: row.createdAt.toISOString(),
-    messages: row.messages.map((message) => ({
+    messages: row.messages.map((message, index) => ({
       id: message.id,
       role: roleToView(message.role),
       content: message.content,
@@ -258,7 +290,11 @@ export async function serializeConversation(
             (message.chatUsage as Record<string, unknown> | null)?.billing,
           ))
         : undefined,
-      chatReferences: serializeChatReferences(message.chatReferences),
+      chatReferences: references[index].map((ref) =>
+        ref.kind === "generated"
+          ? { ...ref, previewUrl: previews.get(ref.id) }
+          : ref,
+      ),
       chatSources: Array.isArray(message.chatSources)
         ? (message.chatSources as unknown as import("@/lib/chat-search").ChatSearchSource[])
         : [],

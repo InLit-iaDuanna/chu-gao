@@ -23,6 +23,8 @@ export const chatReferencesSchema = z
   .array(chatReferenceSchema)
   .max(MAX_CHAT_REFERENCES);
 export type ChatReference = z.infer<typeof chatReferenceSchema>;
+/** Presentation only; preview URLs are never part of a submitted reference. */
+export type ChatReferenceView = ChatReference & { previewUrl?: string };
 
 export interface ChatReferencesInput {
   references?: readonly ChatReference[];

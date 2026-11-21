@@ -151,13 +151,13 @@ describe("reference input", () => {
     expect(result.current.references).toHaveLength(2);
   });
 
-  it("rejects invalid files and separates uploaded and generated references", async () => {
+  it("rejects empty files and separates uploaded and generated references", async () => {
     const { result } = renderHook(() =>
       useReferenceInput({ model, references: [], onChange: vi.fn() }),
     );
     await act(() =>
       result.current.upload(
-        new File(["bad"], "file.txt", { type: "text/plain" }),
+        new File([], "empty.png", { type: "image/png" }),
       ),
     );
     expect(upload).not.toHaveBeenCalled();

@@ -45,6 +45,7 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
 vi.mock("./lib/api", () => ({
+  request: vi.fn(async () => null),
   getMe: mocks.me,
   listModels: mocks.models,
   listConversations: mocks.list,
@@ -267,11 +268,16 @@ beforeEach(() => {
     );
     return structuredClone(stored);
   });
-  mocks.chat.mockImplementation(async ({ handlers: callbacks, content }) => {
-    const turn = managedReply(content, "可以保留原有坡度。", "completed");
-    callbacks.onTurn(turn);
-    callbacks.onDone();
-  });
+  mocks.chat.mockImplementation(
+    async ({ handlers: callbacks, content, references }) => {
+      const turn = managedReply(content, "可以保留原有坡度。", "completed");
+      stored.messages.find(
+        (message) => message.chatTurnId === turn.id && message.role === "user",
+      )!.chatReferences = references;
+      callbacks.onTurn(turn);
+      callbacks.onDone();
+    },
+  );
 });
 
 function managedReply(content: string, text: string, status: string) {
@@ -980,18 +986,40 @@ it("keeps clarification feedback local instead of appending an unmanaged assista
   expect(mocks.generate).not.toHaveBeenCalled();
 });
 
-it("keeps uploaded references across discussion turns", async () => {
+it("moves a sent upload into the user message and sends the next chat without it", async () => {
   render(<StudioApp initialReferenceKeys={["uploads/ref.png"]} />);
   await ready();
-  fireEvent.click(screen.getByRole("radio", { name: "讨论想法" }));
-  fireEvent.change(screen.getByRole("textbox", { name: "对话输入" }), {
+  const input = screen.getByRole("textbox", { name: "对话输入" });
+  fireEvent.change(input, {
     target: { value: "分析这张参考图" },
   });
   fireEvent.click(screen.getByRole("button", { name: "发送" }));
   await screen.findByText("可以保留原有坡度。");
-  expect(screen.getByRole("button", { name: "移除参考图 1" })).toBeVisible();
+  const user = screen.getByRole("article", { name: "你的消息" });
+  expect(within(user).getByRole("img", { name: "参考图 1" })).toHaveAttribute(
+    "src",
+    "/api/upload?key=uploads%2Fref.png",
+  );
+  expect(
+    screen.queryByRole("button", { name: "移除参考图 1" }),
+  ).not.toBeInTheDocument();
+  expect(input).toHaveValue("");
   expect(mocks.chat).toHaveBeenCalledWith(
     expect.objectContaining({ referenceImageKeys: ["uploads/ref.png"] }),
+  );
+  fireEvent.change(input, { target: { value: "继续分析" } });
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "发送" })).toBeEnabled(),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "发送" }));
+  await waitFor(() =>
+    expect(mocks.chat).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        references: [],
+        referenceImageKeys: [],
+        sourceImageIds: [],
+      }),
+    ),
   );
 });
 

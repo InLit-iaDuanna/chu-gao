@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, type ReactNode } from "react";
-import { ImagePlus, Loader2, X } from "lucide-react";
+import { ImageOff, ImagePlus, Loader2, X } from "lucide-react";
 import { IconButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import type { ReferenceItem } from "./CommandDock";
@@ -58,7 +58,8 @@ export function ReferenceDropZone({
           event.dataTransfer.getData(REFERENCE_DRAG_MIME),
         );
         if (reference) onReference(reference);
-        else Array.from(event.dataTransfer.files).forEach((file) => onFile(file));
+        else
+          Array.from(event.dataTransfer.files).forEach((file) => onFile(file));
       }}
       onPaste={(event) => {
         const files = Array.from(event.clipboardData.items)
@@ -89,42 +90,61 @@ export function ReferenceThumbnails({
   uploading = 0,
   onRemove,
 }: {
-  references: ReferenceItem[];
+  references: Array<
+    Pick<ReferenceItem, "kind" | "key"> & { previewUrl?: string }
+  >;
   uploading?: number;
-  onRemove: (key: string) => void;
+  onRemove?: (key: string) => void;
 }) {
   if (!references.length && !uploading) return null;
   return (
     <div
-      className="flex max-h-40 flex-wrap gap-2 overflow-y-auto p-3 pb-1"
-      aria-label="已添加参考图"
+      className={cn(
+        "flex flex-wrap gap-2",
+        onRemove ? "max-h-40 overflow-y-auto p-3 pb-1" : "mb-2",
+      )}
+      aria-label={onRemove ? "已添加参考图" : "消息参考图"}
     >
       {references.map((item, index) => (
         <div
           key={`${item.kind}:${item.key}`}
           className="relative h-16 w-16 shrink-0 rounded-lg bg-surface-2"
         >
-          <img
-            src={item.previewUrl}
-            alt={`参考图 ${index + 1}`}
-            className="h-full w-full rounded-lg object-cover"
-          />
+          {item.previewUrl ? (
+            <img
+              src={item.previewUrl}
+              alt={`参考图 ${index + 1}`}
+              className="h-full w-full rounded-lg object-cover"
+              loading={onRemove ? undefined : "lazy"}
+            />
+          ) : (
+            <span
+              role="img"
+              aria-label={`参考图 ${index + 1} 不可用`}
+              title="原图已不可用"
+              className="flex h-full items-center justify-center text-text-muted"
+            >
+              <ImageOff size={16} />
+            </span>
+          )}
           <span
             aria-hidden="true"
             className="absolute bottom-0.5 left-0.5 rounded bg-black/60 px-1 py-px text-[9px] font-semibold leading-none text-white"
           >
             {index + 1}
           </span>
-          <IconButton
-            type="button"
-            variant="secondary"
-            aria-label={`移除参考图 ${index + 1}`}
-            title="移除参考图"
-            onClick={() => onRemove(item.key)}
-            className="absolute -right-1.5 -top-1.5 h-5 w-5 rounded-full border border-border bg-surface p-0 text-foreground shadow-sm"
-          >
-            <X size={11} />
-          </IconButton>
+          {onRemove ? (
+            <IconButton
+              type="button"
+              variant="secondary"
+              aria-label={`移除参考图 ${index + 1}`}
+              title="移除参考图"
+              onClick={() => onRemove(item.key)}
+              className="absolute -right-1.5 -top-1.5 h-5 w-5 rounded-full border border-border bg-surface p-0 text-foreground shadow-sm"
+            >
+              <X size={11} />
+            </IconButton>
+          ) : null}
         </div>
       ))}
       {uploading > 0 ? (

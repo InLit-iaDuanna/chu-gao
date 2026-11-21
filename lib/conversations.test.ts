@@ -1,9 +1,13 @@
 import { expect, it, vi } from "vitest";
 const groupBy = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/db", () => ({ db: { usageLog: { groupBy } } }));
+const findMany = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/db", () => ({
+  db: { usageLog: { groupBy }, generatedImage: { findMany } },
+}));
 vi.mock("@/lib/storage", () => ({
   privateImageUrl: () => "/private/image",
-  privateImageThumbnailUrl: () => "/private/thumbnail",
+  privateImageThumbnailUrl: (generationId: string, imageId: string) =>
+    `/api/generations/${generationId}/images/${imageId}?variant=thumb`,
 }));
 import {
   serializeConversation,
@@ -106,4 +110,46 @@ it("restores each historical attempt's actual settlement and image ledger withou
     chargedCredits: 0.234567,
   });
   expect(groupBy).toHaveBeenCalledTimes(1);
+  expect(findMany).not.toHaveBeenCalled();
+});
+
+it("restores ordered chat references from other owned generations without revealing deleted or unavailable images", async () => {
+  findMany.mockResolvedValue([{ id: "source", generationId: "other" }]);
+  const now = new Date();
+  const refs = [
+    { kind: "generated", id: "source" },
+    { kind: "upload", key: "uploads/owner/a.png" },
+    { kind: "generated", id: "missing" },
+  ];
+  const row = {
+    id: "chat",
+    userId: "owner",
+    title: "",
+    createdAt: now,
+    lastMessageAt: now,
+    messages: [1, 2].map((id) => ({
+      id: String(id),
+      role: "USER",
+      content: "看图",
+      createdAt: now,
+      chatReferences: refs,
+    })),
+  } as unknown as ConversationWithMessages;
+  const view = await serializeConversation(row);
+  expect(findMany).toHaveBeenCalledExactlyOnceWith({
+    where: {
+      id: { in: ["source", "missing"] },
+      generation: { userId: "owner", deletedAt: null },
+    },
+    select: { id: true, generationId: true },
+  });
+  for (const message of view.messages)
+    expect(message.chatReferences).toEqual([
+      {
+        ...refs[0],
+        previewUrl: "/api/generations/other/images/source?variant=thumb",
+      },
+      refs[1],
+      refs[2],
+    ]);
 });

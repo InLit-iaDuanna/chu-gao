@@ -194,6 +194,7 @@ export interface ConversationMessage {
   chatAttemptId?: string;
   chatStatus?: string;
   chatError?: string | null;
+  chatReferences?: import("@/lib/chat-references-types").ChatReferenceView[];
   chatSources?: import("@/lib/chat-search").ChatSearchSource[];
   chatUsage?: Record<string, unknown> | null;
   chatBilling?: import("@/lib/turn-credit-types").CreditSettlement | null;

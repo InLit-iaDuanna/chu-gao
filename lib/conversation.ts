@@ -14,7 +14,7 @@ export interface ConversationMessage {
   chatBilling?: import("@/lib/turn-credit-types").CreditSettlement | null;
   chatAttemptNumber?: number;
   chatActivityHistory?: string[];
-  chatReferences?: import("@/lib/chat-references-types").ChatReference[];
+  chatReferences?: import("@/lib/chat-references-types").ChatReferenceView[];
   generationPrompt?: string;
   generationModelId?: string;
   generationSize?: string | null;

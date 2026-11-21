@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { ChatTurnInput, ChatTurnView } from "@/lib/chat-turn-types";
+import { chatReferencesSchema } from "@/lib/chat-references-types";
 import { ApiError, isApiError, request } from "./api";
 
 const pendingSchema = z.discriminatedUnion("kind", [
@@ -13,6 +14,7 @@ const pendingSchema = z.discriminatedUnion("kind", [
         modelId: z.string(),
         referenceImageKeys: z.array(z.string()),
         sourceImageIds: z.array(z.string()),
+        references: chatReferencesSchema.optional(),
       })
       .passthrough(),
   }),

@@ -21,6 +21,7 @@ import {
   type ChatContextStatus,
 } from "@/lib/chat-context-types";
 import { chatIsTerminal, type ChatTurnView } from "@/lib/chat-turn-types";
+import { normalizeChatReferences } from "@/lib/chat-references-types";
 import { parseImageCommand } from "@/lib/image-command";
 import {
   cancelManagedChat,
@@ -36,7 +37,7 @@ import {
   readChatReceipt,
   resolveChatSubmission,
 } from "./lib/chat-submission";
-import { mergeChatTurn } from "./lib/chat-turn-view";
+import { mergeChatTurn, type SubmittedChatMessage } from "./lib/chat-turn-view";
 import {
   Button,
   Dialog,
@@ -104,6 +105,7 @@ import { subscribeGeneration } from "./lib/sse";
 import { writeActiveConversationId } from "./lib/active-conversation";
 import {
   chatReferenceRequest,
+  chatThumbnail,
   referenceRequest,
   useReferenceInput,
 } from "./lib/reference-input";
@@ -305,7 +307,7 @@ export function StudioApp({
   const [chatCompacting, setChatCompacting] = useState(false);
   const [busy, setBusy] = useState(false);
   const [optimizing, setOptimizing] = useState(false);
-  const [pending, setPending] = useState<string | null>(null);
+  const [pending, setPending] = useState<SubmittedChatMessage | null>(null);
   const [streaming, setStreaming] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
@@ -791,8 +793,28 @@ export function StudioApp({
     [track],
   );
 
+  const consumeChatDraft = useCallback((message: SubmittedChatMessage) => {
+    setPrompt((value) => (value.trim() === message.content ? "" : value));
+    const sent = (message.chatReferences ?? []).map(chatThumbnail);
+    if (sent.length)
+      setParams((value) => ({
+        ...value,
+        referenceImages: value.referenceImages.filter(
+          (item) =>
+            !sent.some((ref) => ref.kind === item.kind && ref.key === item.key),
+        ),
+      }));
+    // Recipe links seed a draft only once; a reload must not reattach it.
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("reference") || url.searchParams.has("prompt")) {
+      url.searchParams.delete("reference");
+      url.searchParams.delete("prompt");
+      window.history.replaceState(window.history.state, "", url);
+    }
+  }, []);
+
   const resumeChatTurn = useCallback(
-    async (turn: ChatTurnView, userContent?: string) => {
+    async (turn: ChatTurnView, userMessage?: SubmittedChatMessage) => {
       if (
         sendLock.current ||
         !mounted.current ||
@@ -811,7 +833,7 @@ export function StudioApp({
       setPending(null);
       setChatRecoverable(false);
       setSendError(null);
-      setConversation((value) => mergeChatTurn(value, turn, userContent));
+      setConversation((value) => mergeChatTurn(value, turn, userMessage));
       const current = () =>
         mounted.current &&
         version === loadVersion.current &&
@@ -827,7 +849,7 @@ export function StudioApp({
                 managedChatTurn.current = value;
                 setManagedTurnId(value.id);
                 setConversation((previous) =>
-                  mergeChatTurn(previous, value, userContent),
+                  mergeChatTurn(previous, value, userMessage),
                 );
                 if (changedAttempt)
                   void getConversation(value.conversationId)
@@ -837,7 +859,7 @@ export function StudioApp({
                           mergeChatTurn(
                             history,
                             managedChatTurn.current,
-                            userContent,
+                            userMessage,
                           ),
                         );
                     })
@@ -877,7 +899,7 @@ export function StudioApp({
               mergeChatTurn(
                 history,
                 managedChatTurn.current ?? turn,
-                userContent,
+                userMessage,
               ),
             );
         }
@@ -957,13 +979,22 @@ export function StudioApp({
     setBusy(true);
     setSendError(null);
     try {
-      const userContent =
-        receipt?.pending?.kind === "create"
-          ? receipt.pending.input.content
-          : undefined;
+      const pendingInput =
+        receipt?.pending?.kind === "create" ? receipt.pending.input : undefined;
+      const userMessage = pendingInput
+        ? {
+            content: pendingInput.content,
+            chatReferences: normalizeChatReferences(pendingInput),
+          }
+        : undefined;
       let turn = receipt?.pending
         ? await resolveChatSubmission(userId, id)
         : null;
+      if (turn && userMessage && current()) {
+        consumeChatDraft(userMessage);
+        const accepted = turn;
+        setConversation((value) => mergeChatTurn(value, accepted, userMessage));
+      }
       if (!turn) turn = await getActiveChatTurn(id);
       // A fresh history read closes the history/active=null completion race.
       const history = await getConversation(id);
@@ -975,7 +1006,7 @@ export function StudioApp({
       setConversation(history);
       setChatRecoverable(false);
       sendLock.current = false;
-      if (turn) await resumeChatTurn(turn, userContent);
+      if (turn) await resumeChatTurn(turn, userMessage);
     } catch (error) {
       if (current()) {
         const cleared = isApiError(error) && error.code === "CONTENT_CLEARED";
@@ -1002,7 +1033,7 @@ export function StudioApp({
         flushDeferredRecovery();
       }
     }
-  }, [userId, resumeChatTurn, flushDeferredRecovery]);
+  }, [userId, resumeChatTurn, flushDeferredRecovery, consumeChatDraft]);
   useEffect(() => {
     recoveryAction.current = () => void recoverChat();
   }, [recoverChat]);
@@ -1219,7 +1250,16 @@ export function StudioApp({
     });
     return () => setStudioNavigation(null);
   }, [activeId, locked, selectThread, newConversation, setStudioNavigation]);
-  const latestImage = [...(conversation?.messages ?? [])]
+  const messages = conversation?.messages ?? [];
+  // Chat consumes the previous result once. Image generation can keep editing it.
+  const lastChatInput =
+    mode === "chat" && !imageCommand
+      ? messages.findLastIndex(
+          (message) => message.role === "user" && Boolean(message.chatTurnId),
+        )
+      : -1;
+  const latestImage = messages
+    .slice(lastChatInput + 1)
     .reverse()
     .map((message) =>
       message.generationId && message.role === "assistant"
@@ -1609,7 +1649,6 @@ export function StudioApp({
     const revision = ++loadVersion.current;
     const isNew = !conversation;
     setBusy(true);
-    setPending(content);
     setSendError(null);
     const submittedReferences = confirmed
       ? creativeReferences.filter(
@@ -1618,12 +1657,36 @@ export function StudioApp({
             reference.key === confirmed.creative.baseReference.key,
         )
       : effectiveReferences;
+    const chatRequest = chatReferenceRequest(
+      imageSubmission ? [] : submittedReferences,
+    );
+    const submittedMessage: SubmittedChatMessage = {
+      content,
+      chatReferences: chatRequest.references.map((ref, index) => ({
+        ...ref,
+        previewUrl: submittedReferences[index].previewUrl,
+      })),
+    };
+    setPending(submittedMessage);
     let current = conversation;
     try {
       if (!current) {
         setStatus("正在创建对话…");
         current = await createConversation({ title: content.slice(0, 28) });
         if (!mounted.current) return false;
+        if (!imageSubmission && userId) {
+          // From here even an unconfirmed send belongs to this conversation's draft.
+          const prefix = `chugao.dialogue-draft.v1.${userId}.`;
+          try {
+            const draft = sessionStorage.getItem(prefix + "new");
+            if (draft) {
+              sessionStorage.setItem(prefix + current.id, draft);
+              sessionStorage.removeItem(prefix + "new");
+            }
+          } catch {
+            /* The in-memory draft is still available. */
+          }
+        }
         if (confirmed && me) {
           try {
             sessionStorage.setItem(
@@ -1645,6 +1708,7 @@ export function StudioApp({
         setStatus(null);
         setStreaming("");
         setManagedTurnId(null);
+        managedChatTurn.current = null;
         setChatConnection("connected");
         const controller = new AbortController();
         chatAbort.current = controller;
@@ -1668,31 +1732,23 @@ export function StudioApp({
             ? chatContextBudget
             : undefined,
           reasoningEffort,
-          ...chatReferenceRequest(submittedReferences),
-          references: submittedReferences.map((reference, index) =>
-            reference.kind === "upload"
-              ? {
-                  kind: "upload" as const,
-                  key: reference.key,
-                  label: `图${index + 1}`,
-                }
-              : {
-                  kind: "generated" as const,
-                  id: reference.key,
-                  label: `图${index + 1}`,
-                },
-          ),
+          ...chatRequest,
           signal: controller.signal,
           handlers: {
             onTurn: (turn) => {
               if (currentChat()) {
+                if (!managedChatTurn.current) {
+                  consumeChatDraft(submittedMessage);
+                  setPending(null);
+                }
                 const changedAttempt =
                   managedChatTurn.current?.id === turn.id &&
                   managedChatTurn.current.attemptId !== turn.attemptId;
                 managedChatTurn.current = turn;
                 setManagedTurnId(turn.id);
-                setPending(null);
-                setConversation((value) => mergeChatTurn(value, turn, content));
+                setConversation((value) =>
+                  mergeChatTurn(value, turn, submittedMessage),
+                );
                 if (changedAttempt)
                   void getConversation(id)
                     .then((history) => {
@@ -1701,7 +1757,7 @@ export function StudioApp({
                           mergeChatTurn(
                             history,
                             managedChatTurn.current,
-                            content,
+                            submittedMessage,
                           ),
                         );
                     })
@@ -1739,11 +1795,13 @@ export function StudioApp({
           },
         });
         if (!currentChat()) return false;
+        if (!managedChatTurn.current)
+          throw new Error("提交结果尚未确认，请恢复连接后重试");
         const history = await getConversation(id);
         if (!currentChat()) return false;
         setConversation(
           managedChatTurn.current
-            ? mergeChatTurn(history, managedChatTurn.current, content)
+            ? mergeChatTurn(history, managedChatTurn.current, submittedMessage)
             : history,
         );
         refreshMe();
@@ -1872,8 +1930,8 @@ export function StudioApp({
           }
         }
       }
-      setPrompt((value) => (value === submittedPrompt ? "" : value));
-      if (directImage || activeMode === "image" || confirmed) {
+      if (imageSubmission) {
+        setPrompt((value) => (value === submittedPrompt ? "" : value));
         setParams((value) => ({
           ...value,
           referenceImages: value.referenceImages.filter(
@@ -1884,8 +1942,8 @@ export function StudioApp({
               ),
           ),
         }));
+        setUsePrevious(true);
       }
-      setUsePrevious(true);
       if (isNew && me) {
         try {
           sessionStorage.removeItem(
@@ -1923,13 +1981,15 @@ export function StudioApp({
         setSendError(
           error instanceof Error ? error.message : "发送失败，请重试",
         );
-        setPrompt((value) => value || content);
-        setParams((value) => ({
-          ...value,
-          referenceImages: value.referenceImages.length
-            ? value.referenceImages
-            : submittedReferences,
-        }));
+        if (imageSubmission) {
+          setPrompt((value) => value || content);
+          setParams((value) => ({
+            ...value,
+            referenceImages: value.referenceImages.length
+              ? value.referenceImages
+              : submittedReferences,
+          }));
+        }
       }
       return false;
     } finally {

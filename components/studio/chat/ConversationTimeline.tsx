@@ -12,6 +12,9 @@ import { Button, IconButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { CopyTextButton } from "../CopyTextButton";
 import { GenerationCard } from "../GenerationCard";
+import { ReferenceThumbnails } from "../ReferenceDropZone";
+import { chatThumbnail } from "../lib/reference-input";
+import type { SubmittedChatMessage } from "../lib/chat-turn-view";
 import type { Conversation, Generation, ModelInfo } from "../lib/types";
 import { messageGeneration } from "./message-generation";
 import { AssistantContent } from "./AssistantContent";
@@ -35,7 +38,7 @@ interface Props {
   conversation: Conversation | null;
   generations: Record<string, Generation>;
   models: ModelInfo[];
-  pending: string | null;
+  pending: SubmittedChatMessage | null;
   streaming: string | null;
   status: string | null;
   managedTurnId?: string | null;
@@ -48,6 +51,21 @@ interface Props {
   onRetry: (generation: Generation) => void;
   onCancel: (id: string) => void;
   onRetryChat?: (id: string, expectedPreviousAttemptId: string) => void;
+}
+
+function UserContent({ message }: { message: SubmittedChatMessage }) {
+  return (
+    <>
+      {message.chatReferences?.length ? (
+        <ReferenceThumbnails
+          references={message.chatReferences.map(chatThumbnail)}
+        />
+      ) : null}
+      <p className="select-text whitespace-pre-wrap break-words text-base leading-7 [overflow-wrap:anywhere]">
+        {message.content}
+      </p>
+    </>
+  );
 }
 
 function WaitingTime({ since, hasText }: { since: string; hasText: boolean }) {
@@ -289,9 +307,7 @@ export function ConversationTimeline({
                   )}
                 >
                   {isUser ? (
-                    <p className="select-text whitespace-pre-wrap break-words text-base leading-7 [overflow-wrap:anywhere]">
-                      {message.content}
-                    </p>
+                    <UserContent message={message} />
                   ) : !generation || Boolean(message.chatTurnId) ? (
                     <>
                       <ActivityTrail
@@ -463,9 +479,9 @@ export function ConversationTimeline({
           })}
           {pending ? (
             <article aria-label="正在发送的消息" className="flex justify-end">
-              <p className="studio-message max-w-[90%] select-text whitespace-pre-wrap break-words px-4 py-2.5 text-base leading-7 [overflow-wrap:anywhere] sm:max-w-[75%]">
-                {pending}
-              </p>
+              <div className="studio-message min-w-0 max-w-[90%] px-4 py-2.5 sm:max-w-[75%]">
+                <UserContent message={pending} />
+              </div>
             </article>
           ) : null}
           {!managedTurnId && (streaming !== null || status) ? (

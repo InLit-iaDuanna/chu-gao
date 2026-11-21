@@ -68,7 +68,17 @@ it("only renders assistant prose and streamed text as Markdown, preserving image
     conversation,
     generations: {},
     models: [],
-    pending: "**发送原文**",
+    pending: {
+      content: "**发送原文**",
+      chatReferences: [
+        {
+          kind: "generated",
+          id: "source",
+          previewUrl: "/api/generations/other/images/source?variant=thumb",
+        },
+        { kind: "upload", key: "uploads/图 2.png" },
+      ],
+    },
     streaming: "**流式第一段**",
     status: null,
     disabled: false,
@@ -91,9 +101,17 @@ it("only renders assistant prose and streamed text as Markdown, preserving image
   expect(screen.getByRole("button", { name: "复制提示词" })).toBeVisible();
   expect(screen.getByRole("button", { name: "重新编辑消息" })).toBeVisible();
   expect(screen.getByText("流式第一段").tagName).toBe("STRONG");
+  const pending = screen.getByRole("article", { name: "正在发送的消息" });
+  expect(pending).toHaveTextContent("**发送原文**");
   expect(
-    screen.getByRole("article", { name: "正在发送的消息" }),
-  ).toHaveTextContent("**发送原文**");
+    within(pending)
+      .getAllByRole("img")
+      .map((img) => img.getAttribute("src")),
+  ).toEqual([
+    "/api/generations/other/images/source?variant=thumb",
+    `/api/upload?key=${encodeURIComponent("uploads/图 2.png")}`,
+  ]);
+  expect(within(pending).queryByRole("button")).not.toBeInTheDocument();
   view.rerender(
     <ToastProvider>
       <ConversationTimeline {...props} streaming="**流式第二段**" />

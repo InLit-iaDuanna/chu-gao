@@ -246,8 +246,12 @@ afterEach(() => {
 
 it("restores a lost create ACK after remount by the persisted user/conversation request key", async () => {
   loseAck = "after";
-  const view = await start();
+  const view = await start("分析布局", ["uploads/managed-user/layout.png"]);
   await screen.findByText(/提交结果尚未确认/);
+  expect(screen.getByRole("textbox", { name: "对话输入" })).toHaveValue(
+    "分析布局",
+  );
+  expect(screen.getByRole("button", { name: "移除参考图 1" })).toBeVisible();
   const receipt = readChatReceipt("managed-user", "conversation")!;
   expect(receipt.pending?.kind).toBe("create");
   expect(
@@ -266,6 +270,9 @@ it("restores a lost create ACK after remount by the persisted user/conversation 
     usage: { input_tokens: 20, output_tokens: 8 },
   };
   setHistory();
+  history.messages[0].chatReferences = [
+    { kind: "upload", key: "uploads/managed-user/layout.png" },
+  ];
   loseAck = null;
   render(<StudioApp initialThreadId="conversation" />);
   expect(await screen.findByText("已保存的唯一回复")).toBeVisible();
@@ -278,11 +285,23 @@ it("restores a lost create ACK after remount by the persisted user/conversation 
     screen.getByRole("navigation", { name: "回复来源" }),
   ).toHaveTextContent("证据");
   fireEvent.click(screen.getByText("用量"));
-  expect(screen.getByText(/输入 20 · 输出 8/)).toBeVisible();
+  expect(screen.getByText(/输入总量 20 · 输出 8/)).toBeVisible();
   expect(posts.filter((item) => item.path === "/api/chat/turns")).toHaveLength(
     1,
   );
   expect(mocks.append).not.toHaveBeenCalled();
+  expect(screen.getByRole("textbox", { name: "对话输入" })).toHaveValue("");
+  expect(
+    screen.queryByRole("button", { name: "移除参考图 1" }),
+  ).not.toBeInTheDocument();
+  expect(
+    within(screen.getByRole("article", { name: "你的消息" })).getByRole("img", {
+      name: "参考图 1",
+    }),
+  ).toHaveAttribute(
+    "src",
+    "/api/upload?key=uploads%2Fmanaged-user%2Flayout.png",
+  );
 });
 
 it("replays exactly the original body and key if the unknown create has no receipt", async () => {
@@ -306,11 +325,85 @@ it("replays exactly the original body and key if the unknown create has no recei
   const creates = posts.filter((item) => item.path === "/api/chat/turns");
   expect(creates).toHaveLength(2);
   expect(creates[1].body).toEqual(first.body);
+  expect(screen.getByRole("textbox", { name: "对话输入" })).toHaveValue("");
+  expect(
+    screen.queryByRole("button", { name: "移除参考图 1" }),
+  ).not.toBeInTheDocument();
+  expect(
+    within(screen.getByRole("article", { name: "你的消息" })).getByRole("img", {
+      name: "参考图 1",
+    }),
+  ).toHaveAttribute("src", "/api/upload?key=uploads%2Ffirst.png");
   expect(
     fetchMock.mock.calls.some(([path]) =>
       String(path).startsWith("/api/conversations/chat"),
     ),
   ).toBe(false);
+});
+
+it("hands off an automatically attached result on ACK and does not restore it if the final history read fails", async () => {
+  const url = "/api/generations/g/images/result?variant=thumb";
+  history.messages = [
+    {
+      id: "result",
+      role: "assistant",
+      content: "完成",
+      createdAt,
+      generationId: "g",
+      generationStatus: "SUCCEEDED",
+      images: [
+        {
+          id: "result",
+          url,
+          src: url,
+          downloadUrl: url,
+          thumbnailUrl: url,
+          mimeType: "image/png",
+          width: 256,
+          height: 256,
+          createdAt,
+        },
+      ],
+    },
+  ];
+  // This is an earlier image job, not an active chat turn.
+  canonical.status = "completed";
+  const initialRead = fetchMock.getMockImplementation()!;
+  fetchMock.mockImplementation((path: string, init?: RequestInit) => {
+    if (path === "/api/chat/turns" && init?.method === "POST")
+      canonical.status = "running";
+    return initialRead(path, init);
+  });
+  const view = await start("这张图里有什么？");
+  await subscribed();
+  const input = screen.getByRole("textbox", { name: "对话输入" });
+  const article = screen.getByRole("article", { name: "你的消息" });
+  expect(
+    within(article).getByRole("img", { name: "参考图 1" }),
+  ).toHaveAttribute("src", url);
+  expect(
+    posts.find((item) => item.path === "/api/chat/turns")?.body.references,
+  ).toEqual([{ kind: "generated", id: "result", label: "图1" }]);
+  expect(screen.getByRole("button", { name: "停止回复" })).toBeVisible();
+  expect(input).toHaveValue("");
+  expect(
+    screen.queryByRole("button", { name: "移除参考图 1" }),
+  ).not.toBeInTheDocument();
+  mocks.get.mockRejectedValueOnce(new Error("读取历史时断网"));
+  canonical = {
+    ...canonical,
+    status: "completed",
+    text: "已保存回答",
+    lastSeq: 1,
+  };
+  await act(async () => emit(1, "attempt.terminal", { status: "completed" }));
+  await screen.findByText("读取历史时断网");
+  expect(input).toHaveValue("");
+  expect(
+    screen.queryByRole("button", { name: "移除参考图 1" }),
+  ).not.toBeInTheDocument();
+  expect(within(article).getByRole("img", { name: "参考图 1" })).toBeVisible();
+  view.unmount();
 });
 
 it("recovers the known turn even when history says running but the active query returns null", async () => {

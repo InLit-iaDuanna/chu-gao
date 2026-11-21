@@ -2,6 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useToast } from "@/components/ui";
+import type {
+  ChatReference,
+  ChatReferenceView,
+} from "@/lib/chat-references-types";
 import type { ReferenceItem } from "../CommandDock";
 import type { ModelInfo } from "./types";
 import { uploadReferenceImage } from "./api";
@@ -9,7 +13,8 @@ import { uploadReferenceImage } from "./api";
 export const REFERENCE_DRAG_MIME = "application/x-chugao-reference";
 // HEIC/HEIF are accepted by the picker too: the server converts what it can
 // decode, and only then explains a format it cannot handle.
-export const REFERENCE_ACCEPT = "image/png,image/jpeg,image/webp,image/heic,image/heif";
+export const REFERENCE_ACCEPT =
+  "image/png,image/jpeg,image/webp,image/heic,image/heif";
 
 export function parseReferenceDrag(raw: string): ReferenceItem | null {
   try {
@@ -49,7 +54,25 @@ export function referenceRequest(references: ReferenceItem[]) {
 export function chatReferenceRequest(references: ReferenceItem[]) {
   const { referenceOrder, ...request } = referenceRequest(references);
   void referenceOrder;
-  return request;
+  return {
+    ...request,
+    references: references.map(
+      (ref, index): ChatReference =>
+        ref.kind === "upload"
+          ? { kind: "upload", key: ref.key, label: `图${index + 1}` }
+          : { kind: "generated", id: ref.key, label: `图${index + 1}` },
+    ),
+  };
+}
+
+export function chatThumbnail(ref: ChatReferenceView) {
+  return ref.kind === "upload"
+    ? {
+        kind: "upload" as const,
+        key: ref.key,
+        previewUrl: `/api/upload?key=${encodeURIComponent(ref.key)}`,
+      }
+    : { kind: "source" as const, key: ref.id, previewUrl: ref.previewUrl };
 }
 
 export function useReferenceInput({

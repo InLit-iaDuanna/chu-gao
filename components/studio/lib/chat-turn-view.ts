@@ -1,5 +1,10 @@
 import type { ChatTurnView } from "@/lib/chat-turn-types";
-import type { Conversation } from "./types";
+import type { Conversation, ConversationMessage } from "./types";
+
+export type SubmittedChatMessage = Pick<
+  ConversationMessage,
+  "content" | "chatReferences"
+>;
 
 export type ManagedChatView = ChatTurnView & {
   activity?: string;
@@ -25,7 +30,7 @@ export function chatHasSearched(turn: { searched?: boolean; parts?: unknown }) {
 export function mergeChatTurn(
   conversation: Conversation | null,
   turn: ManagedChatView,
-  userContent?: string,
+  userMessage?: SubmittedChatMessage,
 ): Conversation | null {
   if (!conversation || conversation.id !== turn.conversationId)
     return conversation;
@@ -85,7 +90,7 @@ export function mergeChatTurn(
   };
   const messages = [...conversation.messages];
   if (
-    userContent &&
+    userMessage &&
     !messages.some(
       (message) => message.role === "user" && message.chatTurnId === turn.id,
     )
@@ -93,7 +98,7 @@ export function mergeChatTurn(
     messages.push({
       id: `chat-user-${turn.id}`,
       role: "user",
-      content: userContent,
+      ...userMessage,
       chatTurnId: turn.id,
       createdAt,
     });
