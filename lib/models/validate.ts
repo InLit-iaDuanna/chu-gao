@@ -58,6 +58,14 @@ export const generationRequestSchema = z.object({
   // exact user-specified reference image order.
   referenceOrder: z.array(z.string().min(1)).max(20).optional(),
   providerChannelId: z.string().trim().min(1).max(200).optional(),
+  // 局部重绘：base 为被编辑的原图（"upload:<key>" | "source:<id>"），
+  // maskImageKey 为已上传的遮罩（黑底、白色涂抹区）。
+  inpaint: z
+    .object({
+      base: z.string().min(1).max(400),
+      maskImageKey: z.string().min(1).max(400),
+    })
+    .optional(),
 });
 
 export type GenerationRequestInput = z.infer<typeof generationRequestSchema>;
@@ -166,6 +174,34 @@ export function validateAgainstModelDefinition(
     throw new UnsupportedParamError("当前格式不支持压缩率");
   }
 
+  let inpaint: InternalRequest["inpaint"];
+  if (input.inpaint) {
+    const maskKey = normalizeUploadedReferenceKey(input.inpaint.maskImageKey);
+    if (!maskKey) throw new ValidationError("遮罩无效，请重新涂抹");
+    if (!capabilities.supportsReferenceImage)
+      throw new UnsupportedParamError("当前模型不支持局部重绘");
+    if (outputFormat === "gif")
+      throw new UnsupportedParamError("局部重绘不支持 GIF");
+    const [kind, ...rest] = input.inpaint.base.split(":");
+    const key = rest.join(":");
+    if (kind === "upload") {
+      const baseKey = normalizeUploadedReferenceKey(key);
+      if (
+        !baseKey ||
+        !input.referenceImageKeys?.some(
+          (item) => normalizeUploadedReferenceKey(item) === baseKey,
+        )
+      )
+        throw new ValidationError("局部重绘的原图无效");
+      inpaint = { baseKey, maskKey };
+    } else if (kind === "source" && input.sourceImageIds?.includes(key)) {
+      // 生成图由路由解析成存储 key 后替换；未解析的占位在 worker 里会直接失败退款。
+      inpaint = { baseKey: `source:${key}`, maskKey };
+    } else {
+      throw new ValidationError("局部重绘的原图无效");
+    }
+  }
+
   const providerChannelId = normalizeProviderChannelIdForModel(
     modelId,
     input.providerChannelId,
@@ -195,6 +231,7 @@ export function validateAgainstModelDefinition(
       key: normalizeUploadedReferenceKey(key) as string,
       mimeType: mimeTypeForReferenceKey(key),
     })),
+    ...(inpaint ? { inpaint } : {}),
   };
 }
 

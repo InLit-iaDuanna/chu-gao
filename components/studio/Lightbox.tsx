@@ -9,6 +9,7 @@ import {
 } from "@/components/ui";
 
 import {
+  Brush,
   ChevronLeft,
   ChevronRight,
   Download,
@@ -43,6 +44,8 @@ interface LightboxProps {
   onNavigate: (index: number) => void;
   onUseAsReference?: (image: LightboxImage) => void;
   onUsePrompt?: (prompt: string) => void;
+  /** 打开局部重绘编辑器（仅站内生成图）。 */
+  onInpaint?: (image: LightboxImage) => void;
 }
 
 export function Lightbox({
@@ -51,6 +54,7 @@ export function Lightbox({
   onNavigate,
   onUseAsReference,
   onUsePrompt,
+  onInpaint,
 }: LightboxProps) {
   const [actualSize, setActualSize] = useState(false);
   const { generation, index } = state;
@@ -124,6 +128,19 @@ export function Lightbox({
               {actualSize ? <Scan size={17} /> : <ZoomIn size={17} />}
             </IconButton>
             <CopyTextButton text={generation.prompt} />
+            {onInpaint && image.id ? (
+              <Button
+                type="button"
+                variant="secondary"
+                aria-label="局部重绘"
+                title="局部重绘：涂抹要修改的区域"
+                onClick={() => onInpaint(image)}
+                className="h-11 w-11 gap-2 rounded-md px-0 text-sm sm:h-9 sm:w-auto sm:px-3"
+              >
+                <Brush size={16} />
+                <span className="hidden sm:inline">局部重绘</span>
+              </Button>
+            ) : null}
             {onUseAsReference && image.id ? (
               <Button
                 type="button"

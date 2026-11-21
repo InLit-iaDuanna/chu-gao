@@ -75,6 +75,8 @@ export interface CreateGenerationInput {
   referenceImageKeys?: string[];
   sourceImageIds?: string[];
   providerChannelId?: string;
+  /** 局部重绘：base 为 "source:<imageId>" | "upload:<key>"，遮罩白色为重绘区。 */
+  inpaint?: { base: string; maskImageKey: string };
   conversationId?: string;
   userMessage?: string;
   assistantMessage?: string;

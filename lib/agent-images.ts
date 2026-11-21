@@ -164,6 +164,7 @@ export const agentGenerationSchema = generationRequestSchema
     providerChannelId: true,
     image2Mode: true,
     sourceImageIds: true,
+    inpaint: true,
   })
   .extend({
     n: generationRequestSchema.shape.n.default(1),

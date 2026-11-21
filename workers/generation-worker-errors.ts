@@ -8,6 +8,8 @@ export function userFacingGenerationError(error: unknown): string {
   if (error instanceof Error && error.name === "ProviderCreditsError")
     return "积分不足，无法使用备用价格；本次未生成，已退还预扣积分";
   if (error instanceof ProviderSubmissionUnknownError) return error.message;
+  if (error instanceof Error && error.name === "InpaintError")
+    return `局部重绘未完成：${error.message}，已退还预扣积分。`;
   const { category } = classifyProviderFailure(error);
 
   if (category === "CONTENT_REJECTED") {
@@ -39,6 +41,8 @@ export function generationFailureCode(error: unknown): string {
     return "INSUFFICIENT_CREDITS";
   if (error instanceof ProviderSubmissionUnknownError)
     return "UPSTREAM_RESULT_UNKNOWN";
+  if (error instanceof Error && error.name === "InpaintError")
+    return "INPAINT_FAILED";
   const { category } = classifyProviderFailure(error);
 
   if (category === "CONTENT_REJECTED") {

@@ -103,7 +103,10 @@ import {
   planCreativeBrief,
   preflightImageModels,
   updateConversation,
+  uploadReferenceImage,
 } from "./lib/api";
+import { InpaintEditor, type InpaintSubmission } from "./InpaintEditor";
+import { inpaintModelCandidates, inpaintSizeFor } from "./lib/inpaint-routing";
 import { subscribeGeneration } from "./lib/sse";
 import { writeActiveConversationId } from "./lib/active-conversation";
 import {
@@ -316,6 +319,12 @@ export function StudioApp({
   const [status, setStatus] = useState<string | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<LightboxState | null>(null);
+  const [inpaintTarget, setInpaintTarget] = useState<{
+    id: string;
+    url: string;
+  } | null>(null);
+  const [inpaintBusy, setInpaintBusy] = useState(false);
+  const [inpaintError, setInpaintError] = useState<string | null>(null);
   const [focusVersion, setFocusVersion] = useState(0);
   const [rename, setRename] = useState<string | null>(null);
   const [renaming, setRenaming] = useState(false);
@@ -1525,6 +1534,126 @@ export function StudioApp({
     } finally {
       sendLock.current = false;
       if (mounted.current) setChatCompacting(false);
+    }
+  };
+
+  const inpaintModel = inpaintModelCandidates(models, model?.id)[0] ?? null;
+
+  /** 局部重绘：上传遮罩 → 提交带 inpaint 的生成 → 像普通生图一样接入当前对话。 */
+  const submitInpaint = async (submission: InpaintSubmission) => {
+    const target = inpaintTarget;
+    if (!target || inpaintBusy || sendLock.current) return;
+    setInpaintError(null);
+    setInpaintBusy(true);
+    sendLock.current = true;
+    try {
+      const candidates = inpaintModelCandidates(models, model?.id);
+      if (!candidates.length) throw new Error("当前没有可用于局部重绘的图片模型");
+      const preflight = await preflightImageModels(
+        candidates.map((item) => item.id),
+      );
+      const selected = candidates.find(
+        (item) => item.id === preflight.selectedModelId,
+      );
+      if (!selected) throw new Error("当前没有可用的图片模型，请稍后重试");
+      const upload = await uploadReferenceImage(
+        new File([submission.mask], "mask.png", { type: "image/png" }),
+      );
+      const size = inpaintSizeFor(
+        selected,
+        submission.width,
+        submission.height,
+      );
+      const quality = selected.capabilities.qualities?.includes(
+        params.quality as ImageQuality,
+      )
+        ? params.quality
+        : selected.defaults.quality;
+      let current = conversation;
+      if (!current) {
+        current = await createConversation({
+          title: `局部重绘：${submission.prompt}`.slice(0, 28),
+        });
+        if (!mounted.current) return;
+        setConversation(current);
+        setActiveId(current.id);
+        activeRef.current = current.id;
+      }
+      const id = current.id;
+      const content = `局部重绘：${submission.prompt}`;
+      const assistantMessage = "正在局部重绘";
+      const result = await createGeneration({
+        conversationId: id,
+        userMessage: content.slice(0, 4000),
+        assistantMessage,
+        modelId: selected.id,
+        prompt: submission.prompt,
+        n: 1,
+        size,
+        quality,
+        outputFormat: "png",
+        sourceImageIds: [target.id],
+        inpaint: {
+          base: `source:${target.id}`,
+          maskImageKey: upload.key,
+        },
+      });
+      if (!mounted.current) return;
+      setInpaintTarget(null);
+      setLightbox(null);
+      toast({
+        title: "已提交局部重绘",
+        description: `本次预计消耗 ${estimatedCreditLabel(result.estimatedCredits, selected, size)}`,
+        variant: "success",
+      });
+      const createdAt = new Date().toISOString();
+      const reply = {
+        id: "generation-" + result.generationId,
+        role: "assistant" as const,
+        content: assistantMessage,
+        generationId: result.generationId,
+        generationPrompt: submission.prompt,
+        generationStatus: result.status,
+        generationProgress: 0,
+        generationModelId: selected.id,
+        generationSize: size,
+        generationCount: 1,
+        createdAt,
+      };
+      if (activeRef.current === id) {
+        setConversation((value) =>
+          value && value.id === id
+            ? {
+                ...value,
+                messages: [
+                  ...value.messages,
+                  { id: "user-" + result.generationId, role: "user", content, createdAt },
+                  reply,
+                ],
+              }
+            : value,
+        );
+        setGenerations((items) => ({
+          ...items,
+          [result.generationId]: messageGeneration(reply, id)!,
+        }));
+      }
+      if (isActiveStatus(result.status)) track(result.generationId);
+      void getConversation(id)
+        .then((data) => {
+          if (mounted.current && activeRef.current === id) setConversation(data);
+        })
+        .catch(() => undefined);
+      refreshMe();
+      void refreshThreads();
+    } catch (error) {
+      if (mounted.current)
+        setInpaintError(
+          error instanceof Error ? error.message : "局部重绘提交失败，请重试",
+        );
+    } finally {
+      sendLock.current = false;
+      if (mounted.current) setInpaintBusy(false);
     }
   };
 
@@ -2784,6 +2913,33 @@ export function StudioApp({
               });
             setLightbox(null);
           }}
+          onInpaint={
+            inpaintModel
+              ? (image) => {
+                  const url = image.downloadUrl ?? image.url;
+                  if (!image.id || !url) return;
+                  setInpaintError(null);
+                  setInpaintTarget({ id: image.id, url });
+                }
+              : undefined
+          }
+        />
+      ) : null}
+      {inpaintTarget ? (
+        <InpaintEditor
+          key={inpaintTarget.id}
+          imageUrl={inpaintTarget.url}
+          submitting={inpaintBusy}
+          error={inpaintError}
+          note={
+            inpaintModel
+              ? `使用 ${inpaintModel.displayName} · 只替换涂抹区域，其余像素保持原图`
+              : null
+          }
+          onCancel={() => {
+            if (!inpaintBusy) setInpaintTarget(null);
+          }}
+          onSubmit={(submission) => void submitInpaint(submission)}
         />
       ) : null}
     </div>

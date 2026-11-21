@@ -13,6 +13,11 @@ import {
   positiveInteger,
   workerConcurrencyTarget,
 } from "@/lib/generation-capacity";
+import {
+  buildInpaintJob,
+  finishInpaintImage,
+  InpaintError,
+} from "@/lib/inpaint";
 import { logger } from "@/lib/logger";
 import { advanceDeckForGeneration, sweepActiveDecks } from "@/lib/ppt-deck";
 import { withModelCall, withModelCallContext } from "@/lib/model-call-log";
@@ -289,6 +294,28 @@ async function main() {
             () => hydrateReferenceImages(request.referenceImages),
           ),
         };
+        // 局部重绘：原图换成标注图发给模型，出图后只把涂抹区贴回原图。
+        const inpaintJob = request.inpaint
+          ? await withModelCall(
+              {
+                ...logContext,
+                kind: "image",
+                operation: "image.inpaint.prepare",
+                modelId: request.modelId,
+              },
+              async () => {
+                const [mask] =
+                  (await hydrateReferenceImages([
+                    { key: request.inpaint!.maskKey, mimeType: "image/png" },
+                  ])) ?? [];
+                if (!mask?.b64) throw new InpaintError("遮罩已不可用");
+                return buildInpaintJob(
+                  hydratedRequest,
+                  Buffer.from(mask.b64, "base64"),
+                );
+              },
+            )
+          : null;
         const {
           result,
           providerId,
@@ -296,7 +323,7 @@ async function main() {
           providerAccountId,
           providerAccountName,
         } = await withModelCallContext(logContext, () =>
-          selectAndGenerate(hydratedRequest, {
+          selectAndGenerate(inpaintJob?.request ?? hydratedRequest, {
             leaseContext,
             onProviderSelected: async (selection) => {
               await reserveGenerationProviderCredits({
@@ -331,12 +358,32 @@ async function main() {
           throw new Error("provider returned no images");
         }
 
-        const outputImages =
+        const providerImages =
           request.executionPolicy === "single-submit"
             ? result.images.slice(0, 1)
             : isFallbackProvider({ id: providerId })
               ? result.images.slice(0, request.n)
               : result.images;
+        const outputImages = inpaintJob
+          ? await withModelCall(
+              {
+                ...logContext,
+                kind: "image",
+                operation: "image.inpaint.composite",
+                modelId: request.modelId,
+                providerId,
+              },
+              () =>
+                Promise.all(
+                  providerImages.map(async (image) =>
+                    finishInpaintImage(
+                      inpaintJob,
+                      (await materializeGeneratedImage(image)).buffer,
+                    ),
+                  ),
+                ),
+            )
+          : providerImages;
         const persistContext = {
           ...logContext,
           kind: "image" as const,

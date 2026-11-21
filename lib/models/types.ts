@@ -145,4 +145,11 @@ export interface InternalRequest {
   background: ImageBackground;
   outputCompression?: number;
   referenceImages?: InternalReferenceImage[];
+  // 局部重绘：baseKey 为被编辑原图（须在 referenceImages 中），maskKey 为白色涂抹区遮罩。
+  inpaint?: InternalInpaint;
+}
+
+export interface InternalInpaint {
+  baseKey: string;
+  maskKey: string;
 }

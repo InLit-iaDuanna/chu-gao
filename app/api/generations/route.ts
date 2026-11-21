@@ -265,7 +265,10 @@ export async function POST(request: Request) {
 
     const session = sessionResult.user;
     if (
-      parsed.data.referenceImageKeys?.some((key) => {
+      [
+        ...(parsed.data.referenceImageKeys ?? []),
+        ...(parsed.data.inpaint ? [parsed.data.inpaint.maskImageKey] : []),
+      ].some((key) => {
         const normalized = normalizeUploadedReferenceKey(key);
         return !normalized || !normalized.startsWith(`uploads/${session.id}/`);
       })
@@ -403,6 +406,21 @@ export async function POST(request: Request) {
           mimeType: image.mimeType,
         })),
       ];
+    }
+
+    if (internalRequest.inpaint?.baseKey.startsWith("source:")) {
+      const baseImage = sourceImagesById.get(
+        internalRequest.inpaint.baseKey.slice("source:".length),
+      );
+      if (!baseImage) {
+        return fail("REFERENCE_IMAGE_NOT_FOUND", "局部重绘的原图不可用", {
+          status: 404,
+        });
+      }
+      internalRequest.inpaint = {
+        ...internalRequest.inpaint,
+        baseKey: baseImage.storageKey,
+      };
     }
 
     if (
