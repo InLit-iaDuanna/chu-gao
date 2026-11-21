@@ -284,14 +284,16 @@ describe("actual-token settlement transactions", () => {
     const bound = chatInputTokenUpperBound(
       contextRequest.buildRequest([contextRequest.latestMessage]),
     );
-    expect(frozen.maxInputTokens).toBe(bound * 2 + 32_768);
+    // Up to four requests, reserved as three request-equivalents of input
+    // and two full outputs; the worker spends within this per request.
+    expect(frozen.maxInputTokens).toBe(bound + 2 * (bound + 32_768));
     expect(frozen.maxOutputTokens).toBe(16_384 * 2);
     expect(result.priceCredits).toBe(chatTokenReserve(frozen));
     expect(turn.configSnapshot).toMatchObject({
       tokenRequestLimits: {
         maxInputTokens: 262_144,
         maxOutputTokens: 16_384,
-        maxRequests: 2,
+        maxRequests: 4,
       },
     });
     expect(mocks.debit).toHaveBeenCalledExactlyOnceWith(

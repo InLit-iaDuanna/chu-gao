@@ -1,12 +1,25 @@
 "use client";
 
-import { createContext, memo, useContext, useId, useState } from "react";
+import {
+  createContext,
+  memo,
+  useContext,
+  useId,
+  useMemo,
+  useState,
+} from "react";
 import Markdown, { type Components, type UrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ChevronDown, ChevronUp, ImageIcon } from "lucide-react";
 import { IconButton, Tooltip, TooltipProvider } from "@/components/ui";
 import { CopyTextButton } from "../CopyTextButton";
 import { HtmlArtifact, isEmbeddedRasterImage } from "./HtmlArtifact";
+import { parseInteractiveBlocks } from "../lib/chat-interactive-blocks";
+import {
+  AskCard,
+  QuickReplies,
+  type QuickReplyHandler,
+} from "./InteractiveBlocks";
 import styles from "./AssistantContent.module.css";
 
 const MessageContext = createContext<{
@@ -237,14 +250,14 @@ const components: Components = {
   ),
 };
 
-export const AssistantContent = memo(function AssistantContent({
+const MarkdownBody = memo(function MarkdownBody({
   content,
-  streaming = false,
+  streaming,
   messageStatus,
   onOpenArtifact,
 }: {
   content: string;
-  streaming?: boolean;
+  streaming: boolean;
   messageStatus?: string;
   onOpenArtifact?: (source: string) => void;
 }) {
@@ -252,33 +265,76 @@ export const AssistantContent = memo(function AssistantContent({
     /^\s*(?:<!--[\s\S]*?-->\s*)*(?:<!doctype\s+html\b|<html(?:\s|>))/i.test(
       content,
     );
+  return isDocument ? (
+    <HtmlArtifact
+      source={content}
+      streaming={streaming}
+      messageStatus={messageStatus}
+      onOpenInPanel={onOpenArtifact ? () => onOpenArtifact(content) : undefined}
+    />
+  ) : (
+    <TooltipProvider delayDuration={250}>
+      <MessageContext.Provider
+        value={{ streaming, messageStatus, onOpenArtifact }}
+      >
+        <Markdown
+          remarkPlugins={remarkPlugins}
+          components={components}
+          urlTransform={safeUrl}
+          remarkRehypeOptions={{ footnoteLabel: "注释" }}
+        >
+          {content}
+        </Markdown>
+      </MessageContext.Provider>
+    </TooltipProvider>
+  );
+});
+
+export const AssistantContent = memo(function AssistantContent({
+  content,
+  streaming = false,
+  messageStatus,
+  onOpenArtifact,
+  interactive = false,
+  answer,
+  onQuickReply,
+}: {
+  content: string;
+  streaming?: boolean;
+  messageStatus?: string;
+  onOpenArtifact?: (source: string) => void;
+  /** Latest assistant reply with no turn in flight: ask/next blocks accept clicks. */
+  interactive?: boolean;
+  /** The user message right after this reply, to mark the chosen ask option. */
+  answer?: string | null;
+  onQuickReply?: QuickReplyHandler;
+}) {
+  const { body, ask, next } = useMemo(
+    () => parseInteractiveBlocks(content, { streaming }),
+    [content, streaming],
+  );
+  const enabled = interactive && !streaming && Boolean(onQuickReply);
   return (
     <div className={styles.markdown}>
-      {isDocument ? (
-        <HtmlArtifact
-          source={content}
+      {body ? (
+        <MarkdownBody
+          content={body}
           streaming={streaming}
           messageStatus={messageStatus}
-          onOpenInPanel={
-            onOpenArtifact ? () => onOpenArtifact(content) : undefined
-          }
+          onOpenArtifact={onOpenArtifact}
         />
-      ) : (
-        <TooltipProvider delayDuration={250}>
-          <MessageContext.Provider
-            value={{ streaming, messageStatus, onOpenArtifact }}
-          >
-            <Markdown
-              remarkPlugins={remarkPlugins}
-              components={components}
-              urlTransform={safeUrl}
-              remarkRehypeOptions={{ footnoteLabel: "注释" }}
-            >
-              {content}
-            </Markdown>
-          </MessageContext.Provider>
-        </TooltipProvider>
-      )}
+      ) : null}
+      {ask && !streaming ? (
+        <AskCard
+          ask={ask}
+          enabled={enabled}
+          answer={answer}
+          onReply={onQuickReply}
+        />
+      ) : null}
+      {next && enabled ? (
+        <QuickReplies next={next} onReply={onQuickReply!} />
+      ) : null}
     </div>
   );
 });

@@ -42,6 +42,10 @@ const activityText: Record<string, string> = {
   image_tool: "正在准备生图…",
   image_generating: "正在生成图片…",
   answering: "正在生成回复…",
+  reading_url: "正在读取网页…",
+  checking_credits: "正在查询积分…",
+  asking: "正在整理问题…",
+  tool_call: "正在调用工具…",
   retrying: "连接中断，正在重试…",
 };
 

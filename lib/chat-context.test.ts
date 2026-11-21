@@ -691,6 +691,30 @@ describe("complete turns, current identity and retained evidence", () => {
     expect(mocks.references).toHaveBeenCalledWith("alice", references);
   });
 
+  it("lists generated image ids for source_images and replays cards as markers", async () => {
+    own().messages[1].chatReferences = [
+      { kind: "generated", id: "gen-1" },
+      { kind: "generated", id: "gen-2" },
+    ];
+    own().messages[1].content =
+      '画好了。\n\n```chugao-next\n{"options":["换成夜景","再来一张"]}\n```';
+    const result = await prepareChatContext({ ...input, latestMessage });
+    const texts = result.messages.map((row) =>
+      typeof row.content === "string"
+        ? row.content
+        : row.content
+            .flatMap((part) => (part.type === "text" ? [part.text] : []))
+            .join(""),
+    );
+    expect(texts.join("\n")).not.toContain("chugao-next");
+    expect(texts).toContain("画好了。\n\n[已给出快捷回复：换成夜景 / 再来一张]");
+    expect(
+      texts.some((text) =>
+        text.endsWith("\n[本条回复生成的图片] gen-1, gen-2"),
+      ),
+    ).toBe(true);
+  });
+
   it("rehydrates legacy stored arrays and lets an explicit ordered list replace them", async () => {
     histories.set(key(), history(1));
     own().messages[0].chatReferences = {

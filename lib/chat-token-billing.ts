@@ -60,6 +60,12 @@ export function readChatTokenPricingSnapshot(
   return structuredClone(value) as ChatTokenPricingSnapshot;
 }
 
+/**
+ * Most upstream requests one attempt can aggregate: CHAT_TOOL_MAX_REQUESTS (4)
+ * tool rounds plus the recovery retries of non-token-priced turns.
+ */
+export const CHAT_USAGE_SEGMENTS_MAX = 6;
+
 export function normalizeChatTokenUsage(
   value: unknown,
 ):
@@ -70,7 +76,7 @@ export function normalizeChatTokenUsage(
     if (
       !Array.isArray(usage.usage_segments) ||
       !usage.usage_segments.length ||
-      usage.usage_segments.length > 3
+      usage.usage_segments.length > CHAT_USAGE_SEGMENTS_MAX
     )
       return { availability: "unknown", reason: "invalid_usage_segments" };
     const totals: ChatTokenUsage = {

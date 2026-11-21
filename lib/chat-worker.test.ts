@@ -20,6 +20,8 @@ const mocks = vi.hoisted(() => ({
   callUsage: vi.fn(),
   callFinish: vi.fn(),
   submitImage: vi.fn(),
+  readUrl: vi.fn(),
+  checkCredits: vi.fn(),
   active: true,
 }));
 vi.mock("@/lib/db", () => ({
@@ -59,6 +61,13 @@ vi.mock("@/lib/chat-references", () => ({
 vi.mock("@/lib/chat-image-tool", () => ({
   submitChatImageTool: mocks.submitImage,
 }));
+vi.mock("@/lib/chat-read-url-tool", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/chat-read-url-tool")>()),
+  runReadUrlTool: mocks.readUrl,
+}));
+vi.mock("@/lib/chat-credits-tool", () => ({
+  runCheckCreditsTool: mocks.checkCredits,
+}));
 vi.mock("@/lib/logger", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
@@ -76,7 +85,7 @@ import {
 import { OPUS_MODEL_ID } from "@/lib/chat-model-options";
 import { chatInputTokenUpperBound } from "@/lib/chat-token-billing";
 import { chatCompletionsRequestBody } from "@/lib/chat-upstream";
-import { CHAT_IMAGE_TOOL } from "@/lib/chat-image-tool-definition";
+import { chatRequestTools } from "@/lib/chat-tool-set";
 
 const sseResponse = (text: string) =>
   new Response(
@@ -471,12 +480,13 @@ describe("chat worker boundaries", () => {
         effort: "xhigh",
         maxOutputTokens: 64,
         includeUsage: true,
-        tools: [CHAT_IMAGE_TOOL],
+        tools: chatRequestTools("chat_completions_sse"),
       },
     );
     const firstBound = chatInputTokenUpperBound(firstRequest);
+    // The admission formula of chat-turns.ts.
     Object.assign(attempt.turn.configSnapshot.tokenPricing, {
-      maxInputTokens: firstBound * 2 + 32_768,
+      maxInputTokens: firstBound + 2 * (firstBound + 32_768),
       maxOutputTokens: 128,
     });
     Object.assign(attempt.turn.configSnapshot, {
@@ -558,51 +568,67 @@ describe("chat worker boundaries", () => {
     });
   });
 
-  it("runs the model's web_search and keeps the sources on the reply", async () => {
+  const anthropicFrames = (...events: unknown[]) =>
+    events.map((value) => event(value)).join("") + "data: [DONE]\n\n";
+  const anthropicOpus = async (
+    limits: { maxRequests?: number; maxOutputTokens?: number } = {},
+  ) => {
     await imageOpus();
     const attempt = await mocks.findAttempt();
-    attempt.turn.input = { ...attempt.turn.input, webSearch: true } as never;
+    attempt.turn.configSnapshot.transport = "anthropic_messages_sse";
+    Object.assign(attempt.turn.configSnapshot.tokenPricing, {
+      maxInputTokens: 1_000_000,
+      maxOutputTokens: limits.maxOutputTokens ?? 64 * 4,
+    });
+    Object.assign(attempt.turn.configSnapshot.tokenRequestLimits, {
+      maxRequests: limits.maxRequests ?? 4,
+    });
     mocks.findAttempt.mockResolvedValue(attempt);
-    mocks.profile.mockResolvedValue({
-      enabled: true,
-      apiKey: "fixture-key",
-      baseUrl: "https://upstream.invalid",
-      model: OPUS_MODEL_ID,
-      webSearch: true,
-      searchTool: true,
-    } as never);
-    const searchDelta = {
-      choices: [
-        {
-          delta: {
-            tool_calls: [
-              {
-                index: 0,
-                id: "search-call",
-                type: "function",
-                function: {
-                  name: "web_search",
-                  arguments: '{"query":"openai devday"}',
-                },
-              },
-            ],
-          },
-          finish_reason: "tool_calls",
-        },
-      ],
-    };
+    return attempt;
+  };
+  const anthropicToolUse = (
+    id: string,
+    name: string,
+    input: Record<string, unknown>,
+    index = 0,
+  ) => ({
+    type: "content_block_start",
+    index,
+    content_block: { type: "tool_use", id, name, input },
+  });
+  const anthropicStop = (stopReason: string, output = 9) => ({
+    type: "message_delta",
+    delta: { stop_reason: stopReason },
+    usage: { input_tokens: 200, output_tokens: output },
+  });
+  const anthropicText = (text: string, index = 0) => [
+    {
+      type: "content_block_start",
+      index,
+      content_block: { type: "text", text: "" },
+    },
+    {
+      type: "content_block_delta",
+      index,
+      delta: { type: "text_delta", text },
+    },
+  ];
+
+  it("runs the model's search_web tool and keeps the sources on the reply", async () => {
+    const attempt = await anthropicOpus();
+    attempt.turn.input = { ...attempt.turn.input, webSearch: true } as never;
     vi.stubGlobal(
       "fetch",
       vi
         .fn()
         .mockResolvedValueOnce(
           sseResponse(
-            event(searchDelta) +
-              event({
-                choices: [],
-                usage: { prompt_tokens: 200, completion_tokens: 9 },
-              }) +
-              "data: [DONE]\n\n",
+            anthropicFrames(
+              anthropicToolUse("search-call", "search_web", {
+                query: "openai devday",
+              }),
+              anthropicStop("tool_use"),
+            ),
           ),
         )
         // the relay's /v1/messages answer
@@ -625,19 +651,10 @@ describe("chat worker boundaries", () => {
         )
         .mockResolvedValueOnce(
           sseResponse(
-            event({
-              choices: [
-                {
-                  delta: { content: "他们发布了 dots 和 Agents API。" },
-                  finish_reason: "stop",
-                },
-              ],
-            }) +
-              event({
-                choices: [],
-                usage: { prompt_tokens: 260, completion_tokens: 12 },
-              }) +
-              "data: [DONE]\n\n",
+            anthropicFrames(
+              ...anthropicText("他们发布了 dots 和 Agents API。"),
+              anthropicStop("end_turn", 12),
+            ),
           ),
         ),
     );
@@ -649,24 +666,34 @@ describe("chat worker boundaries", () => {
     expect(JSON.parse(String(searchInit?.body)).messages[0].content).toBe(
       "openai devday",
     );
-    // Search stays available for a second look, unlike the one-shot image tool.
+    const first = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string);
     const resumed = JSON.parse(
       vi.mocked(fetch).mock.calls[2][1]!.body as string,
     );
-    expect(
-      resumed.tools.map((tool: { function: { name: string } }) => tool.function.name),
-    ).toEqual(["web_search"]);
-    expect(resumed.messages).toEqual(
-      expect.arrayContaining([
+    // The tool list stays the same across the turn (prompt cache).
+    const names = (body: { tools: Array<{ name: string }> }) =>
+      body.tools.map((tool) => tool.name);
+    expect(names(first)).toEqual([
+      "search_web",
+      "generate_image",
+      "read_url",
+      "check_credits",
+      "ask_user",
+      "suggest_replies",
+    ]);
+    expect(names(resumed)).toEqual(names(first));
+    expect(resumed.messages.at(-1)).toEqual({
+      role: "user",
+      content: [
         expect.objectContaining({
-          role: "tool",
-          name: "web_search",
+          type: "tool_result",
+          tool_use_id: "search-call",
           content: expect.stringContaining(
             "https://openai.com/index/devday-2026-recap/",
           ),
         }),
-      ]),
-    );
+      ],
+    });
     const finished = mocks.finish.mock.calls.at(-1)?.[0];
     expect(finished).toMatchObject({
       status: "completed",
@@ -680,6 +707,416 @@ describe("chat worker boundaries", () => {
     });
     const history = finished.parts.activityHistory as string[];
     expect(history).toContain("searching");
+  });
+
+  it("ends the turn on ask_user without another request and appends the card", async () => {
+    await anthropicOpus();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValueOnce(
+        sseResponse(
+          anthropicFrames(
+            ...anthropicText("先确认一下用途。"),
+            anthropicToolUse(
+              "ask-call",
+              "ask_user",
+              {
+                question: "这张海报用在哪里？",
+                options: [
+                  { label: "手机竖版", description: "朋友圈、小红书" },
+                  { label: "电脑横版" },
+                ],
+              },
+              1,
+            ),
+            anthropicStop("tool_use"),
+          ),
+        ),
+      ),
+    );
+    await executeChatAttempt("attempt-a", new AbortController());
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const finished = mocks.finish.mock.calls.at(-1)?.[0];
+    expect(finished.status).toBe("completed");
+    expect(finished.text).toBe(
+      '先确认一下用途。\n\n```chugao-ask\n{"question":"这张海报用在哪里？","options":[{"label":"手机竖版","description":"朋友圈、小红书"},{"label":"电脑横版"}],"multiple":false}\n```',
+    );
+  });
+
+  it("keeps an ask_user card as the whole reply when the model wrote no text", async () => {
+    await anthropicOpus();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValueOnce(
+        sseResponse(
+          anthropicFrames(
+            anthropicToolUse("ask-call", "ask_user", {
+              question: "横版还是竖版？",
+              options: ["横版", "竖版"],
+            }),
+            anthropicStop("tool_use"),
+          ),
+        ),
+      ),
+    );
+    await executeChatAttempt("attempt-a", new AbortController());
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(mocks.finish.mock.calls.at(-1)?.[0]).toMatchObject({
+      status: "completed",
+      text: '```chugao-ask\n{"question":"横版还是竖版？","options":[{"label":"横版"},{"label":"竖版"}],"multiple":false}\n```',
+    });
+  });
+
+  it("holds suggest_replies until the reply after an image submission has ended", async () => {
+    await anthropicOpus();
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          sseResponse(
+            anthropicFrames(
+              anthropicToolUse("image-call", "generate_image", {
+                prompt: "雨夜街景",
+              }),
+              anthropicToolUse(
+                "next-call",
+                "suggest_replies",
+                { options: ["换成白天", "再来一张竖版", "换成白天"] },
+                1,
+              ),
+              anthropicStop("tool_use"),
+            ),
+          ),
+        )
+        .mockResolvedValueOnce(
+          sseResponse(
+            anthropicFrames(
+              ...anthropicText("已提交雨夜街景。"),
+              anthropicStop("end_turn"),
+            ),
+          ),
+        ),
+    );
+    await executeChatAttempt("attempt-a", new AbortController());
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(mocks.submitImage).toHaveBeenCalledTimes(1);
+    const resumed = JSON.parse(
+      vi.mocked(fetch).mock.calls[1][1]!.body as string,
+    );
+    // Both calls of the round replay together, natively.
+    expect(resumed.messages.slice(-2)).toEqual([
+      {
+        role: "assistant",
+        content: [
+          expect.objectContaining({ type: "tool_use", id: "image-call" }),
+          expect.objectContaining({ type: "tool_use", id: "next-call" }),
+        ],
+      },
+      {
+        role: "user",
+        content: [
+          expect.objectContaining({
+            type: "tool_result",
+            tool_use_id: "image-call",
+            content: expect.stringContaining('"next"'),
+          }),
+          expect.objectContaining({
+            type: "tool_result",
+            tool_use_id: "next-call",
+          }),
+        ],
+      },
+    ]);
+    expect(mocks.finish.mock.calls.at(-1)?.[0]).toMatchObject({
+      status: "completed",
+      text: '已提交雨夜街景。\n\n```chugao-next\n{"options":["换成白天","再来一张竖版"]}\n```',
+    });
+  });
+
+  it("reads a URL once, continues with the page and records it as a source", async () => {
+    await anthropicOpus();
+    mocks.readUrl.mockResolvedValue({
+      ok: true,
+      sources: [{ url: "https://example.com/post", title: "Example post" }],
+      output: "[网页内容] Example post | https://example.com/post\n正文",
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          sseResponse(
+            anthropicFrames(
+              anthropicToolUse("read-call", "read_url", {
+                url: "https://example.com/post",
+              }),
+              anthropicStop("tool_use"),
+            ),
+          ),
+        )
+        .mockResolvedValueOnce(
+          sseResponse(
+            anthropicFrames(
+              ...anthropicText("这篇文章讲的是……"),
+              anthropicStop("end_turn"),
+            ),
+          ),
+        ),
+    );
+    await executeChatAttempt("attempt-a", new AbortController());
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(mocks.readUrl).toHaveBeenCalledExactlyOnceWith(
+      "https://example.com/post",
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+    const finished = mocks.finish.mock.calls.at(-1)?.[0];
+    expect(finished).toMatchObject({
+      status: "completed",
+      text: "这篇文章讲的是……",
+      sources: [{ url: "https://example.com/post", title: "Example post" }],
+    });
+    expect(finished.parts.activityHistory).toContain("reading_url");
+  });
+
+  it("answers over-limit calls with a limit result instead of running them", async () => {
+    await anthropicOpus();
+    mocks.readUrl.mockResolvedValue({
+      ok: true,
+      sources: [],
+      output: "[网页内容] page",
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          sseResponse(
+            anthropicFrames(
+              anthropicToolUse("read-1", "read_url", { url: "https://a.example" }),
+              anthropicToolUse(
+                "read-2",
+                "read_url",
+                { url: "https://b.example" },
+                1,
+              ),
+              anthropicToolUse(
+                "read-3",
+                "read_url",
+                { url: "https://c.example" },
+                2,
+              ),
+              anthropicToolUse("mystery", "delete_everything", {}, 3),
+              anthropicStop("tool_use"),
+            ),
+          ),
+        )
+        .mockResolvedValueOnce(
+          sseResponse(
+            anthropicFrames(...anthropicText("好的。"), anthropicStop("end_turn")),
+          ),
+        ),
+    );
+    await executeChatAttempt("attempt-a", new AbortController());
+    expect(mocks.readUrl).toHaveBeenCalledTimes(2);
+    const resumed = JSON.parse(
+      vi.mocked(fetch).mock.calls[1][1]!.body as string,
+    );
+    const results = resumed.messages.at(-1).content as Array<{
+      tool_use_id: string;
+      content: string;
+    }>;
+    expect(results.map((result) => result.tool_use_id)).toEqual([
+      "read-1",
+      "read-2",
+      "read-3",
+      "mystery",
+    ]);
+    expect(results[2].content).toContain("上限");
+    expect(results[3].content).toContain("UNSUPPORTED_TOOL_CALL");
+    expect(mocks.finish.mock.calls.at(-1)?.[0].status).toBe("completed");
+  });
+
+  it("drops every tool from the last request a turn can afford", async () => {
+    await anthropicOpus({ maxRequests: 2 });
+    mocks.readUrl.mockResolvedValue({
+      ok: true,
+      sources: [],
+      output: "[网页内容] page",
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          sseResponse(
+            anthropicFrames(
+              anthropicToolUse("read-1", "read_url", { url: "https://a.example" }),
+              anthropicStop("tool_use"),
+            ),
+          ),
+        )
+        .mockResolvedValueOnce(
+          sseResponse(
+            anthropicFrames(
+              ...anthropicText("根据网页，"),
+              // Ignored: this request offered no tools.
+              anthropicToolUse("read-2", "read_url", { url: "https://b.example" }, 1),
+              anthropicStop("tool_use"),
+            ),
+          ),
+        ),
+    );
+    await executeChatAttempt("attempt-a", new AbortController());
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(mocks.readUrl).toHaveBeenCalledTimes(1);
+    const last = JSON.parse(vi.mocked(fetch).mock.calls[1][1]!.body as string);
+    expect(last.tools).toBeUndefined();
+    // Without tools the exchange is replayed as text.
+    expect(JSON.stringify(last.messages)).toContain("[read_url 回执]");
+    expect(mocks.finish.mock.calls.at(-1)?.[0]).toMatchObject({
+      status: "completed",
+      text: "根据网页，",
+    });
+  });
+
+  it("caps a later request by the output reserve that is left", async () => {
+    // 64 per request, 160 in total: after two full requests only 32 remain.
+    await anthropicOpus({ maxOutputTokens: 160 });
+    mocks.readUrl.mockResolvedValue({
+      ok: true,
+      sources: [],
+      output: "[网页内容] page",
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          sseResponse(
+            anthropicFrames(
+              anthropicToolUse("read-1", "read_url", { url: "https://a.example" }),
+              anthropicStop("tool_use", 64),
+            ),
+          ),
+        )
+        .mockResolvedValueOnce(
+          sseResponse(
+            anthropicFrames(...anthropicText("好的。"), anthropicStop("end_turn")),
+          ),
+        ),
+    );
+    await executeChatAttempt("attempt-a", new AbortController());
+    const first = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string);
+    const second = JSON.parse(vi.mocked(fetch).mock.calls[1][1]!.body as string);
+    expect(first.max_tokens).toBe(64);
+    expect(first.tools).toBeDefined();
+    // 96 left: a 64-token request would leave less than one more full one.
+    expect(second.max_tokens).toBe(64);
+    expect(second.tools).toBeUndefined();
+  });
+
+  it("replays a Chat Completions tool round as one assistant message with every call", async () => {
+    await imageOpus();
+    const attempt = await mocks.findAttempt();
+    Object.assign(attempt.turn.configSnapshot.tokenPricing, {
+      maxInputTokens: 1_000_000,
+      maxOutputTokens: 256,
+    });
+    attempt.turn.configSnapshot.tokenRequestLimits.maxRequests = 4;
+    mocks.checkCredits.mockResolvedValue({
+      ok: true,
+      output: "[积分查询结果]\n当前余额：20 积分",
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          sseResponse(
+            event({
+              choices: [
+                {
+                  delta: {
+                    tool_calls: [
+                      {
+                        index: 0,
+                        id: "credits-call",
+                        type: "function",
+                        function: { name: "check_credits", arguments: "{}" },
+                      },
+                      {
+                        index: 1,
+                        type: "function",
+                        function: {
+                          name: "suggest_replies",
+                          arguments: '{"options":["充值","降低质量"]}',
+                        },
+                      },
+                    ],
+                  },
+                  finish_reason: "tool_calls",
+                },
+              ],
+            }) +
+              event({
+                choices: [],
+                usage: { prompt_tokens: 200, completion_tokens: 10 },
+              }) +
+              "data: [DONE]\n\n",
+          ),
+        )
+        .mockResolvedValueOnce(
+          sseResponse(
+            event({
+              choices: [
+                { delta: { content: "你还有 20 积分。" }, finish_reason: "stop" },
+              ],
+            }) +
+              event({
+                choices: [],
+                usage: { prompt_tokens: 260, completion_tokens: 8 },
+              }) +
+              "data: [DONE]\n\n",
+          ),
+        ),
+    );
+    await executeChatAttempt("attempt-a", new AbortController());
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(mocks.checkCredits).toHaveBeenCalledExactlyOnceWith(
+      "{}",
+      expect.objectContaining({ userId: "user-a" }),
+    );
+    const resumed = JSON.parse(
+      vi.mocked(fetch).mock.calls[1][1]!.body as string,
+    );
+    const tail = resumed.messages.slice(-3);
+    expect(tail[0]).toMatchObject({
+      role: "assistant",
+      tool_calls: [
+        { id: "credits-call", function: { name: "check_credits" } },
+        {
+          id: "call-attempt-a-1-1",
+          function: { name: "suggest_replies" },
+        },
+      ],
+    });
+    expect(tail[1]).toMatchObject({
+      role: "tool",
+      tool_call_id: "credits-call",
+      content: expect.stringContaining("20 积分"),
+    });
+    expect(tail[2]).toMatchObject({
+      role: "tool",
+      tool_call_id: "call-attempt-a-1-1",
+    });
+    expect(resumed.tools).toHaveLength(5);
+    const finished = mocks.finish.mock.calls.at(-1)?.[0];
+    expect(finished).toMatchObject({
+      status: "completed",
+      text: '你还有 20 积分。\n\n```chugao-next\n{"options":["充值","降低质量"]}\n```',
+    });
+    expect(finished.parts.activityHistory).toContain("checking_credits");
   });
 
   it("never submits an image from a truncated tool call without its completion marker", async () => {

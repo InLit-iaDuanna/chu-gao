@@ -58,10 +58,10 @@ import {
 } from "@/lib/chat-references-types";
 import { resolveChatReferences } from "@/lib/chat-references";
 import {
-  CHAT_IMAGE_ANTHROPIC_TOOL,
-  CHAT_IMAGE_RESPONSES_TOOL,
-  CHAT_IMAGE_TOOL,
-} from "@/lib/chat-image-tool-definition";
+  CHAT_TOOL_MAX_REQUESTS,
+  chatRequestTools,
+  chatSearchAsTool,
+} from "@/lib/chat-tool-set";
 import {
   chatCreditSettlement,
   chatReplyErrorMessage,
@@ -475,8 +475,10 @@ export async function createChatTurn(
   }
   // The Anthropic relay answers its own web_search tool with canned text, so
   // those models search through the application tool instead.
-  const searchAsTool =
-    config.transport === "anthropic_messages_sse" && input.webSearch;
+  const searchAsTool = chatSearchAsTool(config.transport, input.webSearch);
+  const requestTools = chatRequestTools(config.transport, {
+    searchTool: searchAsTool,
+  });
   const instructions = chatSystemInstructions(
     await getConversationSystemPrompt(),
     input.webSearch,
@@ -499,8 +501,9 @@ export async function createChatTurn(
             instructions,
             effort as ReasoningEffort,
             {
+              webSearch: input.webSearch,
               maxOutputTokens: tokenPricing.maxOutputTokens,
-              tools: [CHAT_IMAGE_RESPONSES_TOOL],
+              tools: requestTools,
             },
           )
         : config.transport === "anthropic_messages_sse"
@@ -510,16 +513,17 @@ export async function createChatTurn(
               instructions,
               effort as ReasoningEffort,
               {
-                webSearch: input.webSearch,
+                // Same as the worker: search runs as the search_web tool.
+                webSearch: false,
                 maxOutputTokens: tokenPricing.maxOutputTokens,
-                tools: [CHAT_IMAGE_ANTHROPIC_TOOL],
+                tools: requestTools,
               },
             )
           : chatCompletionsRequestBody(config.model, messages, instructions, {
               effort: effort as ReasoningEffort,
               maxOutputTokens: tokenPricing.maxOutputTokens,
               includeUsage: true,
-              tools: [CHAT_IMAGE_TOOL],
+              tools: requestTools,
             });
     const contextInput = {
       userId,
@@ -556,13 +560,23 @@ export async function createChatTurn(
     tokenRequestLimits = {
       maxInputTokens: tokenPricing.maxInputTokens,
       maxOutputTokens: tokenPricing.maxOutputTokens,
-      maxRequests: 2,
+      maxRequests: CHAT_TOOL_MAX_REQUESTS,
     };
-    // One tool round and one final reply. The continuation allowance covers
-    // the validated image arguments and the small submission receipt.
-    tokenPricing.maxInputTokens =
-      bound + Math.min(tokenPricing.maxInputTokens, bound + 32_768);
-    tokenPricing.maxOutputTokens *= tokenRequestLimits.maxRequests;
+    // Up to CHAT_TOOL_MAX_REQUESTS requests (tool rounds plus the final
+    // reply), but the reserve only covers three request-equivalents of input
+    // and two full outputs. The first request is `bound`; each continuation
+    // may add tool results (a read_url page is ~6000 characters), so two
+    // allowances of bound + 32k cover two or three follow-ups of a normal
+    // context. The worker spends against this budget per request: it caps
+    // each request's max_tokens by the remaining output and drops every tool
+    // from the request that has no room for another round, which forces a
+    // final answer instead of exceeding the reserve.
+    const continuationInput = Math.min(
+      tokenPricing.maxInputTokens,
+      bound + 32_768,
+    );
+    tokenPricing.maxInputTokens = bound + 2 * continuationInput;
+    tokenPricing.maxOutputTokens *= 2;
     contextRevision = prepared.manifest.revision;
   }
   const reserveCredits = tokenPricing

@@ -37,6 +37,12 @@ export interface AnthropicToolContinuation {
   name: string;
   arguments: string;
   output: string;
+  /**
+   * Calls of the same upstream response share a round. Native replay puts a
+   * round's tool_use blocks in one assistant message and their tool_result
+   * blocks in the next user message, as the Messages API expects.
+   */
+  round?: number;
 }
 
 type ContentPart =
@@ -137,42 +143,54 @@ export function anthropicMessagesRequestBody(
       ];
     },
   );
-  // Without any tool definitions in the request, tool_use/tool_result blocks
-  // are rejected or mishandled by relays, so the exchange is replayed as text.
+  // Native tool_use/tool_result replay whenever the request defines tools.
+  // Without any tool definitions (the last request of a turn, which must
+  // answer), tool_use/tool_result blocks are rejected or mishandled by
+  // relays, so the exchange is replayed as text.
   const replayAsText = !options.tools?.length && !options.webSearch;
-  const toolContinuations = (options.toolContinuations ?? []).flatMap(
-    (tool): Array<{ role: "user" | "assistant"; content: unknown }> => replayAsText ? [
-      {
-        role: "assistant" as const,
-        content: `[已调用 ${tool.name}]\n${tool.arguments}`,
-      },
-      {
-        role: "user" as const,
-        content: `[${tool.name} 回执]\n${tool.output}\n请根据回执直接用文字回复用户，不要再调用工具，也不要检索。`,
-      },
-    ] : [
-      {
-        role: "assistant" as const,
-        content: [
-          {
-            type: "tool_use" as const,
-            id: tool.callId,
-            name: tool.name,
-            input: jsonObject(tool.arguments),
-          },
-        ],
-      },
-      {
-        role: "user" as const,
-        content: [
-          {
-            type: "tool_result" as const,
-            tool_use_id: tool.callId,
-            content: tool.output,
-          },
-        ],
-      },
-    ],
+  const rounds: AnthropicToolContinuation[][] = [];
+  for (const tool of options.toolContinuations ?? []) {
+    const last = rounds.at(-1);
+    if (
+      last &&
+      tool.round !== undefined &&
+      last[0].round === tool.round
+    )
+      last.push(tool);
+    else rounds.push([tool]);
+  }
+  const toolContinuations = rounds.flatMap(
+    (round): Array<{ role: "user" | "assistant"; content: unknown }> =>
+      replayAsText
+        ? round.flatMap((tool) => [
+            {
+              role: "assistant" as const,
+              content: `[已调用 ${tool.name}]\n${tool.arguments}`,
+            },
+            {
+              role: "user" as const,
+              content: `[${tool.name} 回执]\n${tool.output}\n请根据回执直接用文字回复用户，不要再调用工具，也不要检索。`,
+            },
+          ])
+        : [
+            {
+              role: "assistant" as const,
+              content: round.map((tool) => ({
+                type: "tool_use" as const,
+                id: tool.callId,
+                name: tool.name,
+                input: jsonObject(tool.arguments),
+              })),
+            },
+            {
+              role: "user" as const,
+              content: round.map((tool) => ({
+                type: "tool_result" as const,
+                tool_use_id: tool.callId,
+                content: tool.output,
+              })),
+            },
+          ],
   );
   const tools = [
     ...(options.webSearch

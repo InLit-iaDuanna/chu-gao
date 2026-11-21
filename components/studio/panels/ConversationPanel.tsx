@@ -33,6 +33,7 @@ import {
 import { streamConversationChat } from "../lib/sse";
 import { mergeChatTurn } from "../lib/chat-turn-view";
 import { readChatReceipt } from "../lib/chat-submission";
+import { stripInteractiveBlocks } from "../lib/chat-interactive-blocks";
 import type { ChatTurnView } from "@/lib/chat-turn-types";
 import { CHAT_INPUT_MAX_CHARS } from "@/lib/chat-turn-types";
 import { readActiveConversationId } from "../lib/active-conversation";
@@ -412,7 +413,7 @@ export function ConversationPanel({
             text={conversation.messages
               .map(
                 (message) =>
-                  `${message.role === "user" ? "我" : "助手"}：\n${message.content}${message.generationPrompt ? `\n提示词：\n${message.generationPrompt}` : ""}`,
+                  `${message.role === "user" ? "我" : "助手"}：\n${stripInteractiveBlocks(message.content)}${message.generationPrompt ? `\n提示词：\n${message.generationPrompt}` : ""}`,
               )
               .join("\n\n")}
           />
@@ -507,7 +508,9 @@ export function ConversationPanel({
                     {thread.title}
                   </span>
                   <span className="block truncate text-xs text-text-muted">
-                    {thread.latestMessage ?? "…"}
+                    {(thread.latestMessage &&
+                      stripInteractiveBlocks(thread.latestMessage)) ||
+                      "…"}
                   </span>
                 </span>
                 <span className="shrink-0 text-xs text-text-muted">
@@ -553,7 +556,7 @@ export function ConversationPanel({
                   )}
                 >
                   <p className="select-text whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
-                    {message.content}
+                    {stripInteractiveBlocks(message.content)}
                   </p>
                   {message.thumbnailUrl ? (
                     <img
@@ -563,14 +566,19 @@ export function ConversationPanel({
                     />
                   ) : null}
                   <div className="mt-1 flex flex-wrap items-center justify-end gap-1 border-t border-border/60 pt-1">
-                    <CopyTextButton text={message.content} label="复制消息" />
+                    <CopyTextButton
+                      text={stripInteractiveBlocks(message.content)}
+                      label="复制消息"
+                    />
                     <IconButton
                       type="button"
                       variant="ghost"
                       aria-label="重新编辑消息"
                       title="重新编辑消息"
                       disabled={streaming !== null}
-                      onClick={() => setDraft(message.content)}
+                      onClick={() =>
+                        setDraft(stripInteractiveBlocks(message.content))
+                      }
                       className="h-11 w-11 rounded-md text-text-muted sm:h-9 sm:w-9"
                     >
                       <SquarePen size={15} />

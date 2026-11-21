@@ -19,7 +19,7 @@ export const CHAT_IMAGE_TOOL_NAME = "generate_image";
  *   description states the condition for passing it.
  */
 export const CHAT_IMAGE_TOOL_DESCRIPTION =
-  "提交一个图片生成任务：文生图，或基于本轮参考图重绘、修改。仅在用户明确要求生成、重绘或修改图片，且画面要求足够具体时调用；每轮最多调用一次。调用只是把任务提交到生成队列并返回提交回执（不是图片本身），图片生成后会自动显示在当前回复下方。本轮的参考图由系统自动附带。";
+  "提交一个图片生成任务：文生图，或基于本轮参考图重绘、修改。仅在用户明确要求生成、重绘或修改图片，且画面要求足够具体时调用；每轮最多调用一次。调用只是把任务提交到生成队列并返回提交回执（不是图片本身），图片生成后会自动显示在当前回复下方。本轮的参考图由系统自动附带；要基于对话里之前生成的图修改时，用 source_images 指定那些图。";
 
 const imageToolParameters = {
   type: "object",
@@ -58,6 +58,13 @@ const imageToolParameters = {
       maximum: 4,
       description:
         "生成张数。仅在用户明确要多张时传入，否则省略以使用用户当前的生图设置。",
+    },
+    source_images: {
+      type: "array",
+      maxItems: 4,
+      items: { type: "string" },
+      description:
+        "要作为参考图的、本对话之前生成的图片。每项是上下文里「[本条回复生成的图片]」列出的图片 ID，或 latest（最近一次生成的第一张图）、latest:N（最近一次生成的第 N 张图）。仅在用户要求基于之前生成的图修改、延续时传入，否则省略；本轮用户上传或选中的参考图会自动附带，不要写进这里。",
     },
   },
   required: ["prompt"],
@@ -143,6 +150,12 @@ const FAILED_NEXT: Record<string, string> = {
     "图片没有提交。如实告诉用户内容没有通过安全审核，请调整描述；不要帮用户改写来规避审核。",
   CONVERSATION_NOT_FOUND:
     "图片没有提交。告诉用户当前对话不可用，请刷新页面或新建对话。",
+  SOURCE_IMAGE_NOT_FOUND:
+    "图片没有提交。source_images 里有图片找不到或已删除；告诉用户这次没有提交，请用户在下一条消息重新选择或上传要修改的图。",
+  TOO_MANY_SOURCE_IMAGES:
+    "图片没有提交。source_images 最多 4 张；告诉用户这次没有提交，请用户说明要基于哪几张图修改。",
+  TOO_MANY_REFERENCE_IMAGES:
+    "图片没有提交。参考图总数超过了当前图片模型的上限；按 message 告诉用户，减少参考图后重试。",
 };
 
 /**

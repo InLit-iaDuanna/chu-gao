@@ -25,6 +25,7 @@ import {
 } from "@/components/studio/lib/status";
 import { StudioPageShell } from "@/components/studio/StudioPageShell";
 import { CopyTextButton } from "@/components/studio/CopyTextButton";
+import { stripInteractiveBlocks } from "@/components/studio/lib/chat-interactive-blocks";
 import { checkSessionFromHeaders } from "@/lib/auth";
 import {
   conversationSummaryRowInclude,
@@ -304,9 +305,10 @@ export default async function HistoryPage({
                     <h3 className="mt-2 line-clamp-1 break-words text-sm font-medium [overflow-wrap:anywhere]">
                       {conversation.title}
                     </h3>
-                    {conversation.latestMessage ? (
+                    {conversation.latestMessage &&
+                    stripInteractiveBlocks(conversation.latestMessage) ? (
                       <p className="mt-2 line-clamp-2 break-words text-sm leading-6 text-text-muted [overflow-wrap:anywhere]">
-                        {conversation.latestMessage}
+                        {stripInteractiveBlocks(conversation.latestMessage)}
                       </p>
                     ) : null}
                   </Link>

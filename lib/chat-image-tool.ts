@@ -52,10 +52,36 @@ const chatImageToolArgsSchema = z
     outputFormat: z.enum(["png", "jpeg", "webp", "gif"]).optional(),
     background: z.enum(["auto", "opaque", "transparent"]).optional(),
     n: z.number().int().min(1).max(4).optional(),
+    source_images: z.array(z.string()).optional(),
   })
   .strict();
 
 export type ChatImageToolArgs = z.infer<typeof chatImageToolArgsSchema>;
+
+/** At most this many earlier images can be referenced by one call. */
+export const CHAT_SOURCE_IMAGES_LIMIT = 4;
+const SOURCE_SELECTOR_PATTERN = /^(?:latest(?::([1-9]))?|[A-Za-z0-9_-]{1,128})$/;
+
+/**
+ * Cleans source_images: trims, drops anything that is neither an image id nor
+ * "latest" / "latest:N", removes duplicates. Returns null when the value is
+ * not usable at all (so it can be reported in `ignored`).
+ */
+function parseSourceImages(value: unknown): string[] | null {
+  const items =
+    typeof value === "string" ? [value] : Array.isArray(value) ? value : null;
+  if (!items) return null;
+  const selectors: string[] = [];
+  for (const item of items) {
+    if (typeof item !== "string") continue;
+    let selector = item.trim();
+    if (/^latest/i.test(selector)) selector = selector.toLowerCase();
+    if (!SOURCE_SELECTOR_PATTERN.test(selector)) continue;
+    if (selector === "latest:1") selector = "latest";
+    if (!selectors.includes(selector)) selectors.push(selector);
+  }
+  return selectors.length ? selectors : null;
+}
 
 const OPTIONAL_TOOL_ARGS = [
   "modelId",
@@ -110,6 +136,16 @@ export function parseChatImageToolArgs(
 
   const value: Record<string, unknown> = { prompt };
   const ignored: string[] = [];
+  if (
+    record.source_images !== undefined &&
+    record.source_images !== null &&
+    record.source_images !== "" &&
+    !(Array.isArray(record.source_images) && !record.source_images.length)
+  ) {
+    const sourceImages = parseSourceImages(record.source_images);
+    if (sourceImages) value.source_images = sourceImages;
+    else ignored.push("source_images");
+  }
   for (const key of OPTIONAL_TOOL_ARGS) {
     let candidate = record[key];
     if (candidate === undefined || candidate === null || candidate === "")
@@ -123,6 +159,7 @@ export function parseChatImageToolArgs(
   for (const key of Object.keys(record))
     if (
       key !== "prompt" &&
+      key !== "source_images" &&
       !(OPTIONAL_TOOL_ARGS as readonly string[]).includes(key)
     )
       ignored.push(key);
@@ -174,8 +211,8 @@ function publicSubmissionError(error: unknown): ChatImageToolError {
   );
 }
 
-function referenceInputs(context: ChatImageToolContext) {
-  const references = context.references?.length
+function turnReferences(context: ChatImageToolContext): ChatReference[] {
+  return context.references?.length
     ? context.references
     : [
         ...context.referenceImageKeys.map((key) => ({
@@ -187,6 +224,9 @@ function referenceInputs(context: ChatImageToolContext) {
           id,
         })),
       ];
+}
+
+function referenceInputs(references: ChatReference[]) {
   const uploadKeys = references.flatMap((reference) =>
     reference.kind === "upload" ? [reference.key] : [],
   );
@@ -194,6 +234,101 @@ function referenceInputs(context: ChatImageToolContext) {
     reference.kind === "generated" ? [reference.id] : [],
   );
   return { references, uploadKeys, sourceImageIds };
+}
+
+/**
+ * Resolves source_images selectors to image ids of this conversation.
+ *
+ * An image qualifies only when its generation belongs to the user, is not
+ * deleted, succeeded, and is linked to the current conversation (chat-tool
+ * generations are linked through their assistant message). "latest" is the
+ * first image of the most recent such generation, "latest:N" its N-th image.
+ */
+export async function resolveConversationSourceImages(
+  userId: string,
+  conversationId: string,
+  selectors: string[],
+): Promise<string[]> {
+  if (selectors.length > CHAT_SOURCE_IMAGES_LIMIT)
+    throw new ChatImageToolError(
+      "TOO_MANY_SOURCE_IMAGES",
+      `source_images 最多引用 ${CHAT_SOURCE_IMAGES_LIMIT} 张图片`,
+    );
+  const generationScope = {
+    userId,
+    deletedAt: null,
+    status: "SUCCEEDED" as const,
+    OR: [{ conversationId }, { messages: { some: { conversationId } } }],
+  };
+  let latest: string[] | null = null;
+  if (selectors.some((selector) => selector.startsWith("latest"))) {
+    const generation = await db.generation.findFirst({
+      where: { ...generationScope, images: { some: {} } },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      select: {
+        images: {
+          select: { id: true },
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        },
+      },
+    });
+    latest = generation?.images.map((image) => image.id) ?? [];
+  }
+  const explicit = selectors.filter((selector) => !selector.startsWith("latest"));
+  const owned = explicit.length
+    ? new Set(
+        (
+          await db.generatedImage.findMany({
+            where: { id: { in: explicit }, generation: generationScope },
+            select: { id: true },
+          })
+        ).map((row) => row.id),
+      )
+    : new Set<string>();
+  const missing = explicit.filter((id) => !owned.has(id));
+  if (missing.length)
+    throw new ChatImageToolError(
+      "SOURCE_IMAGE_NOT_FOUND",
+      `这些图片不属于本对话、已删除或没有生成成功：${missing
+        .slice(0, 4)
+        .join(", ")}`,
+    );
+  const ids: string[] = [];
+  for (const selector of selectors) {
+    let id = selector;
+    if (selector.startsWith("latest")) {
+      const index = Number(selector.split(":")[1] ?? 1);
+      if (!latest?.length)
+        throw new ChatImageToolError(
+          "SOURCE_IMAGE_NOT_FOUND",
+          "本对话还没有生成成功的图片，无法引用 latest",
+        );
+      if (index > latest.length)
+        throw new ChatImageToolError(
+          "SOURCE_IMAGE_NOT_FOUND",
+          `本对话最近一次只生成了 ${latest.length} 张图片，没有第 ${index} 张`,
+        );
+      id = latest[index - 1];
+    }
+    if (!ids.includes(id)) ids.push(id);
+  }
+  return ids;
+}
+
+/** This turn's references first, then the referenced earlier images. */
+export function mergeSourceImages(
+  references: ChatReference[],
+  sourceImageIds: string[],
+): ChatReference[] {
+  const merged = [...references];
+  for (const id of sourceImageIds)
+    if (
+      !merged.some(
+        (reference) => reference.kind === "generated" && reference.id === id,
+      )
+    )
+      merged.push({ kind: "generated", id });
+  return merged;
 }
 
 async function sourceReferences(userId: string, ids: string[]) {
@@ -237,7 +372,31 @@ export async function enqueueChatImageGeneration(
   if (!model)
     throw new ChatImageToolError("MODEL_NOT_AVAILABLE", "当前图片模型不可用");
 
-  const { references, uploadKeys, sourceImageIds } = referenceInputs(context);
+  const current = turnReferences(context);
+  const selected = args.source_images?.length
+    ? await resolveConversationSourceImages(
+        context.userId,
+        context.conversationId,
+        args.source_images,
+      )
+    : [];
+  const { references, uploadKeys, sourceImageIds } = referenceInputs(
+    mergeSourceImages(current, selected),
+  );
+  if (selected.length && !model.capabilities.supportsReferenceImage)
+    throw new ChatImageToolError(
+      "UNSUPPORTED_PARAM",
+      "当前图片模型不支持参考图",
+    );
+  if (
+    selected.length &&
+    (references.length > model.capabilities.maxReferenceImages ||
+      sourceImageIds.length > CHAT_SOURCE_IMAGES_LIMIT)
+  )
+    throw new ChatImageToolError(
+      "TOO_MANY_REFERENCE_IMAGES",
+      `参考图超过上限：本轮附带 ${current.length} 张，source_images 又引用了 ${references.length - current.length} 张；当前图片模型最多 ${model.capabilities.maxReferenceImages} 张，其中历史生成图最多 ${CHAT_SOURCE_IMAGES_LIMIT} 张`,
+    );
   try {
     await resolveChatReferences(context.userId, references);
   } catch {

@@ -17,6 +17,7 @@ import {
   responsesRequestBody,
   type AnthropicToolContinuation,
   type UpstreamChatMessage,
+  type UpstreamFunctionToolCall,
 } from "@/lib/chat-upstream";
 import { consumeChatSse } from "@/lib/chat-responses-stream";
 import { finalizeChatContextManifest } from "@/lib/chat-context-manifest";
@@ -53,23 +54,56 @@ import {
   isTokenPricedChatModel,
 } from "@/lib/chat-model-options";
 import {
-  CHAT_IMAGE_TOOL,
-  CHAT_IMAGE_ANTHROPIC_TOOL,
-  CHAT_IMAGE_RESPONSES_TOOL,
   CHAT_IMAGE_TOOL_NAME,
+  chatImageToolOutput,
 } from "@/lib/chat-image-tool-definition";
 import { submitChatImageTool } from "@/lib/chat-image-tool";
 import {
-  CHAT_SEARCH_ANTHROPIC_TOOL,
   CHAT_SEARCH_LIMIT,
   CHAT_SEARCH_TOOL_NAME,
   runChatSearchTool,
 } from "@/lib/chat-search-tool";
 import {
+  ASK_USER_INVALID_OUTPUT,
+  ASK_USER_RECORDED_OUTPUT,
+  ASK_USER_TOOL_NAME,
+  CHECK_CREDITS_LIMIT,
+  CHECK_CREDITS_TOOL_NAME,
+  READ_URL_LIMIT,
+  READ_URL_TOOL_NAME,
+  SUGGEST_REPLIES_EMPTY_OUTPUT,
+  SUGGEST_REPLIES_RECORDED_OUTPUT,
+  SUGGEST_REPLIES_TOOL_NAME,
+  appendAgentBlocks,
+  chatToolActivity,
+  sanitizeAskUserArgs,
+  sanitizeSuggestRepliesArgs,
+  toolLimitOutput,
+  unsupportedToolOutput,
+  type AskUserOutcome,
+} from "@/lib/chat-agent-tools";
+import {
+  CHAT_TOOL_MAX_REQUESTS,
+  chatRequestTools,
+  chatSearchAsTool,
+} from "@/lib/chat-tool-set";
+import { readUrlArgument, runReadUrlTool } from "@/lib/chat-read-url-tool";
+import { runCheckCreditsTool } from "@/lib/chat-credits-tool";
+import {
   chatInputTokenUpperBound,
   chatModelCallUsage,
+  normalizeChatTokenUsage,
   readChatTokenPricingSnapshot,
 } from "@/lib/chat-token-billing";
+
+/**
+ * Room a tool round must leave for the request after it: the follow-up
+ * carries the previous input plus tool results (a read_url page is at most
+ * ~6000 characters), so it is estimated as one more input bound plus this.
+ */
+const TOOL_RESULT_INPUT_ALLOWANCE = 24_576;
+/** Smallest output a final answer is guaranteed after a tool round. */
+const MIN_FINAL_OUTPUT_TOKENS = 4_096;
 
 export { chatWorkerOnline } from "@/lib/chat-runtime-health";
 const json = (value: unknown) =>
@@ -366,6 +400,13 @@ export async function executeChatAttempt(
 
   let lastImageToolResult: { ok: boolean; message?: string } | null = null;
   let searchCalls = 0;
+  let readUrlCalls = 0;
+  let creditsCalls = 0;
+  let toolRounds = 0;
+  let spentOutputTokens = 0;
+  // Terminal tools: their cards are appended once the whole turn has ended.
+  let pendingAsk: AskUserOutcome | null = null;
+  let pendingNext: string[] | null = null;
   const stopAndDrainFlush = async () => {
     clearInterval(flushTimer);
     await Promise.resolve(flushing).catch(() => undefined);
@@ -424,8 +465,24 @@ export async function executeChatAttempt(
     const promptCacheKey = createHash("sha256")
       .update(JSON.stringify(["chat-cache-v1", turn.userId, snapshot.model]))
       .digest("hex");
-    const buildRequest = (messages: UpstreamChatMessage[]) =>
-      responses
+    // One constant tool list for every request of the turn (prompt cache);
+    // per-tool limits are enforced on the tool results. Only a request that
+    // has no room for another round goes out without tools, which makes the
+    // model answer.
+    const searchAsTool = chatSearchAsTool(
+      String(snapshot.transport),
+      input.webSearch,
+    );
+    const requestTools = chatRequestTools(String(snapshot.transport), {
+      searchTool: searchAsTool,
+    });
+    const buildRequest = (
+      messages: UpstreamChatMessage[],
+      options: { tools?: boolean; maxOutputTokens?: number } = {},
+    ) => {
+      const tools = options.tools === false ? [] : requestTools;
+      const maxOutputTokens = options.maxOutputTokens ?? requestOutputTokens;
+      return responses
         ? responsesRequestBody(
             geminiUpstreamModel(
               String(snapshot.model),
@@ -441,8 +498,8 @@ export async function executeChatAttempt(
               // After a tool result the reply only reports the submission;
               // relays answer a lone web_search tool with a canned search.
               webSearch: input.webSearch && !handledToolCalls.size,
-              maxOutputTokens: 16_384,
-              tools: handledToolCalls.size ? [] : [CHAT_IMAGE_RESPONSES_TOOL],
+              maxOutputTokens: options.maxOutputTokens ?? 16_384,
+              tools,
               toolContinuations: responseToolContinuations,
               ...(snapshot.model === "gpt-6.1-sol"
                 ? {
@@ -468,13 +525,8 @@ export async function executeChatAttempt(
                 // The relay answers its own web_search tool with canned text;
                 // searching goes through the application tool instead.
                 webSearch: false,
-                maxOutputTokens: requestOutputTokens,
-                tools: [
-                  ...(input.webSearch && searchCalls < CHAT_SEARCH_LIMIT
-                    ? [CHAT_SEARCH_ANTHROPIC_TOOL]
-                    : []),
-                  ...(handledToolCalls.size ? [] : [CHAT_IMAGE_ANTHROPIC_TOOL]),
-                ],
+                maxOutputTokens,
+                tools,
                 toolContinuations: anthropicToolContinuations,
               },
             )
@@ -488,12 +540,13 @@ export async function executeChatAttempt(
               tokenPricing
                 ? {
                     effort: snapshot.effort as ReasoningEffort,
-                    maxOutputTokens: requestOutputTokens,
+                    maxOutputTokens,
                     includeUsage: true,
-                    tools: handledToolCalls.size ? [] : [CHAT_IMAGE_TOOL],
+                    tools,
                   }
-                : { tools: handledToolCalls.size ? [] : [CHAT_IMAGE_TOOL] },
+                : { tools },
             );
+    };
     type PreparedContext = Awaited<ReturnType<typeof prepareChatContext>> & {
       manifest?: unknown;
       contextManifest?: unknown;
@@ -543,9 +596,50 @@ export async function executeChatAttempt(
     state.activity = "waiting_upstream";
     lastSemanticAt = Date.now();
     await flush(true);
+    const maxRequests =
+      typeof requestLimits.maxRequests === "number"
+        ? requestLimits.maxRequests
+        : CHAT_TOOL_MAX_REQUESTS;
     for (;;) {
-      const body = buildRequest(context.messages);
-      const inputBound = chatInputTokenUpperBound(body);
+      // Tools are offered only while another request still fits: the request
+      // count, the remaining output reserve after this request's own maximum,
+      // and the remaining input reserve after this request plus a follow-up.
+      // A retry after a retained image submission only rewrites the prose.
+      let offerTools =
+        toolRounds + 1 < maxRequests && !handledToolCalls.has("retained-image");
+      let outputCap: number | undefined;
+      if (tokenPricing) {
+        const perRequest = requestOutputTokens ?? tokenPricing.maxOutputTokens;
+        const remainingOutput = tokenPricing.maxOutputTokens - spentOutputTokens;
+        if (remainingOutput <= 0)
+          throw new Error("token_pricing_output_budget_exhausted");
+        outputCap = Math.min(perRequest, remainingOutput);
+        if (
+          remainingOutput - outputCap <
+          Math.min(perRequest, MIN_FINAL_OUTPUT_TOKENS)
+        )
+          offerTools = false;
+      }
+      let body = buildRequest(context.messages, {
+        tools: offerTools,
+        maxOutputTokens: outputCap,
+      });
+      let inputBound = chatInputTokenUpperBound(body);
+      if (
+        tokenPricing &&
+        offerTools &&
+        requestedInputTokens +
+          inputBound * 2 +
+          TOOL_RESULT_INPUT_ALLOWANCE >
+          tokenPricing.maxInputTokens
+      ) {
+        offerTools = false;
+        body = buildRequest(context.messages, {
+          tools: false,
+          maxOutputTokens: outputCap,
+        });
+        inputBound = chatInputTokenUpperBound(body);
+      }
       if (
         tokenPricing &&
         (requestedInputTokens + inputBound > tokenPricing.maxInputTokens ||
@@ -570,7 +664,8 @@ export async function executeChatAttempt(
         typeof manifest.requestHash === "string" &&
         manifest.requestHash !== requestHash &&
         !toolMessages.length &&
-        !responseToolContinuations.length;
+        !responseToolContinuations.length &&
+        !anthropicToolContinuations.length;
       if (
         (recovery.retries.length || hashDrifted) &&
         typeof manifest.budgetTokens === "number"
@@ -770,7 +865,7 @@ export async function executeChatAttempt(
                 const index =
                   typeof toolCall.index === "number" ? toolCall.index : 0;
                 const current = completionToolCalls.get(index) ?? {
-                  id: `image-${attemptId}-${index}`,
+                  id: `call-${attemptId}-${requestCount}-${index}`,
                   name: "",
                   arguments: "",
                 };
@@ -782,14 +877,15 @@ export async function executeChatAttempt(
                 if (typeof functionValue.arguments === "string")
                   current.arguments += functionValue.arguments;
                 completionToolCalls.set(index, current);
-                state.activity = "image_tool";
+                state.activity = chatToolActivity(current.name);
               }
               if (value.usage) state.usage = record(value.usage);
               if (value.error) {
                 state.terminal = "failed";
                 state.error = record(value.error);
               } else if (choice.finish_reason === "tool_calls") {
-                state.activity = "image_tool";
+                const last = [...completionToolCalls.values()].at(-1);
+                state.activity = chatToolActivity(last?.name);
                 toolRoundComplete = true;
               } else if (choice.finish_reason)
                 state.terminal =
@@ -867,15 +963,38 @@ export async function executeChatAttempt(
                 )),
         );
       }
+      if (tokenPricing) {
+        // Spend the output reserve by what the request really produced, or by
+        // its whole max_tokens when the provider did not say.
+        const used = normalizeChatTokenUsage(state.usage);
+        spentOutputTokens +=
+          used.availability === "reported"
+            ? used.tokens.outputTokens
+            : (outputCap ?? 0);
+      }
       const chatToolCalls =
         !responses && !anthropic ? [...completionToolCalls.values()] : [];
-      if (
+      const toolRoundReady =
         !transportError &&
         (responses || anthropic
           ? state.terminal === "completed"
           : toolRoundComplete) &&
-        (responseToolCalls.length || chatToolCalls.length)
-      ) {
+        (responseToolCalls.length > 0 || chatToolCalls.length > 0);
+      if (toolRoundReady && !offerTools) {
+        // This request carried no tools because no further request fits, so
+        // it had to answer. A stray call is dropped; its text is the reply.
+        logger.warn(
+          {
+            turnId: turn.id,
+            attemptId,
+            tools: [...responseToolCalls, ...chatToolCalls]
+              .map((toolCall) => toolCall.name.slice(0, 64))
+              .slice(0, 8),
+          },
+          "Ignored a tool call from a request that offered no tools.",
+        );
+        if (!responses && !anthropic) state.terminal = "completed";
+      } else if (toolRoundReady) {
         const calls = [
           ...responseToolCalls.map((toolCall) => ({
             id: toolCall.callId,
@@ -884,161 +1003,209 @@ export async function executeChatAttempt(
           })),
           ...chatToolCalls,
         ];
-        const searchRound =
-          calls.every((call) => call.name === CHAT_SEARCH_TOOL_NAME) &&
-          searchCalls < CHAT_SEARCH_LIMIT;
-        if (handledToolCalls.size && !searchRound)
-          throw new Error("unexpected_tool_call_after_continuation");
-        if (searchRound) {
-          for (const call of calls) {
-            let query = "";
-            try {
-              const parsed = JSON.parse(call.arguments);
-              if (parsed && typeof parsed.query === "string") query = parsed.query;
-            } catch {
-              query = "";
+        const round = ++toolRounds;
+        let resumes = false;
+        const completionCalls: UpstreamFunctionToolCall[] = [];
+        const completionResults: UpstreamChatMessage[] = [];
+        for (const [index, toolCall] of calls.entries()) {
+          const name = toolCall.name;
+          const callId =
+            toolCall.id || `call-${attemptId}-${requestCount}-${index}`;
+          let output: string;
+          // ask_user and suggest_replies are terminal: on their own they never
+          // cost another request.
+          let needsReply = true;
+          if (name === ASK_USER_TOOL_NAME) {
+            const outcome = sanitizeAskUserArgs(toolCall.arguments);
+            if (outcome.kind === "invalid") output = ASK_USER_INVALID_OUTPUT;
+            else {
+              pendingAsk = outcome;
+              output = ASK_USER_RECORDED_OUTPUT;
+              needsReply = false;
             }
-            state.activity = "searching";
-            await flush(true);
-            const outcome = await runChatSearchTool(query, {
-              baseUrl: String(snapshot.baseUrl),
-              apiKey,
-              model: String(snapshot.model),
-              signal: abort.signal,
-              timeoutMs: 30_000,
-            });
-            if (outcome.sources.length) state.recordSources(outcome.sources);
-            searchCalls++;
-            handledToolCalls.add(call.id);
-            if (responses)
-              responseToolContinuations.push({
-                callId: call.id,
-                name: call.name,
-                arguments: call.arguments,
-                output: outcome.output,
+          } else if (name === SUGGEST_REPLIES_TOOL_NAME) {
+            const options = sanitizeSuggestRepliesArgs(toolCall.arguments);
+            if (options.length) pendingNext = options;
+            output = options.length
+              ? SUGGEST_REPLIES_RECORDED_OUTPUT
+              : SUGGEST_REPLIES_EMPTY_OUTPUT;
+            needsReply = false;
+          } else if (name === CHAT_SEARCH_TOOL_NAME && searchAsTool) {
+            if (searchCalls >= CHAT_SEARCH_LIMIT)
+              output = toolLimitOutput(name, CHAT_SEARCH_LIMIT);
+            else {
+              let query = "";
+              try {
+                const parsed = JSON.parse(toolCall.arguments);
+                if (parsed && typeof parsed.query === "string")
+                  query = parsed.query;
+              } catch {
+                query = "";
+              }
+              searchCalls++;
+              state.activity = "searching";
+              await flush(true);
+              const outcome = await runChatSearchTool(query, {
+                baseUrl: String(snapshot.baseUrl),
+                apiKey,
+                model: String(snapshot.model),
+                signal: abort.signal,
+                timeoutMs: 30_000,
               });
-            else
-              anthropicToolContinuations.push({
-                callId: call.id,
-                name: call.name,
-                arguments: call.arguments,
-                output: outcome.output,
-              });
-          }
-          state = recovery.continueAfterTool();
-          state.activity = "waiting_upstream";
-          lastSemanticAt = Date.now();
-          await flush(true);
-          continue;
-        }
-        for (const toolCall of calls) {
-          let toolResult:
-            | Awaited<ReturnType<typeof submitChatImageTool>>
-            | {
-                ok: false;
-                code: string;
-                message: string;
+              if (outcome.sources.length) state.recordSources(outcome.sources);
+              output = outcome.output;
+            }
+          } else if (name === READ_URL_TOOL_NAME) {
+            if (readUrlCalls >= READ_URL_LIMIT)
+              output = toolLimitOutput(name, READ_URL_LIMIT);
+            else {
+              readUrlCalls++;
+              state.activity = "reading_url";
+              await flush(true);
+              const outcome = await runReadUrlTool(
+                readUrlArgument(toolCall.arguments),
+                { signal: abort.signal },
+              );
+              abort.signal.throwIfAborted();
+              if (outcome.sources.length) state.recordSources(outcome.sources);
+              output = outcome.output;
+            }
+          } else if (name === CHECK_CREDITS_TOOL_NAME) {
+            if (creditsCalls >= CHECK_CREDITS_LIMIT)
+              output = toolLimitOutput(name, CHECK_CREDITS_LIMIT);
+            else {
+              creditsCalls++;
+              state.activity = "checking_credits";
+              await flush(true);
+              output = (
+                await runCheckCreditsTool(toolCall.arguments, {
+                  userId: turn.userId,
+                  imageModelId: input.imageModelId,
+                  imageSize: input.imageSize,
+                  imageQuality: input.imageQuality,
+                  imageOutputFormat: input.imageOutputFormat,
+                  imageN: input.imageN,
+                })
+              ).output;
+            }
+          } else if (name === CHAT_IMAGE_TOOL_NAME) {
+            let toolResult:
+              | Awaited<ReturnType<typeof submitChatImageTool>>
+              | {
+                  ok: false;
+                  code: string;
+                  message: string;
+                };
+            if (!toolCall.id || !toolCall.arguments) {
+              toolResult = {
+                ok: false,
+                code: "INVALID_TOOL_CALL",
+                message: "生图工具调用不完整，请重新描述图片需求",
               };
-          if (!toolCall.id || !toolCall.name || !toolCall.arguments) {
-            toolResult = {
-              ok: false,
-              code: "INVALID_TOOL_CALL",
-              message: "生图工具调用不完整，请重新描述图片需求",
-            };
-          } else if (
-            imageToolCalls >= 1 ||
-            toolCall.name !== CHAT_IMAGE_TOOL_NAME
-          ) {
-            toolResult = {
-              ok: false,
-              code: "UNSUPPORTED_TOOL_CALL",
-              message: "本轮只支持一次生图调用，请把多个要求合并后再试",
-            };
-          } else {
-            imageToolCalls++;
-            state.activity = "image_generating";
-            await flush(true);
-            toolResult = await submitChatImageTool(toolCall.arguments, {
-              userId: turn.userId,
-              conversationId: turn.conversationId,
-              turnId: turn.id,
-              attemptId,
-              callId: toolCall.id || `image-${attemptId}-${imageToolCalls}`,
-              imageModelId: input.imageModelId,
-              imageSize: input.imageSize,
-              imageQuality: input.imageQuality,
-              imageOutputFormat: input.imageOutputFormat,
-              imageN: input.imageN,
-              referenceImageKeys: input.referenceImageKeys,
-              sourceImageIds: input.sourceImageIds,
-              references: input.references,
-            });
-          }
-          const callId = toolCall?.id || `image-${attemptId}-${imageToolCalls}`;
-          handledToolCalls.add(callId);
-          if (toolResult.ok) {
-            const linked = await db.$transaction(async (tx) => {
-              const updated = await tx.conversationMessage.updateMany({
-                where: {
-                  chatAttemptId: attemptId,
-                  role: "ASSISTANT",
-                },
-                data: { generationId: toolResult.generationId },
-              });
-              if (!updated.count) return false;
-              return appendActiveChatEvent(tx, {
+            } else if (imageToolCalls >= 1) {
+              toolResult = {
+                ok: false,
+                code: "UNSUPPORTED_TOOL_CALL",
+                message: "本轮只支持一次生图调用，请把多个要求合并后再试",
+              };
+            } else {
+              imageToolCalls++;
+              state.activity = "image_generating";
+              await flush(true);
+              toolResult = await submitChatImageTool(toolCall.arguments, {
+                userId: turn.userId,
+                conversationId: turn.conversationId,
                 turnId: turn.id,
                 attemptId,
-                executionToken,
-                type: "generation.created",
-                payload: {
-                  generationId: toolResult.generationId,
-                  status: toolResult.status,
-                  modelId: toolResult.modelId,
-                },
+                callId,
+                imageModelId: input.imageModelId,
+                imageSize: input.imageSize,
+                imageQuality: input.imageQuality,
+                imageOutputFormat: input.imageOutputFormat,
+                imageN: input.imageN,
+                referenceImageKeys: input.referenceImageKeys,
+                sourceImageIds: input.sourceImageIds,
+                references: input.references,
               });
-            });
-            if (!linked) throw new Error("attempt_no_longer_active");
+            }
+            if (toolResult.ok) {
+              const submitted = toolResult;
+              const linked = await db.$transaction(async (tx) => {
+                const updated = await tx.conversationMessage.updateMany({
+                  where: {
+                    chatAttemptId: attemptId,
+                    role: "ASSISTANT",
+                  },
+                  data: { generationId: submitted.generationId },
+                });
+                if (!updated.count) return false;
+                return appendActiveChatEvent(tx, {
+                  turnId: turn.id,
+                  attemptId,
+                  executionToken,
+                  type: "generation.created",
+                  payload: {
+                    generationId: submitted.generationId,
+                    status: submitted.status,
+                    modelId: submitted.modelId,
+                  },
+                });
+              });
+              if (!linked) throw new Error("attempt_no_longer_active");
+            }
+            state.recordToolResult(callId, CHAT_IMAGE_TOOL_NAME, toolResult);
+            lastImageToolResult = toolResult;
+            output = chatImageToolOutput(toolResult);
+          } else {
+            output = unsupportedToolOutput(name);
           }
-          state.recordToolResult(callId, CHAT_IMAGE_TOOL_NAME, toolResult);
-          lastImageToolResult = toolResult;
-          const output = JSON.stringify(toolResult);
-          if (responses) {
+          if (needsReply) resumes = true;
+          handledToolCalls.add(callId);
+          const replayName = name || "unknown_tool";
+          const replayArguments = toolCall.arguments || "{}";
+          if (responses)
             responseToolContinuations.push({
               callId,
-              name: toolCall?.name || CHAT_IMAGE_TOOL_NAME,
-              arguments: toolCall?.arguments || "{}",
+              name: replayName,
+              arguments: replayArguments,
               output,
             });
-          } else if (anthropic) {
+          else if (anthropic)
             anthropicToolContinuations.push({
               callId,
-              name: toolCall?.name || CHAT_IMAGE_TOOL_NAME,
-              arguments: toolCall?.arguments || "{}",
+              name: replayName,
+              arguments: replayArguments,
               output,
+              round,
             });
-          } else {
-            toolMessages.push({
-              role: "assistant",
-              content: state.finalText ?? state.rawText,
-              tool_calls: [
-                {
-                  id: callId,
-                  type: "function",
-                  function: {
-                    name: toolCall?.name || CHAT_IMAGE_TOOL_NAME,
-                    arguments: toolCall?.arguments || "{}",
-                  },
-                },
-              ],
+          else {
+            completionCalls.push({
+              id: callId,
+              type: "function",
+              function: { name: replayName, arguments: replayArguments },
             });
-            toolMessages.push({
+            completionResults.push({
               role: "tool",
               tool_call_id: callId,
-              name: CHAT_IMAGE_TOOL_NAME,
+              name: replayName,
               content: output,
             });
           }
+        }
+        if (completionCalls.length)
+          toolMessages.push(
+            {
+              role: "assistant",
+              content: state.finalText ?? state.rawText,
+              tool_calls: completionCalls,
+            },
+            ...completionResults,
+          );
+        // Only terminal tools: the turn is over, unless the model has not
+        // written any answer yet and asked nothing.
+        if (!resumes && (recovery.text.trim() || pendingAsk)) {
+          state.terminal = "completed";
+          break;
         }
         state = recovery.continueAfterTool();
         state.activity = "waiting_upstream";
@@ -1132,12 +1299,18 @@ export async function executeChatAttempt(
           };
     // Some upstreams answer the post-tool round with nothing but (filtered)
     // reasoning; never leave an empty bubble when the tool already ran.
-    const replyText =
+    const replyBody =
       recovery.text.trim() || !lastImageToolResult
         ? recovery.text
         : lastImageToolResult.ok
           ? "已提交图片生成，图片稍后会显示在下方。"
           : `图片没有提交成功：${lastImageToolResult.message ?? "请稍后重试"}`;
+    // Cards are appended only to a finished turn, after any continuation;
+    // ask_user wins over suggest_replies. A card alone is a complete reply.
+    const replyText =
+      status === "completed"
+        ? appendAgentBlocks(replyBody, { ask: pendingAsk, next: pendingNext })
+        : replyBody;
     await finishWithRetries({
       turnId: turn.id,
       attemptId,

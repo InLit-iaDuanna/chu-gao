@@ -45,7 +45,20 @@ describe("generate_image definition", () => {
       "outputFormat",
       "background",
       "n",
+      "source_images",
     ]);
+  });
+
+  it("lets the model reference earlier generated images by id or latest", () => {
+    const { source_images } = CHAT_IMAGE_TOOL.function.parameters.properties;
+    expect(source_images).toMatchObject({
+      type: "array",
+      maxItems: 4,
+      items: { type: "string" },
+    });
+    expect(source_images.description).toContain("[本条回复生成的图片]");
+    expect(source_images.description).toContain("latest");
+    expect(CHAT_IMAGE_TOOL_DESCRIPTION).toContain("source_images");
   });
 
   it("tells the model when to pass each optional parameter", () => {
@@ -94,6 +107,9 @@ describe("generate_image receipt", () => {
     "REFERENCE_IMAGE_NOT_FOUND",
     "MODERATION_REJECTED",
     "CONVERSATION_NOT_FOUND",
+    "SOURCE_IMAGE_NOT_FOUND",
+    "TOO_MANY_SOURCE_IMAGES",
+    "TOO_MANY_REFERENCE_IMAGES",
     "SOMETHING_NEW",
   ])("gives a next step for %s", (code) => {
     const receipt = JSON.parse(

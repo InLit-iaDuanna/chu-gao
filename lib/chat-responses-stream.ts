@@ -1,6 +1,7 @@
 import { createParser } from "eventsource-parser";
 import { readCitedResponse, type ChatSearchSource } from "@/lib/chat-search";
 import { ThinkingStreamFilter, stripThinkingTags } from "@/lib/chat-text-filter";
+import { chatToolActivity } from "@/lib/chat-agent-tools";
 import type { ChatTerminalStatus } from "@/lib/chat-turn-types";
 
 const record = (value: unknown): Record<string, unknown> =>
@@ -259,8 +260,9 @@ export class ResponsesAccumulator {
   }
 
   private item(item: Record<string, unknown>, outputIndex: number) {
-    this.outputItem(item, outputIndex);
-    if (item.type === "function_call") this.activity = "image_tool";
+    const stored = this.outputItem(item, outputIndex);
+    if (item.type === "function_call")
+      this.activity = chatToolActivity(stored.name);
     if (item.type === "web_search_call" && item.status === "completed") {
       this.searched = true;
       if (this.activity !== "answering")
@@ -386,7 +388,6 @@ export class ResponsesAccumulator {
       );
       if (item.type === "reasoning") this.activity = "reasoning";
       if (item.type === "web_search_call") this.activity = "searching";
-      if (item.type === "function_call") this.activity = "image_tool";
     } else if (
       type === "response.function_call_arguments.delta" ||
       type === "response.function_call_arguments.done"
@@ -414,7 +415,7 @@ export class ResponsesAccumulator {
           key,
           (this.functionArguments.get(key) ?? "") + argumentsValue,
         );
-      this.activity = "image_tool";
+      this.activity = chatToolActivity(item.name);
       if (argumentsValue) this.revision++;
     } else if (type.startsWith("response.web_search_call.")) {
       const outputIndex =
@@ -522,7 +523,11 @@ export class ResponsesAccumulator {
       .filter((item) => item.type === "function_call")
       .map((item) => {
         const callId = item.callId ?? item.itemId;
-        const args = this.functionArguments.get(callId);
+        // A tool without parameters (check_credits) streams no arguments at
+        // all; once the response is complete that means an empty object.
+        const args =
+          this.functionArguments.get(callId) ||
+          (this.terminal === "completed" ? "{}" : undefined);
         if (!args) return null;
         return {
           itemId: item.itemId,

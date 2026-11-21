@@ -65,6 +65,7 @@ import {
   WorkspaceSidebarToggle,
 } from "./WorkspaceShell";
 import { ConversationTimeline } from "./chat/ConversationTimeline";
+import { stripInteractiveBlocks } from "./lib/chat-interactive-blocks";
 import { HtmlArtifact } from "./chat/HtmlArtifact";
 import {
   ImageRoutingDialog,
@@ -1350,6 +1351,19 @@ export function StudioApp({
                         ? "请输入内容"
                         : null;
 
+  // Quick replies bypass the draft and attachments, so only conversation-level blockers apply.
+  const quickReplyDisabledReason = chatRecoverable
+    ? "请先恢复上次提交的结果"
+    : chatCompacting
+      ? "正在压缩上下文"
+      : threadLoading
+        ? "正在加载对话"
+        : threadError
+          ? "请先重新加载对话"
+          : !chatModel
+            ? (chatModelError ?? "正在加载聊天模型，暂不能发送")
+            : null;
+
   const creativeDisabledReason =
     threadLoading || threadError
       ? "请先加载对话"
@@ -1551,11 +1565,17 @@ export function StudioApp({
   const send = async (
     confirmed?: CreateGenerationInput,
     forcedModel?: ModelInfo,
+    /** Option text from an assistant ask card or quick reply: sent as a chat message without touching the draft. */
+    quickReply?: string,
   ): Promise<boolean> => {
-    const activeMode = modeRef.current;
-    const directImage = !confirmed ? parseImageCommand(prompt) : null;
+    const isQuickReply = quickReply !== undefined && !confirmed;
+    const activeMode = isQuickReply ? "chat" : modeRef.current;
+    const directImage =
+      !confirmed && !isQuickReply ? parseImageCommand(prompt) : null;
     const submittedPrompt = prompt;
-    const content = confirmed?.prompt ?? (directImage ? prompt : prompt.trim());
+    const content = isQuickReply
+      ? quickReply.trim()
+      : (confirmed?.prompt ?? (directImage ? prompt : prompt.trim()));
     const imageSubmission =
       Boolean(directImage) || activeMode === "image" || Boolean(confirmed);
     const routeModel = forcedModel ?? model;
@@ -1574,7 +1594,15 @@ export function StudioApp({
       setSendError("请先选择本次对话的图片模型和生成质量");
       return false;
     }
-    const blockedReason = confirmed ? creativeDisabledReason : disabledReason;
+    const blockedReason = confirmed
+      ? creativeDisabledReason
+      : isQuickReply
+        ? quickReplyDisabledReason
+        : disabledReason;
+    if (isQuickReply && blockedReason) {
+      setSendError(blockedReason);
+      return false;
+    }
     const routeOnlyBlocked =
       imageSubmission &&
       routeModel &&
@@ -1650,13 +1678,15 @@ export function StudioApp({
     const isNew = !conversation;
     setBusy(true);
     setSendError(null);
-    const submittedReferences = confirmed
-      ? creativeReferences.filter(
-          (reference) =>
-            reference.kind === confirmed.creative?.baseReference?.kind &&
-            reference.key === confirmed.creative.baseReference.key,
-        )
-      : effectiveReferences;
+    const submittedReferences = isQuickReply
+      ? effectiveReferences.slice(0, 0) // Quick replies never carry attachments.
+      : confirmed
+        ? creativeReferences.filter(
+            (reference) =>
+              reference.kind === confirmed.creative?.baseReference?.kind &&
+              reference.key === confirmed.creative.baseReference.key,
+          )
+        : effectiveReferences;
     const chatRequest = chatReferenceRequest(
       imageSubmission ? [] : submittedReferences,
     );
@@ -1738,7 +1768,8 @@ export function StudioApp({
             onTurn: (turn) => {
               if (currentChat()) {
                 if (!managedChatTurn.current) {
-                  consumeChatDraft(submittedMessage);
+                  // A quick reply never consumes what the user is typing.
+                  if (!isQuickReply) consumeChatDraft(submittedMessage);
                   setPending(null);
                 }
                 const changedAttempt =
@@ -2027,6 +2058,14 @@ export function StudioApp({
     }
   };
 
+  // Stable identity so memoized assistant replies are not re-rendered by every keystroke.
+  const sendRef = useRef(send);
+  sendRef.current = send;
+  const handleQuickReply = useCallback(
+    (text: string) => sendRef.current(undefined, undefined, text),
+    [],
+  );
+
   const handleUsePrompt = (text: string) => {
     setPrompt(text);
     setFocusVersion((value) => value + 1);
@@ -2163,7 +2202,9 @@ export function StudioApp({
                     .map(
                       (message) =>
                         (message.role === "user" ? "我：\n" : "助手：\n") +
-                        message.content +
+                        (message.role === "user"
+                          ? message.content
+                          : stripInteractiveBlocks(message.content)) +
                         (message.generationPrompt
                           ? "\n提示词：\n" + message.generationPrompt
                           : ""),
@@ -2309,6 +2350,7 @@ export function StudioApp({
               onRetry={(generation) => void retry(generation)}
               onCancel={(id) => void cancel(id)}
               onRetryChat={(id, attemptId) => void retryChatTurn(id, attemptId)}
+              onQuickReply={handleQuickReply}
             />
           )}
           <div

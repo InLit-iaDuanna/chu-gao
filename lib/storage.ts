@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import { lookup } from "node:dns/promises";
-import type { LookupAddress, LookupOptions } from "node:dns";
 import { createReadStream } from "node:fs";
 import {
   mkdir,
@@ -11,13 +10,13 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { request as httpsRequest } from "node:https";
-import net from "node:net";
 import path from "node:path";
 
 import sharp from "sharp";
 
 import type { InternalReferenceImage } from "@/lib/models/types";
 import type { GeneratedImageData } from "@/lib/providers/types";
+import { isPrivateAddress, pinnedAddressLookup } from "@/lib/safe-remote-fetch";
 
 export interface PersistedGeneratedImage {
   storageKey: string;
@@ -47,26 +46,8 @@ const MAX_IMAGE_DIMENSION = Number(process.env.MAX_IMAGE_DIMENSION ?? 16_384);
 const MAX_IMAGE_PIXELS = Number(process.env.MAX_IMAGE_PIXELS ?? 40_000_000);
 const MAX_PROVIDER_IMAGE_REDIRECTS = 3;
 
-type PinnedLookupCallback = (
-  error: NodeJS.ErrnoException | null,
-  address: string | LookupAddress[],
-  family?: number,
-) => void;
-
-export function pinnedProviderImageLookup(address: string, family: 4 | 6) {
-  return (
-    _hostname: string,
-    options: LookupOptions,
-    callback: PinnedLookupCallback,
-  ) => {
-    if (options.all) {
-      callback(null, [{ address, family }]);
-      return;
-    }
-
-    callback(null, address, family);
-  };
-}
+/** Kept under its historical name; the guard itself lives in safe-remote-fetch. */
+export const pinnedProviderImageLookup = pinnedAddressLookup;
 
 function providerImageFetchAllowlist(): string[] {
   return (process.env.PROVIDER_IMAGE_FETCH_ALLOWLIST ?? "")
@@ -98,64 +79,6 @@ function hostMatchesAllowlist(hostname: string, entry: string): boolean {
   }
 
   return hostname === entry;
-}
-
-function isPrivateIpv4(value: string): boolean {
-  const parts = value.split(".").map((part) => Number(part));
-  const [first, second, third] = parts;
-
-  if (parts.length !== 4 || first === undefined || second === undefined) {
-    return false;
-  }
-
-  return (
-    first === 0 ||
-    first === 10 ||
-    first === 127 ||
-    (first === 169 && second === 254) ||
-    (first === 172 && second >= 16 && second <= 31) ||
-    (first === 192 && second === 0 && third === 0) ||
-    (first === 192 && second === 0 && third === 2) ||
-    (first === 192 && second === 168) ||
-    (first === 198 && (second === 18 || second === 19)) ||
-    (first === 198 && second === 51 && third === 100) ||
-    (first === 203 && second === 0 && third === 113) ||
-    (first === 100 && second >= 64 && second <= 127) ||
-    first >= 224
-  );
-}
-
-function isPrivateIpv6(value: string): boolean {
-  const normalized = value.toLowerCase().replace(/^\[|\]$/g, "");
-  const mappedIpv4 = normalized.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/)?.[1];
-
-  if (mappedIpv4) {
-    return isPrivateIpv4(mappedIpv4);
-  }
-
-  return (
-    normalized === "::1" ||
-    normalized === "::" ||
-    normalized.startsWith("fc") ||
-    normalized.startsWith("fd") ||
-    normalized.startsWith("fe80:") ||
-    normalized.startsWith("fec") ||
-    normalized.startsWith("ff")
-  );
-}
-
-function isPrivateAddress(value: string): boolean {
-  const version = net.isIP(value);
-
-  if (version === 4) {
-    return isPrivateIpv4(value);
-  }
-
-  if (version === 6) {
-    return isPrivateIpv6(value);
-  }
-
-  return false;
 }
 
 async function resolveSafeRemoteImageUrl(

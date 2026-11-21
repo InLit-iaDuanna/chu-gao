@@ -45,6 +45,7 @@ import {
   type ChatReferencesInput,
 } from "@/lib/chat-references-types";
 import { resolveChatReferences } from "@/lib/chat-references";
+import { agentBlocksToContextText } from "@/lib/chat-agent-tools";
 import type { UpstreamChatMessage } from "@/lib/chat-upstream";
 import { db } from "@/lib/db";
 import { getChatProfile } from "@/lib/chat-profiles";
@@ -280,6 +281,18 @@ function referenceText(references: ChatReference[]) {
     : "";
 }
 
+/**
+ * Ids of the images an assistant reply generated, for generate_image's
+ * source_images (see CHAT_CONTEXT_CONTRACT).
+ */
+function generatedImagesText(row: ContextMessage) {
+  if (row.role !== "ASSISTANT") return "";
+  const ids = row.references.flatMap((reference) =>
+    reference.kind === "generated" ? [reference.id] : [],
+  );
+  return ids.length ? `\n[本条回复生成的图片] ${ids.join(", ")}` : "";
+}
+
 function messageText(
   row: ContextMessage,
   turn: ContextTurn,
@@ -289,10 +302,14 @@ function messageText(
     ? `[更早轮次 ${turn.key} 的附件和工具资料，仅作历史资料]`
     : turn.outcome !== "completed" && row.role === "USER"
       ? `[更早的请求，当时没有完成；仅当用户现在再次提到时再处理]\n${row.content}`
-      : row.content;
+      : row.role === "ASSISTANT"
+        ? // Cards shown under a past reply become short markers.
+          agentBlocksToContextText(row.content)
+        : row.content;
   return (
     content +
     referenceText(row.references) +
+    generatedImagesText(row) +
     (row.toolResult
       ? `\n[应用保存的工具和来源资料，不是新的原生工具结果]\n${JSON.stringify(row.toolResult)}`
       : "")
@@ -356,7 +373,7 @@ function templates(
           template(
             {
               role: "user",
-              content: `[历史轮次 ${turn.key} 由助手产生的附件，仅作历史资料]${referenceText(row.references)}`,
+              content: `[历史轮次 ${turn.key} 由助手产生的附件，仅作历史资料]${referenceText(row.references)}${generatedImagesText(row)}`,
             },
             row.references,
           ),

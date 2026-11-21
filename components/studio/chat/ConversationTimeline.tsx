@@ -18,6 +18,8 @@ import type { SubmittedChatMessage } from "../lib/chat-turn-view";
 import type { Conversation, Generation, ModelInfo } from "../lib/types";
 import { messageGeneration } from "./message-generation";
 import { AssistantContent } from "./AssistantContent";
+import type { QuickReplyHandler } from "./InteractiveBlocks";
+import { stripInteractiveBlocks } from "../lib/chat-interactive-blocks";
 import { TurnXiie, XiieSlot } from "./TurnXiie";
 import {
   ActivityTrail,
@@ -51,6 +53,8 @@ interface Props {
   onRetry: (generation: Generation) => void;
   onCancel: (id: string) => void;
   onRetryChat?: (id: string, expectedPreviousAttemptId: string) => void;
+  /** Sends an option from an assistant ask card or quick reply as a user message. */
+  onQuickReply?: QuickReplyHandler;
 }
 
 function UserContent({ message }: { message: SubmittedChatMessage }) {
@@ -226,6 +230,7 @@ export function ConversationTimeline({
   onRetry,
   onCancel,
   onRetryChat,
+  onQuickReply,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const following = useRef(true);
@@ -236,6 +241,18 @@ export function ConversationTimeline({
   const latestChatMessageId = conversation?.messages
     .filter((message) => message.role === "assistant" && message.chatTurnId)
     .at(-1)?.id;
+  const messages = conversation?.messages ?? [];
+  const latestAssistantId = messages
+    .filter((message) => message.role === "assistant")
+    .at(-1)?.id;
+  // Ask cards and quick replies only accept clicks when nothing is in flight.
+  const turnInFlight =
+    disabled ||
+    pending !== null ||
+    streaming !== null ||
+    messages.some((message) =>
+      ["queued", "running"].includes(message.chatStatus ?? ""),
+    );
   useEffect(() => {
     following.current = true;
     setShowBottom(false);
@@ -271,8 +288,9 @@ export function ConversationTimeline({
         }}
       >
         <div className="mx-auto w-full max-w-[46rem] space-y-9 pb-3">
-          {(conversation?.messages ?? []).map((message) => {
+          {messages.map((message, index) => {
             const isUser = message.role === "user";
+            const nextMessage = messages[index + 1];
             const active =
               !isUser &&
               ["queued", "running"].includes(message.chatStatus ?? "");
@@ -352,6 +370,15 @@ export function ConversationTimeline({
                             streaming={active}
                             messageStatus={message.chatStatus ?? "completed"}
                             onOpenArtifact={onOpenArtifact}
+                            interactive={
+                              message.id === latestAssistantId && !turnInFlight
+                            }
+                            answer={
+                              nextMessage?.role === "user"
+                                ? nextMessage.content
+                                : undefined
+                            }
+                            onQuickReply={onQuickReply}
                           />
                           <ReplyMetadata message={message} />
                         </ResultBubble>
@@ -429,7 +456,12 @@ export function ConversationTimeline({
                     </IconButton>
                   ) : null}
                   <CopyTextButton
-                    text={generation?.prompt ?? message.content}
+                    text={
+                      generation?.prompt ??
+                      (isUser
+                        ? message.content
+                        : stripInteractiveBlocks(message.content))
+                    }
                     label={generation ? "复制提示词" : "复制消息"}
                   />
                   <IconButton
@@ -438,7 +470,12 @@ export function ConversationTimeline({
                     title={isUser ? "重新编辑消息" : "使用提示词"}
                     disabled={disabled}
                     onClick={() =>
-                      onEdit(generation?.prompt ?? message.content)
+                      onEdit(
+                        generation?.prompt ??
+                          (isUser
+                            ? message.content
+                            : stripInteractiveBlocks(message.content)),
+                      )
                     }
                     className="h-8 w-8 text-text-muted"
                   >

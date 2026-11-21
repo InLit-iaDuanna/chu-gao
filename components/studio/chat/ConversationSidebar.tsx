@@ -17,6 +17,7 @@ import { Button, IconButton, Input } from "@/components/ui";
 import { Logo } from "@/components/shared/Logo";
 import { cn } from "@/lib/utils";
 import type { ConversationSummary } from "../lib/types";
+import { stripInteractiveBlocks } from "../lib/chat-interactive-blocks";
 
 interface Props {
   pathname?: string;
@@ -48,7 +49,7 @@ export function ConversationSidebar({
   const [search, setSearch] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const filtered = threads.filter((thread) =>
-    `${thread.title} ${thread.latestMessage ?? ""}`
+    `${thread.title} ${stripInteractiveBlocks(thread.latestMessage ?? "")}`
       .toLowerCase()
       .includes(search.trim().toLowerCase()),
   );
