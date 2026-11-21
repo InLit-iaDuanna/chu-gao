@@ -1,108 +1,157 @@
+/*
+ * Ask card: a quiet bordered list in the Claude style. The question sits on
+ * top, every option is a full-width row (number, label + description, an
+ * arrow that appears on hover), and a hairline footer carries the hint and,
+ * for multi-select, the send button. Black and white only.
+ */
 .card {
   width: 100%;
-  max-width: 34rem;
+  max-width: 36rem;
   min-width: 0;
-  margin: 1em 0 0.25em;
-  padding: 14px 14px 12px;
+  margin: 1.1em 0 0.25em;
+  overflow: hidden;
   border: 1px solid rgb(var(--border));
   border-radius: 12px;
   background: rgb(var(--surface));
-  box-shadow: none;
 }
 
 .question {
-  margin: 0 0 10px;
+  margin: 0;
+  padding: 14px 16px 12px;
   font-size: 15px;
   font-weight: 500;
-  line-height: 1.6;
+  line-height: 1.55;
   color: rgb(var(--text));
   overflow-wrap: anywhere;
 }
 
 .options {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  flex-direction: column;
+  border-top: 1px solid rgb(var(--border));
 }
 
 .option {
-  display: inline-flex;
+  display: grid;
+  width: 100%;
   min-width: 0;
-  max-width: 100%;
-  min-height: 44px;
+  min-height: 48px;
+  grid-template-columns: 22px minmax(0, 1fr) 16px;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border: 1px solid rgb(var(--border-strong));
-  border-radius: 8px;
+  gap: 12px;
+  padding: 10px 16px;
+  border: 0;
+  border-bottom: 1px solid rgb(var(--border));
   background: transparent;
   color: rgb(var(--text));
-  font-size: 14px;
-  line-height: 1.45;
+  font: inherit;
   text-align: left;
   cursor: pointer;
-  transition:
-    background-color 120ms ease,
-    border-color 120ms ease;
+  transition: background-color 120ms ease;
+}
+.option:last-child {
+  border-bottom: 0;
 }
 .option:hover {
-  background: rgb(var(--text) / 0.04);
-  border-color: rgb(var(--text) / 0.35);
+  background: rgb(var(--text) / 0.045);
 }
-.option[data-selected="true"] {
+.option:active {
+  background: rgb(var(--text) / 0.07);
+}
+
+.index,
+.checkbox {
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgb(var(--border-strong));
+  border-radius: 6px;
+  color: rgb(var(--text-muted));
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+.option:hover .index {
   border-color: rgb(var(--text));
+  background: rgb(var(--text));
+  color: rgb(var(--bg));
+}
+.option:hover .checkbox {
+  border-color: rgb(var(--text) / 0.6);
+}
+.option[data-selected="true"] .checkbox {
+  border-color: rgb(var(--text));
+  background: rgb(var(--text));
+  color: rgb(var(--bg));
 }
 
 .optionText {
   display: flex;
   min-width: 0;
   flex-direction: column;
+  gap: 2px;
 }
 .optionLabel {
+  font-size: 14px;
+  line-height: 1.45;
   overflow-wrap: anywhere;
 }
 .optionDescription {
-  font-size: 12px;
-  line-height: 1.5;
+  font-size: 12.5px;
+  line-height: 1.45;
   color: rgb(var(--text-muted));
   overflow-wrap: anywhere;
 }
 
-.checkbox {
-  display: inline-flex;
-  width: 16px;
-  height: 16px;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgb(var(--border-strong));
-  border-radius: 4px;
-  color: rgb(var(--bg));
+.arrow {
+  color: rgb(var(--text-muted));
+  opacity: 0;
+  transform: translateX(-3px);
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
 }
-.option[data-selected="true"] .checkbox {
-  border-color: rgb(var(--text));
-  background: rgb(var(--text));
+.option:hover .arrow,
+.option:focus-visible .arrow {
+  opacity: 1;
+  transform: none;
 }
 
-.actions {
+.footer {
   display: flex;
-  justify-content: flex-end;
-  margin-top: 10px;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px 8px 16px;
+  border-top: 1px solid rgb(var(--border));
+}
+.hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgb(var(--text-faint));
 }
 .submit {
-  min-width: 4.5rem;
-  min-height: 44px;
-  padding: 0 16px;
+  min-width: 4rem;
+  height: 30px;
+  padding: 0 14px;
   border: 1px solid rgb(var(--text));
   border-radius: 8px;
   background: rgb(var(--text));
   color: rgb(var(--bg));
-  font-size: 14px;
+  font-size: 13px;
   cursor: pointer;
   transition: opacity 120ms ease;
 }
 .submit:hover {
-  opacity: 0.88;
+  opacity: 0.86;
 }
 .submit:disabled {
   border-color: rgb(var(--border-strong));
@@ -112,26 +161,27 @@
   opacity: 1;
 }
 
-.hint {
-  margin: 10px 0 0;
-  font-size: 12px;
-  line-height: 1.5;
-  color: rgb(var(--text-faint));
-}
-
+/* Answered or superseded: a one-glance summary instead of live controls. */
 .compact {
-  padding: 10px 12px;
+  display: flex;
+  width: fit-content;
+  max-width: 36rem;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  padding: 10px 14px;
   background: transparent;
 }
 .compact .question {
-  margin-bottom: 6px;
-  font-size: 14px;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 400;
   color: rgb(var(--text-muted));
 }
 .compactOptions {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 4px 10px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -141,33 +191,34 @@
   max-width: 100%;
   align-items: center;
   gap: 4px;
-  padding: 2px 8px;
-  border: 1px solid rgb(var(--border));
-  border-radius: 6px;
   color: rgb(var(--text-faint));
-  font-size: 12px;
-  line-height: 1.6;
+  font-size: 13px;
+  line-height: 1.55;
   overflow-wrap: anywhere;
 }
 .compactOption[data-selected="true"] {
-  border-color: rgb(var(--text));
   color: rgb(var(--text));
+  font-weight: 500;
 }
 
+/* Next-step suggestions: light pills under the reply. */
 .quickReplies {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 14px;
 }
 .chip {
+  display: inline-flex;
   max-width: 100%;
-  min-height: 36px;
-  padding: 6px 14px;
-  border: 1px solid rgb(var(--border-strong));
+  min-height: 32px;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px 5px 10px;
+  border: 1px solid rgb(var(--border));
   border-radius: 999px;
   background: transparent;
-  color: rgb(var(--text));
+  color: rgb(var(--text-muted));
   font-size: 13px;
   line-height: 1.4;
   text-align: left;
@@ -175,31 +226,48 @@
   cursor: pointer;
   transition:
     background-color 120ms ease,
-    border-color 120ms ease;
+    border-color 120ms ease,
+    color 120ms ease;
+}
+.chip svg {
+  flex: 0 0 auto;
+  color: rgb(var(--text-faint));
 }
 .chip:hover {
-  background: rgb(var(--text) / 0.04);
-  border-color: rgb(var(--text) / 0.35);
+  border-color: rgb(var(--border-strong));
+  background: rgb(var(--text) / 0.045);
+  color: rgb(var(--text));
 }
 .chip:disabled {
   color: rgb(var(--text-faint));
   cursor: default;
 }
+.chip:disabled:hover {
+  border-color: rgb(var(--border));
+  background: transparent;
+}
 
-:is(.option, .submit, .chip):focus-visible {
+.option:focus-visible {
+  outline: 2px solid rgb(var(--control-focus));
+  outline-offset: -2px;
+}
+:is(.submit, .chip):focus-visible {
   outline: 2px solid rgb(var(--control-focus));
   outline-offset: 2px;
 }
 
 @media (max-width: 639px) {
-  .chip {
-    min-height: 44px;
+  .option {
+    min-height: 52px;
   }
-}
-
-@media (min-width: 640px) {
-  .option,
-  .submit {
+  .arrow {
+    opacity: 1;
+    transform: none;
+  }
+  .chip {
     min-height: 40px;
+  }
+  .submit {
+    height: 36px;
   }
 }

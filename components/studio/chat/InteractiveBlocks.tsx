@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check } from "lucide-react";
+import { ArrowRight, Check, CornerDownRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   joinAskAnswer,
@@ -50,6 +50,10 @@ export function AskCard({
   if (!active) {
     // Until the sent message lands in the history, mark what was just clicked.
     const chosen = selectedAskOptions(ask, answer ?? sent);
+    // Show only the picked option(s); a typed answer leaves all of them faint.
+    const shown = chosen.size
+      ? ask.options.filter((option) => chosen.has(option.label))
+      : ask.options;
     return (
       <section
         aria-label="助手提问"
@@ -58,7 +62,7 @@ export function AskCard({
       >
         <p className={styles.question}>{ask.question}</p>
         <ul className={styles.compactOptions}>
-          {ask.options.map((option, index) => {
+          {shown.map((option, index) => {
             const selected = chosen.has(option.label);
             return (
               <li
@@ -108,9 +112,13 @@ export function AskCard({
             >
               {ask.multiple ? (
                 <span className={styles.checkbox} aria-hidden>
-                  {isChecked ? <Check size={12} strokeWidth={2.5} /> : null}
+                  {isChecked ? <Check size={13} strokeWidth={2.5} /> : null}
                 </span>
-              ) : null}
+              ) : (
+                <span className={styles.index} aria-hidden>
+                  {index + 1}
+                </span>
+              )}
               <span className={styles.optionText}>
                 <span className={styles.optionLabel}>{option.label}</span>
                 {option.description ? (
@@ -119,12 +127,23 @@ export function AskCard({
                   </span>
                 ) : null}
               </span>
+              {ask.multiple ? (
+                <span aria-hidden />
+              ) : (
+                <ArrowRight
+                  className={styles.arrow}
+                  size={15}
+                  strokeWidth={1.75}
+                  aria-hidden
+                />
+              )}
             </button>
           );
         })}
       </div>
-      {ask.multiple ? (
-        <div className={styles.actions}>
+      <div className={styles.footer}>
+        <p className={styles.hint}>也可以直接在输入框里回复</p>
+        {ask.multiple ? (
           <button
             type="button"
             className={styles.submit}
@@ -133,9 +152,8 @@ export function AskCard({
           >
             发送
           </button>
-        </div>
-      ) : null}
-      <p className={styles.hint}>也可以直接在输入框里回复</p>
+        ) : null}
+      </div>
     </section>
   );
 }
@@ -161,7 +179,8 @@ export function QuickReplies({
             settle(onReply(option), () => setSent(false));
           }}
         >
-          {option}
+          <CornerDownRight size={13} strokeWidth={1.75} aria-hidden />
+          <span>{option}</span>
         </button>
       ))}
     </div>
