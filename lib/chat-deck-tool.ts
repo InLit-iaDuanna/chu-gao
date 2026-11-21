@@ -32,7 +32,7 @@ export const DECK_POINT_MAX = 80;
 export const DECK_VISUAL_MAX = 120;
 
 export const PLAN_PRESENTATION_TOOL_DESCRIPTION =
-  "为用户起草一份演示文稿（PPT / 幻灯片）的逐页大纲，并结束本轮回答。用户明确要做 PPT、幻灯片、演示文稿、路演或汇报材料时调用；只是问怎么做 PPT 或要一段文案时不要调用。大纲会以卡片展示，用户在卡片上确认大纲并选择制作方式（整页设计图，或可编辑的排版幻灯片）后才会开始制作，调用本身不扣积分。结合对话里已有的内容写出每页真实、具体的标题和要点，不要写占位文字；一般 6~12 页，最多 20 页，第一页是封面，按需要加目录、章节页和结尾页。调用后正文只用一两句话说明思路，不要在正文里重复列出大纲，同一轮不要生图。用户要修改大纲时，按修改后的完整大纲重新调用。";
+  "为用户起草一份演示文稿（PPT / 幻灯片）的逐页大纲，并结束本轮回答。用户明确要做 PPT、幻灯片、演示文稿、路演或汇报材料时调用；只是问怎么做 PPT 或要一段文案时不要调用。大纲会以卡片展示，用户在卡片上确认大纲并选择制作方式（整页设计图，或可编辑的排版幻灯片）后才会开始制作，调用本身不扣积分。结合对话里已有的内容写出每页真实、具体的标题和要点，不要写占位文字；一般 6~12 页，最多 20 页，第一页是封面，按需要加目录、章节页和结尾页。调用后正文只用一两句话说明思路，不要在正文里重复列出大纲，同一轮不要生图。用户要修改大纲时，按修改后的完整大纲重新调用。用户要把已有大纲“排版成可编辑幻灯片”时不要调用，直接输出 html 幻灯片。";
 
 const planPresentationParameters = {
   type: "object",
@@ -202,6 +202,14 @@ export function deckBlockContextText(body: string): string {
     .filter(Boolean)
     .join("\n");
 }
+
+/** The message the outline card's editable option sends (DeckCard codeDeckRequest). */
+export function isDeckLayoutRequest(content: unknown): boolean {
+  return typeof content === "string" && /排版成可编辑幻灯片/.test(content);
+}
+
+export const PLAN_PRESENTATION_LAYOUT_OUTPUT =
+  "[plan_presentation] 没有执行：用户已经确认了大纲，并选择做成可编辑幻灯片。不要再起草大纲，也不要调用其他工具：现在就按最近一份 [已给出 PPT 大纲] 输出一个 html 代码块，每页一个 <section class=\"slide\">，固定 1280×720。";
 
 export const PLAN_PRESENTATION_RECORDED_OUTPUT =
   "[plan_presentation] 大纲已保存，会在本轮回答末尾以卡片展示；用户确认大纲并选择制作方式后才开始制作。不要在正文里重复大纲，也不要生图；用一两句话收尾即可。";

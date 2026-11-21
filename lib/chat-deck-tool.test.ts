@@ -86,6 +86,12 @@ describe("deck blocks", () => {
     expect(text).toBe(`思路如下。\n\n${block}`);
   });
 
+  it("recognises the editable layout request", async () => {
+    const { isDeckLayoutRequest } = await import("@/lib/chat-deck-tool");
+    expect(isDeckLayoutRequest("把《路演》这份大纲排版成可编辑幻灯片")).toBe(true);
+    expect(isDeckLayoutRequest("帮我做个 PPT")).toBe(false);
+  });
+
   it("writes the per-slide prompt input", () => {
     expect(deckSlideContent(outline.slides[1])).toBe(
       "标题：功能\n要点：\n- A\n- B\n画面与版式：三列卡片",

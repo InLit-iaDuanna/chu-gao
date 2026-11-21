@@ -89,6 +89,8 @@ import {
 } from "@/lib/chat-conversation-mode";
 import {
   PLAN_PRESENTATION_INVALID_OUTPUT,
+  PLAN_PRESENTATION_LAYOUT_OUTPUT,
+  isDeckLayoutRequest,
   PLAN_PRESENTATION_RECORDED_OUTPUT,
   PLAN_PRESENTATION_TOOL_NAME,
   deckBlock,
@@ -1046,7 +1048,9 @@ export async function executeChatAttempt(
             }
           } else if (name === PLAN_PRESENTATION_TOOL_NAME) {
             const outline = sanitizeDeckOutline(toolCall.arguments);
-            if (deckCalls >= 1)
+            if (isDeckLayoutRequest(input.content))
+              output = PLAN_PRESENTATION_LAYOUT_OUTPUT;
+            else if (deckCalls >= 1)
               output = toolLimitOutput(name, 1);
             else if (!outline) output = PLAN_PRESENTATION_INVALID_OUTPUT;
             else {
