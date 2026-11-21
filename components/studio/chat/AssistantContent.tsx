@@ -315,13 +315,22 @@ export const AssistantContent = memo(function AssistantContent({
   idle?: boolean;
   onOpenDeck?: (id: string) => void;
 }) {
-  const { body, ask, next, deck } = useMemo(
+  const { body, ask, next, deck, listening } = useMemo(
     () => parseInteractiveBlocks(content, { streaming }),
     [content, streaming],
   );
   const enabled = interactive && !streaming && Boolean(onQuickReply);
   return (
     <div className={styles.markdown}>
+      {listening ? (
+        <p
+          className="m-0 select-none text-[13px] tracking-wide text-text-faint"
+          aria-label="在听，这条没有回复"
+          title="在听：这条没有回复，继续说就好"
+        >
+          在听 ···
+        </p>
+      ) : null}
       {body ? (
         <MarkdownBody
           content={body}

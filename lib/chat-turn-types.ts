@@ -30,6 +30,8 @@ export interface ChatTurnInput {
   imageQuality?: string;
   imageOutputFormat?: string;
   imageN?: number;
+  /** Admin preview: 对谈 / 倾听. Omitted means 详答. */
+  conversationMode?: "dialogue" | "listen" | "detail";
   references?: Array<
     | { kind: "upload"; key: string; label?: string }
     | { kind: "generated"; id: string; label?: string }

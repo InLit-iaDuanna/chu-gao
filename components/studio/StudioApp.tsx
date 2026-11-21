@@ -59,6 +59,10 @@ import { Lightbox, type LightboxState } from "./Lightbox";
 import { TopBar } from "./TopBar";
 import { CreationStarters } from "./CreationStarters";
 import { ChatContextControl } from "./ChatContextControl";
+import {
+  ConversationModeControl,
+  useConversationMode,
+} from "./ConversationModeControl";
 import { StudioGreeting } from "./StudioGreeting";
 import {
   useWorkspaceNavigation,
@@ -263,6 +267,8 @@ export function StudioApp({
     useState<StoredImagePreferences | null>(null);
   const [modelError, setModelError] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(initialThreadId);
+  // 对谈 / 倾听 / 详答 — admin preview only.
+  const [conversationMode, setConversationMode] = useConversationMode(activeId);
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [artifactPreview, setArtifactPreview] = useState<
     { kind: "html"; source: string } | { kind: "deck"; deckId: string } | null
@@ -1894,6 +1900,9 @@ export function StudioApp({
             ? chatContextBudget
             : undefined,
           reasoningEffort,
+          ...(me?.role === "ADMIN" && conversationMode !== "detail"
+            ? { conversationMode }
+            : {}),
           ...chatRequest,
           signal: controller.signal,
           handlers: {
@@ -2669,6 +2678,13 @@ export function StudioApp({
                         budgetTokens={chatContextBudget}
                         onBudgetChange={setChatContextBudget}
                       />
+                      {me?.role === "ADMIN" ? (
+                        <ConversationModeControl
+                          mode={conversationMode}
+                          onChange={setConversationMode}
+                          disabled={locked}
+                        />
+                      ) : null}
                       {me?.role === "ADMIN" ? (
                         <Button
                           variant="ghost"

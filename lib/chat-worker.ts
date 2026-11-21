@@ -84,6 +84,10 @@ import {
   type AskUserOutcome,
 } from "@/lib/chat-agent-tools";
 import {
+  latestMessageSuffix,
+  normalizeListenReply,
+} from "@/lib/chat-conversation-mode";
+import {
   PLAN_PRESENTATION_INVALID_OUTPUT,
   PLAN_PRESENTATION_RECORDED_OUTPUT,
   PLAN_PRESENTATION_TOOL_NAME,
@@ -419,6 +423,10 @@ export async function executeChatAttempt(
   let pendingNext: string[] | null = null;
   let pendingDeck: string | null = null;
   let deckCalls = 0;
+  // 对谈 / 倾听 (admin preview): set only when the turn was created in one.
+  const shortMode =
+    typeof snapshot.modeInstruction === "string" &&
+    snapshot.modeInstruction.length > 0;
   const stopAndDrainFlush = async () => {
     clearInterval(flushTimer);
     await Promise.resolve(flushing).catch(() => undefined);
@@ -468,9 +476,10 @@ export async function executeChatAttempt(
       role: "user",
       content:
         input.content +
-        (typeof snapshot.runtimeTime === "string"
-          ? `\n\n[本轮运行时间]\n${snapshot.runtimeTime}`
-          : ""),
+        latestMessageSuffix({
+          modeInstruction: snapshot.modeInstruction,
+          runtimeTime: snapshot.runtimeTime,
+        }),
     };
     const responses = snapshot.transport === "responses_sse";
     const anthropic = snapshot.transport === "anthropic_messages_sse";
@@ -1341,7 +1350,9 @@ export async function executeChatAttempt(
     // reasoning; never leave an empty bubble when the tool already ran.
     const replyBody =
       recovery.text.trim() || !lastImageToolResult
-        ? recovery.text
+        ? shortMode
+          ? normalizeListenReply(recovery.text)
+          : recovery.text
         : lastImageToolResult.ok
           ? "已提交图片生成，图片稍后会显示在下方。"
           : `图片没有提交成功：${lastImageToolResult.message ?? "请稍后重试"}`;
@@ -1350,8 +1361,13 @@ export async function executeChatAttempt(
     const replyText =
       status === "completed"
         ? appendAgentBlocks(replyBody, {
-            ask: pendingAsk,
-            next: pendingNext,
+            // The short modes speak plainly: a question stays a sentence and
+            // quick replies are dropped.
+            ask:
+              shortMode && pendingAsk?.kind === "card"
+                ? { kind: "text", text: pendingAsk.card.question }
+                : pendingAsk,
+            next: shortMode ? null : pendingNext,
             deck: pendingDeck,
           })
         : replyBody;

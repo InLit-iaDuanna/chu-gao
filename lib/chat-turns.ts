@@ -59,6 +59,18 @@ import {
 } from "@/lib/chat-references-types";
 import { resolveChatReferences } from "@/lib/chat-references";
 import {
+  CONVERSATION_MODES,
+  conversationModeInstruction,
+  DEFAULT_CONVERSATION_MODE,
+  isShortConversationMode,
+  latestMessageSuffix,
+  LISTEN_SILENCE_STREAK_MAX,
+  normalizeConversationMode,
+  SHORT_MODE_MAX_OUTPUT_TOKENS,
+  trailingSilenceStreak,
+  type ConversationMode,
+} from "@/lib/chat-conversation-mode";
+import {
   CHAT_TOOL_MAX_REQUESTS,
   chatRequestTools,
   chatSearchAsTool,
@@ -85,6 +97,8 @@ export const chatTurnSchema = z
     imageOutputFormat: z.string().min(1).max(16).optional(),
     imageN: z.number().int().min(1).max(4).optional(),
     references: chatReferencesSchema.optional(),
+    // Admin preview; ignored (treated as detail) for everyone else.
+    conversationMode: z.enum(CONVERSATION_MODES).optional(),
   })
   .strict()
   .refine(
@@ -427,6 +441,40 @@ async function assertChatConcurrency(
     );
 }
 
+/**
+ * The mode actually used for a turn: only admins may leave detail (preview).
+ * Listen mode counts the trailing silent replies so a long silence ends in a
+ * recap.
+ */
+async function resolveConversationMode(
+  userId: string,
+  conversationId: string,
+  requested: ConversationMode | undefined,
+): Promise<{ mode: ConversationMode; instruction: string }> {
+  const mode = normalizeConversationMode(requested);
+  if (!isShortConversationMode(mode)) return { mode, instruction: "" };
+  const user = await db.user.findUnique({
+    where: { id: userId },
+    select: { role: true },
+  });
+  if (user?.role !== "ADMIN")
+    return { mode: DEFAULT_CONVERSATION_MODE, instruction: "" };
+  let silenceStreak = 0;
+  if (mode === "listen") {
+    const recent = await db.conversationMessage.findMany({
+      where: { conversationId, role: "ASSISTANT" },
+      orderBy: { createdAt: "desc" },
+      take: LISTEN_SILENCE_STREAK_MAX,
+      select: { content: true },
+    });
+    silenceStreak = trailingSilenceStreak(recent.map((row) => row.content));
+  }
+  return {
+    mode,
+    instruction: conversationModeInstruction(mode, { silenceStreak }),
+  };
+}
+
 export async function createChatTurn(
   userId: string,
   input: z.infer<typeof chatTurnSchema>,
@@ -488,6 +536,12 @@ export async function createChatTurn(
     searchAsTool,
   );
   const runtimeTime = chatTimeInstruction();
+  const conversationMode = await resolveConversationMode(
+    userId,
+    input.conversationId,
+    input.conversationMode,
+  );
+  const modeInstruction = conversationMode.instruction;
   const effort = input.reasoningEffort ?? config.efforts[0] ?? null;
   let contextRevision: number | null = null;
   let tokenRequestLimits:
@@ -532,7 +586,7 @@ export async function createChatTurn(
       modelId: input.modelId,
       latestMessage: {
         role: "user" as const,
-        content: `${input.content}\n\n[本轮运行时间]\n${runtimeTime}`,
+        content: `${input.content}${latestMessageSuffix({ modeInstruction, runtimeTime })}`,
       },
       references,
       instructions,
@@ -560,7 +614,9 @@ export async function createChatTurn(
       );
     tokenRequestLimits = {
       maxInputTokens: tokenPricing.maxInputTokens,
-      maxOutputTokens: tokenPricing.maxOutputTokens,
+      maxOutputTokens: isShortConversationMode(conversationMode.mode)
+        ? Math.min(tokenPricing.maxOutputTokens, SHORT_MODE_MAX_OUTPUT_TOKENS)
+        : tokenPricing.maxOutputTokens,
       maxRequests: CHAT_TOOL_MAX_REQUESTS,
     };
     // Up to CHAT_TOOL_MAX_REQUESTS requests (tool rounds plus the final
@@ -670,6 +726,9 @@ export async function createChatTurn(
               contextBudgetTokens,
               instructions,
               runtimeTime,
+              ...(modeInstruction
+                ? { conversationMode: conversationMode.mode, modeInstruction }
+                : {}),
               effort,
               profileVersion: operationHash({
                 model: config.model,

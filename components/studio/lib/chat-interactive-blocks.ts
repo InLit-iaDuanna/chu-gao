@@ -8,7 +8,12 @@
  * Pure helpers shared by rendering, copying and previews. Invalid blocks are
  * removed without being shown; unclosed blocks (while streaming or after a
  * truncated preview) are hidden from the opening fence to the end.
+ *
+ * A listen-mode reply that is only the silence marker has an empty body and
+ * `listening: true`.
  */
+
+import { LISTEN_SILENCE_MARKER } from "@/lib/chat-conversation-mode";
 
 export interface AskOption {
   label: string;
@@ -46,6 +51,8 @@ export interface InteractiveBlocks {
   deck?: DeckBlock;
   /** True when an unclosed or partially typed interactive fence was hidden. */
   incomplete: boolean;
+  /** 倾听: the assistant chose not to speak this turn. */
+  listening?: boolean;
 }
 
 export const ASK_LANGUAGE = "chugao-ask";
@@ -190,6 +197,16 @@ export function parseInteractiveBlocks(
   content: string,
   options: { streaming?: boolean } = {},
 ): InteractiveBlocks {
+  const trimmed = content.trim();
+  if (trimmed === LISTEN_SILENCE_MARKER)
+    return { body: "", incomplete: false, listening: true };
+  // While streaming, never flash the marker as it is typed.
+  if (
+    options.streaming &&
+    trimmed.startsWith("[[") &&
+    LISTEN_SILENCE_MARKER.startsWith(trimmed)
+  )
+    return { body: "", incomplete: true };
   if (!content.includes("chugao-") && !options.streaming)
     return { body: content, incomplete: false };
   let ask: AskBlock | null = null;
