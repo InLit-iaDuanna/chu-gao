@@ -496,8 +496,12 @@ export async function executeChatAttempt(
       String(snapshot.transport),
       input.webSearch,
     );
+    // The outline card's "editable slides" message: the outline is already
+    // confirmed, so the turn must write HTML. Offering plan_presentation here
+    // led models to re-plan and then end with an empty reply.
     const requestTools = chatRequestTools(String(snapshot.transport), {
       searchTool: searchAsTool,
+      presentationTool: !isDeckLayoutRequest(input.content),
     });
     const buildRequest = (
       messages: UpstreamChatMessage[],

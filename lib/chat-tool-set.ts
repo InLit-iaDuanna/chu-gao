@@ -50,15 +50,16 @@ export const CHAT_TOOL_MAX_REQUESTS = 4;
  */
 export function chatRequestTools(
   transport: ChatToolTransport | string,
-  options: { searchTool?: boolean } = {},
+  options: { searchTool?: boolean; presentationTool?: boolean } = {},
 ): unknown[] {
+  const deck = options.presentationTool !== false;
   if (transport === "anthropic_messages_sse")
     return [
       ...(options.searchTool ? [CHAT_SEARCH_ANTHROPIC_TOOL] : []),
       CHAT_IMAGE_ANTHROPIC_TOOL,
       READ_URL_ANTHROPIC_TOOL,
       CHECK_CREDITS_ANTHROPIC_TOOL,
-      PLAN_PRESENTATION_ANTHROPIC_TOOL,
+      ...(deck ? [PLAN_PRESENTATION_ANTHROPIC_TOOL] : []),
       ASK_USER_ANTHROPIC_TOOL,
       SUGGEST_REPLIES_ANTHROPIC_TOOL,
     ];
@@ -67,7 +68,7 @@ export function chatRequestTools(
       CHAT_IMAGE_RESPONSES_TOOL,
       READ_URL_RESPONSES_TOOL,
       CHECK_CREDITS_RESPONSES_TOOL,
-      PLAN_PRESENTATION_RESPONSES_TOOL,
+      ...(deck ? [PLAN_PRESENTATION_RESPONSES_TOOL] : []),
       ASK_USER_RESPONSES_TOOL,
       SUGGEST_REPLIES_RESPONSES_TOOL,
     ];
@@ -76,7 +77,7 @@ export function chatRequestTools(
     CHAT_IMAGE_TOOL,
     READ_URL_TOOL,
     CHECK_CREDITS_TOOL,
-    PLAN_PRESENTATION_TOOL,
+    ...(deck ? [PLAN_PRESENTATION_TOOL] : []),
     ASK_USER_TOOL,
     SUGGEST_REPLIES_TOOL,
   ];

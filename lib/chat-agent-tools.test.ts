@@ -73,6 +73,14 @@ describe("tool definitions", () => {
     expect(
       names(chatRequestTools("anthropic_messages_sse", { searchTool: true })),
     ).toEqual(["search_web", ...base]);
+    for (const transport of [
+      "chat_completions_sse",
+      "responses_sse",
+      "anthropic_messages_sse",
+    ])
+      expect(
+        names(chatRequestTools(transport, { presentationTool: false })),
+      ).toEqual(base.filter((name) => name !== "plan_presentation"));
     expect(chatSearchAsTool("anthropic_messages_sse", true)).toBe(true);
     expect(chatSearchAsTool("responses_sse", true)).toBe(false);
     expect(CHAT_TOOL_MAX_REQUESTS).toBe(4);
