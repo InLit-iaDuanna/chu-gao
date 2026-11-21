@@ -14,7 +14,11 @@ import {
   createPricingSnapshot,
   getModelWithPricing,
 } from "@/lib/model-pricing";
-import type { InternalRequest } from "@/lib/models/types";
+import type {
+  InternalReferenceImage,
+  InternalRequest,
+} from "@/lib/models/types";
+import { ConcurrentLimitError } from "@/lib/rate-limit";
 import {
   generationRequestSchema,
   validateAgainstModelDefinition,
@@ -45,6 +49,7 @@ function buildSlideRequest(
   prompt: string,
   seed: number,
   referenceImageKeys: string[],
+  anchor?: InternalReferenceImage,
 ): SlideRequestBundle {
   const seedParam = model.capabilities.supportsSeed ? seed : undefined;
   const input = generationRequestSchema.parse({
@@ -60,6 +65,15 @@ function buildSlideRequest(
   });
 
   const request = validateAgainstModelDefinition(input, model);
+  // The deck's first finished slide anchors the look of the others. It is a
+  // generated image, not an upload, so it joins after validation.
+  if (
+    anchor &&
+    model.capabilities.supportsReferenceImage &&
+    (request.referenceImages?.length ?? 0) <
+      model.capabilities.maxReferenceImages
+  )
+    request.referenceImages = [...(request.referenceImages ?? []), anchor];
   const estimatedCredits = estimateCost(model, request);
   const pricingSnapshot = createPricingSnapshot(
     model,
@@ -114,8 +128,12 @@ export async function runSlideGeneration(params: {
   userId: string;
   pptGenerationId: string;
   slideId: string;
+  /** A finished slide of the same deck used as a style reference. */
+  anchor?: InternalReferenceImage;
+  /** Keep an already optimized prompt (a slide that waited for a free slot). */
+  reusePrompt?: boolean;
 }): Promise<{ generationId: string }> {
-  const { userId, pptGenerationId, slideId } = params;
+  const { userId, pptGenerationId, slideId, anchor, reusePrompt } = params;
 
   const ppt = await db.pPTGeneration.findFirst({
     where: { id: pptGenerationId, userId },
@@ -140,13 +158,15 @@ export async function runSlideGeneration(params: {
     throw new PptSlideGenerationError("模型不可用", "MODEL_NOT_AVAILABLE");
   }
 
-  const systemPrompt = await getPptSystemPrompt();
-  const finalPrompt = await optimizeImagePrompt({
-    logContext: { source: "web", userId, operation: "ppt.optimize" },
-    contextSystemPrompt: systemPrompt,
-    fixedPrompt: ppt.fixedPrompt ?? "",
-    variablePrompt: slide.originalContent,
-  });
+  const finalPrompt =
+    reusePrompt && slide.enhancedPrompt.trim()
+      ? slide.enhancedPrompt
+      : await optimizeImagePrompt({
+          logContext: { source: "web", userId, operation: "ppt.optimize" },
+          contextSystemPrompt: await getPptSystemPrompt(),
+          fixedPrompt: ppt.fixedPrompt ?? "",
+          variablePrompt: slide.originalContent,
+        });
 
   const seed = slide.seed ?? randomSeed();
   const referenceImageKeys = decodePptReferenceImageKeys(ppt.style);
@@ -155,6 +175,10 @@ export async function runSlideGeneration(params: {
     finalPrompt,
     seed,
     referenceImageKeys,
+    anchor,
+  );
+  const recordedReferenceKeys = (bundle.request.referenceImages ?? []).map(
+    (image) => image.key,
   );
 
   try {
@@ -164,7 +188,7 @@ export async function runSlideGeneration(params: {
       normalizedRequestParams: bundle.normalizedRequestParams,
       estimatedCredits: bundle.estimatedCredits,
       pricingSnapshotJson: bundle.pricingSnapshotJson,
-      referenceImageKeys,
+      referenceImageKeys: recordedReferenceKeys,
       // 不关联到聊天对话，避免污染 studio 的对话生成列表。
     });
 
@@ -181,6 +205,15 @@ export async function runSlideGeneration(params: {
 
     return { generationId: result.generationId };
   } catch (error) {
+    // A full concurrency quota is not a failure of this slide: it waits for
+    // the next free slot (lib/ppt-deck advances the deck again).
+    if (error instanceof ConcurrentLimitError) {
+      await db.pPTSlide.update({
+        where: { id: slide.id },
+        data: { status: "PENDING", enhancedPrompt: finalPrompt, error: null },
+      });
+      throw error;
+    }
     const message = error instanceof Error ? error.message : "幻灯片生成失败";
     await db.pPTSlide.update({
       where: { id: slide.id },

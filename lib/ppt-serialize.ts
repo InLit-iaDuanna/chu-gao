@@ -14,7 +14,10 @@ import type {
   PPTSlide,
   PPTSlideStatusView,
 } from "@/lib/ppt-generator";
-import { decodePptReferenceImageKeys } from "@/lib/ppt-reference";
+import {
+  decodeDeckMode,
+  decodePptReferenceImageKeys,
+} from "@/lib/ppt-reference";
 import { privateImageThumbnailUrl, privateImageUrl } from "@/lib/storage";
 
 // 查询时需 include slides + 每个 slide 关联的 generation.images。
@@ -128,11 +131,14 @@ export function serializePPTGeneration(
     ? Math.round((completed / slides.length) * 100)
     : record.progress;
 
+  const mode = decodeDeckMode(record.theme);
   return {
     id: record.id,
     userId: record.userId,
     conversationId: record.conversationId ?? undefined,
-    title: record.title ?? record.theme ?? undefined,
+    title: record.title ?? (mode ? undefined : record.theme) ?? undefined,
+    ...(mode ? { mode } : {}),
+    ...(record.modelId ? { modelId: record.modelId } : {}),
     fixedPrompt: record.fixedPrompt ?? "",
     referenceImageKeys: decodePptReferenceImageKeys(record.style),
     status: GENERATION_STATUS_MAP[record.status],

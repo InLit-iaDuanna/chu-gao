@@ -414,5 +414,11 @@ export const enhancePptPrompt = (input: {
     body: JSON.stringify(input),
   });
 
+export const renderDeck = (id: string, mode: "image" | "code") =>
+  request<{ id: string; mode: "image" | "code" }>("/api/ppt/render", {
+    method: "POST",
+    body: JSON.stringify({ id, mode }),
+  });
+
 export const pptExportUrl = (id: string) =>
   `/api/ppt/export?id=${encodeURIComponent(id)}`;

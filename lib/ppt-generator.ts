@@ -41,6 +41,11 @@ export interface PPTGeneration {
   userId: string;
   conversationId?: string;
   title?: string;
+  // 对话里的演示文稿：用户选择的制作方式；缺省表示大纲待确认或旧版手动构建。
+  mode?: "image" | "code";
+  modelId?: string;
+  // 仅单条查询返回：整页设计图每页预估积分。
+  slideCredits?: number | null;
   // 不变提示词：整套统一风格 / 约束。
   fixedPrompt: string;
   // 整套幻灯片共用的视觉参考图。

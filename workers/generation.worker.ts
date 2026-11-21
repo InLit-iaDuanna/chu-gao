@@ -14,6 +14,7 @@ import {
   workerConcurrencyTarget,
 } from "@/lib/generation-capacity";
 import { logger } from "@/lib/logger";
+import { advanceDeckForGeneration, sweepActiveDecks } from "@/lib/ppt-deck";
 import { withModelCall, withModelCallContext } from "@/lib/model-call-log";
 import { generationCallSource } from "@/lib/model-call-types";
 import {
@@ -115,6 +116,24 @@ async function main() {
         "Reconciled provider account concurrency counters.",
       );
     }
+    // Chat decks whose wake-up was lost continue here.
+    await sweepActiveDecks().catch((error) => {
+      logger.warn(
+        { error: serializeProviderError(error) },
+        "Deck sweep failed.",
+      );
+    });
+  };
+
+  // A finished slide frees a slot and may unlock the rest of its deck.
+  const advanceDeck = (generationId: unknown) => {
+    if (typeof generationId !== "string") return;
+    void advanceDeckForGeneration(generationId).catch((error) => {
+      logger.warn(
+        { generationId, error: serializeProviderError(error) },
+        "Deck advance after generation failed.",
+      );
+    });
   };
 
   await runRecoveryPass();
@@ -517,10 +536,12 @@ async function main() {
       { jobId: job?.id, error: serializeProviderError(error) },
       "Generation job failed.",
     );
+    advanceDeck(job?.data?.generationId);
   });
 
   worker.on("completed", (job) => {
     logger.info({ jobId: job.id }, "Generation job completed.");
+    advanceDeck(job.data?.generationId);
   });
 
   worker.on("closed", () => {

@@ -55,6 +55,8 @@ interface Props {
   onRetryChat?: (id: string, expectedPreviousAttemptId: string) => void;
   /** Sends an option from an assistant ask card or quick reply as a user message. */
   onQuickReply?: QuickReplyHandler;
+  /** Opens a chat deck in the side panel. */
+  onOpenDeck?: (id: string) => void;
 }
 
 function UserContent({ message }: { message: SubmittedChatMessage }) {
@@ -231,6 +233,7 @@ export function ConversationTimeline({
   onCancel,
   onRetryChat,
   onQuickReply,
+  onOpenDeck,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const following = useRef(true);
@@ -379,6 +382,8 @@ export function ConversationTimeline({
                                 : undefined
                             }
                             onQuickReply={onQuickReply}
+                            idle={!turnInFlight}
+                            onOpenDeck={onOpenDeck}
                           />
                           <ReplyMetadata message={message} />
                         </ResultBubble>

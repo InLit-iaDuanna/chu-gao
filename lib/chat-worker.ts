@@ -84,6 +84,15 @@ import {
   type AskUserOutcome,
 } from "@/lib/chat-agent-tools";
 import {
+  PLAN_PRESENTATION_INVALID_OUTPUT,
+  PLAN_PRESENTATION_RECORDED_OUTPUT,
+  PLAN_PRESENTATION_TOOL_NAME,
+  deckBlock,
+  planPresentationFailedOutput,
+  sanitizeDeckOutline,
+} from "@/lib/chat-deck-tool";
+import { createDeckDraft } from "@/lib/ppt-deck";
+import {
   CHAT_TOOL_MAX_REQUESTS,
   chatRequestTools,
   chatSearchAsTool,
@@ -408,6 +417,8 @@ export async function executeChatAttempt(
   // Terminal tools: their cards are appended once the whole turn has ended.
   let pendingAsk: AskUserOutcome | null = null;
   let pendingNext: string[] | null = null;
+  let pendingDeck: string | null = null;
+  let deckCalls = 0;
   const stopAndDrainFlush = async () => {
     clearInterval(flushTimer);
     await Promise.resolve(flushing).catch(() => undefined);
@@ -1024,6 +1035,34 @@ export async function executeChatAttempt(
               output = ASK_USER_RECORDED_OUTPUT;
               needsReply = false;
             }
+          } else if (name === PLAN_PRESENTATION_TOOL_NAME) {
+            const outline = sanitizeDeckOutline(toolCall.arguments);
+            if (deckCalls >= 1)
+              output = toolLimitOutput(name, 1);
+            else if (!outline) output = PLAN_PRESENTATION_INVALID_OUTPUT;
+            else {
+              deckCalls++;
+              state.activity = "planning_deck";
+              await flush(true);
+              try {
+                const deck = await createDeckDraft({
+                  userId: turn.userId,
+                  conversationId: turn.conversationId,
+                  imageModelId: input.imageModelId,
+                  outline,
+                });
+                pendingDeck = deckBlock(deck.id, outline);
+                output = PLAN_PRESENTATION_RECORDED_OUTPUT;
+                // Terminal like ask_user: the card is the rest of the answer.
+                needsReply = false;
+              } catch (error) {
+                logger.warn(
+                  { turnId: turn.id, attemptId, error },
+                  "Deck draft could not be stored.",
+                );
+                output = planPresentationFailedOutput("暂时无法保存");
+              }
+            }
           } else if (name === SUGGEST_REPLIES_TOOL_NAME) {
             const options = sanitizeSuggestRepliesArgs(toolCall.arguments);
             if (options.length) pendingNext = options;
@@ -1204,7 +1243,7 @@ export async function executeChatAttempt(
           );
         // Only terminal tools: the turn is over, unless the model has not
         // written any answer yet and asked nothing.
-        if (!resumes && (recovery.text.trim() || pendingAsk)) {
+        if (!resumes && (recovery.text.trim() || pendingAsk || pendingDeck)) {
           state.terminal = "completed";
           break;
         }
@@ -1310,7 +1349,11 @@ export async function executeChatAttempt(
     // ask_user wins over suggest_replies. A card alone is a complete reply.
     const replyText =
       status === "completed"
-        ? appendAgentBlocks(replyBody, { ask: pendingAsk, next: pendingNext })
+        ? appendAgentBlocks(replyBody, {
+            ask: pendingAsk,
+            next: pendingNext,
+            deck: pendingDeck,
+          })
         : replyBody;
     await finishWithRetries({
       turnId: turn.id,

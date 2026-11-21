@@ -60,6 +60,7 @@ describe("tool definitions", () => {
       "generate_image",
       "read_url",
       "check_credits",
+      "plan_presentation",
       "ask_user",
       "suggest_replies",
     ];

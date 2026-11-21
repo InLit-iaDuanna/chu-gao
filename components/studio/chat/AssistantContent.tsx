@@ -15,6 +15,7 @@ import { IconButton, Tooltip, TooltipProvider } from "@/components/ui";
 import { CopyTextButton } from "../CopyTextButton";
 import { HtmlArtifact, isEmbeddedRasterImage } from "./HtmlArtifact";
 import { parseInteractiveBlocks } from "../lib/chat-interactive-blocks";
+import { DeckCard } from "./DeckCard";
 import {
   AskCard,
   QuickReplies,
@@ -298,6 +299,8 @@ export const AssistantContent = memo(function AssistantContent({
   interactive = false,
   answer,
   onQuickReply,
+  idle = false,
+  onOpenDeck,
 }: {
   content: string;
   streaming?: boolean;
@@ -308,8 +311,11 @@ export const AssistantContent = memo(function AssistantContent({
   /** The user message right after this reply, to mark the chosen ask option. */
   answer?: string | null;
   onQuickReply?: QuickReplyHandler;
+  /** No turn is in flight: a deck card may send its follow-up message. */
+  idle?: boolean;
+  onOpenDeck?: (id: string) => void;
 }) {
-  const { body, ask, next } = useMemo(
+  const { body, ask, next, deck } = useMemo(
     () => parseInteractiveBlocks(content, { streaming }),
     [content, streaming],
   );
@@ -324,7 +330,15 @@ export const AssistantContent = memo(function AssistantContent({
           onOpenArtifact={onOpenArtifact}
         />
       ) : null}
-      {ask && !streaming ? (
+      {deck && !streaming ? (
+        <DeckCard
+          outline={deck}
+          interactive={idle && Boolean(onQuickReply)}
+          onQuickReply={onQuickReply}
+          onOpenDeck={onOpenDeck}
+        />
+      ) : null}
+      {ask && !streaming && !deck ? (
         <AskCard
           ask={ask}
           enabled={enabled}

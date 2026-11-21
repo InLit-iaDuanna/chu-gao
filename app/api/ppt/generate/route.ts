@@ -15,6 +15,7 @@ import {
 } from "@/lib/generations";
 import { logger } from "@/lib/logger";
 import { MAX_PPT_SLIDES } from "@/lib/ppt-generator";
+import { estimateDeckSlideCredits } from "@/lib/ppt-deck";
 import { encodePptReferenceImageKeys } from "@/lib/ppt-reference";
 import { serializePPTGeneration } from "@/lib/ppt-serialize";
 import {
@@ -250,7 +251,10 @@ export async function GET(request: Request) {
       return fail("NOT_FOUND", "PPT 记录不存在", { status: 404 });
     }
 
-    return ok(serializePPTGeneration(record));
+    return ok({
+      ...serializePPTGeneration(record),
+      slideCredits: await estimateDeckSlideCredits(record.modelId),
+    });
   } catch (error) {
     logger.error({ error }, "PPT generation fetch failed.");
     return fail("INTERNAL_ERROR", "获取 PPT 记录失败", { status: 500 });

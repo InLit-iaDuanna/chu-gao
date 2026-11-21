@@ -20,6 +20,12 @@
  * chat-read-url-tool.ts and chat-credits-tool.ts.
  */
 
+import {
+  DECK_BLOCK_LANGUAGE,
+  PLAN_PRESENTATION_TOOL_NAME,
+  deckBlockContextText,
+} from "@/lib/chat-deck-tool";
+
 export const ASK_USER_TOOL_NAME = "ask_user";
 export const SUGGEST_REPLIES_TOOL_NAME = "suggest_replies";
 export const READ_URL_TOOL_NAME = "read_url";
@@ -343,21 +349,32 @@ export function suggestRepliesBlock(options: string[]): string {
  */
 export function appendAgentBlocks(
   text: string,
-  blocks: { ask?: AskUserOutcome | null; next?: string[] | null },
+  blocks: {
+    ask?: AskUserOutcome | null;
+    next?: string[] | null;
+    /** A ready chugao-deck block (plan_presentation); it carries its own actions. */
+    deck?: string | null;
+  },
 ): string {
   let tail = "";
-  if (blocks.ask?.kind === "card") tail = askUserBlock(blocks.ask.card);
+  if (blocks.deck) tail = blocks.deck;
+  else if (blocks.ask?.kind === "card") tail = askUserBlock(blocks.ask.card);
   else if (blocks.ask?.kind === "text") tail = blocks.ask.text;
   else if (blocks.next?.length) tail = suggestRepliesBlock(blocks.next);
   if (!tail) return text;
   // A reply that already ends with the same question needs it only once.
-  if (blocks.ask?.kind === "text" && text.trimEnd().endsWith(tail)) return text;
+  if (
+    !blocks.deck &&
+    blocks.ask?.kind === "text" &&
+    text.trimEnd().endsWith(tail)
+  )
+    return text;
   const head = text.trimEnd();
   return head ? `${head}\n\n${tail}` : tail;
 }
 
 const AGENT_BLOCK_PATTERN =
-  /```(chugao-ask|chugao-next)[^\S\n]*\n([\s\S]*?)\n?```[^\S\n]*/g;
+  /```(chugao-ask|chugao-next|chugao-deck)[^\S\n]*\n([\s\S]*?)\n?```[^\S\n]*/g;
 
 /**
  * Replace stored chugao-ask / chugao-next blocks with short markers before a
@@ -366,6 +383,7 @@ const AGENT_BLOCK_PATTERN =
 export function agentBlocksToContextText(text: string): string {
   if (!text.includes("```chugao-")) return text;
   return text.replace(AGENT_BLOCK_PATTERN, (_match, language: string, body: string) => {
+    if (language === DECK_BLOCK_LANGUAGE) return deckBlockContextText(body);
     const data = parseToolArguments(body.trim());
     if (language === ASK_BLOCK_LANGUAGE) {
       const question = cleanToolText(data.question, ASK_QUESTION_MAX);
@@ -408,6 +426,8 @@ export function chatToolActivity(name: string | undefined): string {
       return "checking_credits";
     case ASK_USER_TOOL_NAME:
       return "asking";
+    case PLAN_PRESENTATION_TOOL_NAME:
+      return "planning_deck";
     case SUGGEST_REPLIES_TOOL_NAME:
       return "answering";
     default:

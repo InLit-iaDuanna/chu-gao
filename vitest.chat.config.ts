@@ -15,6 +15,7 @@ export default defineConfig({
       "lib/chat-token-*.test.ts",
       "lib/chat-model-*.test.ts",
       "lib/chat-opus-*.test.ts",
+      "lib/ppt-deck.test.ts",
       "components/studio/lib/chat-turn-api.test.ts",
     ],
     setupFiles: [],

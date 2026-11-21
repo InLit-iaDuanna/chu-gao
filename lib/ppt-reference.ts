@@ -1,5 +1,22 @@
 const REFERENCE_STYLE_PREFIX = "ppt-reference-images:v1:";
 
+// How a chat deck is made, stored in the legacy PPTGeneration.theme column:
+// null = outline waiting for the user; see lib/ppt-deck.ts.
+export type DeckMode = "image" | "code";
+const DECK_MODE_PREFIX = "deck-mode:";
+
+export function encodeDeckMode(mode: DeckMode): string {
+  return `${DECK_MODE_PREFIX}${mode}`;
+}
+
+export function decodeDeckMode(
+  theme: string | null | undefined,
+): DeckMode | null {
+  if (theme === encodeDeckMode("image")) return "image";
+  if (theme === encodeDeckMode("code")) return "code";
+  return null;
+}
+
 export function encodePptReferenceImageKeys(keys: string[]): string | null {
   const uniqueKeys = [
     ...new Set(keys.map((key) => key.trim()).filter(Boolean)),

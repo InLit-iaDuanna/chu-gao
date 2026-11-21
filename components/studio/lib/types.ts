@@ -329,6 +329,11 @@ export interface PptGeneration {
   userId: string;
   conversationId?: string;
   title?: string;
+  /** Chat decks: how the user chose to make it; absent while the outline waits. */
+  mode?: "image" | "code";
+  modelId?: string;
+  /** Single-record reads only: estimated credits per slide in image mode. */
+  slideCredits?: number | null;
   fixedPrompt: string;
   referenceImageKeys: string[];
   status: PptStatus;

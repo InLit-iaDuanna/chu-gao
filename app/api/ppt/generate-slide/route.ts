@@ -12,7 +12,9 @@ import {
   InsufficientCreditsError,
 } from "@/lib/generations";
 import { logger } from "@/lib/logger";
+import { deckAnchorFor } from "@/lib/ppt-deck";
 import { PptSlideGenerationError, runSlideGeneration } from "@/lib/ppt-service";
+import { ConcurrentLimitError } from "@/lib/rate-limit";
 import { readJsonBodySafe } from "@/lib/request-body";
 
 const generateSlideSchema = z.object({
@@ -79,6 +81,7 @@ export async function POST(request: Request) {
       userId: session.id,
       pptGenerationId: pptId,
       slideId,
+      anchor: await deckAnchorFor(pptId, slideId),
     });
 
     return ok({ slideId, generationId: result.generationId });
@@ -86,6 +89,12 @@ export async function POST(request: Request) {
     if (error instanceof PptSlideGenerationError) {
       return fail(error.code, error.message, {
         status: error.code === "NOT_FOUND" ? 404 : 400,
+      });
+    }
+
+    if (error instanceof ConcurrentLimitError) {
+      return fail("CONCURRENT_LIMIT", "同时生成的任务已达上限，请稍后再试", {
+        status: 429,
       });
     }
 

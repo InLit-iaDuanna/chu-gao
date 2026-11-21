@@ -45,6 +45,7 @@ const activityText: Record<string, string> = {
   reading_url: "正在读取网页…",
   checking_credits: "正在查询积分…",
   asking: "正在整理问题…",
+  planning_deck: "正在起草演示文稿大纲…",
   tool_call: "正在调用工具…",
   retrying: "连接中断，正在重试…",
 };

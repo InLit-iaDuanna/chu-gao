@@ -3,6 +3,7 @@
  *
  * ```chugao-ask   {"question","options":[{label,description?}],"multiple"}
  * ```chugao-next  {"options":[string]}
+ * ```chugao-deck  {"id","title","style","slides":[{title,points,visual?}]}
  *
  * Pure helpers shared by rendering, copying and previews. Invalid blocks are
  * removed without being shown; unclosed blocks (while streaming or after a
@@ -24,17 +25,32 @@ export interface NextBlock {
   options: string[];
 }
 
+export interface DeckBlockSlide {
+  title: string;
+  points: string[];
+  visual?: string;
+}
+
+export interface DeckBlock {
+  id: string;
+  title: string;
+  style: string;
+  slides: DeckBlockSlide[];
+}
+
 export interface InteractiveBlocks {
   /** Content with every interactive block (valid, invalid or unclosed) removed. */
   body: string;
   ask?: AskBlock;
   next?: NextBlock;
+  deck?: DeckBlock;
   /** True when an unclosed or partially typed interactive fence was hidden. */
   incomplete: boolean;
 }
 
 export const ASK_LANGUAGE = "chugao-ask";
 export const NEXT_LANGUAGE = "chugao-next";
+export const DECK_LANGUAGE = "chugao-deck";
 export const ASK_ANSWER_SEPARATOR = "、";
 
 const LIMITS = {
@@ -121,7 +137,35 @@ export function parseNextBlock(source: string): NextBlock | null {
   return { options };
 }
 
-const LANGUAGE = "chugao-(?:ask|next)";
+export function parseDeckBlock(source: string): DeckBlock | null {
+  const data = parseJson(source);
+  if (!isRecord(data)) return null;
+  const id = boundedText(data.id, 64);
+  if (!id || !Array.isArray(data.slides)) return null;
+  const slides: DeckBlockSlide[] = [];
+  for (const item of data.slides.slice(0, 30)) {
+    if (!isRecord(item)) return null;
+    const title = boundedText(item.title, 80);
+    if (!title) return null;
+    const points = Array.isArray(item.points)
+      ? item.points
+          .map((point) => boundedText(point, 120))
+          .filter((point): point is string => Boolean(point))
+          .slice(0, 8)
+      : [];
+    const visual = boundedText(item.visual, 160) ?? undefined;
+    slides.push(visual ? { title, points, visual } : { title, points });
+  }
+  if (!slides.length) return null;
+  return {
+    id,
+    title: boundedText(data.title, 80) ?? slides[0].title,
+    style: boundedText(data.style, 600) ?? "",
+    slides,
+  };
+}
+
+const LANGUAGE = "chugao-(?:ask|next|deck)";
 /** A complete block: opening fence, body, and a closing fence of the same kind at least as long. */
 const CLOSED_BLOCK = new RegExp(
   "(^|\\n)[ \\t]{0,3}(`{3,}|~{3,})[ \\t]*(" +
@@ -137,7 +181,7 @@ const OPEN_FENCE = new RegExp(
 const PARTIAL_FENCE = /(^|\n)[ \t]{0,3}(?:`{3,}|~{3,})[ \t]*([\w-]+)$/;
 
 function isPartialLanguage(value: string): boolean {
-  return [ASK_LANGUAGE, NEXT_LANGUAGE].some(
+  return [ASK_LANGUAGE, NEXT_LANGUAGE, DECK_LANGUAGE].some(
     (language) => language.startsWith(value) && value.length >= 1,
   );
 }
@@ -150,6 +194,7 @@ export function parseInteractiveBlocks(
     return { body: content, incomplete: false };
   let ask: AskBlock | null = null;
   let next: NextBlock | null = null;
+  let deck: DeckBlock | null = null;
   let changed = false;
   let body = "";
   let cursor = 0;
@@ -161,6 +206,7 @@ export function parseInteractiveBlocks(
     cursor = start + whole.length;
     changed = true;
     if (language === ASK_LANGUAGE) ask = ask ?? parseAskBlock(source);
+    else if (language === DECK_LANGUAGE) deck = deck ?? parseDeckBlock(source);
     else next = next ?? parseNextBlock(source);
   }
   body += content.slice(cursor);
@@ -183,6 +229,7 @@ export function parseInteractiveBlocks(
     body,
     ...(ask ? { ask } : {}),
     ...(next ? { next } : {}),
+    ...(deck ? { deck } : {}),
     incomplete,
   };
 }

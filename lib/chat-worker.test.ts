@@ -22,8 +22,10 @@ const mocks = vi.hoisted(() => ({
   submitImage: vi.fn(),
   readUrl: vi.fn(),
   checkCredits: vi.fn(),
+  createDeck: vi.fn(),
   active: true,
 }));
+vi.mock("@/lib/ppt-deck", () => ({ createDeckDraft: mocks.createDeck }));
 vi.mock("@/lib/db", () => ({
   db: {
     $executeRaw: mocks.claim,
@@ -678,6 +680,7 @@ describe("chat worker boundaries", () => {
       "generate_image",
       "read_url",
       "check_credits",
+      "plan_presentation",
       "ask_user",
       "suggest_replies",
     ]);
@@ -1110,13 +1113,67 @@ describe("chat worker boundaries", () => {
       role: "tool",
       tool_call_id: "call-attempt-a-1-1",
     });
-    expect(resumed.tools).toHaveLength(5);
+    expect(resumed.tools).toHaveLength(6);
     const finished = mocks.finish.mock.calls.at(-1)?.[0];
     expect(finished).toMatchObject({
       status: "completed",
       text: '你还有 20 积分。\n\n```chugao-next\n{"options":["充值","降低质量"]}\n```',
     });
     expect(finished.parts.activityHistory).toContain("checking_credits");
+  });
+
+  it("stores a plan_presentation outline and ends the turn with its card", async () => {
+    await imageOpus();
+    mocks.createDeck.mockResolvedValue({ id: "deck-1" });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValueOnce(
+        sseResponse(
+          event({
+            choices: [
+              {
+                delta: {
+                  content: "按路演结构排了 2 页。",
+                  tool_calls: [
+                    {
+                      index: 0,
+                      id: "deck-call",
+                      type: "function",
+                      function: {
+                        name: "plan_presentation",
+                        arguments: JSON.stringify({
+                          title: "路演",
+                          slides: [{ title: "封面" }, { title: "问题", points: ["痛点"] }],
+                        }),
+                      },
+                    },
+                  ],
+                },
+                finish_reason: "tool_calls",
+              },
+            ],
+          }) +
+            event({
+              choices: [],
+              usage: { prompt_tokens: 200, completion_tokens: 30 },
+            }) +
+            "data: [DONE]\n\n",
+        ),
+      ),
+    );
+    await executeChatAttempt("attempt-a", new AbortController());
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(mocks.createDeck).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        userId: "user-a",
+        outline: expect.objectContaining({ title: "路演" }),
+      }),
+    );
+    const finished = mocks.finish.mock.calls.at(-1)?.[0];
+    expect(finished.status).toBe("completed");
+    expect(finished.text).toContain("按路演结构排了 2 页。\n\n```chugao-deck\n");
+    expect(finished.text).toContain('"id":"deck-1"');
+    expect(finished.parts.activityHistory).toContain("planning_deck");
   });
 
   it("never submits an image from a truncated tool call without its completion marker", async () => {

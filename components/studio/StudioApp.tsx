@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   MoreHorizontal,
@@ -67,6 +67,8 @@ import {
 import { ConversationTimeline } from "./chat/ConversationTimeline";
 import { stripInteractiveBlocks } from "./lib/chat-interactive-blocks";
 import { HtmlArtifact } from "./chat/HtmlArtifact";
+import { DeckPanel } from "./chat/DeckPanel";
+import { findDeckHtml, findDeckOutline } from "./lib/deck-messages";
 import {
   ImageRoutingDialog,
   type ImageRoutingSelection,
@@ -259,9 +261,9 @@ export function StudioApp({
   const [modelError, setModelError] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(initialThreadId);
   const [conversation, setConversation] = useState<Conversation | null>(null);
-  const [artifactPreview, setArtifactPreview] = useState<{
-    source: string;
-  } | null>(null);
+  const [artifactPreview, setArtifactPreview] = useState<
+    { kind: "html"; source: string } | { kind: "deck"; deckId: string } | null
+  >(null);
   const conversationRef = useRef(conversation);
   conversationRef.current = conversation;
   const [threadLoading, setThreadLoading] = useState(Boolean(initialThreadId));
@@ -2067,6 +2069,35 @@ export function StudioApp({
     [],
   );
 
+  const handleOpenDeck = useCallback(
+    (deckId: string) => setArtifactPreview({ kind: "deck", deckId }),
+    [],
+  );
+  const deckPanelId =
+    artifactPreview?.kind === "deck" ? artifactPreview.deckId : null;
+  const conversationMessages = conversation?.messages;
+  const deckPanelOutline = useMemo(
+    () =>
+      deckPanelId && conversationMessages
+        ? findDeckOutline(conversationMessages, deckPanelId)
+        : null,
+    [deckPanelId, conversationMessages],
+  );
+  const deckPanelHtml = useMemo(
+    () =>
+      deckPanelOutline && conversationMessages
+        ? findDeckHtml(conversationMessages, deckPanelOutline.index)
+        : null,
+    [deckPanelOutline, conversationMessages],
+  );
+  const deckPanelCanSend =
+    !locked &&
+    pending === null &&
+    streaming === null &&
+    !(conversationMessages ?? []).some((message) =>
+      ["queued", "running"].includes(message.chatStatus ?? ""),
+    );
+
   const handleUsePrompt = (text: string) => {
     setPrompt(text);
     setFocusVersion((value) => value + 1);
@@ -2347,7 +2378,10 @@ export function StudioApp({
               onEdit={handleUsePrompt}
               onReference={handleUseAsReference}
               onOpen={(generation, index) => setLightbox({ generation, index })}
-              onOpenArtifact={(source) => setArtifactPreview({ source })}
+              onOpenArtifact={(source) =>
+                setArtifactPreview({ kind: "html", source })
+              }
+              onOpenDeck={handleOpenDeck}
               onRetry={(generation) => void retry(generation)}
               onCancel={(id) => void cancel(id)}
               onRetryChat={(id, attemptId) => void retryChatTurn(id, attemptId)}
@@ -2604,7 +2638,34 @@ export function StudioApp({
           ) : null}
         </div>
       </div>
-      {artifactPreview ? (
+      {artifactPreview?.kind === "deck" ? (
+        <>
+          <aside
+            aria-label="演示文稿"
+            className="hidden h-full min-h-0 w-[clamp(22rem,36vw,36rem)] shrink-0 flex-col border-l border-border bg-surface md:flex"
+          >
+            <DeckPanel
+              deckId={artifactPreview.deckId}
+              outline={deckPanelOutline?.outline ?? null}
+              html={deckPanelHtml}
+              canSend={deckPanelCanSend}
+              onQuickReply={handleQuickReply}
+              onClose={() => setArtifactPreview(null)}
+            />
+          </aside>
+          <div className="fixed inset-0 z-50 flex min-h-0 flex-col bg-background md:hidden">
+            <DeckPanel
+              mobile
+              deckId={artifactPreview.deckId}
+              outline={deckPanelOutline?.outline ?? null}
+              html={deckPanelHtml}
+              canSend={deckPanelCanSend}
+              onQuickReply={handleQuickReply}
+              onClose={() => setArtifactPreview(null)}
+            />
+          </div>
+        </>
+      ) : artifactPreview ? (
         <>
           <aside
             aria-label="HTML 预览"
