@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button, IconButton, Input } from "@/components/ui";
+import { STOREFRONT_CREDIT_TIERS } from "@/lib/storefront-tiers";
 import { cn } from "@/lib/utils";
 
 import { isApiError, redeemCode } from "./lib/api";
@@ -37,7 +38,8 @@ import {
 const ORDER_KEY = "chugao.storefront.order";
 const CHECKOUT_KEY = "chugao.storefront.checkout";
 const VERIFY_INTERVAL_MS = 8_000;
-const CREDIT_TIERS = [100, 500, 1000, 2000, 5000, 10000];
+const LATE_VERIFY_WINDOW_MS = 30 * 60 * 1000;
+const CREDIT_TIERS = STOREFRONT_CREDIT_TIERS;
 const STATUS_LABELS: Record<string, string> = {
   PENDING: "待支付",
   PAID: "正在核对积分",
@@ -54,6 +56,11 @@ interface PendingCheckout {
 
 function terminal(status: string) {
   return ["COMPLETED", "EXPIRED", "FAILED"].includes(status);
+}
+
+/** Expired after binding a shop order: payment may still have gone through. */
+function recoverable(order: StorefrontRechargeOrder | null): boolean {
+  return Boolean(order && order.status === "EXPIRED" && order.payment_trade_no);
 }
 
 function withExpiry(order: StorefrontRechargeOrder): StorefrontRechargeOrder {
@@ -276,7 +283,7 @@ export function StorefrontRechargeView() {
         if (cancelled) return;
         const restored = updateOrder(saved);
         setSelectedCredits(restored.credits);
-        if (terminal(restored.status)) return;
+        if (terminal(restored.status) && !recoverable(restored)) return;
         pendingCheckout.current = readPendingCheckout(savedId);
         if (pendingCheckout.current && !pendingCheckout.current.external)
           browserBlocked.current = true;
@@ -390,7 +397,7 @@ export function StorefrontRechargeView() {
       const current = orderRef.current;
       if (
         !current ||
-        terminal(current.status) ||
+        (terminal(current.status) && !recoverable(current)) ||
         verifyInFlight.current ||
         creationInFlight.current ||
         redeemInFlight.current
@@ -405,7 +412,7 @@ export function StorefrontRechargeView() {
         const latest = await getOrder(current.order_id);
         if (!isCurrent()) return;
         const refreshed = updateOrder(latest);
-        if (terminal(refreshed.status)) return;
+        if (terminal(refreshed.status) && !recoverable(refreshed)) return;
         if (
           !refreshed.payment_trade_no ||
           (browserBlocked.current && !showPending)
@@ -425,7 +432,11 @@ export function StorefrontRechargeView() {
           context,
           refreshed.payment_trade_no,
         );
-        if (!isCurrent() || terminal(orderRef.current!.status)) return;
+        if (
+          !isCurrent() ||
+          (terminal(orderRef.current!.status) && !recoverable(orderRef.current))
+        )
+          return;
         if (detail.status === 1 && detail.cards.length > 0) {
           const settled = await verifyBrowserOrder(current.order_id, detail);
           if (!isCurrent()) return;
@@ -437,7 +448,12 @@ export function StorefrontRechargeView() {
               ? "充值已到账。"
               : "已收到小铺结果，正在核对积分。",
           );
-        } else if (showPending) setMessage("订单还在等待支付或小铺发卡。");
+        } else if (showPending)
+          setMessage(
+            recoverable(refreshed)
+              ? "小铺尚未显示已支付。如已付款，可稍后再次检查或在小铺订单页查看卡密。"
+              : "订单还在等待支付或小铺发卡。",
+          );
       } catch (caught) {
         if (isCurrent())
           reportError(caught, "订单核对失败，请稍后重试或兑换卡密。");
@@ -451,23 +467,29 @@ export function StorefrontRechargeView() {
 
   useEffect(() => {
     const currentOrder = orderRef.current;
-    if (!currentOrder || terminal(currentOrder.status)) return;
+    if (!currentOrder) return;
+    const late = recoverable(currentOrder);
+    if (terminal(currentOrder.status) && !late) return;
     const id = currentOrder.order_id;
-    const timer = window.setInterval(
-      () => void verifyCurrent(false),
-      VERIFY_INTERVAL_MS,
-    );
-    const remaining = Date.parse(currentOrder.expires_at) - Date.now();
-    const expiryTimer = Number.isFinite(remaining)
-      ? window.setTimeout(
-          () => {
-            const current = orderRef.current;
-            if (current?.order_id === id && !terminal(current.status))
-              updateOrder({ ...current, status: "EXPIRED" });
-          },
-          Math.max(0, Math.min(remaining, 2_147_483_647)),
-        )
-      : null;
+    const expiresAt = Date.parse(currentOrder.expires_at);
+    const timer = window.setInterval(() => {
+      // A payment made near the deadline is still picked up automatically for
+      // a while; after that the buyer checks manually.
+      if (late && !(Date.now() - expiresAt < LATE_VERIFY_WINDOW_MS)) return;
+      void verifyCurrent(false);
+    }, VERIFY_INTERVAL_MS);
+    const remaining = expiresAt - Date.now();
+    const expiryTimer =
+      !late && Number.isFinite(remaining)
+        ? window.setTimeout(
+            () => {
+              const current = orderRef.current;
+              if (current?.order_id === id && !terminal(current.status))
+                updateOrder({ ...current, status: "EXPIRED" });
+            },
+            Math.max(0, Math.min(remaining, 2_147_483_647)),
+          )
+        : null;
     return () => {
       window.clearInterval(timer);
       if (expiryTimer !== null) window.clearTimeout(expiryTimer);
@@ -476,6 +498,7 @@ export function StorefrontRechargeView() {
     order?.order_id,
     order?.status,
     order?.expires_at,
+    order?.payment_trade_no,
     verifyCurrent,
     updateOrder,
   ]);
@@ -612,6 +635,18 @@ export function StorefrontRechargeView() {
     } catch (caught) {
       if (!mounted.current) return;
       reportError(caught, "创建订单失败，请重试或前往官方商品页购买卡密。");
+      if (
+        isStorefrontApiError(caught) &&
+        caught.code === "STOREFRONT_AMOUNT_MISMATCH" &&
+        orderRef.current &&
+        !orderRef.current.payment_trade_no
+      ) {
+        // The server closed this order; drop the stale shop reference so the
+        // buyer is not stuck retrying a binding that can never succeed.
+        pendingCheckout.current = null;
+        writeStorage(CHECKOUT_KEY, null);
+        updateOrder({ ...orderRef.current, status: "FAILED" });
+      }
       if (isStorefrontVerificationError(caught)) {
         const officialUrl = safeExternalUrl(checkoutRef.current?.item_url);
         if (officialUrl) navigatePopup(popup, officialUrl);
@@ -843,6 +878,11 @@ export function StorefrontRechargeView() {
               <p className="mt-1 break-all text-xs text-text-muted">
                 订单号 {order.order_id}
               </p>
+              {recoverable(order) ? (
+                <p className="mt-2 text-xs leading-5 text-text-muted">
+                  订单已超时。如已付款，点右侧“检查支付结果”仍可入账，或打开小铺订单页查看卡密后兑换。
+                </p>
+              ) : null}
             </div>
             <IconButton
               variant="ghost"
@@ -850,7 +890,12 @@ export function StorefrontRechargeView() {
               aria-label="检查支付结果"
               className="h-9 w-9 shrink-0"
               onClick={() => void verifyCurrent(true)}
-              disabled={verifying || busy || redeeming || !activeOrder}
+              disabled={
+                verifying ||
+                busy ||
+                redeeming ||
+                (!activeOrder && !recoverable(order))
+              }
             >
               <RefreshCw
                 className={cn("h-4 w-4", verifying && "animate-spin")}

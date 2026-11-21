@@ -12,10 +12,11 @@ export interface StoredImagePreferences {
 
 const MODEL_ROUTE_PRIORITY: Record<string, number> = {
   "gpt-image-2.6": 0,
-  "gpt-image-2.6-flare": 1,
-  "gpt-image-2.6-sunburst": 2,
-  "gpt-image-2.5-flare": 3,
-  "gpt-image-2.5-sunburst": 4,
+  // 自动路由默认用 Sunburst，Flare 作为同代备选。
+  "gpt-image-2.6-sunburst": 1,
+  "gpt-image-2.6-flare": 2,
+  "gpt-image-2.5-sunburst": 3,
+  "gpt-image-2.5-flare": 4,
   "gpt-image-2": 5,
   "nano-banana-2-512": 6,
 };

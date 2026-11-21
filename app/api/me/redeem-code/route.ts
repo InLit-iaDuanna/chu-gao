@@ -54,98 +54,101 @@ export async function POST(request: Request) {
   const normalizedCode = normalizeRedemptionCode(submittedCode);
 
   try {
-    const result = await db.$transaction(
-      async (tx) => {
-        const now = new Date();
-        const exactCode = await tx.creditRedemptionCode.findUnique({
-          where: { code: submittedCode },
-        });
-        const code =
-          exactCode ??
-          (normalizedCode !== submittedCode
-            ? await tx.creditRedemptionCode.findUnique({
-                where: { code: normalizedCode },
-              })
-            : null);
+    const result = await redeemWithRetry(async (tx) => {
+      const now = new Date();
+      const exactCode = await tx.creditRedemptionCode.findUnique({
+        where: { code: submittedCode },
+      });
+      const code =
+        exactCode ??
+        (normalizedCode !== submittedCode
+          ? await tx.creditRedemptionCode.findUnique({
+              where: { code: normalizedCode },
+            })
+          : null);
 
-        if (!code || code.revokedAt) {
-          throw new RedeemError("REDEEM_INVALID", "兑换码无效");
-        }
+      if (!code || code.revokedAt) {
+        throw new RedeemError("REDEEM_INVALID", "兑换码无效");
+      }
 
-        if (code.expiresAt && code.expiresAt <= now) {
-          throw new RedeemError("REDEEM_EXPIRED", "兑换码已过期");
-        }
+      if (code.expiresAt && code.expiresAt <= now) {
+        throw new RedeemError("REDEEM_EXPIRED", "兑换码已过期");
+      }
 
-        const redeemed = await tx.creditRedemption.findUnique({
-          where: {
-            codeId_userId: {
-              codeId: code.id,
-              userId: session.id,
-            },
-          },
-        });
-
-        if (redeemed) {
-          throw new RedeemError("REDEEM_ALREADY_USED", "你已兑换过该兑换码");
-        }
-
-        const claimed = await tx.creditRedemptionCode.updateMany({
-          where: {
-            id: code.id,
-            revokedAt: null,
-            usedCount: { lt: code.maxUses },
-            OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
-          },
-          data: {
-            usedCount: {
-              increment: 1,
-            },
-          },
-        });
-
-        if (claimed.count === 0) {
-          throw new RedeemError("REDEEM_EXHAUSTED", "兑换码已用尽");
-        }
-
-        await tx.creditRedemption.create({
-          data: {
+      const redeemed = await tx.creditRedemption.findUnique({
+        where: {
+          codeId_userId: {
             codeId: code.id,
             userId: session.id,
-            credits: code.credits,
           },
-        });
+        },
+      });
 
-        const user = await tx.user.update({
-          where: { id: session.id },
-          data: {
-            credits: {
-              increment: code.credits,
-            },
-          },
-          select: {
-            id: true,
-            credits: true,
-          },
-        });
+      if (redeemed) {
+        throw new RedeemError("REDEEM_ALREADY_USED", "你已兑换过该兑换码");
+      }
 
-        await tx.usageLog.create({
-          data: {
-            userId: session.id,
-            action: "redeem_code",
-            creditsDelta: code.credits,
-            metadata: {
-              codeId: code.id,
-            },
+      const claimed = await tx.creditRedemptionCode.updateMany({
+        where: {
+          id: code.id,
+          revokedAt: null,
+          usedCount: { lt: code.maxUses },
+          OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+        },
+        data: {
+          usedCount: {
+            increment: 1,
           },
-        });
+        },
+      });
 
-        return {
+      if (claimed.count === 0) {
+        throw new RedeemError("REDEEM_EXHAUSTED", "兑换码已用尽");
+      }
+
+      await tx.creditRedemption.create({
+        data: {
+          codeId: code.id,
+          userId: session.id,
           credits: code.credits,
-          balance: user.credits,
-        };
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-    );
+        },
+      });
+
+      // Same rule as storefront recharge: disabled accounts cannot gain credits.
+      const credited = await tx.user.updateMany({
+        where: { id: session.id, status: "ACTIVE" },
+        data: {
+          credits: {
+            increment: code.credits,
+          },
+        },
+      });
+
+      if (credited.count !== 1) {
+        throw new RedeemError("USER_INACTIVE", "账户当前不可兑换", 403);
+      }
+
+      const user = await tx.user.findUniqueOrThrow({
+        where: { id: session.id },
+        select: { credits: true },
+      });
+
+      await tx.usageLog.create({
+        data: {
+          userId: session.id,
+          action: "redeem_code",
+          creditsDelta: code.credits,
+          metadata: {
+            codeId: code.id,
+          },
+        },
+      });
+
+      return {
+        credits: code.credits,
+        balance: user.credits,
+      };
+    });
 
     return ok(result);
   } catch (error) {
@@ -153,6 +156,38 @@ export async function POST(request: Request) {
       return fail(error.code, error.message, { status: error.status });
     }
 
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      // Two concurrent submissions of the same code by the same user.
+      return fail("REDEEM_ALREADY_USED", "你已兑换过该兑换码", {
+        status: 400,
+      });
+    }
+
     throw error;
+  }
+}
+
+async function redeemWithRetry<T>(
+  operation: (tx: Prisma.TransactionClient) => Promise<T>,
+): Promise<T> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await db.$transaction(operation, {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      });
+    } catch (error) {
+      if (
+        !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+        error.code !== "P2034"
+      ) {
+        throw error;
+      }
+      if (attempt >= 2) {
+        throw new RedeemError("REDEEM_BUSY", "兑换请求较多，请稍后重试", 409);
+      }
+    }
   }
 }

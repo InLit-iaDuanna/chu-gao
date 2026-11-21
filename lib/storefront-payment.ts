@@ -4,11 +4,16 @@ import type { StorefrontOrder } from "@prisma/client";
 
 import { decrypt, encrypt } from "@/lib/crypto";
 import { normalizeRedemptionCode } from "@/lib/redemption-code";
+import { STOREFRONT_CREDIT_TIERS } from "@/lib/storefront-tiers";
+
+export { STOREFRONT_CREDIT_TIERS };
 
 export const STOREFRONT_CURRENCY = "CNY";
 export const STOREFRONT_FEE_RATE = 0;
 export const STOREFRONT_CREDITS_PER_YUAN = 100;
 export const STOREFRONT_ORDER_TTL_MS = 30 * 60 * 1000;
+/** Unbound orders are only reused while enough time is left to bind and pay. */
+export const STOREFRONT_ORDER_REUSE_MIN_REMAINING_MS = 20 * 60 * 1000;
 
 const ALLOWED_HOSTS = new Set(["wzyp.cn", "pay.ldxp.cn"]);
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{3,80}$/;
@@ -119,7 +124,7 @@ function productFromValue(value: unknown): StorefrontProduct | null {
   const goodsKey = String(
     row.goodsKey ?? row.goods_key ?? row.productId ?? "",
   ).trim();
-  if (!Number.isInteger(credits) || credits < 1 || credits > 1_000_000)
+  if (!Number.isInteger(credits) || !STOREFRONT_CREDIT_TIERS.includes(credits))
     return null;
   if (!TOKEN_PATTERN.test(goodsKey)) return null;
   return { credits, goodsKey, price: storefrontPrice(credits) };
@@ -150,7 +155,7 @@ function configuredProducts(): StorefrontProduct[] {
     }
   }
 
-  for (const credits of [100, 500, 1000, 2000, 5000, 10000]) {
+  for (const credits of STOREFRONT_CREDIT_TIERS) {
     const product = productFromValue({
       credits,
       goodsKey: process.env[`CHUGAO_STOREFRONT_GOODS_${credits}`],

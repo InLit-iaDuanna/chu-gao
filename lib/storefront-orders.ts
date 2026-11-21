@@ -13,6 +13,8 @@ import {
   hashStorefrontQueryPassword,
   storefrontContact,
   storefrontOrderResponse,
+  STOREFRONT_CREDIT_TIERS,
+  STOREFRONT_ORDER_REUSE_MIN_REMAINING_MS,
   STOREFRONT_ORDER_TTL_MS,
   type StorefrontProduct,
 } from "@/lib/storefront-payment";
@@ -31,7 +33,7 @@ export interface BrowserOrderBinding {
   payUrl: string;
 }
 
-const CREDIT_TIERS = new Set([100, 500, 1000, 2000, 5000, 10000]);
+const CREDIT_TIERS = new Set(STOREFRONT_CREDIT_TIERS);
 const CARD_BATCH = "chugao-storefront-20261109";
 
 function amountInCents(amount: number): number | null {
@@ -96,6 +98,20 @@ function isExpired(order: StorefrontOrder) {
   );
 }
 
+/**
+ * An expired order that was bound to a shop order may still have been paid:
+ * the buyer can finish paying, or the shop can deliver the card, after the
+ * checkout window closes. It stays verifiable because credit is authorized by
+ * the single-use local card, not by the order still being open.
+ */
+function isRecoverableExpired(order: StorefrontOrder) {
+  return (
+    order.status === "EXPIRED" &&
+    Boolean(order.externalTradeNo) &&
+    !order.redemptionCodeId
+  );
+}
+
 async function withLockedOrder<T>(
   orderId: string,
   userId: string,
@@ -103,24 +119,31 @@ async function withLockedOrder<T>(
     tx: Prisma.TransactionClient,
     order: StorefrontOrder,
   ) => Promise<T>,
+  options: { allowExpiredBound?: boolean } = {},
 ): Promise<T> {
   const result = await storefrontTransaction(async (tx) => {
     await tx.$queryRaw(
       Prisma.sql`SELECT "id" FROM "StorefrontOrder" WHERE "id" = ${orderId} AND "userId" = ${userId} FOR UPDATE`,
     );
-    const order = await tx.storefrontOrder.findFirst({
+    let order = await tx.storefrontOrder.findFirst({
       where: { id: orderId, userId },
     });
     if (!order) throw new StorefrontOrderError("NOT_FOUND", "订单不存在", 404);
     if (isExpired(order)) {
-      await tx.storefrontOrder.update({
+      order = await tx.storefrontOrder.update({
         where: { id: order.id },
         data: { status: "EXPIRED", lastErrorCode: "ORDER_EXPIRED" },
       });
-      // Return before throwing so that the expiry transition commits.
-      return { expired: true } as const;
+      if (!(options.allowExpiredBound && isRecoverableExpired(order))) {
+        // Return before throwing so that the expiry transition commits.
+        return { expired: true } as const;
+      }
     }
-    if (order.status === "EXPIRED" || order.status === "FAILED") {
+    if (
+      order.status === "FAILED" ||
+      (order.status === "EXPIRED" &&
+        !(options.allowExpiredBound && isRecoverableExpired(order)))
+    ) {
       throw new StorefrontOrderError("INVALID_STATUS", "订单已结束", 409);
     }
     return { expired: false, value: await operation(tx, order) } as const;
@@ -187,7 +210,13 @@ export async function readStorefrontQueryPassword(
   userId: string,
 ): Promise<string> {
   const order = await getStorefrontOrderForUser(orderId, userId);
-  if (order.status !== "PENDING" && order.status !== "PAID") {
+  // Expired-but-bound orders keep the password so a late payment can still be
+  // checked and the delivered card read from the shop.
+  if (
+    order.status !== "PENDING" &&
+    order.status !== "PAID" &&
+    !isRecoverableExpired(order)
+  ) {
     throw new StorefrontOrderError("INVALID_STATUS", "订单已结束");
   }
   return queryPasswordForOrder(order);
@@ -236,7 +265,10 @@ export async function createStorefrontOrderForUser(
         amount: new Prisma.Decimal(product.price.toFixed(2)),
         status: "PENDING",
         externalTradeNo: null,
-        expiresAt: { gt: now },
+        // Do not hand out an order that would expire while the buyer is paying.
+        expiresAt: {
+          gt: new Date(now.getTime() + STOREFRONT_ORDER_REUSE_MIN_REMAINING_MS),
+        },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -362,9 +394,27 @@ export async function bindStorefrontBrowserOrder(
     );
   }
   const payUrl = paymentUrl(input.payUrl, input.tradeNo);
+  let result: { failed: true } | { failed: false; order: StorefrontOrder };
   try {
-    return await withLockedOrder(orderId, userId, async (tx, order) => {
+    result = await withLockedOrder(orderId, userId, async (tx, order) => {
       assertProduct(order.credits, Number(order.amount));
+      if (
+        !order.externalTradeNo &&
+        order.status === "PENDING" &&
+        (amountInCents(input.amount) === null ||
+          amountInCents(input.amount) !== amountInCents(Number(order.amount)))
+      ) {
+        // The shop priced this item differently; retrying the same order can
+        // never succeed, so close it and let the buyer start over.
+        await tx.storefrontOrder.update({
+          where: { id: order.id },
+          data: {
+            status: "FAILED",
+            lastErrorCode: "STOREFRONT_AMOUNT_MISMATCH",
+          },
+        });
+        return { failed: true } as const;
+      }
       assertAmount(input.amount, Number(order.amount));
       if (order.externalTradeNo) {
         if (
@@ -377,12 +427,12 @@ export async function bindStorefrontBrowserOrder(
             409,
           );
         }
-        return order;
+        return { failed: false, order } as const;
       }
       if (order.status !== "PENDING") {
         throw new StorefrontOrderError("INVALID_STATUS", "订单不可绑定", 409);
       }
-      return tx.storefrontOrder.update({
+      const bound = await tx.storefrontOrder.update({
         where: { id: order.id },
         data: {
           externalTradeNo: input.tradeNo,
@@ -391,6 +441,7 @@ export async function bindStorefrontBrowserOrder(
           externalAmount: input.amount,
         },
       });
+      return { failed: false, order: bound } as const;
     });
   } catch (error) {
     if (
@@ -405,6 +456,14 @@ export async function bindStorefrontBrowserOrder(
     }
     throw error;
   }
+  if (result.failed) {
+    throw new StorefrontOrderError(
+      "STOREFRONT_AMOUNT_MISMATCH",
+      "小铺实付金额与充值档位不一致，订单已关闭，请重新选择或联系客服",
+      409,
+    );
+  }
+  return result.order;
 }
 
 async function findLocalCard(
@@ -468,131 +527,136 @@ export async function verifyStorefrontBrowserOrder(
   detail: BrowserOrderDetail,
 ) {
   try {
-    return await withLockedOrder(orderId, userId, async (tx, order) => {
-      assertExternalOrderMatches(order, detail);
-      if (order.status === "COMPLETED") return { order, balance: null };
-      if (detail.status === 0 && detail.cards.length === 0)
-        return { order, balance: null };
-      if (detail.status !== 1) {
-        throw new StorefrontOrderError(
-          "INVALID_STATUS",
-          "小铺订单尚未完成支付",
-          409,
-        );
-      }
-      if (detail.cards.length !== 1) {
-        throw new StorefrontOrderError(
-          "STOREFRONT_CARD_INVALID",
-          "订单必须包含一张充值卡密",
-          409,
-        );
-      }
-      // Browser status is only a claim; a locally issued, single-use secret authorizes credit.
-      const code = await findLocalCard(tx, detail.cards[0], order.credits);
-      const linked = await tx.storefrontOrder.findUnique({
-        where: { redemptionCodeId: code.id },
-        select: { id: true },
-      });
-      if (linked && linked.id !== order.id) {
-        throw new StorefrontOrderError(
-          "STOREFRONT_CARD_USED",
-          "充值卡密已使用",
-          409,
-        );
-      }
-      const redeemed = await tx.creditRedemption.findFirst({
-        where: { codeId: code.id },
-        select: { id: true, userId: true, credits: true },
-      });
-      const completion = {
-        status: "COMPLETED" as const,
-        redemptionCodeId: code.id,
-        paidAt: order.paidAt ?? new Date(),
-        completedAt: new Date(),
-        externalProductId: detail.goodsKey,
-        externalAmount: detail.amount,
-        lastErrorCode: null,
-      };
-      if (
-        code.usedCount === 1 &&
-        redeemed?.userId === userId &&
-        redeemed.credits === order.credits
-      ) {
-        // Manual redemption by this owner already delivered the value; only link the order.
+    return await withLockedOrder(
+      orderId,
+      userId,
+      async (tx, order) => {
+        assertExternalOrderMatches(order, detail);
+        if (order.status === "COMPLETED") return { order, balance: null };
+        if (detail.status === 0 && detail.cards.length === 0)
+          return { order, balance: null };
+        if (detail.status !== 1) {
+          throw new StorefrontOrderError(
+            "INVALID_STATUS",
+            "小铺订单尚未完成支付",
+            409,
+          );
+        }
+        if (detail.cards.length !== 1) {
+          throw new StorefrontOrderError(
+            "STOREFRONT_CARD_INVALID",
+            "订单必须包含一张充值卡密",
+            409,
+          );
+        }
+        // Browser status is only a claim; a locally issued, single-use secret authorizes credit.
+        const code = await findLocalCard(tx, detail.cards[0], order.credits);
+        const linked = await tx.storefrontOrder.findUnique({
+          where: { redemptionCodeId: code.id },
+          select: { id: true },
+        });
+        if (linked && linked.id !== order.id) {
+          throw new StorefrontOrderError(
+            "STOREFRONT_CARD_USED",
+            "充值卡密已使用",
+            409,
+          );
+        }
+        const redeemed = await tx.creditRedemption.findFirst({
+          where: { codeId: code.id },
+          select: { id: true, userId: true, credits: true },
+        });
+        const completion = {
+          status: "COMPLETED" as const,
+          redemptionCodeId: code.id,
+          paidAt: order.paidAt ?? new Date(),
+          completedAt: new Date(),
+          externalProductId: detail.goodsKey,
+          externalAmount: detail.amount,
+          lastErrorCode: null,
+        };
+        if (
+          code.usedCount === 1 &&
+          redeemed?.userId === userId &&
+          redeemed.credits === order.credits
+        ) {
+          // Manual redemption by this owner already delivered the value; only link the order.
+          const user = await tx.user.findUniqueOrThrow({
+            where: { id: userId },
+            select: { credits: true },
+          });
+          const completed = await tx.storefrontOrder.update({
+            where: { id: order.id },
+            data: completion,
+          });
+          return { order: completed, balance: user.credits };
+        }
+        if (redeemed || code.usedCount !== 0) {
+          throw new StorefrontOrderError(
+            "STOREFRONT_CARD_USED",
+            "充值卡密已使用",
+            409,
+          );
+        }
+        const claimed = await tx.creditRedemptionCode.updateMany({
+          where: {
+            id: code.id,
+            credits: order.credits,
+            maxUses: 1,
+            perUserLimit: 1,
+            note: `${CARD_BATCH}:${order.credits}`,
+            revokedAt: null,
+            usedCount: 0,
+            OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+          },
+          data: { usedCount: { increment: 1 } },
+        });
+        if (claimed.count !== 1) {
+          throw new StorefrontOrderError(
+            "STOREFRONT_CARD_USED",
+            "充值卡密已使用",
+            409,
+          );
+        }
+        await tx.creditRedemption.create({
+          data: { codeId: code.id, userId, credits: code.credits },
+        });
+        // Claim the code before updating User, matching the manual redemption lock order.
+        const credited = await tx.user.updateMany({
+          where: { id: userId, status: "ACTIVE" },
+          data: { credits: { increment: order.credits } },
+        });
+        if (credited.count !== 1) {
+          throw new StorefrontOrderError(
+            "USER_INACTIVE",
+            "账户当前不可充值",
+            403,
+          );
+        }
         const user = await tx.user.findUniqueOrThrow({
           where: { id: userId },
           select: { credits: true },
+        });
+        await tx.usageLog.create({
+          data: {
+            userId,
+            action: "storefront_recharge",
+            creditsDelta: order.credits,
+            metadata: {
+              orderId: order.id,
+              externalTradeNo: order.externalTradeNo,
+              redemptionCodeId: code.id,
+            },
+          },
         });
         const completed = await tx.storefrontOrder.update({
           where: { id: order.id },
           data: completion,
         });
         return { order: completed, balance: user.credits };
-      }
-      if (redeemed || code.usedCount !== 0) {
-        throw new StorefrontOrderError(
-          "STOREFRONT_CARD_USED",
-          "充值卡密已使用",
-          409,
-        );
-      }
-      const claimed = await tx.creditRedemptionCode.updateMany({
-        where: {
-          id: code.id,
-          credits: order.credits,
-          maxUses: 1,
-          perUserLimit: 1,
-          note: `${CARD_BATCH}:${order.credits}`,
-          revokedAt: null,
-          usedCount: 0,
-          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
-        },
-        data: { usedCount: { increment: 1 } },
-      });
-      if (claimed.count !== 1) {
-        throw new StorefrontOrderError(
-          "STOREFRONT_CARD_USED",
-          "充值卡密已使用",
-          409,
-        );
-      }
-      await tx.creditRedemption.create({
-        data: { codeId: code.id, userId, credits: code.credits },
-      });
-      // Claim the code before updating User, matching the manual redemption lock order.
-      const credited = await tx.user.updateMany({
-        where: { id: userId, status: "ACTIVE" },
-        data: { credits: { increment: order.credits } },
-      });
-      if (credited.count !== 1) {
-        throw new StorefrontOrderError(
-          "USER_INACTIVE",
-          "账户当前不可充值",
-          403,
-        );
-      }
-      const user = await tx.user.findUniqueOrThrow({
-        where: { id: userId },
-        select: { credits: true },
-      });
-      await tx.usageLog.create({
-        data: {
-          userId,
-          action: "storefront_recharge",
-          creditsDelta: order.credits,
-          metadata: {
-            orderId: order.id,
-            externalTradeNo: order.externalTradeNo,
-            redemptionCodeId: code.id,
-          },
-        },
-      });
-      const completed = await tx.storefrontOrder.update({
-        where: { id: order.id },
-        data: completion,
-      });
-      return { order: completed, balance: user.credits };
-    });
+      },
+      { allowExpiredBound: true },
+    );
   } catch (error) {
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
