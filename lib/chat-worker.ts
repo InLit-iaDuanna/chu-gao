@@ -51,6 +51,7 @@ import type { ChatTurnInput } from "@/lib/chat-turn-types";
 import type { ReasoningEffort } from "@/lib/chat-model-options";
 import {
   geminiUpstreamModel,
+  isGptModelId,
   isTokenPricedChatModel,
 } from "@/lib/chat-model-options";
 import {
@@ -501,7 +502,7 @@ export async function executeChatAttempt(
               maxOutputTokens: options.maxOutputTokens ?? 16_384,
               tools,
               toolContinuations: responseToolContinuations,
-              ...(snapshot.model === "gpt-6.1-sol"
+              ...(isGptModelId(String(snapshot.model))
                 ? {
                     promptCacheKey,
                     promptCacheOptions: {

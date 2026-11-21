@@ -17,6 +17,7 @@ const updateSchema = z
       .refine((value) => /^https:\/\//i.test(value))
       .optional(),
     apiKey: z.string().max(400).optional(),
+    // Retired per-turn price: accepted so a stale tab's save still lands.
     credits: z.number().min(0).max(1_000_000).multipleOf(0.1).optional(),
   })
   .strict()

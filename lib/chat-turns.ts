@@ -40,6 +40,7 @@ import {
 } from "@/lib/chat-instructions";
 import {
   CHAT_MODEL_IDS,
+  ACCEPTED_CHAT_MODEL_IDS,
   isTokenPricedChatModel,
   REASONING_EFFORTS,
   type ReasoningEffort,
@@ -72,7 +73,7 @@ export const chatTurnSchema = z
     conversationId: z.string().min(1).max(128),
     clientRequestId: z.string().min(8).max(128),
     content: z.string().trim().min(1).max(CHAT_INPUT_MAX_CHARS),
-    modelId: z.enum(CHAT_MODEL_IDS),
+    modelId: z.enum(ACCEPTED_CHAT_MODEL_IDS),
     contextBudgetTokens: z.number().int().optional(),
     reasoningEffort: z.enum(REASONING_EFFORTS).optional(),
     webSearch: z.boolean().default(false),

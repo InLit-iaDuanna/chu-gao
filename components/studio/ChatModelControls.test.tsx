@@ -26,6 +26,7 @@ const opus: ChatModelOption = {
   },
   reasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
   defaultReasoningEffort: "low",
+  multiplier: 1,
 };
 
 it("lists models the way Claude's picker does: name, one line, a check", async () => {
@@ -55,6 +56,39 @@ it("lists models the way Claude's picker does: name, one line, a check", async (
   await user.click(option);
   expect(onSelectModel).toHaveBeenCalledWith(opus.id);
   expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+});
+
+it("marks every per-token model with its multiplier against Opus 5.5", async () => {
+  const sol: ChatModelOption = {
+    ...opus,
+    id: "gpt-6.2-sol",
+    displayName: "GPT-6.2 Sol",
+    multiplier: 0.8,
+  };
+  const astra: ChatModelOption = {
+    ...opus,
+    id: "gpt-6.2-astra",
+    displayName: "GPT-6.2 Astra",
+    multiplier: 4,
+  };
+  render(
+    <ChatModelControls
+      models={[fixed, opus, sol, astra]}
+      model={opus}
+      onSelectModel={vi.fn()}
+      onReasoningEffortChange={vi.fn()}
+    />,
+  );
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: /模型与思考强度：Opus 5.5/ }));
+  const row = (name: RegExp) =>
+    screen.getByRole("menuitemradio", { name });
+  expect(within(row(/Opus 5\.5/)).getByText("×1")).toBeVisible();
+  expect(within(row(/GPT-6\.2 Sol/)).getByText("×0.8")).toBeVisible();
+  expect(within(row(/GPT-6\.2 Astra/)).getByText("×4")).toBeVisible();
+  // A flat per-turn price has no multiplier to show.
+  expect(within(row(/固定点价/)).queryByText(/^×/)).not.toBeInTheDocument();
+  expect(screen.getByText("倍率以 Opus 5.5 为 1× 基准")).toBeVisible();
 });
 
 it("keeps effort in a side menu that marks the default and the current level", async () => {

@@ -1,6 +1,6 @@
 import type { ChatReference } from "@/lib/chat-references-types";
 import type { ChatSearchSource } from "@/lib/chat-search";
-import { OPUS_MODEL_ID, SOL_MODEL_ID } from "@/lib/chat-model-options";
+import { OPUS_MODEL_ID, SOL_MODEL_ID, ASTRA_MODEL_ID, LEGACY_SOL_MODEL_ID } from "@/lib/chat-model-options";
 
 export const CHAT_CONTEXT_BUDGET_TOKENS = 24_000;
 export const CHAT_CONTEXT_AUTO_COMPACT_RATIO = 0.85;
@@ -32,7 +32,12 @@ export const COMPACTION_FALLBACK_CODES: ReadonlySet<string> = new Set([
 
 export function contextBudgetOptionsForModel(modelId?: string) {
   if (modelId === OPUS_MODEL_ID) return OPUS_CONTEXT_BUDGET_OPTIONS;
-  if (modelId === SOL_MODEL_ID) return SOL_CONTEXT_BUDGET_OPTIONS;
+  if (
+    modelId === SOL_MODEL_ID ||
+    modelId === ASTRA_MODEL_ID ||
+    modelId === LEGACY_SOL_MODEL_ID
+  )
+    return SOL_CONTEXT_BUDGET_OPTIONS;
   return [];
 }
 
@@ -120,8 +125,10 @@ export function normalizeChatContextBudget(
   if (!Number.isSafeInteger(budget) || !options.includes(budget))
     throw new ChatContextError(
       "VALIDATION_ERROR",
-      modelId === SOL_MODEL_ID
-        ? "GPT-6.1 Sol 上下文档位必须是 100k 到 500k 的整档"
+      modelId === SOL_MODEL_ID ||
+      modelId === ASTRA_MODEL_ID ||
+      modelId === LEGACY_SOL_MODEL_ID
+        ? "GPT 上下文档位必须是 100k 到 500k 的整档"
         : "Opus 上下文档位必须是 100k 到 1m 的整档",
       400,
     );

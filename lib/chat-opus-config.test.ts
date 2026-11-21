@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   failure: vi.fn(),
   audit: vi.fn(),
   sol: vi.fn(),
+  astra: vi.fn(),
 }));
 vi.mock("@/lib/db", () => ({
   db: {
@@ -39,6 +40,7 @@ vi.mock("@/lib/luna-config", () => ({
 }));
 vi.mock("@/lib/sol-config", () => ({
   getSolConfig: mocks.sol,
+  getAstraConfig: mocks.astra,
 }));
 
 import {
@@ -51,7 +53,7 @@ import {
 } from "./opus-config";
 import { getChatCatalog } from "./chat-models";
 import { getChatProfile } from "./chat-profiles";
-import { OPUS_MODEL_ID, REASONING_EFFORTS } from "./chat-model-options";
+import { OPUS_MODEL_ID, REASONING_EFFORTS, ASTRA_MODEL_ID, LUNA_MODEL_ID, SOL_MODEL_ID, scaleChatPricing } from "./chat-model-options";
 import { SYSTEM_CONFIG_DEFAULT_ROWS } from "./system-config";
 import { GET, PATCH } from "@/app/api/admin/integrations/opus/route";
 
@@ -66,6 +68,7 @@ describe("private Opus configuration and public catalog", () => {
     mocks.transaction.mockImplementation((writes) => Promise.all(writes));
     mocks.failure.mockReturnValue(null);
     mocks.sol.mockResolvedValue({ enabled: false });
+    mocks.astra.mockResolvedValue({ enabled: false });
   });
   afterEach(() => vi.unstubAllEnvs());
 
@@ -144,7 +147,8 @@ describe("private Opus configuration and public catalog", () => {
       /synthetic-key|encrypted-fixture|https?:|baseUrl|apiKey/,
     );
     expect(await getChatProfile(OPUS_MODEL_ID)).toMatchObject({
-      transport: "chat_completions_sse",
+      // Opus runs on the Anthropic Messages API so it can use the native tool.
+      transport: "anthropic_messages_sse",
       tokenPricing: { pricing: { input: 120 } },
       efforts: [...REASONING_EFFORTS],
     });
@@ -155,6 +159,55 @@ describe("private Opus configuration and public catalog", () => {
       throw new Error("invalid encryption");
     });
     expect((await getOpusStatus()).hasKey).toBe(false);
+  });
+
+  it("lists both GPT tiers priced as multiples of the Opus card", async () => {
+    mocks.read.mockResolvedValue([
+      { key: OPUS_CONFIG_KEYS.enabled, value: true },
+      { key: OPUS_CONFIG_KEYS.apiKeyEnc, value: "encrypted-fixture" },
+    ]);
+    mocks.sol.mockResolvedValue({
+      enabled: true,
+      apiKey: "synthetic-sol",
+      model: SOL_MODEL_ID,
+      baseUrl: "https://gateway.invalid",
+      multiplier: 0.8,
+      pricing: scaleChatPricing(OPUS_DEFAULT_PRICING, 0.8),
+    });
+    mocks.astra.mockResolvedValue({
+      enabled: true,
+      apiKey: "synthetic-sol",
+      model: ASTRA_MODEL_ID,
+      baseUrl: "https://gateway.invalid",
+      multiplier: 4,
+      pricing: scaleChatPricing(OPUS_DEFAULT_PRICING, 4),
+    });
+    const models = (await getChatCatalog()).models;
+    expect(models).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: OPUS_MODEL_ID,
+          multiplier: 1,
+          pricing: OPUS_DEFAULT_PRICING,
+        }),
+        expect.objectContaining({
+          id: SOL_MODEL_ID,
+          displayName: "GPT-6.2 Sol",
+          multiplier: 0.8,
+          pricing: scaleChatPricing(OPUS_DEFAULT_PRICING, 0.8),
+          credits: 0,
+        }),
+        expect.objectContaining({
+          id: ASTRA_MODEL_ID,
+          displayName: "GPT-6.2 Astra",
+          multiplier: 4,
+          pricing: scaleChatPricing(OPUS_DEFAULT_PRICING, 4),
+          credits: 0,
+        }),
+      ]),
+    );
+    // The retired 5.6 entry is no longer offered.
+    expect(models.map((model) => model.id)).not.toContain(LUNA_MODEL_ID);
   });
 
   it("uses Opus as the chat default when it becomes available", async () => {

@@ -1,5 +1,8 @@
 export const LUNA_MODEL_ID = "gpt-5.6-luna";
-export const SOL_MODEL_ID = "gpt-6.1-sol";
+export const SOL_MODEL_ID = "gpt-6.2-sol";
+export const ASTRA_MODEL_ID = "gpt-6.2-astra";
+/** Retired 6.1 id: still accepted so open tabs and drafts keep working. */
+export const LEGACY_SOL_MODEL_ID = "gpt-6.1-sol";
 export const OPUS_MODEL_ID = "claude-opus-5-5";
 // The premium Anthropic route uses private catalog ids so it can coexist with
 // the existing lower-cost Opus route without exposing provider channels.
@@ -27,10 +30,20 @@ export const REASONING_EFFORTS = [
 export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
 export const GEMINI_REASONING_EFFORTS = ["low", "medium", "high"] as const;
 
+export const GPT_MODEL_IDS = [LUNA_MODEL_ID, SOL_MODEL_ID, ASTRA_MODEL_ID] as const;
+export const RETIRED_CHAT_MODEL_IDS = [LEGACY_SOL_MODEL_ID] as const;
+
+export function isGptModelId(
+  modelId: string,
+): modelId is (typeof GPT_MODEL_IDS)[number] {
+  return (GPT_MODEL_IDS as readonly string[]).includes(modelId);
+}
+
 export const CHAT_MODEL_IDS = [
   "default",
   LUNA_MODEL_ID,
   SOL_MODEL_ID,
+  ASTRA_MODEL_ID,
   OPUS_MODEL_ID,
   PREMIUM_OPUS_MODEL_ID,
   FABLE_MODEL_ID,
@@ -38,6 +51,16 @@ export const CHAT_MODEL_IDS = [
 ] as const;
 
 export type ChatModelId = (typeof CHAT_MODEL_IDS)[number];
+
+/** Selectable ids plus retired ones that must keep resolving for stored turns. */
+export const ACCEPTED_CHAT_MODEL_IDS = [
+  ...CHAT_MODEL_IDS,
+  ...RETIRED_CHAT_MODEL_IDS,
+] as const;
+
+export function isAcceptedChatModelId(modelId: string): boolean {
+  return (ACCEPTED_CHAT_MODEL_IDS as readonly string[]).includes(modelId);
+}
 
 export function isGeminiModelId(
   modelId: string,
@@ -61,6 +84,9 @@ export function geminiUpstreamModel(
 
 export function isTokenPricedChatModel(modelId: string): boolean {
   return (
+    modelId === SOL_MODEL_ID ||
+    modelId === ASTRA_MODEL_ID ||
+    modelId === LEGACY_SOL_MODEL_ID ||
     modelId === OPUS_MODEL_ID ||
     modelId === PREMIUM_OPUS_MODEL_ID ||
     modelId === FABLE_MODEL_ID ||
@@ -76,6 +102,8 @@ export interface ChatModelOption {
   defaultReasoningEffort?: ReasoningEffort;
   credits: number;
   pricing?: ChatTokenPricing;
+  /** Retail price as a multiple of the Opus 5.5 base rates (see below). */
+  multiplier?: number;
   supportsVision: boolean;
   maxReferenceImages: number;
   supportsWebSearch?: boolean;
@@ -88,6 +116,46 @@ export interface ChatTokenPricing {
   output: number;
   cacheRead: number;
   cacheCreation: number;
+}
+
+/**
+ * Every chat price is the Opus 5.5 route's rate card times a multiplier, so one
+ * admin edit to Opus repriced the whole catalog consistently.
+ */
+export const CHAT_PRICE_BASE_MODEL_ID = OPUS_MODEL_ID;
+
+export const CHAT_MODEL_MULTIPLIERS: Readonly<Record<string, number>> = {
+  [OPUS_MODEL_ID]: 1,
+  [SOL_MODEL_ID]: 0.8,
+  [ASTRA_MODEL_ID]: 4,
+};
+
+const roundRate = (value: number) => Number(value.toFixed(6));
+
+/** All four token rates scaled by `multiplier`; the shape stays identical. */
+export function scaleChatPricing(
+  base: ChatTokenPricing,
+  multiplier: number,
+): ChatTokenPricing {
+  return {
+    type: "per_million_tokens",
+    input: roundRate(base.input * multiplier),
+    output: roundRate(base.output * multiplier),
+    cacheRead: roundRate(base.cacheRead * multiplier),
+    cacheCreation: roundRate(base.cacheCreation * multiplier),
+  };
+}
+
+/**
+ * Display multiplier for a rate card nobody declared: output is the rate a turn
+ * actually spends against, so it is the honest single number to show.
+ */
+export function chatPriceMultiplier(
+  pricing: ChatTokenPricing | undefined,
+  base: ChatTokenPricing,
+): number | undefined {
+  if (!pricing || base.output <= 0) return undefined;
+  return Number((pricing.output / base.output).toFixed(2));
 }
 
 export interface OpusStatus {
@@ -143,6 +211,22 @@ export interface LunaStatus {
   model: string;
   hasKey: boolean;
   credits: number;
+}
+
+/** Sol and Astra share one channel: same gateway and key, separate switches. */
+export interface GptStatus {
+  enabled: boolean;
+  baseUrl: string;
+  model: string;
+  hasKey: boolean;
+  multiplier: number;
+  pricing: ChatTokenPricing;
+}
+
+export interface GptConfigUpdate {
+  enabled?: boolean;
+  baseUrl?: string;
+  apiKey?: string;
 }
 
 export interface LunaConfigUpdate {

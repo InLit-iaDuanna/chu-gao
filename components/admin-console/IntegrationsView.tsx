@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 
 import { ChatRuntimeSection } from "./ChatRuntimeSection";
-import { LunaSection } from "./LunaSection";
+import { GptSection } from "./GptSection";
 import { OpusSection } from "./OpusSection";
 import { TokenProviderSection } from "./TokenProviderSection";
 import {
@@ -84,8 +84,8 @@ export function IntegrationsView() {
           loadingLabel="正在加载 Gemini 4 配置"
           savedLabel="Gemini 4 配置已保存"
         />
-        <LunaSection variant="sol" />
-        <LunaSection />
+        <GptSection variant="sol" />
+        <GptSection variant="astra" />
         {failed ? (
           <EmptyPanel text="集成配置暂时不可用" />
         ) : !data ? (

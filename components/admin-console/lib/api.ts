@@ -4,8 +4,8 @@ import type { ModelInfo } from "@/components/studio/lib/types";
 import type {
   GeminiConfigUpdate,
   GeminiStatus,
-  LunaConfigUpdate,
-  LunaStatus,
+  GptConfigUpdate,
+  GptStatus,
   OpusConfigUpdate,
   OpusStatus,
   PremiumAnthropicConfigUpdate,
@@ -508,16 +508,15 @@ export const getAdminIntegrations = () =>
 export const patchAdminIntegrations = (input: AdminIntegrationsPatch) =>
   patch<AdminIntegrations>("/api/admin/integrations", input);
 
-export const getAdminLuna = () =>
-  request<LunaStatus>("/api/admin/integrations/luna");
-
-export const patchAdminLuna = (input: LunaConfigUpdate) =>
-  patch<LunaStatus>("/api/admin/integrations/luna", input);
-
 export const getAdminSol = () =>
-  request<LunaStatus>("/api/admin/integrations/sol");
-export const patchAdminSol = (input: LunaConfigUpdate) =>
-  patch<LunaStatus>("/api/admin/integrations/sol", input);
+  request<GptStatus>("/api/admin/integrations/sol");
+export const patchAdminSol = (input: GptConfigUpdate) =>
+  patch<GptStatus>("/api/admin/integrations/sol", input);
+
+export const getAdminAstra = () =>
+  request<GptStatus>("/api/admin/integrations/astra");
+export const patchAdminAstra = (input: { enabled?: boolean }) =>
+  patch<GptStatus>("/api/admin/integrations/astra", input);
 
 export const getAdminOpus = () =>
   request<OpusStatus>("/api/admin/integrations/opus");

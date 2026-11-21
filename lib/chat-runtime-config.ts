@@ -1,7 +1,13 @@
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { CHAT_MODEL_IDS, OPUS_MODEL_ID } from "@/lib/chat-model-options";
+import {
+  ACCEPTED_CHAT_MODEL_IDS,
+  CHAT_MODEL_IDS,
+  LEGACY_SOL_MODEL_ID,
+  OPUS_MODEL_ID,
+  SOL_MODEL_ID,
+} from "@/lib/chat-model-options";
 
 export const CHAT_TASK_PROTOCOL_VERSION = 2;
 export const CHAT_RUNTIME_PROTOCOL_VERSION = CHAT_TASK_PROTOCOL_VERSION;
@@ -11,7 +17,9 @@ export const CHAT_RUNTIME_CONFIG_KEY = "chat.runtime";
 const configSchema = z
   .object({
     enabled: z.boolean(),
-    profiles: z.array(z.enum(CHAT_MODEL_IDS)).max(CHAT_MODEL_IDS.length),
+    profiles: z
+      .array(z.enum(ACCEPTED_CHAT_MODEL_IDS))
+      .max(ACCEPTED_CHAT_MODEL_IDS.length),
     userAllowlist: z.array(z.string().trim().min(1).max(128)).max(10_000),
     queueTimeoutMs: z.number().int().min(1_000).max(86_400_000).nullable(),
   })
@@ -30,7 +38,12 @@ const defaults = (): ChatRuntimeSettings => ({
 const parseSettings = (value: unknown): ChatRuntimeSettings => {
   const parsed = configSchema.parse({ ...defaults(), ...(value as object) });
   const profiles = [
-    ...new Set(parsed.profiles.filter((id) => id !== "default")),
+    ...new Set(
+      parsed.profiles
+        .filter((id) => id !== "default")
+        // The 6.1 id is retired; keep the slot but point it at the 6.2 model.
+        .map((id) => (id === LEGACY_SOL_MODEL_ID ? SOL_MODEL_ID : id)),
+    ),
   ];
   if (!profiles.includes(OPUS_MODEL_ID)) profiles.unshift(OPUS_MODEL_ID);
   return { ...parsed, profiles: profiles.slice(0, CHAT_MODEL_IDS.length) };

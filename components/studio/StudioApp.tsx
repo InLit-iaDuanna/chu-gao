@@ -169,6 +169,7 @@ const chatPricingSchema = z
             cacheCreation: z.number().nonnegative(),
           })
           .optional(),
+        multiplier: z.number().positive().optional(),
         supportsVision: z.boolean(),
         maxReferenceImages: z.number().int().nonnegative(),
         supportsWebSearch: z.boolean().optional(),

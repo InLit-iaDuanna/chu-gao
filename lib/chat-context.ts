@@ -37,7 +37,7 @@ import {
   type ChatContextStatus,
 } from "@/lib/chat-context-types";
 import { chatTurnInstructions } from "@/lib/chat-instructions";
-import { CHAT_MODEL_IDS } from "@/lib/chat-model-options";
+import { isAcceptedChatModelId } from "@/lib/chat-model-options";
 import {
   normalizeChatReferences,
   storedChatReferences,
@@ -115,7 +115,7 @@ interface Template {
 }
 
 function validateModel(modelId: string) {
-  if (!(CHAT_MODEL_IDS as readonly string[]).includes(modelId))
+  if (!isAcceptedChatModelId(modelId))
     throw new ChatContextError("VALIDATION_ERROR", "不支持的对话模型", 400);
 }
 

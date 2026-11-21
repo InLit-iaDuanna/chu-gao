@@ -4,11 +4,11 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Loader2, RefreshCw, Save } from "lucide-react";
 import { Button, Input, Switch, Textarea, Tooltip } from "@/components/ui";
 import {
+  ASTRA_MODEL_ID,
   FABLE_MODEL_ID,
   GEMINI_ARGON_MODEL_ID,
   GEMINI_CARBON_MODEL_ID,
   GEMINI_HYDROGEN_MODEL_ID,
-  LUNA_MODEL_ID,
   PREMIUM_OPUS_MODEL_ID,
   SOL_MODEL_ID,
   OPUS_MODEL_ID,
@@ -27,8 +27,8 @@ const profiles = [
   [GEMINI_ARGON_MODEL_ID, "Gemini 4 Argon"],
   [GEMINI_CARBON_MODEL_ID, "Gemini 4 Carbon"],
   [GEMINI_HYDROGEN_MODEL_ID, "Gemini 4 Hydrogen"],
-  [SOL_MODEL_ID, "GPT-6.1 Sol"],
-  [LUNA_MODEL_ID, "GPT-5.6 Luna"],
+  [SOL_MODEL_ID, "GPT-6.2 Sol"],
+  [ASTRA_MODEL_ID, "GPT-6.2 Astra"],
 ] as const;
 
 export function ChatRuntimeSection() {

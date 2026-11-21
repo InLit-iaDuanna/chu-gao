@@ -5,31 +5,34 @@ import type { FormEvent } from "react";
 import { Loader2, RefreshCw, Save } from "lucide-react";
 
 import { Button, Input, Switch } from "@/components/ui";
-import { LUNA_MODEL_ID, SOL_MODEL_ID } from "@/lib/chat-model-options";
-import type { LunaConfigUpdate, LunaStatus } from "@/lib/chat-model-options";
-
 import {
-  getAdminLuna,
-  getAdminSol,
-  patchAdminLuna,
-  patchAdminSol,
-} from "./lib/api";
+  ASTRA_MODEL_ID,
+  CHAT_PRICE_BASE_MODEL_ID,
+  SOL_MODEL_ID,
+} from "@/lib/chat-model-options";
+import type { GptConfigUpdate, GptStatus } from "@/lib/chat-model-options";
+
+import { getAdminAstra, getAdminSol, patchAdminAstra, patchAdminSol } from "./lib/api";
 import { AdminField, ErrorText } from "./ui";
 
-export function LunaSection({
-  variant = "luna",
-}: { variant?: "luna" | "sol" } = {}) {
-  const modelId = variant === "sol" ? SOL_MODEL_ID : LUNA_MODEL_ID;
-  const name = variant === "sol" ? "GPT-6.1 Sol" : "GPT-5.6 Luna";
-  const getStatus = variant === "sol" ? getAdminSol : getAdminLuna;
-  const patchStatus = variant === "sol" ? patchAdminSol : patchAdminLuna;
-  const [status, setStatus] = useState<LunaStatus | null>(null);
-  const [form, setForm] = useState({
-    enabled: false,
-    baseUrl: "",
-    credits: "",
-    apiKey: "",
-  });
+const BASE_LABEL = "Opus 5.5";
+
+/**
+ * Sol and Astra share one gateway and key; only the switch and the read-only
+ * rate summary differ. Both are priced as Opus 5.5 × fixed multiplier.
+ */
+export function GptSection({
+  variant,
+}: {
+  variant: "sol" | "astra";
+}) {
+  const isSol = variant === "sol";
+  const name = isSol ? "GPT-6.2 Sol" : "GPT-6.2 Astra";
+  const modelId = isSol ? SOL_MODEL_ID : ASTRA_MODEL_ID;
+  const getStatus = isSol ? getAdminSol : getAdminAstra;
+  const patchStatus = isSol ? patchAdminSol : patchAdminAstra;
+  const [status, setStatus] = useState<GptStatus | null>(null);
+  const [form, setForm] = useState({ enabled: false, baseUrl: "", apiKey: "" });
   const [clearKey, setClearKey] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -42,17 +45,11 @@ export function LunaSection({
     let active = true;
     setLoading(true);
     setError(null);
-
     getStatus()
       .then((data) => {
         if (!active) return;
         setStatus(data);
-        setForm({
-          enabled: data.enabled,
-          baseUrl: data.baseUrl,
-          credits: String(data.credits),
-          apiKey: "",
-        });
+        setForm({ enabled: data.enabled, baseUrl: data.baseUrl, apiKey: "" });
       })
       .catch((loadError: unknown) => {
         if (!active) return;
@@ -65,55 +62,38 @@ export function LunaSection({
       .finally(() => {
         if (active) setLoading(false);
       });
-
     return () => {
       active = false;
     };
-  }, [loadVersion, variant, getStatus, name]);
+  }, [loadVersion, name, getStatus]);
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy || !status) return;
     setError(null);
     setNotice(null);
-
-    const credits = Number(form.credits);
-    if (
-      form.credits.trim() === "" ||
-      !Number.isFinite(credits) ||
-      credits < 0 ||
-      credits > 1_000_000 ||
-      credits !== Number(credits.toFixed(1))
-    ) {
-      setError("每轮积分须为 0 到 1000000，最多一位小数");
-      return;
-    }
     if (!clearKey && form.apiKey !== "" && !form.apiKey.trim()) {
       setError("API Key 不能仅包含空格");
       return;
     }
-
-    const input: LunaConfigUpdate = {
+    const input: GptConfigUpdate = {
       enabled: form.enabled,
-      baseUrl: form.baseUrl.trim(),
-      credits,
-      ...(clearKey
-        ? { apiKey: "" }
-        : form.apiKey !== ""
-          ? { apiKey: form.apiKey.trim() }
-          : {}),
+      ...(isSol
+        ? {
+            baseUrl: form.baseUrl.trim(),
+            ...(clearKey
+              ? { apiKey: "" }
+              : form.apiKey !== ""
+                ? { apiKey: form.apiKey.trim() }
+                : {}),
+          }
+        : {}),
     };
-
     setSaving(true);
     try {
       const data = await patchStatus(input);
       setStatus(data);
-      setForm({
-        enabled: data.enabled,
-        baseUrl: data.baseUrl,
-        credits: String(data.credits),
-        apiKey: "",
-      });
+      setForm({ enabled: data.enabled, baseUrl: data.baseUrl, apiKey: "" });
       setClearKey(false);
       setNotice(`${name} 配置已保存`);
     } catch (saveError) {
@@ -174,11 +154,12 @@ export function LunaSection({
             启用
           </label>
           <div className="grid gap-3 sm:grid-cols-2">
-            <AdminField label="Base URL">
+            <AdminField label={isSol ? "Base URL" : "Base URL（与 Sol 共用）"}>
               <Input
                 className="h-9 text-sm"
                 type="url"
                 required
+                readOnly={!isSol}
                 disabled={busy}
                 value={form.baseUrl}
                 onChange={(event) =>
@@ -195,42 +176,43 @@ export function LunaSection({
               />
             </AdminField>
           </div>
-          <AdminField label="API Key（留空不修改）">
+          <AdminField label="计费">
             <Input
               className="h-9 text-sm"
-              type="password"
-              autoComplete="new-password"
-              spellCheck={false}
-              disabled={busy || clearKey}
-              value={form.apiKey}
-              onChange={(event) =>
-                setForm({ ...form, apiKey: event.target.value })
-              }
-            />
-          </AdminField>
-          <label className="flex items-center gap-2 text-sm text-text-muted">
-            <Switch
-              checked={clearKey}
-              disabled={busy || !status.hasKey}
-              onChange={setClearKey}
-            />
-            保存时清除密钥
-          </label>
-          <AdminField label="每轮积分">
-            <Input
-              className="h-9 text-sm"
-              type="number"
-              min={0}
-              max={1_000_000}
-              step={0.1}
-              required
+              value={`${BASE_LABEL} × ${status.multiplier} · 输入 ${status.pricing.input} / 输出 ${status.pricing.output} 积分每百万 token`}
+              readOnly
               disabled={busy}
-              value={form.credits}
-              onChange={(event) =>
-                setForm({ ...form, credits: event.target.value })
-              }
             />
           </AdminField>
+          <p className="text-xs leading-5 text-text-faint">
+            价格跟随 {BASE_LABEL}（{CHAT_PRICE_BASE_MODEL_ID}）的单价自动换算，
+            改 {BASE_LABEL} 的价格这里会一起变。
+          </p>
+          {isSol ? (
+            <>
+              <AdminField label="API Key（留空不修改）">
+                <Input
+                  className="h-9 text-sm"
+                  type="password"
+                  autoComplete="new-password"
+                  spellCheck={false}
+                  disabled={busy || clearKey}
+                  value={form.apiKey}
+                  onChange={(event) =>
+                    setForm({ ...form, apiKey: event.target.value })
+                  }
+                />
+              </AdminField>
+              <label className="flex items-center gap-2 text-sm text-text-muted">
+                <Switch
+                  checked={clearKey}
+                  disabled={busy || !status.hasKey}
+                  onChange={setClearKey}
+                />
+                保存时清除密钥
+              </label>
+            </>
+          ) : null}
           {error ? (
             <div role="alert">
               <ErrorText message={error} />

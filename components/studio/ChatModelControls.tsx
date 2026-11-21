@@ -3,6 +3,7 @@
 import * as Menu from "@radix-ui/react-dropdown-menu";
 import { Check, ChevronDown, ChevronRight } from "lucide-react";
 import {
+  ASTRA_MODEL_ID,
   LUNA_MODEL_ID,
   OPUS_MODEL_ID,
   SOL_MODEL_ID,
@@ -31,11 +32,19 @@ const REASONING_HINTS: Record<ReasoningEffort, string> = {
 const MODEL_TAGLINES: Record<string, string> = {
   [OPUS_MODEL_ID]: "长文与复杂推理",
   [SOL_MODEL_ID]: "深入分析与方案推敲",
+  [ASTRA_MODEL_ID]: "最难的创意与推演",
   [LUNA_MODEL_ID]: "轻快的日常讨论",
 };
 
 function priceLine(model: ChatModelOption) {
   return model.pricing ? "按用量计费" : `${model.credits} 积分 / 轮`;
+}
+
+/** "×0.8" — the retail rate relative to Opus 5.5, the 1× baseline. */
+function multiplierLabel(model: ChatModelOption) {
+  return typeof model.multiplier === "number" && model.multiplier > 0
+    ? `×${Number(model.multiplier.toFixed(2))}`
+    : null;
 }
 
 export function ChatModelPrice({
@@ -124,6 +133,7 @@ export function ChatModelControls({
             >
               {models.map((item) => {
                 const tagline = MODEL_TAGLINES[item.id];
+                const multiplier = multiplierLabel(item);
                 return (
                   <Menu.RadioItem
                     key={item.id}
@@ -141,6 +151,11 @@ export function ChatModelControls({
                         {priceLine(item)}
                       </span>
                     </span>
+                    {multiplier ? (
+                      <span className="shrink-0 text-xs tabular-nums text-text-faint">
+                        {multiplier}
+                      </span>
+                    ) : null}
                     <Menu.ItemIndicator className="shrink-0">
                       <Check size={16} strokeWidth={2} />
                     </Menu.ItemIndicator>
@@ -148,6 +163,11 @@ export function ChatModelControls({
                 );
               })}
             </Menu.RadioGroup>
+
+            <Menu.Separator className="mx-1 my-1.5 h-px bg-border" />
+            <p className="px-2.5 pb-1 text-[11px] leading-4 text-text-faint">
+              倍率以 Opus 5.5 为 1× 基准
+            </p>
 
             {selectedEffort ? (
               <>
