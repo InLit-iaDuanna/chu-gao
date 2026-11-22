@@ -35,6 +35,7 @@ import {
   CHAT_TASK_PROTOCOL_VERSION,
 } from "@/lib/chat-runtime-config";
 import { getConversationSystemPrompt } from "@/lib/ai-config";
+import { isDeckLayoutRequest } from "@/lib/chat-deck-tool";
 import {
   chatSystemInstructions,
   chatTalkInstructions,
@@ -545,7 +546,9 @@ export async function createChatTurn(
   const conversationMode = await resolveConversationMode(
     userId,
     input.conversationId,
-    input.conversationMode,
+    // Laying out an outline as editable slides needs the deck contract and
+    // the full output budget, whatever mode the dock is in.
+    isDeckLayoutRequest(input.content) ? undefined : input.conversationMode,
   );
   const modeInstruction = conversationMode.instruction;
   // 对谈 / 倾听 are quick spoken turns: a short contract, three tools, no
