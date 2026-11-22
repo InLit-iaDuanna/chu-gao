@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import {
+  Cloud,
   Compass,
   History,
   Network,
@@ -10,11 +11,13 @@ import {
   Presentation,
   Search,
   Settings,
+  Smartphone,
   Trash2,
   Wallet,
 } from "lucide-react";
 import { Button, IconButton, Input } from "@/components/ui";
 import { Logo } from "@/components/shared/Logo";
+import { useIsNativeApp } from "@/lib/app-client";
 import { cn } from "@/lib/utils";
 import type { ConversationSummary } from "../lib/types";
 import { stripInteractiveBlocks } from "../lib/chat-interactive-blocks";
@@ -48,6 +51,8 @@ export function ConversationSidebar({
 }: Props) {
   const [search, setSearch] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  // 节点画布与 PPT 只支持电脑端，原生 APP 里隐藏入口（直接访问会看到占位页）。
+  const isNativeApp = useIsNativeApp();
   const filtered = threads.filter((thread) =>
     `${thread.title} ${stripInteractiveBlocks(thread.latestMessage ?? "")}`
       .toLowerCase()
@@ -98,8 +103,9 @@ export function ConversationSidebar({
               : undefined
           }
           onClick={onNavigate}
-          className={linkClass(
-            isActive("/app/nodes") || isActive("/app/canvas"),
+          className={cn(
+            linkClass(isActive("/app/nodes") || isActive("/app/canvas")),
+            isNativeApp && "hidden",
           )}
         >
           <Network size={16} strokeWidth={1.75} /> 节点画布
@@ -108,7 +114,10 @@ export function ConversationSidebar({
           href="/app/ppt"
           aria-current={isActive("/app/ppt") ? "page" : undefined}
           onClick={onNavigate}
-          className={linkClass(isActive("/app/ppt"))}
+          className={cn(
+            linkClass(isActive("/app/ppt")),
+            isNativeApp && "hidden",
+          )}
         >
           <Presentation size={16} strokeWidth={1.75} /> PPT
         </Link>
@@ -172,11 +181,40 @@ export function ConversationSidebar({
                 disabled={disabled}
                 onClick={() => onSelect(thread.id)}
                 aria-current={activeId === thread.id ? "page" : undefined}
-                title={thread.title}
+                title={
+                  thread.localOnly
+                    ? `${thread.title}（仅本机）`
+                    : thread.title
+                }
                 className="flex h-8 min-w-0 flex-1 items-center rounded-lg px-2 text-left text-sm focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[rgb(var(--text)/0.4)] disabled:opacity-50"
               >
                 <span className="min-w-0 truncate">{thread.title}</span>
               </button>
+              {thread.localOnly ? (
+                <span
+                  className="shrink-0 rounded bg-[rgb(var(--text)/0.08)] px-1 text-[10px] leading-4 text-text-faint"
+                  aria-hidden="true"
+                >
+                  仅本机
+                </span>
+              ) : null}
+              <span
+                aria-hidden="true"
+                title={
+                  thread.storage === "local"
+                    ? thread.localOnly
+                      ? "仅本机（云端副本已过期）"
+                      : "仅保存在本机"
+                    : "已保存在云端"
+                }
+                className="shrink-0 text-text-faint"
+              >
+                {thread.storage === "local" ? (
+                  <Smartphone size={13} />
+                ) : (
+                  <Cloud size={13} />
+                )}
+              </span>
               {onDelete ? (
                 <IconButton
                   type="button"
@@ -186,9 +224,12 @@ export function ConversationSidebar({
                   disabled={disabled || deletingId === thread.id}
                   onClick={async (event) => {
                     event.stopPropagation();
+                    const message = thread.localOnly
+                      ? "将从本机删除该对话记录，无法恢复。确定删除？"
+                      : "删除“" + thread.title + "”？";
                     if (
                       typeof window !== "undefined" &&
-                      !window.confirm("删除“" + thread.title + "”？")
+                      !window.confirm(message)
                     )
                       return;
                     setDeletingId(thread.id);

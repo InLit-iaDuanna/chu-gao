@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
+import { isAppUserAgent } from "@/lib/app-ua";
 import {
   getAdminClientIp,
   isAdminIpAllowed,
@@ -26,6 +27,25 @@ function withSecurityHeaders(response: NextResponse) {
 
 function isAdminPath(pathname: string): boolean {
   return pathname.startsWith("/admin") || pathname.startsWith("/api/admin/");
+}
+
+/**
+ * 原生壳打开站点根路径时，直接进入工作台，跳过营销首页。
+ * UA 只决定这一跳转，真正的访问控制仍在 /app 布局里的会话校验。
+ */
+function nativeAppEntryRedirect(request: NextRequest): NextResponse | null {
+  if (request.nextUrl.pathname !== "/") {
+    return null;
+  }
+
+  if (!isAppUserAgent(request.headers.get("user-agent"))) {
+    return null;
+  }
+
+  const destination = request.nextUrl.clone();
+  destination.pathname = "/app";
+
+  return NextResponse.redirect(destination, 307);
 }
 
 function requiresCanonicalAuthOrigin(pathname: string): boolean {
@@ -88,6 +108,12 @@ export function middleware(request: NextRequest) {
 
   if (canonicalRedirect) {
     return withSecurityHeaders(canonicalRedirect);
+  }
+
+  const appEntryRedirect = nativeAppEntryRedirect(request);
+
+  if (appEntryRedirect) {
+    return withSecurityHeaders(appEntryRedirect);
   }
 
   if (

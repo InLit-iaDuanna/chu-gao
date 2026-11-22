@@ -11,6 +11,7 @@ import {
   conversationMessagesInclude,
   serializeConversation,
 } from "@/lib/conversations";
+import { conversationVisibilityWhere } from "@/lib/conversation-access";
 import { db } from "@/lib/db";
 import { getImage2ChannelDisplayNameMap } from "@/lib/provider-channel-config";
 import { isDatabaseUnavailableError } from "@/lib/service-errors";
@@ -69,8 +70,8 @@ export async function PATCH(
         conversationId: id,
         role: "USER",
         conversation: {
-          userId: session.id,
           archivedAt: null,
+          ...conversationVisibilityWhere(session.id, session.deviceId),
         },
       },
       select: {
@@ -83,7 +84,7 @@ export async function PATCH(
     }
 
     await db.$transaction(async (tx) => {
-      await assertChatConversationIdle(tx, id, session.id);
+      await assertChatConversationIdle(tx, id, session.id, session.deviceId);
       await tx.conversationMessage.update({
         where: {
           id: messageId,
@@ -102,7 +103,7 @@ export async function PATCH(
     const conversation = await db.conversation.findFirstOrThrow({
       where: {
         id,
-        userId: session.id,
+        ...conversationVisibilityWhere(session.id, session.deviceId),
       },
       include: conversationMessagesInclude(),
     });

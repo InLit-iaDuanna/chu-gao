@@ -28,6 +28,7 @@ describe("IconRail navigation", () => {
     navigation.pathname = "/app";
     navigation.push.mockReset();
     window.localStorage.clear();
+    vi.restoreAllMocks();
   });
 
   it("renders only the active mobile destinations in the required order", () => {
@@ -129,5 +130,27 @@ describe("IconRail navigation", () => {
 
     await user.click(within(menu).getByRole("menuitem", { name: "PPT" }));
     expect(navigation.push).toHaveBeenCalledWith("/app/ppt");
+  });
+
+  it("hides the desktop-only PPT destination inside the native app", async () => {
+    vi.spyOn(window.navigator, "userAgent", "get").mockReturnValue(
+      "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/130.0 Mobile Safari/537.36 ChugaoApp/1.0.0 (Android; 1)",
+    );
+    const user = userEvent.setup();
+
+    const { unmount } = render(<IconRail />);
+    const nav = screen.getByRole("navigation", { name: "主导航" });
+    expect(within(nav).queryByRole("link", { name: "PPT" })).toBeNull();
+    expect(within(nav).getByRole("link", { name: "历史" })).toBeVisible();
+    unmount();
+
+    render(<IconRail mobile />);
+    await user.click(screen.getByRole("button", { name: "更多" }));
+    const menu = screen.getByRole("menu", { name: "更多" });
+    expect(
+      within(menu)
+        .getAllByRole("menuitem")
+        .map((item) => item.textContent?.trim()),
+    ).toEqual(["设置"]);
   });
 });

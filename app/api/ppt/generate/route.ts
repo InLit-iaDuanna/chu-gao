@@ -7,6 +7,7 @@ import { z } from "zod";
 import { ok, fail } from "@/lib/api-response";
 import { userActionRateLimitResponse } from "@/lib/api-rate-limit";
 import { checkSession } from "@/lib/auth";
+import { conversationVisibilityWhere } from "@/lib/conversation-access";
 import { db } from "@/lib/db";
 import {
   ConversationNotFoundError,
@@ -167,7 +168,11 @@ export async function POST(request: Request) {
 
     if (conversationId) {
       const conversation = await db.conversation.findFirst({
-        where: { id: conversationId, userId: session.id, archivedAt: null },
+        where: {
+          id: conversationId,
+          archivedAt: null,
+          ...conversationVisibilityWhere(session.id, session.deviceId),
+        },
         select: { id: true },
       });
       if (!conversation) {

@@ -123,6 +123,8 @@ export interface Me {
   concurrentLimit: number;
   dailyUsed: number;
   dailyLimit: number;
+  /** 境外模型服务商处理提示词/图片的单独同意时间；null 表示尚未同意。 */
+  crossBorderConsentAt: string | null;
   authenticated: true;
 }
 
@@ -230,6 +232,8 @@ export interface ConversationMessage {
 export interface Conversation {
   id: string;
   title: string;
+  /** local：仅保存在绑定设备（不传即网页端 CLOUD 行为）。 */
+  storage?: "local" | "cloud";
   lastMessageAt: string;
   createdAt: string;
   messages: ConversationMessage[];
@@ -238,6 +242,10 @@ export interface Conversation {
 export interface ConversationSummary {
   id: string;
   title: string;
+  /** local：仅保存在绑定设备。 */
+  storage?: "local" | "cloud";
+  /** 只存在于手机本地索引、服务端已不可访问的对话。 */
+  localOnly?: boolean;
   lastMessageAt: string;
   createdAt: string;
   latestMessage: string | null;

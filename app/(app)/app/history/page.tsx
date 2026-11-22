@@ -31,6 +31,7 @@ import {
   conversationSummaryRowInclude,
   serializeConversationSummary,
 } from "@/lib/conversations";
+import { conversationVisibilityWhere } from "@/lib/conversation-access";
 import { db } from "@/lib/db";
 import {
   serializeGeneration,
@@ -103,8 +104,11 @@ async function getConversations({ query, status, page }: HistoryFilters) {
     const [rows, displayNameMap] = await Promise.all([
       db.conversation.findMany({
         where: {
-          userId: sessionResult.user.id,
           archivedAt: null,
+          ...conversationVisibilityWhere(
+            sessionResult.user.id,
+            sessionResult.user.deviceId,
+          ),
           ...(query
             ? { title: { contains: query, mode: "insensitive" as const } }
             : {}),

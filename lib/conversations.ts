@@ -1,5 +1,6 @@
 import type { ConversationMessageRole, Prisma } from "@prisma/client";
 import { storedChatReferences } from "@/lib/chat-references-types";
+import { conversationStorageView } from "@/lib/conversation-access";
 import { db } from "@/lib/db";
 
 import type {
@@ -271,6 +272,7 @@ export async function serializeConversation(
   return {
     id: row.id,
     title: row.title,
+    storage: conversationStorageView(row.storage),
     lastMessageAt: row.lastMessageAt.toISOString(),
     createdAt: row.createdAt.toISOString(),
     messages: row.messages.map((message, index) => ({
@@ -339,6 +341,7 @@ export function serializeConversationSummary(
   return {
     id: row.id,
     title: row.title,
+    storage: conversationStorageView(row.storage),
     lastMessageAt: row.lastMessageAt.toISOString(),
     createdAt: row.createdAt.toISOString(),
     latestMessage: row.messages[0]?.content ?? null,

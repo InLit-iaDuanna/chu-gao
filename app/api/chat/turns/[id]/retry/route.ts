@@ -49,6 +49,7 @@ export async function POST(
         (await context.params).id,
         parsed.data.clientRequestId,
         parsed.data.expectedPreviousAttemptId,
+        auth.deviceId,
       ),
     );
   } catch (error) {

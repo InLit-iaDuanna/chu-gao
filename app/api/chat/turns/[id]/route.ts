@@ -10,9 +10,12 @@ export async function GET(
   const auth = await chatRequestUser(request);
   if (auth.response) return auth.response;
   try {
-    return ok(await getChatTurn(auth.userId!, (await context.params).id), {
-      headers: { "Cache-Control": "private, no-store" },
-    });
+    return ok(
+      await getChatTurn(auth.userId!, (await context.params).id, true, auth.deviceId),
+      {
+        headers: { "Cache-Control": "private, no-store" },
+      },
+    );
   } catch (error) {
     return chatTurnFailure(error);
   }

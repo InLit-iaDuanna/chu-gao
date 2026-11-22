@@ -62,6 +62,7 @@ export async function GET(request: Request) {
         dailyGenLimit: true,
         concurrentLimit: true,
         materialInboxBeta: true,
+        crossBorderConsentAt: true,
       },
     });
 
@@ -73,6 +74,7 @@ export async function GET(request: Request) {
 
     return ok({
       ...user,
+      crossBorderConsentAt: user.crossBorderConsentAt?.toISOString() ?? null,
       dailyUsed,
       dailyLimit: user.dailyGenLimit,
       authenticated: true,
@@ -136,12 +138,14 @@ export async function PATCH(request: Request) {
         dailyGenLimit: true,
         concurrentLimit: true,
         materialInboxBeta: true,
+        crossBorderConsentAt: true,
       },
     });
     const dailyUsed = await dailyUsedForUser(user.id);
 
     return ok({
       ...user,
+      crossBorderConsentAt: user.crossBorderConsentAt?.toISOString() ?? null,
       dailyUsed,
       dailyLimit: user.dailyGenLimit,
       authenticated: true,

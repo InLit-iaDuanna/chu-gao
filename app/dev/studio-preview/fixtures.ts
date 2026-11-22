@@ -35,6 +35,7 @@ export const me: Me = {
   concurrentLimit: 4,
   dailyUsed: 7,
   dailyLimit: 200,
+  crossBorderConsentAt: "2026-10-01T08:00:00.000Z",
   authenticated: true,
 };
 

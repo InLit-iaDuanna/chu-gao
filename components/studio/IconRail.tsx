@@ -17,6 +17,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "@/components/ui";
+import { useIsNativeApp } from "@/lib/app-client";
 import { cn } from "@/lib/utils";
 import {
   activeConversationHref,
@@ -47,6 +48,7 @@ export function IconRail({
 }: IconRailProps = {}) {
   const pathname = usePathname();
   const router = useRouter();
+  const isNativeApp = useIsNativeApp();
   const [workbenchHref, setWorkbenchHref] = useState("/app");
 
   useEffect(() => {
@@ -63,8 +65,13 @@ export function IconRail({
   // lives inside the authenticated app shell.
   const inspirationActive =
     isPathWithin("/app/inspiration") || isPathWithin("/app/publish");
+  // 原生 APP 里 PPT 只支持电脑端，隐藏入口（直接访问会看到占位页）。
+  const desktopItems = isNativeApp
+    ? DESKTOP_NAV_ITEMS.filter((item) => item.href !== "/app/ppt")
+    : DESKTOP_NAV_ITEMS;
   const settingsActive = isActive("/app/settings");
-  const moreActive = isPathWithin("/app/ppt") || settingsActive;
+  const moreActive =
+    (!isNativeApp && isPathWithin("/app/ppt")) || settingsActive;
 
   const linkClass = (active: boolean) =>
     cn(
@@ -91,7 +98,7 @@ export function IconRail({
           : "hidden h-full w-12 flex-col items-center gap-1 border-r py-3 md:flex",
       )}
     >
-      {(mobile ? MOBILE_NAV_ITEMS : DESKTOP_NAV_ITEMS).map((item) => {
+      {(mobile ? MOBILE_NAV_ITEMS : desktopItems).map((item) => {
         const Icon = item.icon;
         const active =
           item.href === "/app/inspiration"
@@ -139,10 +146,15 @@ export function IconRail({
             </button>
           }
         >
-          <DropdownMenuItem onClick={() => router.push("/app/ppt")}>
-            <Presentation aria-hidden="true" focusable="false" size={14} /> PPT
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
+          {!isNativeApp ? (
+            <>
+              <DropdownMenuItem onClick={() => router.push("/app/ppt")}>
+                <Presentation aria-hidden="true" focusable="false" size={14} />{" "}
+                PPT
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          ) : null}
           <DropdownMenuItem onClick={() => router.push("/app/settings")}>
             <Settings aria-hidden="true" focusable="false" size={14} /> 设置
           </DropdownMenuItem>

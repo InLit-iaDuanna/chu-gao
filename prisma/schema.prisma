@@ -54,6 +54,13 @@ enum ConversationMessageRole {
   ASSISTANT
 }
 
+// 对话保存位置：CLOUD 为网页端正常行为；LOCAL 只绑定创建它的设备，
+// 服务器上仅作为手机本地记录的工作副本，闲置后由保留策略清理。
+enum ConversationStorage {
+  CLOUD
+  LOCAL
+}
+
 // Design inspiration community -------------------------------------------------
 // Keep these enums in the Prisma schema (rather than accepting arbitrary strings)
 // so public filters and moderation queues have a stable vocabulary.
@@ -169,6 +176,12 @@ model User {
   inviteCodeId      String?
   bannedAt          DateTime?
   bannedReason      String?
+  // APP 合规：注册时同意的《用户协议》《隐私政策》，以及个人信息出境（境外模型
+  // 服务商处理提示词/图片）的单独同意时间。null 表示尚未同意。
+  termsAcceptedAt      DateTime?
+  crossBorderConsentAt DateTime?
+  // 用户自助注销的时间戳。注销后账号被匿名化并禁用，数据行保留用于法定记录关联。
+  deletedAt            DateTime?
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 
@@ -199,6 +212,7 @@ model User {
 
   @@index([createdAt])
   @@index([status])
+  @@index([deletedAt])
 }
 
 model ResearchProject {
@@ -455,14 +469,16 @@ model InviteCode {
 }
 
 model Conversation {
-  id              String    @id @default(cuid())
+  id              String              @id @default(cuid())
   userId          String
   title           String
-  lastMessageAt   DateTime  @default(now())
+  lastMessageAt   DateTime            @default(now())
   archivedAt      DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  contextRevision Int       @default(0)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  contextRevision Int                 @default(0)
+  storage         ConversationStorage @default(CLOUD)
+  localDeviceId   String?
 
   user             User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages         ConversationMessage[]
@@ -472,6 +488,7 @@ model Conversation {
   contextSnapshots ContextSnapshot[]
 
   @@index([userId, lastMessageAt(sort: Desc)])
+  @@index([userId, storage])
   @@index([archivedAt])
 }
 

@@ -1,3 +1,5 @@
+import type { ConversationStorageView } from "@/lib/conversation-access";
+
 export type ConversationRole = "user" | "assistant";
 
 export interface ConversationMessage {
@@ -58,6 +60,7 @@ export interface CompiledConversationPrompt {
 export interface ConversationView {
   id: string;
   title: string;
+  storage: ConversationStorageView;
   lastMessageAt: string;
   createdAt: string;
   messages: ConversationMessage[];
@@ -66,6 +69,7 @@ export interface ConversationView {
 export interface ConversationSummaryView {
   id: string;
   title: string;
+  storage: ConversationStorageView;
   lastMessageAt: string;
   createdAt: string;
   latestMessage: string | null;

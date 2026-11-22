@@ -51,7 +51,9 @@ export async function GET(request: Request) {
   const session = await checkSession(request);
   const failure = sessionFailureResponse(session);
   if (failure) return failure;
-  const userId = authenticatedUser(session).id;
+  const user = authenticatedUser(session);
+  const userId = user.id;
+  const deviceId = user.deviceId;
   const parsed = conversationIdSchema.safeParse(
     new URL(request.url).searchParams.get("conversationId"),
   );
@@ -83,13 +85,22 @@ export async function GET(request: Request) {
         status: 400,
         headers: privateHeaders,
       });
-    const status = model.data
-      ? budget.data === undefined
-        ? getChatContextStatus(userId, parsed.data, model.data)
-        : getChatContextStatus(userId, parsed.data, model.data, budget.data)
-      : budget.data === undefined
-        ? getChatContextStatus(userId, parsed.data)
-        : getChatContextStatus(userId, parsed.data, undefined, budget.data);
+    // 设备可见性只有安卓外壳的会话才有；网页端保持原来的调用形态。
+    const status = deviceId
+      ? getChatContextStatus(
+          userId,
+          parsed.data,
+          model.data,
+          budget.data,
+          deviceId,
+        )
+      : model.data
+        ? budget.data === undefined
+          ? getChatContextStatus(userId, parsed.data, model.data)
+          : getChatContextStatus(userId, parsed.data, model.data, budget.data)
+        : budget.data === undefined
+          ? getChatContextStatus(userId, parsed.data)
+          : getChatContextStatus(userId, parsed.data, undefined, budget.data);
     return ok(await status, { headers: privateHeaders });
   } catch (error) {
     return contextFailure(error);
@@ -100,7 +111,8 @@ export async function POST(request: Request) {
   const session = await checkSession(request);
   const failure = sessionFailureResponse(session);
   if (failure) return failure;
-  const userId = authenticatedUser(session).id;
+  const user = authenticatedUser(session);
+  const userId = user.id;
   const body = await readJsonBodySafe(request);
   if (!body.ok) return body.response;
   const parsed = compactSchema.safeParse(body.data);
@@ -118,6 +130,7 @@ export async function POST(request: Request) {
       await compactChatContext({
         userId,
         ...parsed.data,
+        deviceId: user.deviceId,
         signal: request.signal,
       }),
       { headers: privateHeaders },

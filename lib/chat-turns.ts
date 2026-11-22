@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { conversationAccessWhere } from "@/lib/conversation-access";
 import { getChatProfile } from "@/lib/chat-profiles";
 import { debitChatCredits } from "@/lib/chat-billing";
 import {
@@ -190,6 +191,7 @@ export async function getChatTurnByRequest(
   userId: string,
   conversationId: string,
   clientRequestId: string,
+  deviceId?: string | null,
 ) {
   const receipt = await db.chatRequestReceipt.findUnique({
     where: {
@@ -207,7 +209,7 @@ export async function getChatTurnByRequest(
       "这次请求的聊天内容已清空，不会再次执行",
       410,
     );
-  return getChatTurn(userId, receipt.turnId);
+  return getChatTurn(userId, receipt.turnId, true, deviceId);
 }
 
 async function receiptTurn(
@@ -215,6 +217,7 @@ async function receiptTurn(
   scope: string,
   clientRequestId: string,
   inputHash: string,
+  deviceId?: string | null,
 ) {
   const receipt = await db.chatRequestReceipt.findUnique({
     where: { userId_scope_clientRequestId: { userId, scope, clientRequestId } },
@@ -232,7 +235,7 @@ async function receiptTurn(
       "这次请求的聊天内容已清空，不会再次执行",
       410,
     );
-  return getChatTurn(userId, receipt.turnId);
+  return getChatTurn(userId, receipt.turnId, true, deviceId);
 }
 
 export function serializeChatEvent(row: {
@@ -256,11 +259,19 @@ export async function getChatTurn(
   userId: string,
   id: string,
   reconcile = true,
+  deviceId?: string | null,
 ): Promise<ChatTurnView> {
   const turn = await db.$transaction(
     (tx) =>
       tx.chatTurn.findFirst({
-        where: { id, userId, conversation: { archivedAt: null } },
+        where: {
+          id,
+          userId,
+          conversation: {
+            archivedAt: null,
+            ...conversationAccessWhere(userId, deviceId),
+          },
+        },
         include: { attempts: { orderBy: { ordinal: "desc" }, take: 1 } },
       }),
     { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
@@ -397,6 +408,7 @@ export async function assertChatConversationIdle(
   tx: Prisma.TransactionClient,
   conversationId: string,
   userId?: string,
+  deviceId?: string | null,
 ) {
   await tx.$queryRaw(
     Prisma.sql`SELECT "id" FROM "Conversation" WHERE "id" = ${conversationId} FOR UPDATE`,
@@ -404,7 +416,11 @@ export async function assertChatConversationIdle(
   if (
     userId &&
     !(await tx.conversation.findFirst({
-      where: { id: conversationId, userId, archivedAt: null },
+      where: {
+        id: conversationId,
+        archivedAt: null,
+        ...conversationAccessWhere(userId, deviceId),
+      },
       select: { id: true },
     }))
   )
@@ -478,6 +494,7 @@ async function resolveConversationMode(
 export async function createChatTurn(
   userId: string,
   input: z.infer<typeof chatTurnSchema>,
+  deviceId?: string | null,
 ) {
   const { clientRequestId, ...content } = input;
   const inputHash = createHash("sha256")
@@ -488,6 +505,7 @@ export async function createChatTurn(
     "create",
     clientRequestId,
     inputHash,
+    deviceId,
   );
   if (existing) return existing;
   await assertChatRuntimeAdmission(userId, input.modelId);
@@ -647,7 +665,11 @@ export async function createChatTurn(
           Prisma.sql`SELECT "id" FROM "Conversation" WHERE "id" = ${input.conversationId} AND "userId" = ${userId} FOR UPDATE`,
         );
         const owned = await tx.conversation.findFirst({
-          where: { id: input.conversationId, userId, archivedAt: null },
+          where: {
+            id: input.conversationId,
+            archivedAt: null,
+            ...conversationAccessWhere(userId, deviceId),
+          },
           select: { id: true, contextRevision: true },
         });
         if (!owned) throw new ChatTurnError("NOT_FOUND", "对话不存在", 404);
@@ -1066,8 +1088,9 @@ export async function cancelChatTurn(
   userId: string,
   id: string,
   expectedAttemptId?: string,
+  deviceId?: string | null,
 ) {
-  const view = await getChatTurn(userId, id);
+  const view = await getChatTurn(userId, id, true, deviceId);
   if (expectedAttemptId && view.attemptId !== expectedAttemptId)
     throw new ChatTurnError(
       "ATTEMPT_CHANGED",
@@ -1083,7 +1106,7 @@ export async function cancelChatTurn(
       publicMessage: "文字回复已停止，收到的内容已保存，文字回复未收费",
     },
   });
-  return getChatTurn(userId, id);
+  return getChatTurn(userId, id, true, deviceId);
 }
 
 export async function retryChatTurn(
@@ -1091,14 +1114,21 @@ export async function retryChatTurn(
   id: string,
   clientRequestId: string,
   expectedPreviousAttemptId?: string,
+  deviceId?: string | null,
 ) {
   const hash = operationHash({
     id,
     expectedPreviousAttemptId: expectedPreviousAttemptId ?? null,
   });
-  const replay = await receiptTurn(userId, "retry", clientRequestId, hash);
+  const replay = await receiptTurn(
+    userId,
+    "retry",
+    clientRequestId,
+    hash,
+    deviceId,
+  );
   if (replay) return replay;
-  const initial = await getChatTurn(userId, id);
+  const initial = await getChatTurn(userId, id, true, deviceId);
   await assertChatRuntimeAdmission(userId, initial.modelId);
   await db.$transaction(async (tx) => {
     await tx.$queryRaw(
@@ -1106,7 +1136,11 @@ export async function retryChatTurn(
     );
     if (
       !(await tx.conversation.findFirst({
-        where: { id: initial.conversationId, userId, archivedAt: null },
+        where: {
+          id: initial.conversationId,
+          archivedAt: null,
+          ...conversationAccessWhere(userId, deviceId),
+        },
         select: { id: true },
       }))
     )

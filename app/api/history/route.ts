@@ -1,5 +1,6 @@
 import { fail, ok } from "@/lib/api-response";
 import { checkSession } from "@/lib/auth";
+import { conversationVisibilityWhere } from "@/lib/conversation-access";
 import { db } from "@/lib/db";
 import { isDatabaseUnavailableError } from "@/lib/service-errors";
 
@@ -26,8 +27,8 @@ export async function DELETE(request: Request) {
     const [conversations, generations] = await db.$transaction([
       db.conversation.updateMany({
         where: {
-          userId: session.id,
           archivedAt: null,
+          ...conversationVisibilityWhere(session.id, session.deviceId),
         },
         data: {
           archivedAt: now,

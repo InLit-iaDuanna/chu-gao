@@ -2,6 +2,8 @@
 
 import { AgentAccessSection } from "@/components/agent/AgentAccessSection";
 import { ApiKeySection } from "@/components/agent/ApiKeySection";
+import { AccountSecuritySection } from "@/components/settings/AccountSecuritySection";
+import { AboutSection } from "@/components/settings/AboutSection";
 import { Button } from "@/components/ui";
 
 import { Input, Select, Skeleton } from "@/components/ui";
@@ -94,6 +96,10 @@ export function SettingsView({ user, models }: SettingsViewProps) {
       </div>
 
       <AgentAccessSection />
+      <div className="grid gap-6 lg:grid-cols-2">
+        <AccountSecuritySection email={user.email} />
+        <AboutSection />
+      </div>
       <ApiKeySection />
       <UsageSection />
     </div>

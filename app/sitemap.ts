@@ -8,6 +8,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: origin, changeFrequency: "weekly", priority: 1 },
     { url: `${origin}/inspiration`, changeFrequency: "daily", priority: 0.9 },
     { url: `${origin}/inspiration/daily`, changeFrequency: "daily", priority: 0.8 },
+    { url: `${origin}/download`, changeFrequency: "weekly", priority: 0.8 },
+    { url: `${origin}/legal/terms`, changeFrequency: "yearly", priority: 0.3 },
+    { url: `${origin}/legal/privacy`, changeFrequency: "yearly", priority: 0.3 },
   ];
   if (!process.env.DATABASE_URL) return base;
   try {

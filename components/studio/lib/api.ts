@@ -239,6 +239,8 @@ export const getConversation = (id: string) =>
 export const createConversation = (input: {
   title?: string;
   firstMessage?: string;
+  /** 安卓 APP 内新建对话默认 "local"（仅保存在本机）。 */
+  storage?: "local" | "cloud";
 }) =>
   request<Conversation>("/api/conversations", {
     method: "POST",
@@ -247,7 +249,11 @@ export const createConversation = (input: {
 
 export const updateConversation = (
   id: string,
-  patch: { title?: string; archived?: boolean },
+  patch: {
+    title?: string;
+    archived?: boolean;
+    storage?: "local" | "cloud";
+  },
 ) =>
   request<Conversation>(`/api/conversations/${id}`, {
     method: "PATCH",

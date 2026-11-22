@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="Theme.Chugao" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/brand_accent</item>
+        <item name="colorOnPrimary">@color/window_background</item>
+        <item name="colorPrimaryContainer">@color/brand_accent</item>
+        <item name="colorOnPrimaryContainer">@color/window_background</item>
+        <item name="colorSurface">@color/window_background</item>
+        <item name="colorOnSurface">@color/brand_accent</item>
+        <item name="colorOnSurfaceVariant">@color/text_secondary</item>
+        <item name="colorOutline">@color/text_tertiary</item>
+        <item name="android:colorBackground">@color/window_background</item>
+        <item name="android:windowBackground">@color/window_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+</resources>

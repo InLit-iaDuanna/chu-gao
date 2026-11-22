@@ -488,6 +488,7 @@ export async function POST(request: Request) {
       estimatedCredits,
       pricingSnapshotJson,
       conversationId,
+      deviceId: session.deviceId,
       referenceImageKeys: (() => {
         const order = parsed.data.referenceOrder;
         const uploadKeys = parsed.data.referenceImageKeys ?? [];

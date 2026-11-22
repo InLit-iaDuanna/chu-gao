@@ -22,7 +22,14 @@ import {
 } from "@/components/ui";
 import { ConversationSidebar } from "./chat/ConversationSidebar";
 import { TopBar } from "./TopBar";
+import { CrossBorderConsentDialog } from "@/components/consent/CrossBorderConsentDialog";
 import { deleteConversation, getMe, listConversations } from "./lib/api";
+import {
+  deleteLocalConversation,
+  listLocalConversations,
+  type LocalConversationIndexEntry,
+} from "./lib/local-conversations";
+import { hasNativeBridge } from "@/lib/native-bridge";
 import { activeConversationHref } from "./lib/active-conversation";
 import type { ConversationSummary, Me } from "./lib/types";
 
@@ -44,6 +51,37 @@ interface WorkspaceContextValue {
 }
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
+
+/**
+ * APP 内的会话列表：服务端列表优先，再把只存在于手机的对话
+ * （服务端工作副本已过期）作为「仅本机」条目接在后面。
+ */
+function mergeLocalThreads(
+  server: ConversationSummary[],
+  local: LocalConversationIndexEntry[],
+): ConversationSummary[] {
+  const seen = new Set(server.map((item) => item.id));
+  const merged: ConversationSummary[] = server.map((item) => ({
+    ...item,
+    storage: item.storage ?? "cloud",
+  }));
+  const localOnly: ConversationSummary[] = local
+    .filter((item) => !seen.has(item.id))
+    .map((item) => ({
+      id: item.id,
+      title: item.title,
+      lastMessageAt: item.lastMessageAt,
+      createdAt: item.lastMessageAt,
+      latestMessage: null,
+      thumbnailUrl: null,
+      generationCount: 0,
+      storage: "local" as const,
+      localOnly: true,
+    }))
+    .sort((a, b) => b.lastMessageAt.localeCompare(a.lastMessageAt));
+
+  return [...merged, ...localOnly];
+}
 
 export function useWorkspaceNavigation() {
   const context = useContext(WorkspaceContext);
@@ -94,10 +132,13 @@ function pageTitle(pathname: string) {
 export function WorkspaceShell({
   children,
   studio,
+  nativeApp,
 }: {
   children: ReactNode;
   /** Treat this route as the chat workspace (the dev preview mounts it elsewhere). */
   studio?: boolean;
+  /** 服务端根据 UA 判定：运行在安卓原生壳里。只影响界面分支。 */
+  nativeApp?: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -122,9 +163,12 @@ export function WorkspaceShell({
   const refreshThreads = useCallback(async () => {
     const version = ++requestVersion.current;
     try {
-      const result = await listConversations(50);
+      const [result, localItems] = await Promise.all([
+        listConversations(50),
+        hasNativeBridge() ? listLocalConversations() : Promise.resolve([]),
+      ]);
       if (!mounted.current || version !== requestVersion.current) return;
-      setThreads(result.items);
+      setThreads(mergeLocalThreads(result.items, localItems));
       setError(null);
     } catch {
       if (mounted.current && version === requestVersion.current)
@@ -137,11 +181,18 @@ export function WorkspaceShell({
 
   const deleteThread = useCallback(
     async (id: string) => {
-      await deleteConversation(id);
+      const localOnly = threads.find((thread) => thread.id === id)?.localOnly;
+      if (localOnly) {
+        await deleteLocalConversation(id);
+      } else {
+        await deleteConversation(id);
+        // 云端对话删除后本机快照也一并清理，避免残留。
+        await deleteLocalConversation(id).catch(() => undefined);
+      }
       if (studioNavigation?.activeId === id) studioNavigation.onNew();
       await refreshThreads();
     },
-    [refreshThreads, studioNavigation],
+    [refreshThreads, studioNavigation, threads],
   );
 
   useEffect(() => {
@@ -205,7 +256,10 @@ export function WorkspaceShell({
 
   return (
     <WorkspaceContext.Provider value={context}>
-      <div className="studio-workspace flex h-dvh min-h-0 overflow-hidden bg-background text-foreground md:h-screen">
+      <div
+        data-native-app={nativeApp ? "true" : undefined}
+        className="studio-workspace flex h-dvh min-h-0 overflow-hidden bg-background text-foreground md:h-screen"
+      >
         {sidebarOpen ? (
           <aside
             aria-label="对话侧栏"
@@ -235,6 +289,7 @@ export function WorkspaceShell({
           {sidebar}
         </DialogContent>
       </Dialog>
+      <CrossBorderConsentDialog />
     </WorkspaceContext.Provider>
   );
 }

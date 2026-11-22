@@ -3,12 +3,15 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { WorkspaceShell } from "@/components/studio/WorkspaceShell";
+import { isAppRequestHeaders } from "@/lib/app-ua";
 import { checkSessionFromHeaders } from "@/lib/auth";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const headerList = await headers();
   const sessionResult = await checkSessionFromHeaders(headerList);
   const currentPath = headerList.get("x-current-path") ?? "/app";
+  // UA 只用于界面分支（隐藏电脑端功能、APP 文案），不参与鉴权。
+  const nativeApp = isAppRequestHeaders(headerList);
 
   if (sessionResult.status === "unauthenticated") {
     redirect(`/login?next=${encodeURIComponent(currentPath)}`);
@@ -28,5 +31,5 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     );
   }
 
-  return <WorkspaceShell>{children}</WorkspaceShell>;
+  return <WorkspaceShell nativeApp={nativeApp}>{children}</WorkspaceShell>;
 }

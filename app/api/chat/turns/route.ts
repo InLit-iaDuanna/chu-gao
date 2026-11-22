@@ -8,6 +8,7 @@ import {
   getChatTurnByRequest,
 } from "@/lib/chat-turns";
 import { chatWorkerOnline } from "@/lib/chat-worker";
+import { conversationVisibilityWhere } from "@/lib/conversation-access";
 import { readJsonBodySafe } from "@/lib/request-body";
 import { db } from "@/lib/db";
 
@@ -28,7 +29,12 @@ export async function GET(request: Request) {
       if (requestId.length < 8 || requestId.length > 128)
         return fail("VALIDATION_ERROR", "请求标识不合法", { status: 400 });
       return ok(
-        await getChatTurnByRequest(auth.userId!, conversationId, requestId),
+        await getChatTurnByRequest(
+          auth.userId!,
+          conversationId,
+          requestId,
+          auth.deviceId,
+        ),
         { headers: { "Cache-Control": "private, no-store" } },
       );
     }
@@ -36,13 +42,19 @@ export async function GET(request: Request) {
       where: {
         userId: auth.userId!,
         activeConversationId: conversationId,
-        conversation: { archivedAt: null },
+        conversation: {
+          archivedAt: null,
+          ...conversationVisibilityWhere(auth.userId!, auth.deviceId),
+        },
       },
       select: { id: true },
     });
-    return ok(turn ? await getChatTurn(auth.userId!, turn.id) : null, {
-      headers: { "Cache-Control": "private, no-store" },
-    });
+    return ok(
+      turn ? await getChatTurn(auth.userId!, turn.id, true, auth.deviceId) : null,
+      {
+        headers: { "Cache-Control": "private, no-store" },
+      },
+    );
   } catch (error) {
     return chatTurnFailure(error);
   }
@@ -79,7 +91,7 @@ export async function POST(request: Request) {
       return fail("WORKER_UNAVAILABLE", "对话服务正在连接，请稍后重试", {
         status: 503,
       });
-    return ok(await createChatTurn(auth.userId!, parsed.data), {
+    return ok(await createChatTurn(auth.userId!, parsed.data, auth.deviceId), {
       headers: { "Cache-Control": "private, no-store" },
     });
   } catch (error) {

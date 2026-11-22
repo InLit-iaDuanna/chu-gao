@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
+  Cloud,
   MoreHorizontal,
   PanelRightClose,
   Pencil,
   RotateCcw,
+  Smartphone,
   SquarePen,
   Search,
   Trash2,
@@ -72,6 +74,20 @@ import {
   WorkspaceSidebarToggle,
 } from "./WorkspaceShell";
 import { ConversationTimeline } from "./chat/ConversationTimeline";
+import {
+  ConversationStorageBadge,
+  LocalConversationView,
+} from "./chat/LocalConversationView";
+import {
+  loadConversationSnapshot,
+  withLocalImageUrls,
+  type LocalConversationRecord,
+} from "./lib/local-conversations";
+import {
+  useLocalConversationSync,
+  useNativeResumeEvent,
+  type DraftStorageChoice,
+} from "./lib/useLocalConversationSync";
 import { stripInteractiveBlocks } from "./lib/chat-interactive-blocks";
 import { HtmlArtifact } from "./chat/HtmlArtifact";
 import { DeckPanel } from "./chat/DeckPanel";
@@ -357,6 +373,16 @@ export function StudioApp({
       })),
   });
   const streams = useRef(new Map<string, () => void>());
+  const {
+    isNativeApp,
+    draftStorage,
+    setDraftStorage,
+    tipVisible: storageTipVisible,
+    dismissTip: dismissStorageTip,
+    switchingStorage,
+    scheduleSnapshot,
+    changeStorage,
+  } = useLocalConversationSync({ conversation, busy });
   const activeRef = useRef(activeId);
   activeRef.current = activeId;
   const mounted = useRef(true);
@@ -373,6 +399,9 @@ export function StudioApp({
   }, []);
   const [managedTurnId, setManagedTurnId] = useState<string | null>(null);
   const [chatRecoverable, setChatRecoverable] = useState(false);
+  // 服务端已不可访问（工作副本过期）时，用手机本地快照只读展示。
+  const [localSnapshot, setLocalSnapshot] =
+    useState<LocalConversationRecord | null>(null);
   const [chatConnection, setChatConnection] = useState<
     "connected" | "reconnecting" | "disconnected"
   >("connected");
@@ -774,6 +803,7 @@ export function StudioApp({
       setActiveId(id);
       activeRef.current = id;
       setConversation(null);
+      setLocalSnapshot(null);
       setAgentTurns([]);
       setActiveQuestion(null);
       setAgentQuality(null);
@@ -794,6 +824,7 @@ export function StudioApp({
         const data = await getConversation(id);
         if (!mounted.current || version !== loadVersion.current) return;
         setConversation(data);
+        setLocalSnapshot(null);
         const items = data.messages
           .map((message) => messageGeneration(message, id))
           .filter((item): item is Generation => Boolean(item));
@@ -804,9 +835,19 @@ export function StudioApp({
         items
           .filter((item) => isActiveStatus(item.status))
           .forEach((item) => track(item.id));
-      } catch {
-        if (mounted.current && version === loadVersion.current)
+      } catch (error) {
+        // 服务端工作副本可能已被保留策略清理：退回手机本地快照只读查看。
+        const record =
+          isApiError(error) && error.status === 404
+            ? await loadConversationSnapshot(id)
+            : null;
+        if (!mounted.current || version !== loadVersion.current) return;
+        if (record) {
+          setConversation(null);
+          setLocalSnapshot(record);
+        } else {
           setThreadError("这段对话暂时无法加载");
+        }
       } finally {
         if (mounted.current && version === loadVersion.current)
           setThreadLoading(false);
@@ -1227,6 +1268,8 @@ export function StudioApp({
     setActiveId(null);
     activeRef.current = null;
     setConversation(null);
+    setLocalSnapshot(null);
+    setDraftStorage("local");
     setArtifactPreview(null);
     setThreadLoading(false);
     setThreadError(null);
@@ -1262,7 +1305,12 @@ export function StudioApp({
     ])
       url.searchParams.delete(key);
     window.history.replaceState(window.history.state, "", url);
-  }, [closeMobile, locked, resetImageSettingsForNewConversation]);
+  }, [
+    closeMobile,
+    locked,
+    resetImageSettingsForNewConversation,
+    setDraftStorage,
+  ]);
   useEffect(() => {
     setStudioNavigation({
       activeId,
@@ -1272,6 +1320,11 @@ export function StudioApp({
     });
     return () => setStudioNavigation(null);
   }, [activeId, locked, selectThread, newConversation, setStudioNavigation]);
+  // 原生 app.resume：回到前台时刷新当前对话（不影响进行中的任务）。
+  useNativeResumeEvent(() => {
+    if (sendLock.current || !activeRef.current) return;
+    void loadThread(activeRef.current);
+  });
   const messages = conversation?.messages ?? [];
   // Chat consumes the previous result once. Image generation can keep editing it.
   const lastChatInput =
@@ -1843,7 +1896,11 @@ export function StudioApp({
     try {
       if (!current) {
         setStatus("正在创建对话…");
-        current = await createConversation({ title: content.slice(0, 28) });
+        current = await createConversation({
+          title: content.slice(0, 28),
+          // APP 内默认只保存在本机；网页端不传，保持云端行为不变。
+          ...(isNativeApp ? { storage: draftStorage } : {}),
+        });
         if (!mounted.current) return false;
         if (!imageSubmission && userId) {
           // From here even an unconfirmed send belongs to this conversation's draft.
@@ -2377,11 +2434,32 @@ export function StudioApp({
       setRenaming(false);
     }
   };
+  // APP 内切换已有对话的保存位置：本机 ⇄ 云端。
+  const switchStorage = async (storage: DraftStorageChoice) => {
+    if (!activeId || switchingStorage) return;
+    try {
+      const updated = await changeStorage(activeId, storage);
+      if (!updated) return;
+      setConversation(updated);
+      setLocalSnapshot(null);
+      toast({
+        title: storage === "local" ? "已改为仅保存在本机" : "已同步到云端",
+        description:
+          storage === "local"
+            ? "只有这台手机能看到这段对话"
+            : "网页端和其它设备现在也能看到这段对话",
+      });
+      void refreshThreads();
+    } catch {
+      toast({ title: "保存位置切换失败", variant: "danger" });
+    }
+  };
   const empty =
     !conversation?.messages.length &&
     !pending &&
     !threadLoading &&
-    !threadError;
+    !threadError &&
+    !localSnapshot;
 
   return (
     <div className="flex h-full min-h-0 min-w-0 bg-background">
@@ -2394,6 +2472,9 @@ export function StudioApp({
           actions={
             conversation ? (
               <>
+                {isNativeApp ? (
+                  <ConversationStorageBadge storage={conversation.storage} />
+                ) : null}
                 <CopyTextButton
                   label="复制全文"
                   text={conversation.messages
@@ -2436,6 +2517,27 @@ export function StudioApp({
                     <Trash2 size={16} />
                     删除对话
                   </DropdownMenuItem>
+                  {isNativeApp ? (
+                    conversation.storage === "local" ? (
+                      <DropdownMenuItem
+                        className="h-11"
+                        disabled={switchingStorage}
+                        onClick={() => void switchStorage("cloud")}
+                      >
+                        <Cloud size={16} />
+                        同步到云端
+                      </DropdownMenuItem>
+                    ) : (
+                      <DropdownMenuItem
+                        className="h-11"
+                        disabled={switchingStorage}
+                        onClick={() => void switchStorage("local")}
+                      >
+                        <Smartphone size={16} />
+                        改为仅保存在本机
+                      </DropdownMenuItem>
+                    )
+                  ) : null}
                   <DropdownMenuItem className="h-11" onClick={newConversation}>
                     <SquarePen size={16} />
                     新对话
@@ -2476,6 +2578,14 @@ export function StudioApp({
                 </Button>
               ) : null}
             </div>
+          ) : localSnapshot ? (
+            <LocalConversationView
+              conversation={withLocalImageUrls(
+                localSnapshot.snapshot,
+                localSnapshot.localUrlMap,
+              )}
+              localOnly
+            />
           ) : mode === "agent" ? (
             <div className="min-h-0 flex-1 overflow-y-auto px-4 md:px-6 lg:px-8">
               <CreativeBriefPanel
@@ -2557,6 +2667,19 @@ export function StudioApp({
               onQuickReply={handleQuickReply}
             />
           )}
+          {localSnapshot ? (
+            <div className="shrink-0 px-3 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-6 lg:px-8">
+              <div className="mx-auto flex w-full max-w-[52rem] flex-wrap items-center gap-3 border-t border-border pt-3">
+                <Button variant="secondary" onClick={newConversation}>
+                  <SquarePen size={16} />
+                  新建对话
+                </Button>
+                <p className="text-xs leading-5 text-text-muted">
+                  本机记录只读，继续对话请新建一个对话
+                </p>
+              </div>
+            </div>
+          ) : (
           <div
             className={cn(
               "shrink-0 px-3 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-6 lg:px-8",
@@ -2565,6 +2688,58 @@ export function StudioApp({
             )}
           >
             <div className={cn("mx-auto w-full", "max-w-[52rem]")}>
+              {isNativeApp && empty ? (
+                <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
+                  <span className="text-text-muted">保存在</span>
+                  <div
+                    role="group"
+                    aria-label="对话保存位置"
+                    className="inline-flex items-center rounded-full border border-border p-0.5"
+                  >
+                    {(["local", "cloud"] as const).map((value) => (
+                      <button
+                        key={value}
+                        type="button"
+                        aria-pressed={draftStorage === value}
+                        onClick={() => setDraftStorage(value)}
+                        className={cn(
+                          "inline-flex h-7 items-center gap-1 rounded-full px-2.5 transition-colors",
+                          draftStorage === value
+                            ? "bg-[rgb(var(--text)/0.1)] text-foreground"
+                            : "text-text-muted hover:text-foreground",
+                        )}
+                      >
+                        {value === "local" ? (
+                          <Smartphone size={13} />
+                        ) : (
+                          <Cloud size={13} />
+                        )}
+                        {value === "local" ? "本机" : "云端"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              {isNativeApp && storageTipVisible ? (
+                <p
+                  role="status"
+                  className="mb-2 flex items-start gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs leading-5 text-text-muted"
+                >
+                  <Smartphone size={14} className="mt-0.5 shrink-0" />
+                  <span className="flex-1">
+                    手机端新对话默认只保存在本机，可随时同步到云端
+                  </span>
+                  <button
+                    type="button"
+                    aria-label="关闭提示"
+                    title="关闭提示"
+                    onClick={dismissStorageTip}
+                    className="shrink-0 rounded p-0.5 hover:text-foreground"
+                  >
+                    <X size={13} />
+                  </button>
+                </p>
+              ) : null}
               {sendError ? (
                 <p
                   role="alert"
@@ -2802,6 +2977,7 @@ export function StudioApp({
               />
             </div>
           </div>
+          )}
           {empty && mode === "image" ? (
             <div className="shrink-0 px-3 md:px-6 lg:px-8">
               <CreationStarters

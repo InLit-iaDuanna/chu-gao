@@ -2,6 +2,7 @@ import { fail } from "@/lib/api-response";
 import { chatRequestUser, chatTurnFailure } from "@/lib/chat-turn-http";
 import { getChatTurn, serializeChatEvent } from "@/lib/chat-turns";
 import { chatIsTerminal } from "@/lib/chat-turn-types";
+import { conversationVisibilityWhere } from "@/lib/conversation-access";
 import { db } from "@/lib/db";
 
 export const runtime = "nodejs";
@@ -22,7 +23,7 @@ export async function GET(
     return fail("VALIDATION_ERROR", "无效的事件位置", { status: 400 });
   let after = Number(rawCursor);
   try {
-    const turn = await getChatTurn(auth.userId!, id);
+    const turn = await getChatTurn(auth.userId!, id, true, auth.deviceId);
     if (after > turn.lastSeq)
       return fail("VALIDATION_ERROR", "事件位置超出范围", { status: 400 });
   } catch (error) {
@@ -43,7 +44,7 @@ export async function GET(
           if (Date.now() - reconciledAt > 5_000) {
             // Subscription-driven reconciliation also releases lost holds when
             // the only worker was killed and has not restarted yet.
-            await getChatTurn(auth.userId!, id);
+            await getChatTurn(auth.userId!, id, true, auth.deviceId);
             reconciledAt = Date.now();
           }
           const rows = await db.chatEvent.findMany({
@@ -74,7 +75,10 @@ export async function GET(
             where: {
               id,
               userId: auth.userId!,
-              conversation: { archivedAt: null },
+              conversation: {
+                archivedAt: null,
+                ...conversationVisibilityWhere(auth.userId!, auth.deviceId),
+              },
             },
             select: { status: true, nextSeq: true },
           });

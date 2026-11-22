@@ -151,6 +151,9 @@ export async function POST(request: Request) {
             passwordHash,
             credits: initialCredits,
             inviteCodeId: inviteRecordId,
+            // 注册表单的两项勾选就是同意凭据，分别记录时间戳。
+            termsAcceptedAt: new Date(),
+            crossBorderConsentAt: new Date(),
           },
           select: {
             id: true,

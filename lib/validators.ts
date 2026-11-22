@@ -15,6 +15,13 @@ export const loginSchema = z.object({
 export const registerSchema = loginSchema.extend({
   name: z.string().trim().min(1).max(40).optional(),
   inviteCode: z.string().trim().min(4).max(40).optional(),
+  // 合规必选项：服务端同样校验，避免绕过前端复选框。
+  acceptTerms: z.literal(true, {
+    error: "请先阅读并同意《用户协议》与《隐私政策》",
+  }),
+  acceptCrossBorder: z.literal(true, {
+    error: "需要同意将提示词与上传图片提供给境外模型服务商处理",
+  }),
 });
 
 export const providerSchema = z.object({

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { fail, ok } from "@/lib/api-response";
 import { chatRequestUser, chatTurnFailure } from "@/lib/chat-turn-http";
+import { conversationVisibilityWhere } from "@/lib/conversation-access";
 import { db } from "@/lib/db";
 import { readJsonBodySafe } from "@/lib/request-body";
 
@@ -27,7 +28,13 @@ export async function POST(
       where: {
         id: parsed.data.expectedAttemptId,
         turnId: id,
-        turn: { userId: auth.userId!, conversation: { archivedAt: null } },
+        turn: {
+          userId: auth.userId!,
+          conversation: {
+            archivedAt: null,
+            ...conversationVisibilityWhere(auth.userId!, auth.deviceId),
+          },
+        },
       },
       select: { id: true, createdAt: true },
     });

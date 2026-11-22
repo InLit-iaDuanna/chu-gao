@@ -14,6 +14,11 @@ export interface SessionUser {
   role: "USER" | "ADMIN";
   status: "ACTIVE" | "BANNED";
   sessionVersion: number;
+  /**
+   * 签名会话里的设备 ID。只用于把 LOCAL 对话绑定到创建它的设备；
+   * 开发者绕过（无数据库）时为 null，因此那里的会话看不到 LOCAL 对话。
+   */
+  deviceId?: string | null;
 }
 
 export type SessionCheckResult =
@@ -105,7 +110,10 @@ async function cookieSession(headers: Headers): Promise<SessionCheckResult> {
       return { status: "unauthenticated" };
     }
 
-    return { status: "authenticated", user };
+    return {
+      status: "authenticated",
+      user: { ...user, deviceId: deviceSession.deviceId },
+    };
   } catch (error) {
     logger.error(
       { error },
@@ -226,5 +234,6 @@ export function devBypassSession(
     role: isAdmin ? "ADMIN" : "USER",
     status: "ACTIVE",
     sessionVersion: 0,
+    deviceId: null,
   };
 }

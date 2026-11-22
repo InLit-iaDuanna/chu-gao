@@ -11,6 +11,7 @@ import {
   conversationMessagesInclude,
   serializeConversation,
 } from "@/lib/conversations";
+import { conversationVisibilityWhere } from "@/lib/conversation-access";
 import { db } from "@/lib/db";
 import { getImage2ChannelDisplayNameMap } from "@/lib/provider-channel-config";
 import { isDatabaseUnavailableError } from "@/lib/service-errors";
@@ -19,6 +20,8 @@ import { assertChatConversationIdle, ChatTurnError } from "@/lib/chat-turns";
 const updateConversationSchema = z.object({
   title: z.string().trim().min(1).max(80).optional(),
   archived: z.boolean().optional(),
+  // 手机端在「仅保存在本机」与「同步到云端」之间切换。
+  storage: z.enum(["local", "cloud"]).optional(),
 });
 
 function conversationsUnavailable() {
@@ -50,8 +53,8 @@ export async function GET(
     const conversation = await db.conversation.findFirst({
       where: {
         id,
-        userId: session.id,
         archivedAt: null,
+        ...conversationVisibilityWhere(session.id, session.deviceId),
       },
       include: conversationMessagesInclude(),
     });
@@ -110,19 +113,35 @@ export async function PATCH(
 
   try {
     const session = authenticatedUser(sessionResult);
+    if (parsed.data.storage === "local" && !session.deviceId) {
+      return fail(
+        "VALIDATION_ERROR",
+        "当前设备无法把对话改为仅保存在本机",
+        { status: 400 },
+      );
+    }
     const updated = await db.$transaction(async (tx) => {
       if (parsed.data.archived)
-        await assertChatConversationIdle(tx, id, session.id);
+        await assertChatConversationIdle(tx, id, session.id, session.deviceId);
       return tx.conversation.updateMany({
         where: {
           id,
-          userId: session.id,
+          ...conversationVisibilityWhere(session.id, session.deviceId),
         },
         data: {
           ...(parsed.data.title ? { title: parsed.data.title } : {}),
           ...(parsed.data.archived === undefined
             ? {}
             : { archivedAt: parsed.data.archived ? new Date() : null }),
+          ...(parsed.data.storage === undefined
+            ? {}
+            : {
+                storage: parsed.data.storage === "local" ? "LOCAL" : "CLOUD",
+                localDeviceId:
+                  parsed.data.storage === "local"
+                    ? (session.deviceId ?? null)
+                    : null,
+              }),
         },
       });
     });
@@ -134,7 +153,7 @@ export async function PATCH(
     const conversation = await db.conversation.findFirstOrThrow({
       where: {
         id,
-        userId: session.id,
+        ...conversationVisibilityWhere(session.id, session.deviceId),
       },
       include: conversationMessagesInclude(),
     });

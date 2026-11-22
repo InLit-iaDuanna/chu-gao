@@ -30,6 +30,7 @@ const me: Me = {
   concurrentLimit: 2,
   dailyUsed: 3,
   dailyLimit: 20,
+  crossBorderConsentAt: null,
   authenticated: true,
 };
 

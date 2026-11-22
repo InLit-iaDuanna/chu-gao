@@ -12,9 +12,9 @@ import { ChatRuntimeAdmissionError } from "@/lib/chat-runtime-config";
 export async function chatRequestUser(request: Request) {
   const session = await checkSession(request);
   const response = sessionFailureResponse(session);
-  return response
-    ? { response, userId: null }
-    : { response: null, userId: authenticatedUser(session).id };
+  if (response) return { response, userId: null, deviceId: null };
+  const user = authenticatedUser(session);
+  return { response: null, userId: user.id, deviceId: user.deviceId ?? null };
 }
 
 export function chatTurnFailure(error: unknown) {

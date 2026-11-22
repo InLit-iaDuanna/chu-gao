@@ -11,6 +11,7 @@ import {
   conversationMessagesInclude,
   serializeConversation,
 } from "@/lib/conversations";
+import { conversationVisibilityWhere } from "@/lib/conversation-access";
 import { db } from "@/lib/db";
 import { getImage2ChannelDisplayNameMap } from "@/lib/provider-channel-config";
 import { isDatabaseUnavailableError } from "@/lib/service-errors";
@@ -89,8 +90,8 @@ export async function POST(
     const conversation = await db.conversation.findFirst({
       where: {
         id,
-        userId: session.id,
         archivedAt: null,
+        ...conversationVisibilityWhere(session.id, session.deviceId),
       },
       select: {
         id: true,
@@ -132,7 +133,7 @@ export async function POST(
     }
 
     await db.$transaction(async (tx) => {
-      await assertChatConversationIdle(tx, id, session.id);
+      await assertChatConversationIdle(tx, id, session.id, session.deviceId);
       for (const message of parsed.data.messages) {
         await tx.conversationMessage.create({
           data: {
@@ -156,7 +157,7 @@ export async function POST(
     const updated = await db.conversation.findFirstOrThrow({
       where: {
         id,
-        userId: session.id,
+        ...conversationVisibilityWhere(session.id, session.deviceId),
       },
       include: conversationMessagesInclude(),
     });
@@ -200,8 +201,8 @@ export async function DELETE(
     const conversation = await db.conversation.findFirst({
       where: {
         id,
-        userId: session.id,
         archivedAt: null,
+        ...conversationVisibilityWhere(session.id, session.deviceId),
       },
       select: {
         id: true,

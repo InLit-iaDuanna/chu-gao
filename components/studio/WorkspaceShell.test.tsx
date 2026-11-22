@@ -42,6 +42,10 @@ vi.mock("./lib/api", () => ({
   getMe: mocks.me,
   listConversations: mocks.list,
 }));
+// 画布/节点页面会在服务端读 UA 判断是否显示电脑端占位页。
+vi.mock("next/headers", () => ({
+  headers: async () => new Headers(),
+}));
 vi.mock("./TopBar", () => ({
   TopBar: ({ title, leading }: { title: string; leading: ReactNode }) => (
     <header>
@@ -377,8 +381,8 @@ describe("shared workspace navigation", () => {
 
   it.each([CanvasPage, NodesPage])(
     "keeps the node canvas available from its legacy URLs",
-    (page) => {
-      expect(page()).toBeTruthy();
+    async (page) => {
+      await expect(page()).resolves.toBeTruthy();
       expect(mocks.redirect).not.toHaveBeenCalled();
     },
   );

@@ -11,6 +11,7 @@ import {
   type ChatReference,
 } from "@/lib/chat-references-types";
 import type { ChatSearchSource } from "@/lib/chat-search";
+import { conversationAccessWhere } from "@/lib/conversation-access";
 import { db } from "@/lib/db";
 
 const historySelect = {
@@ -198,9 +199,14 @@ export async function loadContextHistory(
   userId: string,
   conversationId: string,
   client: Pick<Prisma.TransactionClient, "conversation"> = db,
+  deviceId?: string | null,
 ): Promise<ContextHistory> {
   const history = await client.conversation.findFirst({
-    where: { id: conversationId, userId, archivedAt: null },
+    where: {
+      id: conversationId,
+      archivedAt: null,
+      ...conversationAccessWhere(userId, deviceId),
+    },
     select: historySelect,
   });
   if (!history) throw new ChatContextError("NOT_FOUND", "对话不存在", 404);

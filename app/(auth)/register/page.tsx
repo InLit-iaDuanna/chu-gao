@@ -2,6 +2,7 @@ import { RegisterForm } from "@/components/auth/RegisterForm";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { ActionableStatus } from "@/components/shared/ActionableStatus";
 import { Button } from "@/components/ui";
+import { isAppRequestHeaders } from "@/lib/app-ua";
 import { checkSessionFromHeaders } from "@/lib/auth";
 import { safeNextPath } from "@/lib/safe-next-path";
 import {
@@ -18,8 +19,11 @@ export default async function RegisterPage({
   searchParams: Promise<{ next?: string | string[] }>;
 }) {
   const { next } = await searchParams;
-  const session = await checkSessionFromHeaders(await headers());
+  const headerList = await headers();
+  const session = await checkSessionFromHeaders(headerList);
   const safeNext = safeNextPath(next);
+  // UA 只用于界面分支：APP 里换成移动端全屏版面。
+  const nativeApp = isAppRequestHeaders(headerList);
   let inviteOnly = true;
   let configUnavailable = false;
 
@@ -50,6 +54,8 @@ export default async function RegisterPage({
       }
       asideNote="把灵感、模型和生成记录留在同一个安静的工作空间里。"
       art="/studio/architecture.jpg"
+      nativeApp={nativeApp}
+      appTagline="注册即送初始额度，用一句话开始你的第一张图。"
     >
       <h2 className="text-[28px] font-semibold tracking-[-0.03em]">创建账户</h2>
       <p className="mt-2 text-[15px] leading-6 text-text-muted">
@@ -78,6 +84,15 @@ export default async function RegisterPage({
       ) : (
         <RegisterForm inviteOnly={inviteOnly} nextPath={safeNext} />
       )}
+      <p className="mt-6 text-center text-sm text-text-muted">
+        已有账户？{" "}
+        <Link
+          href={`/login?next=${encodeURIComponent(safeNext)}`}
+          className="font-medium text-foreground underline-offset-4 hover:underline"
+        >
+          去登录
+        </Link>
+      </p>
     </AuthShell>
   );
 }

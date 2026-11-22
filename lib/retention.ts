@@ -1,6 +1,9 @@
 // 数据保留：聊天记录与生成图片仅保留 30 天。
 // 沿用项目的软删除约定：过期的 Generation 置 deletedAt（对用户不可见、不可下载），
 // 过期的 Conversation 置 archivedAt（从活跃列表移除）。不物理删除存储对象。
+//
+// 例外：LOCAL 对话（安卓 APP 内默认只保存在本机的对话）在服务器上只是工作副本，
+// 完整记录保存在手机本地。闲置 7 天后直接归档并清空 ConversationMessage 内容。
 
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
@@ -11,14 +14,27 @@ import {
 
 export const RETENTION_DAYS = 30;
 
+/** LOCAL 对话工作副本的闲置天数。 */
+export const LOCAL_CONVERSATION_RETENTION_DAYS = 7;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const LOCAL_CONVERSATION_BATCH = 500;
+
 export function retentionCutoff(now: Date = new Date()): Date {
-  return new Date(now.getTime() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
+  return new Date(now.getTime() - RETENTION_DAYS * DAY_MS);
+}
+
+export function localConversationRetentionCutoff(
+  now: Date = new Date(),
+): Date {
+  return new Date(now.getTime() - LOCAL_CONVERSATION_RETENTION_DAYS * DAY_MS);
 }
 
 export interface RetentionCleanupResult {
   cutoff: string;
   generationsSoftDeleted: number;
   conversationsArchived: number;
+  localConversationsPurged: number;
   designPostMediaPurged: number;
   uploadedReferencesPurged: number;
 }
@@ -32,6 +48,33 @@ export async function cleanupExpiredData(
   }
 
   const cutoff = retentionCutoff(now);
+  const localCutoff = localConversationRetentionCutoff(now);
+
+  // 闲置的 LOCAL 对话先处理：归档并删除服务器上的消息副本。
+  // 手机本地快照不受影响，用户仍可在设备上查看完整记录。
+  const idleLocal = await db.conversation.findMany({
+    where: {
+      storage: "LOCAL",
+      archivedAt: null,
+      lastMessageAt: { lt: localCutoff },
+    },
+    select: { id: true },
+    orderBy: { lastMessageAt: "asc" },
+    take: LOCAL_CONVERSATION_BATCH,
+  });
+  let localConversationsPurged = 0;
+  for (const conversation of idleLocal) {
+    const [, removed] = await db.$transaction([
+      db.conversation.updateMany({
+        where: { id: conversation.id, archivedAt: null },
+        data: { archivedAt: now },
+      }),
+      db.conversationMessage.deleteMany({
+        where: { conversationId: conversation.id },
+      }),
+    ]);
+    localConversationsPurged += removed.count;
+  }
 
   const [generations, conversations] = await Promise.all([
     db.generation.updateMany({
@@ -85,6 +128,7 @@ export async function cleanupExpiredData(
     cutoff: cutoff.toISOString(),
     generationsSoftDeleted: generations.count,
     conversationsArchived: conversations.count,
+    localConversationsPurged,
     designPostMediaPurged,
     uploadedReferencesPurged,
   };

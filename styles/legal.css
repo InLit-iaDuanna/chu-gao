@@ -1,0 +1,132 @@
+/* 法律条款 / 隐私政策的 Markdown 排版（prose 风格，未引入 typography 插件）。 */
+.legal-prose {
+  color: rgb(var(--text));
+  font-size: 15px;
+  line-height: 1.85;
+  overflow-wrap: anywhere;
+}
+
+.legal-prose > :first-child {
+  margin-top: 0;
+}
+
+.legal-prose h2 {
+  margin: 2.2em 0 0.7em;
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: var(--ls-snug);
+  color: rgb(var(--text));
+}
+
+.legal-prose h3 {
+  margin: 1.6em 0 0.5em;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: var(--ls-normal);
+  color: rgb(var(--text));
+}
+
+.legal-prose p,
+.legal-prose ul,
+.legal-prose ol,
+.legal-prose blockquote,
+.legal-prose table {
+  margin: 0.9em 0;
+}
+
+.legal-prose ul,
+.legal-prose ol {
+  padding-left: 1.45em;
+}
+
+.legal-prose ul {
+  list-style: disc;
+}
+
+.legal-prose ol {
+  list-style: decimal;
+}
+
+.legal-prose li {
+  margin: 0.35em 0;
+}
+
+.legal-prose li > ul,
+.legal-prose li > ol {
+  margin: 0.3em 0;
+}
+
+.legal-prose li::marker {
+  color: rgb(var(--text-faint));
+}
+
+.legal-prose strong {
+  font-weight: 600;
+  color: rgb(var(--text));
+}
+
+.legal-prose em {
+  font-style: italic;
+}
+
+.legal-prose a {
+  color: rgb(var(--text));
+  text-decoration: underline;
+  text-decoration-color: rgb(var(--border-strong));
+  text-underline-offset: 3px;
+}
+
+.legal-prose a:hover {
+  text-decoration-color: rgb(var(--text));
+}
+
+.legal-prose blockquote {
+  padding: 0.6em 1em;
+  border-left: 2px solid rgb(var(--border-strong));
+  background: rgb(var(--surface-2) / 0.45);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  color: rgb(var(--text-muted));
+  font-size: 0.94em;
+}
+
+.legal-prose blockquote p {
+  margin: 0.35em 0;
+}
+
+/* 表格：窄屏可横向滚动，不撑破页面。 */
+.legal-prose table {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: 0.9em;
+  -webkit-overflow-scrolling: touch;
+}
+
+.legal-prose thead th {
+  background: rgb(var(--surface-2));
+  white-space: nowrap;
+}
+
+.legal-prose th,
+.legal-prose td {
+  border: 1px solid rgb(var(--border));
+  padding: 0.5em 0.75em;
+  text-align: left;
+  vertical-align: top;
+}
+
+.legal-prose code {
+  font-family: var(--font-stack-mono);
+  font-size: 0.9em;
+  padding: 0.1em 0.35em;
+  border-radius: var(--radius-sm);
+  background: rgb(var(--surface-2));
+}
+
+.legal-prose hr {
+  margin: 2em 0;
+  border: 0;
+  border-top: 1px solid rgb(var(--border));
+}

@@ -71,6 +71,8 @@ export interface ContextInput {
   conversationId: string;
   modelId: string;
   budgetTokens?: number;
+  /** 设备可见性：LOCAL 对话只对绑定设备可用。 */
+  deviceId?: string | null;
   signal?: AbortSignal;
   /** Supply the frozen execution instructions for an exact prompt estimate. */
   instructions?: string;
@@ -205,7 +207,12 @@ async function loadState(
   latest?: PrepareContextInput,
   allProfiles = false,
 ): Promise<ContextState> {
-  const history = await loadContextHistory(input.userId, input.conversationId);
+  const history = await loadContextHistory(
+    input.userId,
+    input.conversationId,
+    undefined,
+    input.deviceId,
+  );
   let currentId = latest?.latestMessageId ?? null;
   if (latest?.currentTurnId) {
     const users = history.messages.filter(
@@ -579,6 +586,7 @@ async function commitSnapshot(
       input.userId,
       input.conversationId,
       tx,
+      input.deviceId,
     );
     assertContextNotAborted(input.signal);
     if (
@@ -737,6 +745,7 @@ export async function getChatContextStatus(
   conversationId: string,
   modelId?: string,
   budgetTokens?: number,
+  deviceId?: string | null,
 ): Promise<ChatContextStatus> {
   if (modelId) validateModel(modelId);
   const state = await loadState(
@@ -745,6 +754,7 @@ export async function getChatContextStatus(
       conversationId,
       modelId: modelId ?? "default",
       budgetTokens,
+      deviceId,
     },
     undefined,
     !modelId,

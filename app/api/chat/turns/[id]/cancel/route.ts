@@ -26,6 +26,7 @@ export async function POST(
         auth.userId!,
         (await context.params).id,
         parsed.data.expectedAttemptId,
+        auth.deviceId,
       ),
     );
   } catch (error) {

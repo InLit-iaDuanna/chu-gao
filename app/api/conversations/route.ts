@@ -14,6 +14,7 @@ import {
   serializeConversation,
   serializeConversationSummary,
 } from "@/lib/conversations";
+import { conversationVisibilityWhere } from "@/lib/conversation-access";
 import { db } from "@/lib/db";
 import { getImage2ChannelDisplayNameMap } from "@/lib/provider-channel-config";
 import { isDatabaseUnavailableError } from "@/lib/service-errors";
@@ -22,6 +23,9 @@ import { CHAT_INPUT_MAX_CHARS } from "@/lib/chat-turn-types";
 const createConversationSchema = z.object({
   title: z.string().trim().min(1).max(80).optional(),
   firstMessage: z.string().trim().min(1).max(CHAT_INPUT_MAX_CHARS).optional(),
+  // 安卓 APP 内新建对话默认只保存在本机（LOCAL，绑定当前设备）；
+  // 网页端不传，保持 CLOUD 行为不变。
+  storage: z.enum(["local", "cloud"]).optional(),
 });
 
 function conversationsUnavailable() {
@@ -54,8 +58,8 @@ export async function GET(request: Request) {
     const [rows, displayNameMap] = await Promise.all([
       db.conversation.findMany({
         where: {
-          userId: session.id,
           archivedAt: null,
+          ...conversationVisibilityWhere(session.id, session.deviceId),
         },
         include: conversationSummaryRowInclude(),
         orderBy: {
@@ -115,12 +119,22 @@ export async function POST(request: Request) {
   try {
     const session = authenticatedUser(sessionResult);
     const firstMessage = parsed.data.firstMessage;
+    const storage = parsed.data.storage ?? "cloud";
+
+    if (storage === "local" && !session.deviceId) {
+      return fail("VALIDATION_ERROR", "当前设备无法创建仅保存在本机的对话", {
+        status: 400,
+      });
+    }
+
     const title =
       parsed.data.title ?? conversationTitleFromText(firstMessage ?? "");
     const conversation = await db.conversation.create({
       data: {
         userId: session.id,
         title,
+        storage: storage === "local" ? "LOCAL" : "CLOUD",
+        localDeviceId: storage === "local" ? (session.deviceId ?? null) : null,
         ...(firstMessage
           ? {
               lastMessageAt: new Date(),
@@ -168,8 +182,8 @@ export async function DELETE(request: Request) {
     const session = authenticatedUser(sessionResult);
     const archived = await db.conversation.updateMany({
       where: {
-        userId: session.id,
         archivedAt: null,
+        ...conversationVisibilityWhere(session.id, session.deviceId),
       },
       data: {
         archivedAt: new Date(),

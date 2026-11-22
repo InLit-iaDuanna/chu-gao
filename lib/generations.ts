@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 
 import { publicChannelAlias } from "@/lib/channel-alias";
+import { conversationAccessWhere } from "@/lib/conversation-access";
 import { db } from "@/lib/db";
 import {
   findGenerationOperation,
@@ -209,6 +210,8 @@ export interface CreateGenerationInput {
   estimatedCredits: number;
   pricingSnapshotJson: Prisma.InputJsonObject;
   conversationId?: string;
+  /** 设备可见性：LOCAL 对话只对绑定设备可用。 */
+  deviceId?: string | null;
   // 最终参考图 storageKey 列表（含来源图）。
   referenceImageKeys?: string[];
   // 可选：写入对话的用户/助手消息。
@@ -239,6 +242,7 @@ export async function createAndEnqueueGeneration(
     estimatedCredits,
     pricingSnapshotJson,
     conversationId,
+    deviceId,
     referenceImageKeys = [],
     userMessage,
     assistantMessage,
@@ -269,12 +273,12 @@ export async function createAndEnqueueGeneration(
     await assertGenerationAllowedForClient(tx, userId);
 
     if (conversationId) {
-      await assertChatConversationIdle(tx, conversationId, userId);
+      await assertChatConversationIdle(tx, conversationId, userId, deviceId);
       const conversation = await tx.conversation.findFirst({
         where: {
           id: conversationId,
-          userId,
           archivedAt: null,
+          ...conversationAccessWhere(userId, deviceId),
         },
         select: { id: true },
       });

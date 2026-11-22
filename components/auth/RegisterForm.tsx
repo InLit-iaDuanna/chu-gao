@@ -6,6 +6,7 @@ import { ArrowRight, Eye, EyeOff } from "lucide-react";
 
 import { ActionableStatus } from "@/components/shared/ActionableStatus";
 import { friendlyErrorMessage } from "@/components/shared/error-copy";
+import { LegalLinks } from "@/components/legal/LegalLinks";
 import {
   Button,
   Checkbox,
@@ -44,6 +45,7 @@ export function RegisterForm({
   const [confirmPassword, setConfirmPassword] = useState("");
   const [inviteCode, setInviteCode] = useState("");
   const [accepted, setAccepted] = useState(false);
+  const [crossBorderAccepted, setCrossBorderAccepted] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -83,6 +85,7 @@ export function RegisterForm({
     password.length >= 8 &&
     confirmPassword === password &&
     accepted &&
+    crossBorderAccepted &&
     (!inviteOnly || inviteCode.trim().length > 0) &&
     !isSubmitting;
 
@@ -112,6 +115,8 @@ export function RegisterForm({
             name: name.trim() || undefined,
             password,
             inviteCode: inviteCode.trim() || undefined,
+            acceptTerms: true,
+            acceptCrossBorder: true,
           }),
         });
       });
@@ -262,15 +267,31 @@ export function RegisterForm({
         </FormField>
       ) : null}
 
-      <label className="flex items-start gap-2 text-sm leading-6 text-text-muted">
-        <Checkbox
-          checked={accepted}
-          className="mt-1"
-          required
-          onChange={(event) => setAccepted(event.target.checked)}
-        />
-        <span>我已了解并同意仅将本工作台用于合规创作。</span>
-      </label>
+      <div className="space-y-3 rounded-lg border border-border bg-surface-2/40 p-3">
+        <label className="flex items-start gap-2 text-sm leading-6 text-text-muted">
+          <Checkbox
+            checked={accepted}
+            className="mt-1"
+            required
+            onChange={(event) => setAccepted(event.target.checked)}
+          />
+          <span>
+            我已阅读并同意
+            <LegalLinks className="text-text-muted" />
+          </span>
+        </label>
+        <label className="flex items-start gap-2 text-sm leading-6 text-text-muted">
+          <Checkbox
+            checked={crossBorderAccepted}
+            className="mt-1"
+            required
+            onChange={(event) => setCrossBorderAccepted(event.target.checked)}
+          />
+          <span>
+            我同意将提示词与上传图片提供给境外模型服务商处理（用于生成内容）
+          </span>
+        </label>
+      </div>
 
       {error ? (
         <ActionableStatus
