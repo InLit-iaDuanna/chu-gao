@@ -96,3 +96,18 @@ it("answers a poke with a heart, and tells its owner", () => {
   expect(onPoke).toHaveBeenCalledTimes(1);
   expect(svg.querySelectorAll("path").length).toBe(before + 1);
 });
+
+it("plays a reaction once per cue: a mark floats up, a nod adds none", () => {
+  const view = render(<Xiie pose="focus" />);
+  const svg = view.container.querySelector("svg")!;
+  const before = svg.querySelectorAll("path").length;
+  view.rerender(<Xiie pose="focus" cue={{ id: 1, kind: "heart" }} />);
+  expect(svg.querySelectorAll("path").length).toBe(before + 1);
+  // The same cue again does not play twice.
+  view.rerender(<Xiie pose="focus" cue={{ id: 1, kind: "heart" }} />);
+  expect(svg.querySelectorAll("path").length).toBe(before + 1);
+  view.rerender(<Xiie pose="focus" cue={{ id: 2, kind: "nod" }} />);
+  expect(svg.querySelectorAll("path").length).toBe(before + 1);
+  view.rerender(<Xiie pose="focus" cue={{ id: 3, kind: "ask" }} />);
+  expect(svg.querySelectorAll("path").length).toBe(before + 2);
+});

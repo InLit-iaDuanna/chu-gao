@@ -65,8 +65,13 @@ import {
   ConversationModeControl,
   useConversationMode,
 } from "./ConversationModeControl";
-import { requestListenNudge, useListenQueue } from "./lib/listen-queue";
-import type { XiiePose } from "./chat/Xiie";
+import {
+  LISTEN_REACTION_CUES,
+  requestListenNudge,
+  requestListenReaction,
+  useListenQueue,
+} from "./lib/listen-queue";
+import type { XiieCue, XiiePose } from "./chat/Xiie";
 import { isListenSilence } from "@/lib/chat-conversation-mode";
 import { StudioGreeting } from "./StudioGreeting";
 import {
@@ -2278,6 +2283,48 @@ export function StudioApp({
     key: string;
     line: string | null;
   } | null>(null);
+  // Xiie's quick reaction to the line just said; only the newest one lands.
+  const [listenReaction, setListenReaction] = useState<{
+    key: string;
+    cue: XiieCue | null;
+    line: string | null;
+  } | null>(null);
+  const reactionSeq = useRef(0);
+  const dropListenReaction = () => {
+    reactionSeq.current += 1;
+    setListenReaction(null);
+  };
+  const listenDraftRef = useRef(prompt);
+  listenDraftRef.current = prompt;
+  // What Xiie murmured since the last reply, so it never says it twice.
+  const listenMurmurs = useRef({ key: "", list: [] as string[] });
+  const reactToListenLines = (lines: string[]) => {
+    const conversationId = activeRef.current;
+    const key = conversationId ?? "";
+    if (listenMurmurs.current.key !== key)
+      listenMurmurs.current = { key, list: [] };
+    const seq = (reactionSeq.current += 1);
+    void requestListenReaction({
+      conversationId,
+      lines,
+      murmurs: listenMurmurs.current.list,
+    }).then((result) => {
+      if (!result || reactionSeq.current !== seq) return;
+      const kind = LISTEN_REACTION_CUES[result.reaction];
+      // Already typing again: the nod still shows, the murmur would interrupt.
+      const line = listenDraftRef.current.trim() ? null : result.line;
+      if (line && listenMurmurs.current.key === key)
+        listenMurmurs.current.list = [...listenMurmurs.current.list, line];
+      setListenReaction({ key, cue: kind ? { id: seq, kind } : null, line });
+    });
+  };
+  // Once the user talks again Xiie goes back to just listening.
+  useEffect(() => {
+    if (prompt.trim())
+      setListenReaction((value) =>
+        value?.line ? { ...value, line: null } : value,
+      );
+  }, [prompt]);
   const listenQueue = useListenQueue({
     enabled: listenDuplex,
     busy: busy || chatCompacting || threadLoading,
@@ -2285,11 +2332,14 @@ export function StudioApp({
     conversationKey: activeId,
     flush: (content) => {
       setListenNudge(null);
+      dropListenReaction();
+      listenMurmurs.current = { key: "", list: [] };
       return sendRef.current(undefined, undefined, content);
     },
     onNudge: (reason) => {
       const conversationId = activeRef.current;
       if (!conversationId || !chatModel) return;
+      dropListenReaction();
       setListenNudge({ key: conversationId, line: null });
       void requestListenNudge({
         conversationId,
@@ -2308,6 +2358,10 @@ export function StudioApp({
   });
   const shownNudge =
     listenDuplex && listenNudge?.key === activeId ? listenNudge : null;
+  const shownReaction =
+    listenDuplex && !shownNudge && listenReaction?.key === (activeId ?? "")
+      ? listenReaction
+      : null;
   const lastAssistant = conversation?.messages
     .filter((message) => message.role === "assistant")
     .at(-1);
@@ -2693,7 +2747,8 @@ export function StudioApp({
               compact={shortConversation}
               listenQueue={listenQueue.lines}
               listenPose={listenPose}
-              listenLine={shownNudge?.line ?? null}
+              listenLine={shownNudge?.line ?? shownReaction?.line ?? null}
+              listenCue={shownReaction?.cue ?? null}
               onRetry={(generation) => void retry(generation)}
               onCancel={(id) => void cancel(id)}
               onRetryChat={(id, attemptId) => void retryChatTurn(id, attemptId)}
@@ -2903,6 +2958,7 @@ export function StudioApp({
                   ) {
                     listenQueue.push(prompt);
                     setListenNudge(null);
+                    reactToListenLines([...listenQueue.lines, prompt.trim()]);
                     setPrompt("");
                   } else void send();
                 }}

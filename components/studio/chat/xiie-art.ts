@@ -1300,6 +1300,7 @@ export const XIIE_PUFFS = {
   note: paint({ 0: "p2-3", 1: "p2", 2: "p2", 3: "p0-2", 4: "p0-1" }, -2, -6),
   star: paint({ 0: "b1", 1: "b0-2", 2: "b1" }, -1, -4),
   bang: paint({ 0: "p0", 1: "p0", 2: "p0", 4: "p0" }, 0, -6),
+  ask: paint({ 0: "p0-2", 1: "p2", 2: "p1", 4: "p1" }, -1, -6),
 };
 export type XiiePuff = keyof typeof XIIE_PUFFS;
 

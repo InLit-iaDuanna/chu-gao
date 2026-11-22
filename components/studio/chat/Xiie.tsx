@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 
 import {
   XIIE_ART,
@@ -13,6 +13,12 @@ import {
 import styles from "./Xiie.module.css";
 
 export type { XiiePose };
+
+/**
+ * Something Xiie shows on cue, the way it answers a poke: a nod, or a
+ * little mark floating up. A new `id` plays it again.
+ */
+export type XiieCue = { id: number; kind: XiiePuff | "nod" };
 
 function Paint({ paint }: { paint: XiiePaint }) {
   return paint.map(({ ink, d }) => <path key={ink} className={styles[ink]} d={d} />);
@@ -58,6 +64,14 @@ const SQUASH = [
   "scale(1, 1)",
 ].map((transform) => ({ transform }));
 const SQUINT = [0.15, 0.15, 1].map((y) => ({ transform: `scaleY(${y})` }));
+/** Two small dips, gentler than a poke. */
+const NOD = [
+  "scale(1, 1)",
+  "scale(1.04, 0.93)",
+  "scale(1, 1)",
+  "scale(1.03, 0.95)",
+  "scale(1, 1)",
+].map((transform) => ({ transform }));
 
 /**
  * Xiie, the studio's pixel lizard, as a jointed paper puppet: each drawing in
@@ -71,6 +85,7 @@ export function Xiie({
   at,
   className,
   onPoke,
+  cue,
 }: {
   pose: XiiePose;
   /** CSS pixels per art pixel. */
@@ -79,6 +94,7 @@ export function Xiie({
   at?: number;
   className?: string;
   onPoke?: () => void;
+  cue?: XiieCue | null;
 }) {
   const art = XIIE_ART[pose];
   const svg = useRef<SVGSVGElement>(null);
@@ -99,6 +115,23 @@ export function Xiie({
     }
     onPoke?.();
   };
+
+  const played = useRef<number | null>(null);
+  useEffect(() => {
+    if (!cue || frozen || played.current === cue.id) return;
+    played.current = cue.id;
+    const id = (pokes.current += 1);
+    if (cue.kind !== "nod") {
+      const kind = cue.kind;
+      setPuffs((list) => [...list.slice(-3), { id, kind }]);
+    }
+    const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (still || !svg.current?.animate) return;
+    svg.current.animate(NOD, { duration: 640, easing: "ease-in-out" });
+    if (cue.kind === "heart" || cue.kind === "star")
+      for (const eye of svg.current.querySelectorAll("[data-eye]"))
+        eye.animate(SQUINT, { duration: 640, easing: "ease-in" });
+  }, [cue, frozen]);
 
   return (
     <svg

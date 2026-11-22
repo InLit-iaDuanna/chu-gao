@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import type { ListenReaction } from "@/lib/chat-listen-react";
+
+import type { XiieCue } from "../chat/Xiie";
 import { request } from "./api";
 
 /**
@@ -30,6 +33,44 @@ export async function requestListenNudge(input: {
       { method: "POST", body: JSON.stringify(input) },
     );
     return result.line?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+/** How each reaction shows on Xiie; plain listening adds nothing. */
+export const LISTEN_REACTION_CUES: Record<
+  ListenReaction,
+  XiieCue["kind"] | null
+> = {
+  listen: null,
+  nod: "nod",
+  care: "heart",
+  happy: "star",
+  wow: "bang",
+  curious: "ask",
+};
+
+/**
+ * Xiie's quick reaction to the lines said so far in this stretch; null when
+ * there is none (no reaction set up, or the call failed).
+ */
+export async function requestListenReaction(input: {
+  conversationId: string | null;
+  lines: string[];
+  /** What Xiie already murmured in this stretch, so it does not repeat. */
+  murmurs: string[];
+}): Promise<{ reaction: ListenReaction; line: string | null } | null> {
+  try {
+    const result = await request<{
+      reaction: ListenReaction | null;
+      line: string | null;
+    }>("/api/chat/listen-react", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+    if (!result.reaction) return null;
+    return { reaction: result.reaction, line: result.line?.trim() || null };
   } catch {
     return null;
   }

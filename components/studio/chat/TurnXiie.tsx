@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { Xiie, type XiiePose } from "./Xiie";
+import { Xiie, type XiieCue, type XiiePose } from "./Xiie";
 import styles from "./Xiie.module.css";
 
 /** How long Xiie celebrates a finished reply before it sinks away. */
@@ -44,7 +44,14 @@ export function turnPose({
 }
 
 /** Holds Xiie's place under a turn, and lets it sink away when `pose` clears. */
-export function XiieSlot({ pose }: { pose: XiiePose | null }) {
+export function XiieSlot({
+  pose,
+  cue,
+}: {
+  pose: XiiePose | null;
+  /** A reaction to play, such as a nod or a little heart. */
+  cue?: XiieCue | null;
+}) {
   const [last, setLast] = useState(pose);
   useEffect(() => {
     if (pose) {
@@ -58,7 +65,7 @@ export function XiieSlot({ pose }: { pose: XiiePose | null }) {
   if (!shown) return null;
   return (
     <div className={pose ? styles.slot : `${styles.slot} ${styles.leaving}`}>
-      <Xiie pose={shown} />
+      <Xiie pose={shown} cue={pose ? cue : null} />
     </div>
   );
 }

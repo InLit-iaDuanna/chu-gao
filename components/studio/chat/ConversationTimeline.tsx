@@ -21,7 +21,7 @@ import { AssistantContent } from "./AssistantContent";
 import type { QuickReplyHandler } from "./InteractiveBlocks";
 import { stripInteractiveBlocks } from "../lib/chat-interactive-blocks";
 import { TurnXiie, XiieSlot } from "./TurnXiie";
-import type { XiiePose } from "./Xiie";
+import type { XiieCue, XiiePose } from "./Xiie";
 import { isListenSilence } from "@/lib/chat-conversation-mode";
 import {
   ActivityTrail,
@@ -70,6 +70,8 @@ interface Props {
   listenPose?: XiiePose | null;
   /** 倾听: what Xiie says to a user who is hesitating; never stored. */
   listenLine?: string | null;
+  /** 倾听: Xiie's quick reaction to the line just said (a nod, a heart). */
+  listenCue?: XiieCue | null;
 }
 
 function UserContent({ message }: { message: SubmittedChatMessage }) {
@@ -251,6 +253,7 @@ export function ConversationTimeline({
   listenQueue = [],
   listenPose = null,
   listenLine = null,
+  listenCue = null,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const following = useRef(true);
@@ -590,7 +593,7 @@ export function ConversationTimeline({
                   {listenLine}
                 </p>
               ) : null}
-              <XiieSlot pose={listenPose} />
+              <XiieSlot pose={listenPose} cue={listenCue} />
             </div>
           ) : null}
           {!managedTurnId && (streaming !== null || status) ? (

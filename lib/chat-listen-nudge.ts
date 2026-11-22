@@ -12,6 +12,8 @@ import {
 } from "@/lib/chat-upstream";
 import { chatModelCallUsage } from "@/lib/chat-token-billing";
 import { isListenSilence } from "@/lib/chat-conversation-mode";
+import { callListenFlash } from "@/lib/chat-listen-flash";
+import { logger } from "@/lib/logger";
 
 /** What makes Xiie speak up while the user hesitates in 倾听. */
 export type ListenNudgeReason = "stalled" | "rewriting";
@@ -71,6 +73,23 @@ export function cleanNudge(text: string): string | null {
     : line;
 }
 
+/** The sent history with the hesitation note on the user's last turn. */
+export function nudgeInput(
+  messages: { role: string; content: string }[],
+  reason: ListenNudgeReason,
+): UpstreamChatMessage[] {
+  const history = nudgeHistory(messages);
+  const note = nudgeInstruction(reason);
+  const last = history.at(-1);
+  // Keep the note attached to the last real message when the user spoke last.
+  if (last?.role === "user")
+    return [
+      ...history.slice(0, -1),
+      { role: "user", content: `${String(last.content)}\n\n${note}` },
+    ];
+  return [...history, { role: "user", content: note }];
+}
+
 const record = (value: unknown) =>
   value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -82,24 +101,30 @@ export async function generateListenNudge(
   reason: ListenNudgeReason,
   logContext?: ModelCallContext,
 ): Promise<string | null> {
+  const input = nudgeInput(messages, reason);
+  // Flash answers in about a second; the main model is the fallback.
+  try {
+    const quick = await callListenFlash(
+      [
+        { role: "system", content: LISTEN_NUDGE_PROMPT },
+        ...input.map((message) => ({
+          role: message.role === "assistant" ? ("assistant" as const) : ("user" as const),
+          content: String(message.content),
+        })),
+      ],
+      { maxTokens: 80, operation: "chat.listen_nudge", logContext },
+    );
+    const line = quick === null ? null : cleanNudge(quick);
+    if (line) return line;
+  } catch (error) {
+    logger.warn(
+      { errorName: error instanceof Error ? error.name : "unknown" },
+      "Listen nudge on Flash failed; using the chat model",
+    );
+  }
   const config = await getChatProfile(modelId);
   if (!config.enabled || !config.apiKey) return null;
   const apiKey = config.apiKey;
-  const history = nudgeHistory(messages);
-  const input: UpstreamChatMessage[] = [
-    ...history,
-    { role: "user", content: nudgeInstruction(reason) },
-  ];
-  // Two user turns in a row are fine for every gateway we use, but keep the
-  // instruction attached to the last real message when there is one.
-  if (history.at(-1)?.role === "user") {
-    input.pop();
-    const last = input.pop()!;
-    input.push({
-      role: "user",
-      content: `${String(last.content)}\n\n${nudgeInstruction(reason)}`,
-    });
-  }
   const transport = config.transport;
   const body =
     transport === "responses_sse"
