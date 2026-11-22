@@ -60,14 +60,16 @@ interface Props {
   /** Opens a chat deck in the side panel. */
   onOpenDeck?: (id: string) => void;
   /**
-   * 对谈 / 倖听: Xiie alone shows the work, without the step trail and timer,
+   * 对谈 / 倾听: Xiie alone shows the work, without the step trail and timer,
    * and a listen-mode silence leaves no reply behind.
    */
   compact?: boolean;
-  /** 倖听: lines the user has said that are not sent to the model yet. */
+  /** 倾听: lines the user has said that are not sent to the model yet. */
   listenQueue?: string[];
-  /** 倖听: Xiie's pose at the foot of the conversation, if any. */
+  /** 倾听: Xiie's pose at the foot of the conversation, if any. */
   listenPose?: XiiePose | null;
+  /** 倾听: what Xiie says to a user who is hesitating; never stored. */
+  listenLine?: string | null;
 }
 
 function UserContent({ message }: { message: SubmittedChatMessage }) {
@@ -248,6 +250,7 @@ export function ConversationTimeline({
   compact = false,
   listenQueue = [],
   listenPose = null,
+  listenLine = null,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const following = useRef(true);
@@ -295,6 +298,7 @@ export function ConversationTimeline({
     generations,
     listenQueue.length,
     listenPose,
+    listenLine,
   ]);
 
   return (
@@ -581,6 +585,11 @@ export function ConversationTimeline({
           ))}
           {listenPose ? (
             <div aria-label="正在听" role="status">
+              {listenLine ? (
+                <p className="mb-1 text-base leading-7 text-text-muted">
+                  {listenLine}
+                </p>
+              ) : null}
               <XiieSlot pose={listenPose} />
             </div>
           ) : null}

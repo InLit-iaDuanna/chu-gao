@@ -2,17 +2,46 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { request } from "./api";
+
 /**
- * How long the user must stay quiet (no new line, no typing) before the
- * lines said so far go to the model together.
+ * How long the input box must stay empty and untouched before the lines
+ * said so far go to the model together.
  */
-export const LISTEN_IDLE_MS = 2_500;
+export const LISTEN_IDLE_MS = 6_000;
+/** Text left in the box this long without a keystroke counts as hesitating. */
+export const LISTEN_STALL_MS = 20_000;
+/** This many separate erasures of a few characters count as rewriting. */
+export const LISTEN_REWRITES = 3;
+/** An erasure only counts once at least this many characters went. */
+const ERASE_CHARS = 4;
+
+export type ListenNudgeReason = "stalled" | "rewriting";
+
+/** Asks the main model for one short line; null when it has nothing to say. */
+export async function requestListenNudge(input: {
+  conversationId: string;
+  modelId: string;
+  reason: ListenNudgeReason;
+}): Promise<string | null> {
+  try {
+    const result = await request<{ line: string | null }>(
+      "/api/chat/listen-nudge",
+      { method: "POST", body: JSON.stringify(input) },
+    );
+    return result.line?.trim() || null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * 倾听 as a full-duplex conversation: the user keeps talking line after line
- * without waiting for the assistant. Lines pile up here and are sent as one
- * message once the user pauses and no reply is in flight, so a burst of
- * short lines costs one model call instead of one per line.
+ * without waiting for the assistant. Lines pile up here and go out as one
+ * message once the box has been empty and still for a while and no reply is
+ * in flight, so a burst of short lines costs one model call. While the user
+ * is typing nothing is sent; if they hesitate (text sits untouched, or they
+ * keep writing and erasing) `onNudge` fires once per stretch of talk.
  */
 export function useListenQueue({
   enabled,
@@ -20,6 +49,7 @@ export function useListenQueue({
   draft,
   conversationKey,
   flush,
+  onNudge,
 }: {
   enabled: boolean;
   /** A reply is in flight; new lines wait for it. */
@@ -30,6 +60,8 @@ export function useListenQueue({
   conversationKey: string | null;
   /** Sends the joined lines; resolves true when the message was accepted. */
   flush: (content: string) => Promise<boolean>;
+  /** The user is hesitating; called at most once per stretch of talk. */
+  onNudge?: (reason: ListenNudgeReason) => void;
 }) {
   const [lines, setLines] = useState<string[]>([]);
   const [lastActivity, setLastActivity] = useState(0);
@@ -38,8 +70,25 @@ export function useListenQueue({
   const flushing = useRef(false);
   const flushRef = useRef(flush);
   flushRef.current = flush;
+  const nudgeRef = useRef(onNudge);
+  nudgeRef.current = onNudge;
+  const busyRef = useRef(busy);
+  busyRef.current = busy;
   const keyRef = useRef(conversationKey);
   keyRef.current = conversationKey;
+
+  // One nudge per stretch of talk; a sent line starts a new stretch.
+  const nudged = useRef(false);
+  const erase = useRef({ previous: 0, run: 0, counted: false, count: 0 });
+  const newStretch = useCallback(() => {
+    nudged.current = false;
+    erase.current = { previous: 0, run: 0, counted: false, count: 0 };
+  }, []);
+  const nudge = useCallback((reason: ListenNudgeReason) => {
+    if (nudged.current || busyRef.current || !keyRef.current) return;
+    nudged.current = true;
+    nudgeRef.current?.(reason);
+  }, []);
 
   const previousKey = useRef(conversationKey);
   useEffect(() => {
@@ -49,23 +98,48 @@ export function useListenQueue({
     if (previous === null || previous === conversationKey) return;
     setLines([]);
     setHeld(false);
-  }, [conversationKey]);
+    newStretch();
+  }, [conversationKey, newStretch]);
 
-  // Typing counts as still talking.
+  // Typing counts as still talking; watch it for hesitation.
   useEffect(() => {
-    if (enabled && draft) setLastActivity(Date.now());
-  }, [enabled, draft]);
-
-  const push = useCallback((line: string) => {
-    const text = line.trim();
-    if (!text) return;
-    setLines((value) => [...value, text]);
+    if (!enabled) return;
+    const state = erase.current;
+    const length = draft.length;
+    if (length < state.previous) {
+      state.run += state.previous - length;
+      if (!state.counted && state.run >= ERASE_CHARS) {
+        state.counted = true;
+        state.count += 1;
+      }
+    } else if (length > state.previous) {
+      state.run = 0;
+      state.counted = false;
+    }
+    state.previous = length;
     setLastActivity(Date.now());
-    setHeld(false);
-  }, []);
+    if (state.count >= LISTEN_REWRITES) nudge("rewriting");
+    if (!draft.trim()) return;
+    const timer = setTimeout(() => nudge("stalled"), LISTEN_STALL_MS);
+    return () => clearTimeout(timer);
+  }, [enabled, draft, nudge]);
 
+  const push = useCallback(
+    (line: string) => {
+      const text = line.trim();
+      if (!text) return;
+      setLines((value) => [...value, text]);
+      setLastActivity(Date.now());
+      setHeld(false);
+      newStretch();
+    },
+    [newStretch],
+  );
+
+  // Something in the box means the user is still talking: never send then.
+  const composing = enabled && Boolean(draft.trim());
   useEffect(() => {
-    if (busy || held || !lines.length || flushing.current) return;
+    if (busy || held || composing || !lines.length || flushing.current) return;
     // Leaving 倾听 sends whatever is still waiting right away.
     const wait = enabled
       ? Math.max(0, lastActivity + LISTEN_IDLE_MS - Date.now())
@@ -95,7 +169,7 @@ export function useListenQueue({
         });
     }, wait);
     return () => clearTimeout(timer);
-  }, [enabled, busy, held, lines, lastActivity]);
+  }, [enabled, busy, held, composing, lines, lastActivity]);
 
   const talking = enabled && Boolean(lines.length || draft.trim());
   return { lines, push, talking };

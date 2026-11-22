@@ -65,7 +65,7 @@ import {
   ConversationModeControl,
   useConversationMode,
 } from "./ConversationModeControl";
-import { useListenQueue } from "./lib/listen-queue";
+import { requestListenNudge, useListenQueue } from "./lib/listen-queue";
 import type { XiiePose } from "./chat/Xiie";
 import { isListenSilence } from "@/lib/chat-conversation-mode";
 import { StudioGreeting } from "./StudioGreeting";
@@ -2267,30 +2267,62 @@ export function StudioApp({
     [],
   );
 
-  // 对谈 / 倖听 (admin preview) keep the reply area quiet: Xiie shows the work.
+  // 对谈 / 倾听 (admin preview) keep the reply area quiet: Xiie shows the work.
   const shortConversation =
     me?.role === "ADMIN" && mode === "chat" && conversationMode !== "detail";
-  // 倖听 is full duplex: lines queue while the user talks and go out together.
+  // 倾听 is full duplex: lines queue while the user talks and go out together.
   const listenDuplex =
     me?.role === "ADMIN" && mode === "chat" && conversationMode === "listen";
+  // What Xiie says when the user hesitates; cleared once they talk again.
+  const [listenNudge, setListenNudge] = useState<{
+    key: string;
+    line: string | null;
+  } | null>(null);
   const listenQueue = useListenQueue({
     enabled: listenDuplex,
     busy: busy || chatCompacting || threadLoading,
     draft: listenDuplex ? prompt : "",
     conversationKey: activeId,
-    flush: (content) => sendRef.current(undefined, undefined, content),
+    flush: (content) => {
+      setListenNudge(null);
+      return sendRef.current(undefined, undefined, content);
+    },
+    onNudge: (reason) => {
+      const conversationId = activeRef.current;
+      if (!conversationId || !chatModel) return;
+      setListenNudge({ key: conversationId, line: null });
+      void requestListenNudge({
+        conversationId,
+        modelId: chatModel.id,
+        reason,
+      }).then((line) =>
+        setListenNudge((value) =>
+          value?.key === conversationId && !value.line
+            ? line
+              ? { key: conversationId, line }
+              : null
+            : value,
+        ),
+      );
+    },
   });
+  const shownNudge =
+    listenDuplex && listenNudge?.key === activeId ? listenNudge : null;
   const lastAssistant = conversation?.messages
     .filter((message) => message.role === "assistant")
     .at(-1);
   const listenPose: XiiePose | null =
     !listenDuplex || busy
       ? null
-      : listenQueue.talking ||
-          (lastAssistant?.chatStatus === "completed" &&
-            isListenSilence(lastAssistant.content))
-        ? "focus"
-        : null;
+      : shownNudge
+        ? shownNudge.line
+          ? "idea"
+          : "thinking"
+        : listenQueue.talking ||
+            (lastAssistant?.chatStatus === "completed" &&
+              isListenSilence(lastAssistant.content))
+          ? "focus"
+          : null;
 
   const handleOpenDeck = useCallback(
     (deckId: string) => setArtifactPreview({ kind: "deck", deckId }),
@@ -2661,6 +2693,7 @@ export function StudioApp({
               compact={shortConversation}
               listenQueue={listenQueue.lines}
               listenPose={listenPose}
+              listenLine={shownNudge?.line ?? null}
               onRetry={(generation) => void retry(generation)}
               onCancel={(id) => void cancel(id)}
               onRetryChat={(id, attemptId) => void retryChatTurn(id, attemptId)}
@@ -2834,7 +2867,7 @@ export function StudioApp({
                   setCreative((value) => ({ ...value, operationId: null }));
                 }}
                 busy={
-                  // 倖听 never makes the user wait for a reply to keep talking.
+                  // 倾听 never makes the user wait for a reply to keep talking.
                   (busy && !(listenDuplex && !imageCommand)) ||
                   imageRoutingChecking ||
                   chatCompacting ||
@@ -2869,6 +2902,7 @@ export function StudioApp({
                     prompt.trim()
                   ) {
                     listenQueue.push(prompt);
+                    setListenNudge(null);
                     setPrompt("");
                   } else void send();
                 }}
