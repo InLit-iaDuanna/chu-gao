@@ -270,4 +270,35 @@ describe("copy and draft reuse", () => {
     fireEvent.keyDown(screen.getByLabelText("对话输入"), { key: "Enter" });
     expect(onSubmit).not.toHaveBeenCalled();
   });
+
+  it("keeps the draft open while a reply streams, but holds the send", () => {
+    const onSubmit = vi.fn();
+    const props = {
+      prompt: "还有一件事",
+      onPromptChange: vi.fn(),
+      models: [model],
+      model,
+      onSelectModel: vi.fn(),
+      params: { n: 1, referenceImages: [] },
+      onParamsChange: vi.fn(),
+      busy: true,
+      optimizing: false,
+      onOptimize: vi.fn(),
+      onUploadFile: vi.fn(),
+      onRemoveReference: vi.fn(),
+      onSubmit,
+      disabledReason: null,
+      mode: "chat" as const,
+    };
+    const { rerender } = render(
+      <CommandDock {...props} typingLocked={false} />,
+    );
+    const input = screen.getByLabelText("对话输入");
+    expect(input).toBeEnabled();
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onSubmit).not.toHaveBeenCalled();
+    // Without the override a busy dock still freezes the draft.
+    rerender(<CommandDock {...props} />);
+    expect(screen.getByLabelText("对话输入")).toBeDisabled();
+  });
 });

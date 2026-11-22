@@ -77,6 +77,11 @@ interface CommandDockProps {
   params: DockParams;
   onParamsChange: (patch: Partial<DockParams>) => void;
   busy: boolean;
+  /**
+   * Whether the draft itself is frozen. Defaults to `busy`; the chat composer
+   * keeps it open while a reply streams so the next thought can be typed.
+   */
+  typingLocked?: boolean;
   optimizing: boolean;
   onOptimize: () => void;
   onUploadFile: (file: File) => void;
@@ -138,6 +143,7 @@ export function CommandDock({
   params,
   onParamsChange,
   busy,
+  typingLocked = busy,
   optimizing,
   onOptimize,
   onUploadFile,
@@ -288,7 +294,7 @@ export function CommandDock({
               value={prompt}
               rows={1}
               maxLength={promptMaxLength}
-              disabled={busy}
+              disabled={typingLocked}
               placeholder={
                 isAgent
                   ? agentQuestion
@@ -335,7 +341,7 @@ export function CommandDock({
                 variant="ghost"
                 aria-label="展开消息编辑"
                 title="展开编辑"
-                disabled={busy}
+                disabled={typingLocked}
                 onClick={() => setExpanded(true)}
                 className="absolute right-0 top-0 h-9 w-9 border-transparent bg-transparent text-text-faint hover:bg-surface-2 hover:text-foreground sm:hidden"
               >
@@ -745,7 +751,7 @@ export function CommandDock({
                   variant="ghost"
                   aria-label="展开消息编辑"
                   title="展开编辑"
-                  disabled={busy}
+                  disabled={typingLocked}
                   onClick={() => setExpanded(true)}
                   className={cn(
                     toolClass,

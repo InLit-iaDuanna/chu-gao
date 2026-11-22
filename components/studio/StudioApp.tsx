@@ -2933,6 +2933,8 @@ export function StudioApp({
                   renaming ||
                   restoring
                 }
+                // Typing never waits for a reply; only sending does.
+                typingLocked={threadLoading || restoring}
                 optimizing={optimizing}
                 onOptimize={() => void optimize()}
                 uploading={references.uploading}
