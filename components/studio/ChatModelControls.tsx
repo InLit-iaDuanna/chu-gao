@@ -70,6 +70,7 @@ export function ChatModelControls({
   onSelectModel,
   onReasoningEffortChange,
   disabled = false,
+  fixedEffort,
 }: {
   models: ChatModelOption[];
   model: ChatModelOption | null;
@@ -77,9 +78,14 @@ export function ChatModelControls({
   onSelectModel: (id: string) => void;
   onReasoningEffortChange: (effort: ReasoningEffort) => void;
   disabled?: boolean;
+  /** 对谈 / 倾听: the turn always runs at this effort; no picker. */
+  fixedEffort?: ReasoningEffort;
 }) {
   const efforts = model?.reasoningEfforts ?? [];
+  const pinned =
+    fixedEffort && efforts.includes(fixedEffort) ? fixedEffort : undefined;
   const selectedEffort =
+    pinned ??
     efforts.find(
       (effort) => effort === (reasoningEffort ?? model?.defaultReasoningEffort),
     ) ?? efforts[0];
@@ -169,7 +175,7 @@ export function ChatModelControls({
               倍率以 Opus 5.5 为 1× 基准
             </p>
 
-            {selectedEffort ? (
+            {selectedEffort && !pinned ? (
               <>
                 <Menu.Separator className="mx-1 my-1.5 h-px bg-border" />
                 <Menu.Sub>

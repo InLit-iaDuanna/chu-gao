@@ -57,7 +57,7 @@ export function nudgeHistory(
 }
 
 export function nudgeInstruction(reason: ListenNudgeReason) {
-  return `[系统提示：用户在输入框里${reason === "rewriting" ? "写了又删了好几次" : "停了二十多秒没有发送"}。按倾听模式的要求，轻轻提一嘴。]`;
+  return `[系统提示：用户在输入框里${reason === "rewriting" ? "写了又删了好几次" : "停了半分钟没有发送"}。按倾听模式的要求，轻轻提一嘴。]`;
 }
 
 /** One clean sentence, or null when the model said nothing usable. */

@@ -502,6 +502,8 @@ export async function executeChatAttempt(
     const requestTools = chatRequestTools(String(snapshot.transport), {
       searchTool: searchAsTool,
       presentationTool: !isDeckLayoutRequest(input.content),
+      // 对谈 / 倾听 turns: the three tools their short contract describes.
+      talk: snapshot.talk === true,
     });
     const buildRequest = (
       messages: UpstreamChatMessage[],

@@ -72,7 +72,10 @@ import {
   useListenQueue,
 } from "./lib/listen-queue";
 import type { XiieCue, XiiePose } from "./chat/Xiie";
-import { isListenSilence } from "@/lib/chat-conversation-mode";
+import {
+  isListenSilence,
+  TALK_REASONING_EFFORT,
+} from "@/lib/chat-conversation-mode";
 import { StudioGreeting } from "./StudioGreeting";
 import {
   useWorkspaceNavigation,
@@ -862,7 +865,15 @@ export function StudioApp({
   );
 
   const consumeChatDraft = useCallback((message: SubmittedChatMessage) => {
-    setPrompt((value) => (value.trim() === message.content ? "" : value));
+    // The box stays editable while a reply streams, so the user may already
+    // have kept typing after what was sent: drop only the sent part.
+    setPrompt((value) =>
+      value.trim() === message.content
+        ? ""
+        : value.trimStart().startsWith(message.content)
+          ? value.trimStart().slice(message.content.length).trimStart()
+          : value,
+    );
     const sent = (message.chatReferences ?? []).map(chatThumbnail);
     if (sent.length)
       setParams((value) => ({
@@ -2275,9 +2286,9 @@ export function StudioApp({
   // 对谈 / 倾听 (admin preview) keep the reply area quiet: Xiie shows the work.
   const shortConversation =
     me?.role === "ADMIN" && mode === "chat" && conversationMode !== "detail";
-  // 倾听 is full duplex: lines queue while the user talks and go out together.
-  const listenDuplex =
-    me?.role === "ADMIN" && mode === "chat" && conversationMode === "listen";
+  // 对谈 and 倾听 are full duplex: lines queue while the user talks and go
+  // out together once they pause; only 倾听 lets the model stay silent.
+  const listenDuplex = shortConversation;
   // What Xiie says when the user hesitates; cleared once they talk again.
   const [listenNudge, setListenNudge] = useState<{
     key: string;
@@ -2971,6 +2982,9 @@ export function StudioApp({
                 chatModels={chatPricing?.models ?? []}
                 chatModel={chatModel}
                 chatReasoningEffort={reasoningEffort}
+                chatFixedEffort={
+                  shortConversation ? TALK_REASONING_EFFORT : undefined
+                }
                 chatTools={
                   mode === "chat" ? (
                     <>

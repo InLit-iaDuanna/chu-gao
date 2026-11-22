@@ -100,6 +100,8 @@ interface CommandDockProps {
   chatModels?: ChatModelOption[];
   chatModel?: ChatModelOption | null;
   chatReasoningEffort?: ReasoningEffort;
+  /** Pins the chat effort and hides its picker (对谈 / 倾听). */
+  chatFixedEffort?: ReasoningEffort;
   onSelectChatModel?: (id: string) => void;
   onChatReasoningEffortChange?: (effort: ReasoningEffort) => void;
   chatUnavailableReason?: string | null;
@@ -158,6 +160,7 @@ export function CommandDock({
   chatModels = [],
   chatModel = null,
   chatReasoningEffort,
+  chatFixedEffort,
   onSelectChatModel = () => undefined,
   onChatReasoningEffortChange = () => undefined,
   chatUnavailableReason,
@@ -647,6 +650,7 @@ export function CommandDock({
                 reasoningEffort={chatReasoningEffort}
                 onSelectModel={onSelectChatModel}
                 onReasoningEffortChange={onChatReasoningEffortChange}
+                fixedEffort={chatFixedEffort}
                 disabled={busy || optimizing || uploading > 0}
               />
             ) : null}

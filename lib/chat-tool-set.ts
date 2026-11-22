@@ -50,8 +50,28 @@ export const CHAT_TOOL_MAX_REQUESTS = 4;
  */
 export function chatRequestTools(
   transport: ChatToolTransport | string,
-  options: { searchTool?: boolean; presentationTool?: boolean } = {},
+  options: {
+    searchTool?: boolean;
+    presentationTool?: boolean;
+    /** 对谈 / 倾听: only the tools CHAT_TALK_CONTRACT describes. */
+    talk?: boolean;
+  } = {},
 ): unknown[] {
+  if (options.talk) {
+    if (transport === "anthropic_messages_sse")
+      return [
+        CHAT_IMAGE_ANTHROPIC_TOOL,
+        READ_URL_ANTHROPIC_TOOL,
+        CHECK_CREDITS_ANTHROPIC_TOOL,
+      ];
+    if (transport === "responses_sse")
+      return [
+        CHAT_IMAGE_RESPONSES_TOOL,
+        READ_URL_RESPONSES_TOOL,
+        CHECK_CREDITS_RESPONSES_TOOL,
+      ];
+    return [CHAT_IMAGE_TOOL, READ_URL_TOOL, CHECK_CREDITS_TOOL];
+  }
   const deck = options.presentationTool !== false;
   if (transport === "anthropic_messages_sse")
     return [

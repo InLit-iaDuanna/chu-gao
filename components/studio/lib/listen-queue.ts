@@ -11,9 +11,9 @@ import { request } from "./api";
  * How long the input box must stay empty and untouched before the lines
  * said so far go to the model together.
  */
-export const LISTEN_IDLE_MS = 6_000;
+export const LISTEN_IDLE_MS = 10_000;
 /** Text left in the box this long without a keystroke counts as hesitating. */
-export const LISTEN_STALL_MS = 20_000;
+export const LISTEN_STALL_MS = 30_000;
 /** This many separate erasures of a few characters count as rewriting. */
 export const LISTEN_REWRITES = 3;
 /** An erasure only counts once at least this many characters went. */

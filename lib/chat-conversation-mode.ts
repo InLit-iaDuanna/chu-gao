@@ -31,6 +31,9 @@ export const LISTEN_SILENCE_STREAK_MAX = 5;
 /** Loose per-request output ceiling for the short modes (includes thinking). */
 export const SHORT_MODE_MAX_OUTPUT_TOKENS = 8_192;
 
+/** The short modes always think at this effort; no picker is shown. */
+export const TALK_REASONING_EFFORT = "low" as const;
+
 export function normalizeConversationMode(value: unknown): ConversationMode {
   return typeof value === "string" &&
     (CONVERSATION_MODES as readonly string[]).includes(value)

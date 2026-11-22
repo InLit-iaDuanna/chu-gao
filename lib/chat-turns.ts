@@ -37,6 +37,7 @@ import {
 import { getConversationSystemPrompt } from "@/lib/ai-config";
 import {
   chatSystemInstructions,
+  chatTalkInstructions,
   chatTimeInstruction,
 } from "@/lib/chat-instructions";
 import {
@@ -68,6 +69,7 @@ import {
   LISTEN_SILENCE_STREAK_MAX,
   normalizeConversationMode,
   SHORT_MODE_MAX_OUTPUT_TOKENS,
+  TALK_REASONING_EFFORT,
   trailingSilenceStreak,
   type ConversationMode,
 } from "@/lib/chat-conversation-mode";
@@ -540,27 +542,34 @@ export async function createChatTurn(
       );
     }
   }
-  // The Anthropic relay answers its own web_search tool with canned text, so
-  // those models search through the application tool instead.
-  const searchAsTool = chatSearchAsTool(config.transport, input.webSearch);
-  const requestTools = chatRequestTools(config.transport, {
-    searchTool: searchAsTool,
-  });
-  const instructions = chatSystemInstructions(
-    await getConversationSystemPrompt(),
-    input.webSearch,
-    false,
-    true,
-    searchAsTool,
-  );
-  const runtimeTime = chatTimeInstruction();
   const conversationMode = await resolveConversationMode(
     userId,
     input.conversationId,
     input.conversationMode,
   );
   const modeInstruction = conversationMode.instruction;
-  const effort = input.reasoningEffort ?? config.efforts[0] ?? null;
+  // 对谈 / 倾听 are quick spoken turns: a short contract, three tools, no
+  // search (the relay's search tool alone doubles the input) and a fixed low
+  // effort, so each line costs about a third of a detail turn.
+  const talk = isShortConversationMode(conversationMode.mode);
+  const webSearch = input.webSearch && !talk;
+  const storedContent = talk ? { ...content, webSearch: false } : content;
+  // The Anthropic relay answers its own web_search tool with canned text, so
+  // those models search through the application tool instead.
+  const searchAsTool = chatSearchAsTool(config.transport, webSearch);
+  const requestTools = chatRequestTools(config.transport, {
+    searchTool: searchAsTool,
+    talk,
+  });
+  const systemPrompt = await getConversationSystemPrompt();
+  const instructions = talk
+    ? chatTalkInstructions(systemPrompt)
+    : chatSystemInstructions(systemPrompt, webSearch, false, true, searchAsTool);
+  const runtimeTime = chatTimeInstruction();
+  const effort =
+    talk && config.efforts.includes(TALK_REASONING_EFFORT)
+      ? TALK_REASONING_EFFORT
+      : (input.reasoningEffort ?? config.efforts[0] ?? null);
   let contextRevision: number | null = null;
   let tokenRequestLimits:
     | { maxInputTokens: number; maxOutputTokens: number; maxRequests: number }
@@ -574,7 +583,7 @@ export async function createChatTurn(
             instructions,
             effort as ReasoningEffort,
             {
-              webSearch: input.webSearch,
+              webSearch,
               maxOutputTokens: tokenPricing.maxOutputTokens,
               tools: requestTools,
             },
@@ -738,7 +747,7 @@ export async function createChatTurn(
             conversationId: input.conversationId,
             clientRequestId,
             inputHash,
-            input: json(content),
+            input: json(storedContent),
             configSnapshot: json({
               model: config.model,
               baseUrl: config.baseUrl,
@@ -751,6 +760,8 @@ export async function createChatTurn(
               ...(modeInstruction
                 ? { conversationMode: conversationMode.mode, modeInstruction }
                 : {}),
+              // The worker offers the same short tool list.
+              ...(talk ? { talk: true } : {}),
               effort,
               profileVersion: operationHash({
                 model: config.model,

@@ -31,5 +31,5 @@ it("keeps one short clean line", () => {
 it("tells the model it cannot see the draft and names the hesitation", () => {
   expect(LISTEN_NUDGE_PROMPT).toContain("你看不到他正在写什么");
   expect(nudgeInstruction("rewriting")).toContain("写了又删");
-  expect(nudgeInstruction("stalled")).toContain("二十多秒");
+  expect(nudgeInstruction("stalled")).toContain("半分钟");
 });

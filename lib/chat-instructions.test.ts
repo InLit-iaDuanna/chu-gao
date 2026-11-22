@@ -2,9 +2,33 @@ import { afterEach, expect, it, vi } from "vitest";
 import {
   CHAT_AGENT_TOOLS_CONTRACT,
   chatSystemInstructions,
+  chatTalkInstructions,
   chatTimeInstruction,
   chatTurnInstructions,
 } from "@/lib/chat-instructions";
+import { chatRequestTools } from "@/lib/chat-tool-set";
+
+it("gives 对谈 / 倾听 a short contract that names exactly the tools they get", () => {
+  const talk = chatTalkInstructions("base");
+  const full = chatTurnInstructions("base", true);
+  expect(talk.length).toBeLessThan(full.length / 2);
+  for (const transport of [
+    "responses_sse",
+    "anthropic_messages_sse",
+    "chat_completions_sse",
+  ]) {
+    const names = chatRequestTools(transport, { talk: true, searchTool: true }).map(
+      (tool) => {
+        const value = tool as { name?: string; function?: { name: string } };
+        return value.name ?? value.function?.name;
+      },
+    );
+    expect(names).toEqual(["generate_image", "read_url", "check_credits"]);
+    for (const name of names) expect(talk).toContain(name!);
+  }
+  for (const absent of ["ask_user", "suggest_replies", "plan_presentation", "search_web"])
+    expect(talk).not.toContain(absent);
+});
 
 it("describes the agent tools in turn instructions, before the search section", () => {
   const instructions = chatTurnInstructions("base", false);
