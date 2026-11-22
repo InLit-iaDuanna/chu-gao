@@ -21,6 +21,8 @@ import { AssistantContent } from "./AssistantContent";
 import type { QuickReplyHandler } from "./InteractiveBlocks";
 import { stripInteractiveBlocks } from "../lib/chat-interactive-blocks";
 import { TurnXiie, XiieSlot } from "./TurnXiie";
+import type { XiiePose } from "./Xiie";
+import { isListenSilence } from "@/lib/chat-conversation-mode";
 import {
   ActivityTrail,
   chatUsageBreakdown,
@@ -57,6 +59,15 @@ interface Props {
   onQuickReply?: QuickReplyHandler;
   /** Opens a chat deck in the side panel. */
   onOpenDeck?: (id: string) => void;
+  /**
+   * 对谈 / 倖听: Xiie alone shows the work, without the step trail and timer,
+   * and a listen-mode silence leaves no reply behind.
+   */
+  compact?: boolean;
+  /** 倖听: lines the user has said that are not sent to the model yet. */
+  listenQueue?: string[];
+  /** 倖听: Xiie's pose at the foot of the conversation, if any. */
+  listenPose?: XiiePose | null;
 }
 
 function UserContent({ message }: { message: SubmittedChatMessage }) {
@@ -234,6 +245,9 @@ export function ConversationTimeline({
   onRetryChat,
   onQuickReply,
   onOpenDeck,
+  compact = false,
+  listenQueue = [],
+  listenPose = null,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const following = useRef(true);
@@ -273,7 +287,15 @@ export function ConversationTimeline({
         window.getSelection()?.isCollapsed !== false)
     )
       scrollToBottom();
-  }, [conversation?.messages, pending, streaming, status, generations]);
+  }, [
+    conversation?.messages,
+    pending,
+    streaming,
+    status,
+    generations,
+    listenQueue.length,
+    listenPose,
+  ]);
 
   return (
     <div className="relative min-h-0 flex-1">
@@ -306,6 +328,16 @@ export function ConversationTimeline({
                 ? (generations[message.generationId] ??
                   messageGeneration(message, conversation!.id))
                 : null;
+            // A listen-mode silence: Xiie at the foot already says "listening".
+            if (
+              compact &&
+              !isUser &&
+              !active &&
+              !generation &&
+              message.chatStatus === "completed" &&
+              isListenSilence(message.content)
+            )
+              return null;
             return (
               <article
                 key={
@@ -331,7 +363,7 @@ export function ConversationTimeline({
                     <UserContent message={message} />
                   ) : !generation || Boolean(message.chatTurnId) ? (
                     <>
-                      <ActivityTrail
+                      {compact ? null : <ActivityTrail
                         status={message.chatStatus}
                         history={message.chatActivityHistory}
                         current={
@@ -357,8 +389,8 @@ export function ConversationTimeline({
                                   : undefined))
                               : undefined
                         }
-                      />
-                      {active ? (
+                      />}
+                      {active && !compact ? (
                         <div className="mb-3 text-xs text-text-muted">
                           <WaitingTime
                             since={message.chatStartedAt ?? message.createdAt}
@@ -390,7 +422,17 @@ export function ConversationTimeline({
                       ) : (
                         <ReplyMetadata message={message} />
                       )}
-                      {message.chatTurnId ? (
+                      {message.chatTurnId && compact ? (
+                        <XiieSlot
+                          pose={
+                            active
+                              ? message.content
+                                ? "idea"
+                                : "thinking"
+                              : null
+                          }
+                        />
+                      ) : message.chatTurnId ? (
                         <TurnXiie
                           active={active}
                           status={message.chatStatus}
@@ -526,12 +568,39 @@ export function ConversationTimeline({
               </div>
             </article>
           ) : null}
+          {listenQueue.map((line, index) => (
+            <article
+              key={`listen:${index}:${line}`}
+              aria-label="你的消息（等待一起发送）"
+              className="flex justify-end"
+            >
+              <div className="studio-message min-w-0 max-w-[90%] px-4 py-2.5 opacity-80 sm:max-w-[75%]">
+                <UserContent message={{ content: line }} />
+              </div>
+            </article>
+          ))}
+          {listenPose ? (
+            <div aria-label="正在听" role="status">
+              <XiieSlot pose={listenPose} />
+            </div>
+          ) : null}
           {!managedTurnId && (streaming !== null || status) ? (
             <article
               aria-label="正在回复"
               className="min-w-0 text-base leading-7"
             >
-              {streaming ? (
+              {compact ? (
+                streaming ? (
+                  <ResultBubble streaming>
+                    <AssistantContent
+                      content={streaming}
+                      streaming
+                      messageStatus="running"
+                      onOpenArtifact={onOpenArtifact}
+                    />
+                  </ResultBubble>
+                ) : null
+              ) : streaming ? (
                 <>
                   <ActivityTrail
                     history={[]}

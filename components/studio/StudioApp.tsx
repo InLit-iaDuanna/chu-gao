@@ -63,6 +63,9 @@ import {
   ConversationModeControl,
   useConversationMode,
 } from "./ConversationModeControl";
+import { useListenQueue } from "./lib/listen-queue";
+import type { XiiePose } from "./chat/Xiie";
+import { isListenSilence } from "@/lib/chat-conversation-mode";
 import { StudioGreeting } from "./StudioGreeting";
 import {
   useWorkspaceNavigation,
@@ -2207,6 +2210,31 @@ export function StudioApp({
     [],
   );
 
+  // 对谈 / 倖听 (admin preview) keep the reply area quiet: Xiie shows the work.
+  const shortConversation =
+    me?.role === "ADMIN" && mode === "chat" && conversationMode !== "detail";
+  // 倖听 is full duplex: lines queue while the user talks and go out together.
+  const listenDuplex =
+    me?.role === "ADMIN" && mode === "chat" && conversationMode === "listen";
+  const listenQueue = useListenQueue({
+    enabled: listenDuplex,
+    busy: busy || chatCompacting || threadLoading,
+    draft: listenDuplex ? prompt : "",
+    conversationKey: activeId,
+    flush: (content) => sendRef.current(undefined, undefined, content),
+  });
+  const lastAssistant = conversation?.messages
+    .filter((message) => message.role === "assistant")
+    .at(-1);
+  const listenPose: XiiePose | null =
+    !listenDuplex || busy
+      ? null
+      : listenQueue.talking ||
+          (lastAssistant?.chatStatus === "completed" &&
+            isListenSilence(lastAssistant.content))
+        ? "focus"
+        : null;
+
   const handleOpenDeck = useCallback(
     (deckId: string) => setArtifactPreview({ kind: "deck", deckId }),
     [],
@@ -2520,6 +2548,9 @@ export function StudioApp({
                 setArtifactPreview({ kind: "html", source })
               }
               onOpenDeck={handleOpenDeck}
+              compact={shortConversation}
+              listenQueue={listenQueue.lines}
+              listenPose={listenPose}
               onRetry={(generation) => void retry(generation)}
               onCancel={(id) => void cancel(id)}
               onRetryChat={(id, attemptId) => void retryChatTurn(id, attemptId)}
@@ -2628,7 +2659,8 @@ export function StudioApp({
                   setCreative((value) => ({ ...value, operationId: null }));
                 }}
                 busy={
-                  busy ||
+                  // 倖听 never makes the user wait for a reply to keep talking.
+                  (busy && !(listenDuplex && !imageCommand)) ||
                   imageRoutingChecking ||
                   chatCompacting ||
                   planning ||
@@ -2655,7 +2687,15 @@ export function StudioApp({
                 }}
                 onSubmit={() => {
                   if (mode === "agent") void plan();
-                  else void send();
+                  else if (
+                    listenDuplex &&
+                    !imageCommand &&
+                    !effectiveReferences.length &&
+                    prompt.trim()
+                  ) {
+                    listenQueue.push(prompt);
+                    setPrompt("");
+                  } else void send();
                 }}
                 disabledReason={disabledReason}
                 mode={mode}
