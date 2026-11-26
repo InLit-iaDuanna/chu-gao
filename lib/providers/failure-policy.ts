@@ -10,6 +10,11 @@ export function isDowngradable(error: unknown): boolean {
   return category === "RATE_LIMITED" || category === "TRANSIENT_PROVIDER";
 }
 
+/** The channel refused this request itself; another account can still serve it. */
+export function isChannelLimited(error: unknown): boolean {
+  return classifyProviderFailure(error).category === "CHANNEL_LIMITED";
+}
+
 export function isAuthenticationError(error: unknown): boolean {
   return classifyProviderFailure(error).category === "AUTH_ACCOUNT_FATAL";
 }

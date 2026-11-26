@@ -49,10 +49,18 @@ vi.mock("@/lib/providers/config", () => ({
 }));
 vi.mock("@/lib/providers/diagnostics", () => ({
   serializeProviderError: vi.fn((error) => String(error)),
+  // Kept local to the factory: vi.mock hoists above the file's own declarations.
+  ProviderChannelLimitedError: class ProviderChannelLimitedError extends Error {
+    constructor(readonly providerCause?: unknown) {
+      super("Provider channel cannot serve this request.");
+      this.name = "ProviderChannelLimitedError";
+    }
+  },
 }));
 vi.mock("@/lib/logger", () => ({ logger: { warn: vi.fn() } }));
 vi.mock("@/lib/providers/factory", () => ({ buildAdapter: vi.fn() }));
 vi.mock("@/lib/providers/failure-policy", () => ({
+  isChannelLimited: vi.fn(() => false),
   isDowngradable: vi.fn(() => false),
   isFatalAccountError: vi.fn(() => false),
   providerRejectedError: vi.fn(() => null),
@@ -78,7 +86,8 @@ import {
   selectAndGenerate,
 } from "@/lib/providers";
 import { buildAdapter } from "@/lib/providers/factory";
-import { isDowngradable } from "@/lib/providers/failure-policy";
+import { ProviderChannelLimitedError } from "@/lib/providers/diagnostics";
+import { isChannelLimited, isDowngradable } from "@/lib/providers/failure-policy";
 import { ProviderSubmissionUnknownError } from "@/lib/providers/single-submit";
 import {
   markAccountHealthy,
@@ -112,6 +121,12 @@ const request = {
   outputFormat: "png",
   protocol: "OPENAI_IMAGES",
 };
+
+// Opt-in per test: vi.clearAllMocks keeps implementations, so a stale true
+// would reroute every later case through the capability-limit path.
+beforeEach(() => {
+  vi.mocked(isChannelLimited).mockReturnValue(false);
+});
 
 describe("provider saturation", () => {
   beforeEach(() => {
@@ -218,6 +233,68 @@ describe("provider saturation", () => {
       providerAccountId: "account-1",
     });
     expect(generate).toHaveBeenCalledOnce();
+  });
+});
+
+describe("channel capability limits", () => {
+  const first = { ...saturatedAccount, id: "account-a" };
+  const second = { ...saturatedAccount, id: "account-b" };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.DATABASE_URL = "postgresql://mocked";
+    mocks.db.provider.findMany.mockResolvedValue([]);
+    mocks.db.providerAccount.count.mockResolvedValue(0);
+    mocks.findEligibleProviderAccounts.mockResolvedValue([first, second]);
+    mocks.maxAttemptsForAccounts.mockImplementation((accounts: unknown[]) =>
+      Math.min(2, accounts.length),
+    );
+    mocks.leaseProviderAccount.mockImplementation(async (account) => ({
+      account: { ...account, apiKeyEnc: "encrypted" },
+      provider: account.provider,
+      leaseId: `lease-${account.id}`,
+    }));
+    vi.mocked(isDowngradable).mockReturnValue(false);
+    vi.mocked(isChannelLimited).mockReturnValue(false);
+  });
+
+  it("hands the request to another account when a channel cannot serve it", async () => {
+    const attempts: string[] = [];
+    vi.mocked(buildAdapter).mockImplementation(
+      ({ id }) =>
+        ({
+          generate: async () => {
+            attempts.push(id);
+            if (id === first.id) throw new Error("four_k_disabled");
+            return generated;
+          },
+        }) as never,
+    );
+    vi.mocked(isChannelLimited).mockReturnValueOnce(true);
+
+    const result = await selectAndGenerate(automaticRequest as never, {
+      leaseContext,
+      onProviderSelected: vi.fn(),
+    });
+
+    expect(attempts).toEqual([first.id, second.id]);
+    expect(result.providerAccountId).toBe(second.id);
+    expect(markAccountErrored).not.toHaveBeenCalled();
+  });
+
+  it("reports the channel limit once the whole pool refuses", async () => {
+    vi.mocked(buildAdapter).mockReturnValue({
+      generate: vi.fn().mockRejectedValue(new Error("four_k_disabled")),
+    } as never);
+    vi.mocked(isChannelLimited).mockReturnValue(true);
+
+    await expect(
+      selectAndGenerate(automaticRequest as never, {
+        leaseContext,
+        onProviderSelected: vi.fn(),
+      }),
+    ).rejects.toBeInstanceOf(ProviderChannelLimitedError);
+    expect(mocks.leaseProviderAccount).toHaveBeenCalledTimes(2);
   });
 });
 

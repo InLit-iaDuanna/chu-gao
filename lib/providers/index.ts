@@ -11,7 +11,10 @@ import {
   getImage2ProviderChannel,
   supportsProviderChannels,
 } from "@/lib/provider-channels";
-import { serializeProviderError } from "@/lib/providers/diagnostics";
+import {
+  ProviderChannelLimitedError,
+  serializeProviderError,
+} from "@/lib/providers/diagnostics";
 import { buildAdapter } from "@/lib/providers/factory";
 import { generationTimeoutMs } from "@/lib/providers/config";
 import {
@@ -36,6 +39,7 @@ import {
   supportedModelIds,
 } from "@/lib/providers/availability";
 import {
+  isChannelLimited,
   isDowngradable,
   isFatalAccountError,
   providerRejectedError,
@@ -183,6 +187,7 @@ export async function selectAndGenerate(
   }
 
   const errors: unknown[] = [];
+  const channelLimitedErrors: unknown[] = [];
   const providerPoolErrors = new Map<string, unknown[]>();
   let accountAttempts = 0;
   let capacityBlocked = false;
@@ -318,6 +323,15 @@ export async function selectAndGenerate(
         // Local reservation/ownership failures have not submitted anything and
         // must not penalize a provider or turn into an ambiguous submission.
         if (!dispatched) throw error;
+        // The channel could not serve this request (a size tier it turned off,
+        // a model it has not priced). Nothing was generated and the account is
+        // fine for other requests, so hand the request to the next account
+        // instead of failing and instead of penalizing this one.
+        if (isChannelLimited(error)) {
+          channelLimitedErrors.push(error);
+          errors.push(error);
+          continue;
+        }
         const rejectedError = providerRejectedError(error);
 
         if (rejectedError) {
@@ -457,6 +471,11 @@ export async function selectAndGenerate(
       } catch (error) {
         clearTimeout(timer);
         if (!dispatched) throw error;
+        if (isChannelLimited(error)) {
+          channelLimitedErrors.push(error);
+          errors.push(error);
+          continue;
+        }
         const rejectedError = providerRejectedError(error);
 
         if (rejectedError) {
@@ -478,6 +497,15 @@ export async function selectAndGenerate(
         }
       }
     }
+  }
+
+  // Every dispatched attempt failed because a channel could not serve this
+  // request at all: say so instead of blaming the parameters or the whole pool.
+  if (
+    channelLimitedErrors.length > 0 &&
+    channelLimitedErrors.length === errors.length
+  ) {
+    throw new ProviderChannelLimitedError(channelLimitedErrors[0]);
   }
 
   if (capacityBlocked) {

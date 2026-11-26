@@ -31,6 +31,7 @@ export const CALL_OPERATION_LABELS: Record<string, string> = {
 export const CALL_ERROR_LABELS: Record<string, string> = {
   CONTENT_REJECTED: "内容安全拒绝",
   BAD_REQUEST: "请求参数错误",
+  CHANNEL_LIMITED: "渠道不支持该请求",
   RATE_LIMITED: "上游限流",
   TRANSIENT_PROVIDER: "上游服务异常",
   AUTH_ACCOUNT_FATAL: "账号 / 鉴权异常",

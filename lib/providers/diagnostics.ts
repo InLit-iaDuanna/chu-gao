@@ -48,8 +48,21 @@ export class ProviderRejectedRequestError extends Error {
   }
 }
 
+/**
+ * The channel itself cannot serve this request - a size tier it has switched
+ * off, a model it has not priced yet. The parameters are valid and nothing was
+ * generated, so another channel in the pool should get the same request.
+ */
+export class ProviderChannelLimitedError extends Error {
+  constructor(readonly providerCause?: unknown) {
+    super("Provider channel cannot serve this request.");
+    this.name = "ProviderChannelLimitedError";
+  }
+}
+
 export type ProviderFailureCategory =
   | "CONTENT_REJECTED"
+  | "CHANNEL_LIMITED"
   | "BAD_REQUEST"
   | "RATE_LIMITED"
   | "TRANSIENT_PROVIDER"
@@ -91,6 +104,19 @@ const CONTENT_REJECTION_PATTERNS = [
   /暴力/,
 ];
 
+// Signals that the channel, not the request, is the limit: another account in
+// the pool may serve the same request fine.
+const CHANNEL_LIMIT_PATTERNS = [
+  /four_k_disabled/i,
+  /4k\s*图片暂时不能生成/i,
+  /model_price_error/i,
+  /has not been priced/i,
+  /尚未定价/,
+  /暂不支持.*尺寸/,
+  /size[_ ]?not[_ ]?supported/i,
+  /该渠道.*暂不支持/i,
+];
+
 const BAD_REQUEST_PATTERNS = [
   /bad\s+request/i,
   /invalid[_\s-]?request/i,
@@ -129,6 +155,10 @@ function hasContentRejectionSignal(text: string): boolean {
   return CONTENT_REJECTION_PATTERNS.some((pattern) => pattern.test(text));
 }
 
+function hasChannelLimitSignal(text: string): boolean {
+  return CHANNEL_LIMIT_PATTERNS.some((pattern) => pattern.test(text));
+}
+
 function hasBadRequestSignal(text: string): boolean {
   return BAD_REQUEST_PATTERNS.some((pattern) => pattern.test(text));
 }
@@ -138,6 +168,10 @@ export function classifyProviderFailure(
 ): ProviderFailureClassification {
   if (error instanceof ProviderContentRejectedError) {
     return { category: "CONTENT_REJECTED" };
+  }
+
+  if (error instanceof ProviderChannelLimitedError) {
+    return { category: "CHANNEL_LIMITED" };
   }
 
   if (error instanceof ProviderRejectedRequestError) {
@@ -182,6 +216,13 @@ export function classifyProviderFailure(
       return { category: "CONTENT_REJECTED", status };
     }
 
+    if (
+      (status === 400 || status === 403 || status === 422 || status === 451) &&
+      hasChannelLimitSignal(text)
+    ) {
+      return { category: "CHANNEL_LIMITED", status };
+    }
+
     if (status === 400 || status === 422) {
       return { category: "BAD_REQUEST", status };
     }
@@ -213,6 +254,10 @@ export function classifyProviderFailure(
 
   if (status === 429) {
     return { category: "RATE_LIMITED", status };
+  }
+
+  if (hasChannelLimitSignal(text)) {
+    return { category: "CHANNEL_LIMITED", status };
   }
 
   if (status === 400 || status === 422 || hasBadRequestSignal(text)) {
